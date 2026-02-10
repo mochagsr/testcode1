@@ -1,0 +1,194 @@
+@extends('layouts.app')
+
+@section('title', __('txn.create_order_note_title').' - PgPOS ERP')
+
+@section('content')
+    <h1 class="page-title">{{ __('txn.create_order_note_title') }}</h1>
+
+    <form method="post" action="{{ route('order-notes.store') }}">
+        @csrf
+
+        <div class="card">
+            <div class="form-section">
+                <h3 class="form-section-title">{{ __('txn.order_header') }}</h3>
+                <p class="form-section-note">{{ __('txn.order_summary_note') }}</p>
+                <div class="row">
+                    <div class="col-4">
+                        <label>{{ __('txn.date') }} <span class="label-required">*</span></label>
+                        <input type="date" name="note_date" value="{{ old('note_date', now()->format('Y-m-d')) }}" required>
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.customer') }} ({{ __('txn.optional') }})</label>
+                        @php
+                            $customerMap = $customers->keyBy('id');
+                            $oldCustomerId = old('customer_id');
+                            $oldCustomerLabel = $oldCustomerId && $customerMap->has($oldCustomerId)
+                                ? $customerMap[$oldCustomerId]->name.' ('.($customerMap[$oldCustomerId]->city ?: '-').')'
+                                : '';
+                        @endphp
+                        <input type="text"
+                               id="customer-search"
+                               list="customers-list"
+                               value="{{ $oldCustomerLabel }}"
+                               placeholder="{{ __('txn.manual_customer') }}">
+                        <input type="hidden" id="customer_id" name="customer_id" value="{{ $oldCustomerId }}">
+                        <datalist id="customers-list">
+                            @foreach($customers as $customer)
+                                <option value="{{ $customer->name }} ({{ $customer->city ?: '-' }})"></option>
+                            @endforeach
+                        </datalist>
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.created_by') }}</label>
+                        <input type="text" name="created_by_name" value="{{ old('created_by_name', 'System') }}">
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.customer') }} {{ __('txn.name') }} <span class="label-required">*</span></label>
+                        <input id="customer_name" type="text" name="customer_name" value="{{ old('customer_name') }}" required>
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.phone') }}</label>
+                        <input id="customer_phone" type="text" name="customer_phone" value="{{ old('customer_phone') }}">
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.city') }}</label>
+                        <input id="city" type="text" name="city" value="{{ old('city') }}">
+                    </div>
+                    <div class="col-12">
+                        <label>{{ __('txn.notes') }}</label>
+                        <textarea name="notes" rows="2">{{ old('notes') }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="flex" style="justify-content: space-between;">
+                <h3 style="margin: 0;">{{ __('txn.items') }}</h3>
+                <button type="button" id="add-item" class="btn secondary">{{ __('txn.add_row') }}</button>
+            </div>
+            <table id="items-table" style="margin-top: 12px;">
+                <thead>
+                <tr>
+                    <th style="width: 30%">{{ __('txn.product') }} ({{ __('txn.optional') }})</th>
+                    <th>{{ __('txn.code') }} ({{ __('txn.optional') }})</th>
+                    <th>{{ __('txn.name') }} *</th>
+                    <th>{{ __('txn.qty') }} *</th>
+                    <th>{{ __('txn.notes') }}</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <button class="btn" type="submit">{{ __('txn.save_order_note') }}</button>
+        <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.cancel') }}</a>
+    </form>
+
+    <script>
+        const customers = @json($customers->values());
+        const products = @json($products);
+        const tbody = document.querySelector('#items-table tbody');
+        const addBtn = document.getElementById('add-item');
+        const customerSearch = document.getElementById('customer-search');
+        const customerIdField = document.getElementById('customer_id');
+
+        function customerLabel(customer) {
+            const city = customer.city || '-';
+            return `${customer.name} (${city})`;
+        }
+
+        function findCustomerByLabel(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = label.trim().toLowerCase();
+            return customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
+                || customers.find((customer) => customer.name.toLowerCase() === normalized)
+                || customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
+                || customers.find((customer) => customer.name.toLowerCase().includes(normalized))
+                || null;
+        }
+
+        function productLabel(product) {
+            return `${product.code} - ${product.name}`;
+        }
+
+        function findProductByLabel(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = label.trim().toLowerCase();
+            return products.find((product) => productLabel(product).toLowerCase() === normalized)
+                || products.find((product) => product.code.toLowerCase() === normalized)
+                || products.find((product) => product.name.toLowerCase() === normalized)
+                || products.find((product) => productLabel(product).toLowerCase().includes(normalized))
+                || products.find((product) => product.name.toLowerCase().includes(normalized))
+                || null;
+        }
+
+        function addRow() {
+            const index = tbody.children.length;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <input type="text" class="product-search" list="products-list" placeholder="{{ __('txn.manual_item') }}">
+                    <input type="hidden" name="items[${index}][product_id]" class="product-id">
+                </td>
+                <td><input name="items[${index}][product_code]" class="code"></td>
+                <td><input name="items[${index}][product_name]" class="name" required></td>
+                <td><input name="items[${index}][quantity]" type="number" min="1" value="1" required></td>
+                <td><input name="items[${index}][notes]"></td>
+                <td><button type="button" class="btn secondary remove">{{ __('txn.remove') }}</button></td>
+            `;
+            tbody.appendChild(tr);
+
+            tr.querySelector('.product-search').addEventListener('input', (event) => {
+                const product = findProductByLabel(event.currentTarget.value);
+                tr.querySelector('.product-id').value = product ? product.id : '';
+                if (!product) {
+                    return;
+                }
+                tr.querySelector('.code').value = product.code || '';
+                tr.querySelector('.name').value = product.name || '';
+            });
+            tr.querySelector('.remove').addEventListener('click', () => tr.remove());
+        }
+
+        if (customerSearch) {
+            const bootCustomer = customerIdField.value
+                ? customers.find(c => String(c.id) === String(customerIdField.value))
+                : findCustomerByLabel(customerSearch.value);
+            if (bootCustomer) {
+                customerIdField.value = bootCustomer.id;
+            }
+            customerSearch.addEventListener('input', (event) => {
+                const customer = findCustomerByLabel(event.currentTarget.value);
+                customerIdField.value = customer ? customer.id : '';
+                if (!customer) {
+                    return;
+                }
+                document.getElementById('customer_name').value = customer.name || '';
+                document.getElementById('customer_phone').value = customer.phone || '';
+                document.getElementById('city').value = customer.city || '';
+            });
+            customerSearch.addEventListener('change', (event) => {
+                const customer = findCustomerByLabel(event.currentTarget.value);
+                customerIdField.value = customer ? customer.id : '';
+                if (customer) {
+                    customerSearch.value = customerLabel(customer);
+                }
+            });
+        }
+
+        addBtn.addEventListener('click', addRow);
+        addRow();
+    </script>
+
+    <datalist id="products-list">
+        @foreach($products as $product)
+            <option value="{{ $product->code }} - {{ $product->name }}"></option>
+        @endforeach
+    </datalist>
+@endsection

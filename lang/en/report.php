@@ -1,0 +1,48 @@
+<?php
+
+return [
+    'export_title' => 'Reports Export',
+    'export_options' => 'Export options: download CSV (Excel-compatible), PDF, or print view.',
+    'dataset' => 'Dataset',
+    'csv_excel' => 'CSV (Excel)',
+    'pdf' => 'PDF',
+    'print_view' => 'Print View',
+    'download_csv' => 'Download CSV',
+    'download_pdf' => 'Download PDF',
+    'open_print' => 'Open Print View',
+    'print_save_pdf' => 'Print / Save as PDF',
+    'printed' => 'Printed',
+    'no_data' => 'No data.',
+    'semester_filter' => 'Semester Filter',
+    'all_semesters' => 'All Semesters',
+    'apply_filter' => 'Apply',
+    'customer_filter' => 'Customer Filter',
+    'all_customers' => 'All Customers',
+    'customer_filter_note' => 'Customer filter only affects Receivables report.',
+    'filters' => [
+        'semester' => 'Semester',
+        'customer' => 'Customer',
+    ],
+    'datasets' => [
+        'products' => 'Products',
+        'customers' => 'Customers',
+        'sales_invoices' => 'Sales Invoices',
+        'receivables' => 'Receivables',
+        'sales_returns' => 'Sales Returns',
+        'delivery_notes' => 'Delivery Notes',
+        'order_notes' => 'Order Notes',
+    ],
+    'titles' => [
+        'products' => 'Products Report',
+        'customers' => 'Customers Report',
+        'sales_invoices' => 'Sales Invoices Report',
+        'receivables' => 'Receivables Report',
+        'sales_returns' => 'Sales Returns Report',
+        'delivery_notes' => 'Delivery Notes Report',
+        'order_notes' => 'Order Notes Report',
+    ],
+    'receivable_summary' => [
+        'total_unpaid_invoices' => 'Total Unpaid Invoices',
+        'total_outstanding' => 'Total Outstanding Receivable',
+    ],
+];

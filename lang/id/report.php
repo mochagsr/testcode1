@@ -1,0 +1,48 @@
+<?php
+
+return [
+    'export_title' => 'Export Laporan',
+    'export_options' => 'Pilihan export: unduh CSV (kompatibel Excel), PDF, atau tampilan cetak.',
+    'dataset' => 'Dataset',
+    'csv_excel' => 'CSV (Excel)',
+    'pdf' => 'PDF',
+    'print_view' => 'Tampilan Cetak',
+    'download_csv' => 'Unduh CSV',
+    'download_pdf' => 'Unduh PDF',
+    'open_print' => 'Buka Tampilan Cetak',
+    'print_save_pdf' => 'Cetak / Simpan PDF',
+    'printed' => 'Dicetak',
+    'no_data' => 'Tidak ada data.',
+    'semester_filter' => 'Filter Semester',
+    'all_semesters' => 'Semua Semester',
+    'apply_filter' => 'Terapkan',
+    'customer_filter' => 'Filter Customer',
+    'all_customers' => 'Semua Customer',
+    'customer_filter_note' => 'Filter customer hanya mempengaruhi laporan Piutang.',
+    'filters' => [
+        'semester' => 'Semester',
+        'customer' => 'Customer',
+    ],
+    'datasets' => [
+        'products' => 'Barang',
+        'customers' => 'Customer',
+        'sales_invoices' => 'Faktur Penjualan',
+        'receivables' => 'Piutang',
+        'sales_returns' => 'Retur Penjualan',
+        'delivery_notes' => 'Surat Jalan',
+        'order_notes' => 'Surat Pesanan',
+    ],
+    'titles' => [
+        'products' => 'Laporan Barang',
+        'customers' => 'Laporan Customer',
+        'sales_invoices' => 'Laporan Faktur Penjualan',
+        'receivables' => 'Laporan Piutang',
+        'sales_returns' => 'Laporan Retur Penjualan',
+        'delivery_notes' => 'Laporan Surat Jalan',
+        'order_notes' => 'Laporan Surat Pesanan',
+    ],
+    'receivable_summary' => [
+        'total_unpaid_invoices' => 'Total Invoice Belum Lunas',
+        'total_outstanding' => 'Total Sisa Piutang',
+    ],
+];
