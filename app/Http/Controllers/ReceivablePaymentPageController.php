@@ -13,7 +13,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class ReceivablePaymentPageController extends Controller
 {
@@ -25,6 +24,8 @@ class ReceivablePaymentPageController extends Controller
     public function index(Request $request): View
     {
         $search = trim((string) $request->string('search', ''));
+        $status = trim((string) $request->string('status', ''));
+        $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
 
         $payments = ReceivablePayment::query()
             ->with('customer:id,name,city')
@@ -34,8 +35,11 @@ class ReceivablePaymentPageController extends Controller
                         ->orWhereHas('customer', function ($customerQuery) use ($search): void {
                             $customerQuery->where('name', 'like', "%{$search}%")
                                 ->orWhere('city', 'like', "%{$search}%");
-                        });
+                    });
                 });
+            })
+            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                $query->where('is_canceled', $selectedStatus === 'canceled');
             })
             ->latest('payment_date')
             ->latest('id')
@@ -45,15 +49,38 @@ class ReceivablePaymentPageController extends Controller
         return view('receivable_payments.index', [
             'payments' => $payments,
             'search' => $search,
+            'selectedStatus' => $selectedStatus,
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $prefillCustomerId = $request->integer('customer_id');
+        $rawPrefillAmount = $request->integer('amount', 0);
+        $prefillAmount = $rawPrefillAmount > 0 ? $rawPrefillAmount : null;
+        $prefillDate = trim((string) $request->string('payment_date', now()->format('Y-m-d')));
+        $preferredInvoiceId = $request->integer('preferred_invoice_id');
+        $returnTo = $this->sanitizeReturnPath((string) $request->string('return_to', ''));
+
+        $preferredInvoice = null;
+        if ($prefillCustomerId > 0 && $preferredInvoiceId > 0) {
+            $preferredInvoice = SalesInvoice::query()
+                ->whereKey($preferredInvoiceId)
+                ->where('customer_id', $prefillCustomerId)
+                ->where('is_canceled', false)
+                ->where('balance', '>', 0)
+                ->first(['id', 'invoice_number', 'balance']);
+        }
+
         return view('receivable_payments.create', [
             'customers' => Customer::query()
                 ->orderBy('name')
-                ->get(['id', 'name', 'city', 'address', 'outstanding_receivable']),
+                ->get(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance']),
+            'prefillCustomerId' => $prefillCustomerId > 0 ? $prefillCustomerId : null,
+            'prefillAmount' => $prefillAmount,
+            'prefillDate' => $prefillDate !== '' ? $prefillDate : now()->format('Y-m-d'),
+            'preferredInvoice' => $preferredInvoice,
+            'returnTo' => $returnTo,
         ]);
     }
 
@@ -63,7 +90,9 @@ class ReceivablePaymentPageController extends Controller
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'payment_date' => ['required', 'date'],
             'customer_address' => ['nullable', 'string', 'max:255'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'amount' => ['required', 'integer', 'min:1'],
+            'preferred_invoice_id' => ['nullable', 'integer', 'exists:sales_invoices,id'],
+            'return_to' => ['nullable', 'string', 'max:500'],
             'customer_signature' => ['required', 'string', 'max:120'],
             'user_signature' => ['required', 'string', 'max:120'],
             'notes' => ['nullable', 'string'],
@@ -75,18 +104,6 @@ class ReceivablePaymentPageController extends Controller
                 ->findOrFail((int) $data['customer_id']);
 
             $amount = (float) $data['amount'];
-            $outstanding = (float) $customer->outstanding_receivable;
-            if ($outstanding <= 0) {
-                throw ValidationException::withMessages([
-                    'amount' => __('receivable.customer_has_no_outstanding'),
-                ]);
-            }
-
-            if ($amount > $outstanding) {
-                throw ValidationException::withMessages([
-                    'amount' => __('receivable.payment_exceeds_customer_outstanding'),
-                ]);
-            }
 
             $paymentDate = Carbon::parse((string) $data['payment_date']);
             $payment = ReceivablePayment::create([
@@ -105,11 +122,22 @@ class ReceivablePaymentPageController extends Controller
             $remaining = $amount;
             $invoices = SalesInvoice::query()
                 ->where('customer_id', $customer->id)
+                ->where('is_canceled', false)
                 ->where('balance', '>', 0)
                 ->orderBy('invoice_date')
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
+
+            $preferredInvoiceId = (int) ($data['preferred_invoice_id'] ?? 0);
+            if ($preferredInvoiceId > 0) {
+                $preferred = $invoices->firstWhere('id', $preferredInvoiceId);
+                if ($preferred) {
+                    $invoices = collect([$preferred])->concat(
+                        $invoices->reject(fn (SalesInvoice $invoice): bool => (int) $invoice->id === $preferredInvoiceId)
+                    )->values();
+                }
+            }
 
             foreach ($invoices as $invoice) {
                 if ($remaining <= 0) {
@@ -128,7 +156,7 @@ class ReceivablePaymentPageController extends Controller
                     'payment_date' => $paymentDate->toDateString(),
                     'amount' => $payAmount,
                     'method' => 'cash',
-                    'notes' => "Receivable payment {$payment->payment_number}",
+                    'notes' => __('receivable.receivable_payment', ['payment' => $payment->payment_number]),
                 ]);
 
                 $newTotalPaid = (float) $invoice->total_paid + $payAmount;
@@ -136,7 +164,7 @@ class ReceivablePaymentPageController extends Controller
                 $invoice->update([
                     'total_paid' => $newTotalPaid,
                     'balance' => $newBalance,
-                    'payment_status' => $newBalance <= 0 ? 'paid' : 'partial',
+                    'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
                 ]);
 
                 $this->receivableLedgerService->addCredit(
@@ -145,38 +173,175 @@ class ReceivablePaymentPageController extends Controller
                     entryDate: $paymentDate,
                     amount: $payAmount,
                     periodCode: $invoice->semester_period,
-                    description: "Payment {$payment->payment_number} for {$invoice->invoice_number}"
+                    description: __('receivable.receivable_payment_for_invoice', [
+                        'payment' => $payment->payment_number,
+                        'invoice' => $invoice->invoice_number,
+                    ])
                 );
 
                 $remaining -= $payAmount;
             }
 
             if ($remaining > 0) {
+                $newCreditBalance = (float) $customer->credit_balance + $remaining;
+                $customer->update([
+                    'credit_balance' => $newCreditBalance,
+                ]);
+
                 $this->receivableLedgerService->addCredit(
                     customerId: (int) $customer->id,
                     invoiceId: null,
                     entryDate: $paymentDate,
                     amount: $remaining,
                     periodCode: null,
-                    description: "Payment {$payment->payment_number}"
+                    description: __('receivable.receivable_payment', ['payment' => $payment->payment_number])
                 );
             }
 
             return $payment;
         });
 
-        return redirect()
-            ->route('receivable-payments.show', $payment)
+        $redirect = redirect()->route('receivable-payments.show', $payment);
+        $returnTo = $this->sanitizeReturnPath((string) ($data['return_to'] ?? ''));
+        if ($returnTo !== null) {
+            $redirect->with('receivable_payment_return_to', $returnTo);
+        }
+
+        return $redirect
             ->with('success', __('receivable.receivable_payment_saved'));
     }
 
     public function show(ReceivablePayment $receivablePayment): View
     {
         $receivablePayment->load('customer:id,name,city,address,phone');
+        $returnTo = $this->sanitizeReturnPath((string) session('receivable_payment_return_to', ''));
 
         return view('receivable_payments.show', [
             'payment' => $receivablePayment,
+            'returnTo' => $returnTo,
         ]);
+    }
+
+    public function adminUpdate(Request $request, ReceivablePayment $receivablePayment): RedirectResponse
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'customer_address' => ['nullable', 'string', 'max:255'],
+            'customer_signature' => ['required', 'string', 'max:120'],
+            'user_signature' => ['required', 'string', 'max:120'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $receivablePayment->update([
+            'payment_date' => $data['payment_date'],
+            'customer_address' => $data['customer_address'] ?? null,
+            'customer_signature' => $data['customer_signature'],
+            'user_signature' => $data['user_signature'],
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('receivable-payments.show', $receivablePayment)
+            ->with('success', __('txn.admin_update_saved'));
+    }
+
+    public function cancel(Request $request, ReceivablePayment $receivablePayment): RedirectResponse
+    {
+        $data = $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        DB::transaction(function () use ($receivablePayment, $data): void {
+            $payment = ReceivablePayment::query()
+                ->whereKey($receivablePayment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($payment->is_canceled) {
+                return;
+            }
+
+            $customer = Customer::query()
+                ->whereKey($payment->customer_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $paymentRef = __('receivable.receivable_payment', ['payment' => $payment->payment_number]);
+
+            $invoicePayments = InvoicePayment::query()
+                ->with('invoice:id,customer_id,total,total_paid,balance,payment_status,invoice_number,semester_period')
+                ->where('method', 'cash')
+                ->where('notes', $paymentRef)
+                ->whereDate('payment_date', $payment->payment_date?->toDateString())
+                ->lockForUpdate()
+                ->get();
+
+            $appliedToInvoices = 0.0;
+            foreach ($invoicePayments as $invoicePayment) {
+                $invoice = $invoicePayment->invoice;
+                if (! $invoice || (int) $invoice->customer_id !== (int) $customer->id) {
+                    continue;
+                }
+
+                $amount = (float) $invoicePayment->amount;
+                if ($amount <= 0) {
+                    continue;
+                }
+
+                $appliedToInvoices += $amount;
+
+                $newTotalPaid = max(0, (float) $invoice->total_paid - $amount);
+                $newBalance = max(0, (float) $invoice->total - $newTotalPaid);
+                $invoice->update([
+                    'total_paid' => $newTotalPaid,
+                    'balance' => $newBalance,
+                    'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+                ]);
+
+                $this->receivableLedgerService->addDebit(
+                    customerId: (int) $customer->id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: now(),
+                    amount: $amount,
+                    periodCode: $invoice->semester_period,
+                    description: __('txn.cancel_receivable_payment_invoice_ledger_note', [
+                        'payment' => $payment->payment_number,
+                        'invoice' => $invoice->invoice_number,
+                    ]),
+                );
+
+                $invoicePayment->delete();
+            }
+
+            $overPayment = max(0, (float) $payment->amount - $appliedToInvoices);
+            if ($overPayment > 0) {
+                $customer->update([
+                    'credit_balance' => max(0, (float) $customer->credit_balance - $overPayment),
+                ]);
+
+                $this->receivableLedgerService->addDebit(
+                    customerId: (int) $customer->id,
+                    invoiceId: null,
+                    entryDate: now(),
+                    amount: $overPayment,
+                    periodCode: null,
+                    description: __('txn.cancel_receivable_payment_balance_ledger_note', [
+                        'payment' => $payment->payment_number,
+                    ]),
+                );
+            }
+
+            $payment->update([
+                'is_canceled' => true,
+                'canceled_at' => now(),
+                'canceled_by_user_id' => auth()->id(),
+                'cancel_reason' => $data['cancel_reason'],
+            ]);
+        });
+
+        return redirect()
+            ->route('receivable-payments.show', $receivablePayment)
+            ->with('success', __('txn.transaction_canceled_success'));
     }
 
     public function print(ReceivablePayment $receivablePayment): View
@@ -203,7 +368,7 @@ class ReceivablePaymentPageController extends Controller
 
     private function generatePaymentNumber(string $date): string
     {
-        $prefix = 'PYT-'.date('Ymd', strtotime($date));
+        $prefix = 'KWT-'.date('Ymd', strtotime($date));
         $count = ReceivablePayment::query()
             ->whereDate('payment_date', $date)
             ->lockForUpdate()
@@ -214,17 +379,8 @@ class ReceivablePaymentPageController extends Controller
 
     private function toIndonesianWords(float $amount): string
     {
-        $integerPart = (int) floor($amount);
-        $decimalPart = (int) round(($amount - $integerPart) * 100);
+        $integerPart = (int) round($amount);
         $result = trim($this->spellNumber($integerPart)).' rupiah';
-
-        if ($decimalPart > 0) {
-            $digits = str_split((string) $decimalPart);
-            $decimalWords = collect($digits)
-                ->map(fn (string $digit): string => $this->digitWord((int) $digit))
-                ->implode(' ');
-            $result .= ' koma '.$decimalWords;
-        }
 
         return ucfirst(trim($result));
     }
@@ -278,21 +434,19 @@ class ReceivablePaymentPageController extends Controller
         return $this->spellNumber((int) floor($number / 1000000000000)).' triliun '.$this->spellNumber($number % 1000000000000);
     }
 
-    private function digitWord(int $digit): string
+    private function sanitizeReturnPath(string $path): ?string
     {
-        $words = [
-            'nol',
-            'satu',
-            'dua',
-            'tiga',
-            'empat',
-            'lima',
-            'enam',
-            'tujuh',
-            'delapan',
-            'sembilan',
-        ];
+        $path = trim($path);
+        if ($path === '') {
+            return null;
+        }
 
-        return $words[$digit] ?? 'nol';
+        // Allow only local relative paths to avoid open redirects.
+        if (str_starts_with($path, '/') && ! str_starts_with($path, '//')) {
+            return $path;
+        }
+
+        return null;
     }
+
 }

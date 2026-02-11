@@ -5,6 +5,18 @@
 @section('content')
     <h1 class="page-title">{{ __('txn.create_order_note_title') }}</h1>
 
+    <style>
+        #items-table input[type=number].qty-input::-webkit-outer-spin-button,
+        #items-table input[type=number].qty-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        #items-table input[type=number].qty-input {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+    </style>
+
     <form method="post" action="{{ route('order-notes.store') }}">
         @csrf
 
@@ -18,33 +30,27 @@
                         <input type="date" name="note_date" value="{{ old('note_date', now()->format('Y-m-d')) }}" required>
                     </div>
                     <div class="col-4">
-                        <label>{{ __('txn.customer') }} ({{ __('txn.optional') }})</label>
+                        <label>{{ __('txn.customer') }} {{ __('txn.name') }} <span class="label-required">*</span></label>
                         @php
                             $customerMap = $customers->keyBy('id');
                             $oldCustomerId = old('customer_id');
                             $oldCustomerLabel = $oldCustomerId && $customerMap->has($oldCustomerId)
                                 ? $customerMap[$oldCustomerId]->name.' ('.($customerMap[$oldCustomerId]->city ?: '-').')'
-                                : '';
+                                : old('customer_name', '');
                         @endphp
                         <input type="text"
                                id="customer-search"
+                               name="customer_name"
                                list="customers-list"
                                value="{{ $oldCustomerLabel }}"
-                               placeholder="{{ __('txn.manual_customer') }}">
+                               placeholder="{{ __('txn.manual_customer') }}"
+                               required>
                         <input type="hidden" id="customer_id" name="customer_id" value="{{ $oldCustomerId }}">
                         <datalist id="customers-list">
                             @foreach($customers as $customer)
                                 <option value="{{ $customer->name }} ({{ $customer->city ?: '-' }})"></option>
                             @endforeach
                         </datalist>
-                    </div>
-                    <div class="col-4">
-                        <label>{{ __('txn.created_by') }}</label>
-                        <input type="text" name="created_by_name" value="{{ old('created_by_name', 'System') }}">
-                    </div>
-                    <div class="col-4">
-                        <label>{{ __('txn.customer') }} {{ __('txn.name') }} <span class="label-required">*</span></label>
-                        <input id="customer_name" type="text" name="customer_name" value="{{ old('customer_name') }}" required>
                     </div>
                     <div class="col-4">
                         <label>{{ __('txn.phone') }}</label>
@@ -70,10 +76,8 @@
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
                 <tr>
-                    <th style="width: 30%">{{ __('txn.product') }} ({{ __('txn.optional') }})</th>
-                    <th>{{ __('txn.code') }} ({{ __('txn.optional') }})</th>
-                    <th>{{ __('txn.name') }} *</th>
-                    <th>{{ __('txn.qty') }} *</th>
+                    <th style="width: 40%">{{ __('txn.product') }} *</th>
+                    <th style="width: 8%">{{ __('txn.qty') }} *</th>
                     <th>{{ __('txn.notes') }}</th>
                     <th></th>
                 </tr>
@@ -90,6 +94,7 @@
         const customers = @json($customers->values());
         const products = @json($products);
         const tbody = document.querySelector('#items-table tbody');
+        const productsList = document.getElementById('products-list');
         const addBtn = document.getElementById('add-item');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
@@ -112,7 +117,32 @@
         }
 
         function productLabel(product) {
-            return `${product.code} - ${product.name}`;
+            return `${product.name}`;
+        }
+
+        function escapeAttribute(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function renderProductSuggestions(query) {
+            if (!productsList) {
+                return;
+            }
+            const normalized = (query || '').trim().toLowerCase();
+            const matches = products.filter((product) => {
+                const label = productLabel(product).toLowerCase();
+                const code = (product.code || '').toLowerCase();
+                const name = (product.name || '').toLowerCase();
+                return normalized === '' || label.includes(normalized) || code.includes(normalized) || name.includes(normalized);
+            }).slice(0, 60);
+
+            productsList.innerHTML = matches
+                .map((product) => `<option value="${escapeAttribute(productLabel(product))}"></option>`)
+                .join('');
         }
 
         function findProductByLabel(label) {
@@ -133,25 +163,26 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" list="products-list" placeholder="{{ __('txn.manual_item') }}">
+                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="{{ __('txn.manual_item') }}" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                 </td>
-                <td><input name="items[${index}][product_code]" class="code"></td>
-                <td><input name="items[${index}][product_name]" class="name" required></td>
-                <td><input name="items[${index}][quantity]" type="number" min="1" value="1" required></td>
+                <td><input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required style="max-width: 88px;"></td>
                 <td><input name="items[${index}][notes]"></td>
                 <td><button type="button" class="btn secondary remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
 
             tr.querySelector('.product-search').addEventListener('input', (event) => {
+                renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (!product) {
                     return;
                 }
-                tr.querySelector('.code').value = product.code || '';
-                tr.querySelector('.name').value = product.name || '';
+                tr.querySelector('.product-search').value = product.name || '';
+            });
+            tr.querySelector('.product-search').addEventListener('focus', (event) => {
+                renderProductSuggestions(event.currentTarget.value);
             });
             tr.querySelector('.remove').addEventListener('click', () => tr.remove());
         }
@@ -169,7 +200,7 @@
                 if (!customer) {
                     return;
                 }
-                document.getElementById('customer_name').value = customer.name || '';
+                customerSearch.value = customer.name || '';
                 document.getElementById('customer_phone').value = customer.phone || '';
                 document.getElementById('city').value = customer.city || '';
             });
@@ -183,12 +214,13 @@
         }
 
         addBtn.addEventListener('click', addRow);
+        renderProductSuggestions('');
         addRow();
     </script>
 
     <datalist id="products-list">
         @foreach($products as $product)
-            <option value="{{ $product->code }} - {{ $product->name }}"></option>
+            <option value="{{ $product->name }}"></option>
         @endforeach
     </datalist>
 @endsection

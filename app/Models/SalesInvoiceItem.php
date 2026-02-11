@@ -31,9 +31,9 @@ class SalesInvoiceItem extends Model
     {
         return [
             'quantity' => 'integer',
-            'unit_price' => 'decimal:2',
-            'discount' => 'decimal:2',
-            'line_total' => 'decimal:2',
+            'unit_price' => 'integer',
+            'discount' => 'integer',
+            'line_total' => 'integer',
         ];
     }
 
@@ -53,3 +53,4 @@ class SalesInvoiceItem extends Model
         return $this->belongsTo(Product::class);
     }
 }
+

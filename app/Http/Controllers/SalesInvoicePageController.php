@@ -11,6 +11,7 @@ use App\Models\SalesInvoiceItem;
 use App\Models\StockMutation;
 use App\Services\ReceivableLedgerService;
 use App\Services\AuditLogService;
+use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -32,7 +33,11 @@ class SalesInvoicePageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $semester = trim((string) $request->string('semester', ''));
+        $status = trim((string) $request->string('status', ''));
+        $invoiceDate = trim((string) $request->string('invoice_date', ''));
+        $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
         $selectedSemester = $semester !== '' ? $semester : null;
+        $selectedInvoiceDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $invoiceDate) === 1 ? $invoiceDate : null;
 
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
@@ -48,6 +53,10 @@ class SalesInvoicePageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
+        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
+            $selectedSemester = null;
+        }
 
         $invoices = SalesInvoice::query()
             ->with('customer:id,name,city')
@@ -63,26 +72,42 @@ class SalesInvoicePageController extends Controller
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                 $query->where('semester_period', $selectedSemester);
             })
+            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                $query->where('is_canceled', $selectedStatus === 'canceled');
+            })
+            ->when($selectedInvoiceDate !== null, function ($query) use ($selectedInvoiceDate): void {
+                $query->whereDate('invoice_date', $selectedInvoiceDate);
+            })
             ->latest('invoice_date')
             ->latest('id')
             ->paginate(25)
             ->withQueryString();
 
         $semesterSummary = SalesInvoice::query()
-            ->selectRaw('COUNT(*) as total_invoice, COALESCE(SUM(total), 0) as grand_total, COALESCE(SUM(total_paid), 0) as paid_total, COALESCE(SUM(balance), 0) as balance_total')
+            ->selectRaw('COUNT(*) as total_invoice, COALESCE(SUM(total), 0) as grand_total')
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                 $query->where('semester_period', $selectedSemester);
             })
+            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                $query->where('is_canceled', $selectedStatus === 'canceled');
+            })
+            ->when($selectedInvoiceDate !== null, function ($query) use ($selectedInvoiceDate): void {
+                $query->whereDate('invoice_date', $selectedInvoiceDate);
+            })
             ->first();
+        $customerSemesterLockMap = $this->customerSemesterLockMap(collect($invoices->items()));
 
         return view('sales_invoices.index', [
             'invoices' => $invoices,
             'search' => $search,
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
+            'selectedStatus' => $selectedStatus,
+            'selectedInvoiceDate' => $selectedInvoiceDate,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'semesterSummary' => $semesterSummary,
+            'customerSemesterLockMap' => $customerSemesterLockMap,
         ]);
     }
 
@@ -90,7 +115,7 @@ class SalesInvoicePageController extends Controller
     {
         $defaultSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($defaultSemester);
-        $configured = collect(explode(',', (string) AppSetting::getValue('semester_period_options', '')))
+        $configured = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->filter(fn (string $item): bool => $item !== '');
 
@@ -105,6 +130,10 @@ class SalesInvoicePageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
+        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        if (! $semesterOptions->contains($defaultSemester)) {
+            $defaultSemester = (string) ($semesterOptions->first() ?? $defaultSemester);
+        }
 
         return view('sales_invoices.create', [
             'customers' => Customer::query()
@@ -128,12 +157,12 @@ class SalesInvoicePageController extends Controller
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string'],
-            'payment_method' => ['nullable', 'in:cash,bank_transfer'],
+            'payment_method' => ['required', 'in:tunai,kredit'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'items.*.discount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
         $invoice = DB::transaction(function () use ($data): SalesInvoice {
@@ -154,20 +183,22 @@ class SalesInvoicePageController extends Controller
                 $product = $products->get((int) $row['product_id']);
                 if (! $product) {
                     throw ValidationException::withMessages([
-                        "items.{$index}.product_id" => 'Product not found.',
+                        "items.{$index}.product_id" => __('txn.product_not_found'),
                     ]);
                 }
 
                 $quantity = (int) $row['quantity'];
                 if ($product->stock < $quantity) {
                     throw ValidationException::withMessages([
-                        "items.{$index}.quantity" => "Insufficient stock for {$product->name}.",
+                        "items.{$index}.quantity" => __('txn.insufficient_stock_for', ['product' => $product->name]),
                     ]);
                 }
 
-                $unitPrice = (float) $row['unit_price'];
-                $discount = (float) ($row['discount'] ?? 0);
-                $lineTotal = max(0, ($quantity * $unitPrice) - $discount);
+                $unitPrice = (float) round((float) $row['unit_price']);
+                $discountPercent = max(0.0, min(100.0, (float) ($row['discount'] ?? 0)));
+                $gross = $quantity * $unitPrice;
+                $discount = (float) round($gross * ($discountPercent / 100));
+                $lineTotal = max(0, $gross - $discount);
                 $subtotal += $lineTotal;
 
                 $computedRows[] = [
@@ -230,21 +261,21 @@ class SalesInvoicePageController extends Controller
                 description: "Invoice {$invoice->invoice_number}"
             );
 
-            $initialPayment = !empty($data['payment_method']) ? (float) $invoice->total : 0.0;
+            $initialPayment = $data['payment_method'] === 'tunai' ? (float) $invoice->total : 0.0;
             if ($initialPayment > 0) {
                 InvoicePayment::create([
                     'sales_invoice_id' => $invoice->id,
                     'payment_date' => $invoiceDate->toDateString(),
                     'amount' => $initialPayment,
-                    'method' => (string) $data['payment_method'],
-                    'notes' => 'Full payment on invoice creation',
+                    'method' => 'cash',
+                    'notes' => __('txn.full_payment_on_create'),
                 ]);
 
                 $balance = max(0, (float) $invoice->total - $initialPayment);
                 $invoice->update([
                     'total_paid' => $initialPayment,
                     'balance' => $balance,
-                    'payment_status' => $balance <= 0 ? 'paid' : 'partial',
+                    'payment_status' => $balance <= 0 ? 'paid' : 'unpaid',
                 ]);
 
                 $this->receivableLedgerService->addCredit(
@@ -257,14 +288,59 @@ class SalesInvoicePageController extends Controller
                 );
             }
 
+            $customer = Customer::query()
+                ->lockForUpdate()
+                ->findOrFail((int) $invoice->customer_id);
+
+            $availableCustomerBalance = (float) $customer->credit_balance;
+            $invoiceBalance = (float) $invoice->balance;
+            $appliedFromBalance = min($availableCustomerBalance, $invoiceBalance);
+            if ($appliedFromBalance > 0) {
+                InvoicePayment::create([
+                    'sales_invoice_id' => $invoice->id,
+                    'payment_date' => $invoiceDate->toDateString(),
+                    'amount' => $appliedFromBalance,
+                    'method' => 'customer_balance',
+                    'notes' => __('txn.used_customer_balance'),
+                ]);
+
+                $newTotalPaid = (float) $invoice->total_paid + $appliedFromBalance;
+                $newBalance = max(0, (float) $invoice->total - $newTotalPaid);
+                $invoice->update([
+                    'total_paid' => $newTotalPaid,
+                    'balance' => $newBalance,
+                    'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+                ]);
+
+                $customer->update([
+                    'credit_balance' => max(0, $availableCustomerBalance - $appliedFromBalance),
+                ]);
+
+                $this->receivableLedgerService->addCredit(
+                    customerId: (int) $invoice->customer_id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: $invoiceDate,
+                    amount: $appliedFromBalance,
+                    periodCode: $invoice->semester_period,
+                    description: __('txn.customer_balance_applied_for_invoice', [
+                        'invoice' => $invoice->invoice_number,
+                    ])
+                );
+            }
+
             return $invoice;
         });
 
-        $this->auditLogService->log('sales.invoice.create', $invoice, "Invoice created: {$invoice->invoice_number}", $request);
+        $this->auditLogService->log(
+            'sales.invoice.create',
+            $invoice,
+            __('txn.audit_invoice_created', ['number' => $invoice->invoice_number]),
+            $request
+        );
 
         return redirect()
             ->route('sales-invoices.show', $invoice)
-            ->with('success', "Invoice {$invoice->invoice_number} has been created.");
+            ->with('success', __('txn.invoice_created_success', ['number' => $invoice->invoice_number]));
     }
 
     public function show(SalesInvoice $salesInvoice): View
@@ -274,10 +350,318 @@ class SalesInvoicePageController extends Controller
             'items.product:id,code,name',
             'payments',
         ]);
+        $customerSemesterLockState = $this->customerSemesterLockState(
+            (int) $salesInvoice->customer_id,
+            (string) $salesInvoice->semester_period
+        );
 
         return view('sales_invoices.show', [
             'invoice' => $salesInvoice,
+            'customerSemesterLockState' => $customerSemesterLockState,
+            'products' => Product::query()
+                ->orderBy('name')
+                ->get(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general']),
         ]);
+    }
+
+    public function adminUpdate(Request $request, SalesInvoice $salesInvoice): RedirectResponse
+    {
+        $data = $request->validate([
+            'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
+            'semester_period' => ['nullable', 'string', 'max:30'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $auditBefore = '';
+        $auditAfter = '';
+
+        DB::transaction(function () use ($salesInvoice, $data, &$auditBefore, &$auditAfter): void {
+            $invoice = SalesInvoice::query()
+                ->with(['items', 'payments'])
+                ->whereKey($salesInvoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($invoice->is_canceled) {
+                throw ValidationException::withMessages([
+                    'items' => __('txn.canceled_info'),
+                ]);
+            }
+
+            $rows = collect($data['items'] ?? []);
+            $oldTotal = (float) $invoice->total;
+            $auditBefore = $invoice->items
+                ->map(fn (SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price".(int) round((float) $item->unit_price))
+                ->implode(' | ');
+
+            $oldQtyByProduct = [];
+            foreach ($invoice->items as $existingItem) {
+                $productId = (int) ($existingItem->product_id ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                $oldQtyByProduct[$productId] = ($oldQtyByProduct[$productId] ?? 0) + (int) $existingItem->quantity;
+            }
+
+            $newQtyByProduct = [];
+            foreach ($rows as $row) {
+                $productId = (int) ($row['product_id'] ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                $newQtyByProduct[$productId] = ($newQtyByProduct[$productId] ?? 0) + (int) ($row['quantity'] ?? 0);
+            }
+
+            $productIds = collect(array_merge(array_keys($oldQtyByProduct), array_keys($newQtyByProduct)))
+                ->unique()
+                ->values()
+                ->all();
+
+            $products = Product::query()
+                ->whereIn('id', $productIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($productIds as $productId) {
+                $product = $products->get((int) $productId);
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'items' => __('txn.product_not_found'),
+                    ]);
+                }
+
+                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
+                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
+                $delta = $oldQty - $newQty;
+
+                if ($delta < 0) {
+                    $need = abs($delta);
+                    if ((int) $product->stock < $need) {
+                        throw ValidationException::withMessages([
+                            'items' => __('txn.insufficient_stock_for', ['product' => $product->name]),
+                        ]);
+                    }
+                }
+            }
+
+            foreach ($productIds as $productId) {
+                $product = $products->get((int) $productId);
+                if (! $product) {
+                    continue;
+                }
+
+                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
+                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
+                $delta = $oldQty - $newQty;
+                if ($delta === 0) {
+                    continue;
+                }
+
+                if ($delta > 0) {
+                    $product->increment('stock', $delta);
+                    StockMutation::create([
+                        'product_id' => $product->id,
+                        'reference_type' => SalesInvoice::class,
+                        'reference_id' => $invoice->id,
+                        'mutation_type' => 'in',
+                        'quantity' => $delta,
+                        'notes' => "Admin edit invoice {$invoice->invoice_number}",
+                        'created_by_user_id' => auth()->id(),
+                    ]);
+                } else {
+                    $outQty = abs($delta);
+                    $product->decrement('stock', $outQty);
+                    StockMutation::create([
+                        'product_id' => $product->id,
+                        'reference_type' => SalesInvoice::class,
+                        'reference_id' => $invoice->id,
+                        'mutation_type' => 'out',
+                        'quantity' => $outQty,
+                        'notes' => "Admin edit invoice {$invoice->invoice_number}",
+                        'created_by_user_id' => auth()->id(),
+                    ]);
+                }
+            }
+
+            $invoice->items()->delete();
+
+            $subtotal = 0.0;
+            foreach ($rows as $index => $row) {
+                $product = $products->get((int) $row['product_id']);
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}.product_id" => __('txn.product_not_found'),
+                    ]);
+                }
+
+                $quantity = (int) $row['quantity'];
+                $unitPrice = (float) round((float) $row['unit_price']);
+                $discountPercent = max(0.0, min(100.0, (float) ($row['discount'] ?? 0)));
+                $gross = $quantity * $unitPrice;
+                $discount = (float) round($gross * ($discountPercent / 100));
+                $lineTotal = max(0, $gross - $discount);
+                $subtotal += $lineTotal;
+
+                SalesInvoiceItem::create([
+                    'sales_invoice_id' => $invoice->id,
+                    'product_id' => $product->id,
+                    'product_code' => $product->code,
+                    'product_name' => $product->name,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'discount' => $discount,
+                    'line_total' => $lineTotal,
+                ]);
+            }
+
+            $auditAfter = $rows
+                ->map(function (array $row) use ($products): string {
+                    $product = $products->get((int) ($row['product_id'] ?? 0));
+                    $name = $product?->name ?: (string) ($row['product_id'] ?? '-');
+                    $qty = (int) ($row['quantity'] ?? 0);
+                    $price = (int) round((float) ($row['unit_price'] ?? 0));
+
+                    return "{$name}:qty{$qty}:price{$price}";
+                })
+                ->implode(' | ');
+
+            $paymentsTotal = (float) $invoice->payments->sum('amount');
+            $newBalance = max(0, $subtotal - $paymentsTotal);
+
+            $invoice->update([
+                'invoice_date' => $data['invoice_date'],
+                'due_date' => $data['due_date'] ?? null,
+                'semester_period' => $data['semester_period'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'subtotal' => $subtotal,
+                'total' => $subtotal,
+                'total_paid' => $paymentsTotal,
+                'balance' => $newBalance,
+                'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+            ]);
+
+            $difference = (float) round($subtotal - $oldTotal);
+            if ($difference > 0) {
+                $this->receivableLedgerService->addDebit(
+                    customerId: (int) $invoice->customer_id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: Carbon::parse((string) $data['invoice_date']),
+                    amount: $difference,
+                    periodCode: $invoice->semester_period,
+                    description: __('txn.admin_invoice_edit_ledger_increase', ['invoice' => $invoice->invoice_number]),
+                );
+            } elseif ($difference < 0) {
+                $this->receivableLedgerService->addCredit(
+                    customerId: (int) $invoice->customer_id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: Carbon::parse((string) $data['invoice_date']),
+                    amount: abs($difference),
+                    periodCode: $invoice->semester_period,
+                    description: __('txn.admin_invoice_edit_ledger_decrease', ['invoice' => $invoice->invoice_number]),
+                );
+            }
+        });
+
+        $salesInvoice->refresh();
+        $this->auditLogService->log(
+            'sales.invoice.admin_update',
+            $salesInvoice,
+            __('txn.audit_invoice_admin_updated', [
+                'number' => $salesInvoice->invoice_number,
+                'before' => $auditBefore !== '' ? $auditBefore : '-',
+                'after' => $auditAfter !== '' ? $auditAfter : '-',
+            ]),
+            $request
+        );
+
+        return redirect()
+            ->route('sales-invoices.show', $salesInvoice)
+            ->with('success', __('txn.admin_update_saved'));
+    }
+
+    public function cancel(Request $request, SalesInvoice $salesInvoice): RedirectResponse
+    {
+        $data = $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        DB::transaction(function () use ($salesInvoice, $data): void {
+            $invoice = SalesInvoice::query()
+                ->with('items')
+                ->whereKey($salesInvoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($invoice->is_canceled) {
+                return;
+            }
+
+            foreach ($invoice->items as $item) {
+                if (! $item->product_id || (int) $item->quantity <= 0) {
+                    continue;
+                }
+
+                $product = Product::query()
+                    ->whereKey($item->product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $product) {
+                    continue;
+                }
+
+                $product->increment('stock', (int) $item->quantity);
+
+                StockMutation::create([
+                    'product_id' => $product->id,
+                    'reference_type' => SalesInvoice::class,
+                    'reference_id' => $invoice->id,
+                    'mutation_type' => 'in',
+                    'quantity' => (int) $item->quantity,
+                    'notes' => "Cancel invoice {$invoice->invoice_number}",
+                    'created_by_user_id' => auth()->id(),
+                ]);
+            }
+
+            $openBalance = max(0, (float) $invoice->balance);
+            if ($openBalance > 0) {
+                $this->receivableLedgerService->addCredit(
+                    customerId: (int) $invoice->customer_id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: now(),
+                    amount: $openBalance,
+                    periodCode: $invoice->semester_period,
+                    description: __('txn.admin_invoice_cancel_ledger_note', ['invoice' => $invoice->invoice_number]),
+                );
+            }
+
+            $invoice->update([
+                'balance' => 0,
+                'payment_status' => 'paid',
+                'is_canceled' => true,
+                'canceled_at' => now(),
+                'canceled_by_user_id' => auth()->id(),
+                'cancel_reason' => $data['cancel_reason'],
+            ]);
+        });
+
+        $this->auditLogService->log(
+            'sales.invoice.cancel',
+            $salesInvoice,
+            __('txn.audit_invoice_canceled', ['number' => $salesInvoice->invoice_number]),
+            $request
+        );
+
+        return redirect()
+            ->route('sales-invoices.show', $salesInvoice)
+            ->with('success', __('txn.transaction_canceled_success'));
     }
 
     public function print(SalesInvoice $salesInvoice): View
@@ -330,22 +714,33 @@ class SalesInvoicePageController extends Controller
             fputcsv($handle, ['Invoice Date', $salesInvoice->invoice_date?->format('d-m-Y')]);
             fputcsv($handle, ['Customer', $salesInvoice->customer?->name]);
             fputcsv($handle, ['City', $salesInvoice->customer?->city]);
-            fputcsv($handle, ['Status', strtoupper((string) $salesInvoice->payment_status)]);
-            fputcsv($handle, ['Total', $salesInvoice->total]);
-            fputcsv($handle, ['Paid', $salesInvoice->total_paid]);
-            fputcsv($handle, ['Balance', $salesInvoice->balance]);
+            $paymentStatusLabel = match ((string) $salesInvoice->payment_status) {
+                'paid' => __('txn.status_paid'),
+                default => __('txn.status_unpaid'),
+            };
+            fputcsv($handle, ['Status', $paymentStatusLabel]);
+            $paidFromCustomerBalance = (float) $salesInvoice->payments
+                ->where('method', 'customer_balance')
+                ->sum('amount');
+            $paidCash = max(0, (float) $salesInvoice->total_paid - $paidFromCustomerBalance);
+            fputcsv($handle, ['Total', number_format((int) round((float) $salesInvoice->total), 0, ',', '.')]);
+            fputcsv($handle, ['Paid', number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')]);
+            fputcsv($handle, ['Paid (Cash)', number_format((int) round($paidCash), 0, ',', '.')]);
+            fputcsv($handle, ['Paid (Customer Balance)', number_format((int) round($paidFromCustomerBalance), 0, ',', '.')]);
+            fputcsv($handle, ['Balance', number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')]);
             fputcsv($handle, []);
             fputcsv($handle, ['Items']);
-            fputcsv($handle, ['Code', 'Name', 'Qty', 'Unit Price', 'Discount', 'Line Total']);
+            fputcsv($handle, ['Name', 'Qty', 'Unit Price', 'Discount (%)', 'Line Total']);
 
             foreach ($salesInvoice->items as $item) {
+                $gross = (float) $item->quantity * (float) $item->unit_price;
+                $discountPercent = $gross > 0 ? (float) $item->discount / $gross * 100 : 0;
                 fputcsv($handle, [
-                    $item->product_code,
                     $item->product_name,
                     $item->quantity,
-                    $item->unit_price,
-                    $item->discount,
-                    $item->line_total,
+                    number_format((int) round((float) $item->unit_price), 0, ',', '.'),
+                    (int) round($discountPercent),
+                    number_format((int) round((float) $item->line_total), 0, ',', '.'),
                 ]);
             }
 
@@ -355,8 +750,8 @@ class SalesInvoicePageController extends Controller
             foreach ($salesInvoice->payments as $payment) {
                 fputcsv($handle, [
                     $payment->payment_date?->format('d-m-Y'),
-                    $payment->method,
-                    $payment->amount,
+                    $this->paymentMethodLabel((string) $payment->method),
+                    number_format((int) round((float) $payment->amount), 0, ',', '.'),
                     $payment->notes,
                 ]);
             }
@@ -409,8 +804,107 @@ class SalesInvoicePageController extends Controller
 
     private function configuredSemesterOptions()
     {
-        return collect(explode(',', (string) AppSetting::getValue('semester_period_options', '')))
+        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->filter(fn (string $item): bool => $item !== '');
+    }
+
+    private function semesterBookService(): SemesterBookService
+    {
+        return app(SemesterBookService::class);
+    }
+
+    private function paymentMethodLabel(string $method): string
+    {
+        return match (strtolower($method)) {
+            'customer_balance' => __('txn.customer_balance'),
+            'cash' => __('txn.cash'),
+            'writeoff' => __('txn.writeoff'),
+            'discount' => __('receivable.method_discount'),
+            default => __('txn.credit'),
+        };
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, SalesInvoice>  $invoices
+     * @return array<string, array{locked:bool,manual:bool,auto:bool}>
+     */
+    private function customerSemesterLockMap(\Illuminate\Support\Collection $invoices): array
+    {
+        $pairs = $invoices
+            ->map(function (SalesInvoice $invoice): ?array {
+                $customerId = (int) $invoice->customer_id;
+                $semester = trim((string) $invoice->semester_period);
+                if ($customerId <= 0 || $semester === '') {
+                    return null;
+                }
+
+                return [
+                    'customer_id' => $customerId,
+                    'semester' => $semester,
+                ];
+            })
+            ->filter()
+            ->values();
+        if ($pairs->isEmpty()) {
+            return [];
+        }
+
+        $customerIds = $pairs->pluck('customer_id')->unique()->values();
+        $semesterCodes = $pairs->pluck('semester')->unique()->values();
+
+        $aggregates = SalesInvoice::query()
+            ->selectRaw('customer_id, semester_period, COUNT(*) as invoice_count, COALESCE(SUM(balance), 0) as outstanding')
+            ->where('is_canceled', false)
+            ->whereIn('customer_id', $customerIds->all())
+            ->whereIn('semester_period', $semesterCodes->all())
+            ->groupBy('customer_id', 'semester_period')
+            ->get();
+
+        $autoMap = [];
+        foreach ($aggregates as $aggregate) {
+            $key = ((int) $aggregate->customer_id).':'.(string) $aggregate->semester_period;
+            $invoiceCount = (int) ($aggregate->invoice_count ?? 0);
+            $outstanding = (float) ($aggregate->outstanding ?? 0);
+            $autoMap[$key] = $invoiceCount > 0 && round($outstanding) <= 0;
+        }
+
+        $manualMap = collect($this->semesterBookService()->closedCustomerSemesters())
+            ->mapWithKeys(fn (string $item): array => [$item => true])
+            ->all();
+
+        $result = [];
+        foreach ($pairs as $pair) {
+            $key = ((int) $pair['customer_id']).':'.(string) $pair['semester'];
+            $manual = (bool) ($manualMap[$key] ?? false);
+            $auto = (bool) ($autoMap[$key] ?? false);
+            $result[$key] = [
+                'locked' => $manual || $auto,
+                'manual' => $manual,
+                'auto' => $auto,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array{locked:bool,manual:bool,auto:bool}
+     */
+    private function customerSemesterLockState(int $customerId, string $semester): array
+    {
+        $normalizedSemester = trim($semester);
+        if ($customerId <= 0 || $normalizedSemester === '') {
+            return ['locked' => false, 'manual' => false, 'auto' => false];
+        }
+
+        $manual = $this->semesterBookService()->isCustomerClosed($customerId, $normalizedSemester);
+        $auto = $this->semesterBookService()->isCustomerAutoClosed($customerId, $normalizedSemester);
+
+        return [
+            'locked' => $manual || $auto,
+            'manual' => $manual,
+            'auto' => $auto,
+        ];
     }
 }

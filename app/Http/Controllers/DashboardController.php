@@ -20,7 +20,7 @@ class DashboardController extends Controller
                     'total_receivable' => 0,
                     'invoice_this_month' => 0,
                 ],
-                'recentInvoices' => collect(),
+                'uncollectedCustomers' => collect(),
             ]);
         }
 
@@ -34,16 +34,17 @@ class DashboardController extends Controller
                 ->sum('total'),
         ];
 
-        $recentInvoices = SalesInvoice::query()
-            ->with('customer:id,name,city')
-            ->latest('invoice_date')
-            ->latest('id')
-            ->limit(10)
+        $uncollectedCustomers = Customer::query()
+            ->select(['id', 'name', 'city', 'outstanding_receivable'])
+            ->where('outstanding_receivable', '>', 0)
+            ->orderByDesc('outstanding_receivable')
+            ->orderBy('name')
+            ->limit(15)
             ->get();
 
         return view('dashboard', [
             'summary' => $summary,
-            'recentInvoices' => $recentInvoices,
+            'uncollectedCustomers' => $uncollectedCustomers,
         ]);
     }
 }

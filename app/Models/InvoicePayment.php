@@ -28,7 +28,7 @@ class InvoicePayment extends Model
     {
         return [
             'payment_date' => 'date',
-            'amount' => 'decimal:2',
+            'amount' => 'integer',
         ];
     }
 
@@ -40,3 +40,4 @@ class InvoicePayment extends Model
         return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id');
     }
 }
+

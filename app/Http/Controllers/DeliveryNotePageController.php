@@ -7,6 +7,8 @@ use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\Product;
+use App\Services\AuditLogService;
+use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -17,11 +19,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DeliveryNotePageController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogService $auditLogService
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $search = trim((string) $request->string('search', ''));
         $semester = trim((string) $request->string('semester', ''));
+        $status = trim((string) $request->string('status', ''));
+        $noteDate = trim((string) $request->string('note_date', ''));
+        $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
         $selectedSemester = $semester !== '' ? $semester : null;
+        $selectedNoteDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $noteDate) === 1 ? $noteDate : null;
 
         $currentSemester = $this->currentSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
@@ -38,6 +49,11 @@ class DeliveryNotePageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
+        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
+            $selectedSemester = null;
+            $semesterRange = null;
+        }
 
         $notes = DeliveryNote::query()
             ->with('customer:id,name,city')
@@ -51,6 +67,12 @@ class DeliveryNotePageController extends Controller
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
             })
+            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                $query->where('is_canceled', $selectedStatus === 'canceled');
+            })
+            ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
+                $query->whereDate('note_date', $selectedNoteDate);
+            })
             ->latest('note_date')
             ->latest('id')
             ->paginate(25)
@@ -59,6 +81,12 @@ class DeliveryNotePageController extends Controller
         $summaryQuery = DeliveryNote::query()
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
+            })
+            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                $query->where('is_canceled', $selectedStatus === 'canceled');
+            })
+            ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
+                $query->whereDate('note_date', $selectedNoteDate);
             });
 
         $summary = (object) [
@@ -68,6 +96,12 @@ class DeliveryNotePageController extends Controller
                 ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                     $query->whereBetween('delivery_notes.note_date', [$semesterRange['start'], $semesterRange['end']]);
                 })
+                ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                    $query->where('delivery_notes.is_canceled', $selectedStatus === 'canceled');
+                })
+                ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
+                    $query->whereDate('delivery_notes.note_date', $selectedNoteDate);
+                })
                 ->sum('delivery_note_items.quantity'),
         ];
 
@@ -76,6 +110,8 @@ class DeliveryNotePageController extends Controller
             'search' => $search,
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
+            'selectedStatus' => $selectedStatus,
+            'selectedNoteDate' => $selectedNoteDate,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'summary' => $summary,
@@ -102,7 +138,6 @@ class DeliveryNotePageController extends Controller
             'recipient_phone' => ['nullable', 'string', 'max:30'],
             'city' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string'],
-            'created_by_name' => ['nullable', 'string', 'max:150'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -127,7 +162,7 @@ class DeliveryNotePageController extends Controller
                 'city' => $data['city'] ?? null,
                 'address' => $data['address'] ?? null,
                 'notes' => $data['notes'] ?? null,
-                'created_by_name' => $data['created_by_name'] ?? 'System',
+                'created_by_name' => auth()->user()?->name ?? __('txn.system_user'),
             ]);
 
             foreach ($data['items'] as $row) {
@@ -161,9 +196,16 @@ class DeliveryNotePageController extends Controller
             return $note;
         });
 
+        $this->auditLogService->log(
+            'delivery.note.create',
+            $note,
+            __('txn.audit_delivery_created', ['number' => $note->note_number]),
+            $request
+        );
+
         return redirect()
             ->route('delivery-notes.show', $note)
-            ->with('success', "Delivery note {$note->note_number} has been created.");
+            ->with('success', __('txn.delivery_note_created_success', ['number' => $note->note_number]));
     }
 
     public function show(DeliveryNote $deliveryNote): View
@@ -172,7 +214,114 @@ class DeliveryNotePageController extends Controller
 
         return view('delivery_notes.show', [
             'note' => $deliveryNote,
+            'products' => Product::query()
+                ->orderBy('name')
+                ->get(['id', 'code', 'name', 'unit', 'price_general']),
         ]);
+    }
+
+    public function adminUpdate(Request $request, DeliveryNote $deliveryNote): RedirectResponse
+    {
+        $data = $request->validate([
+            'note_date' => ['required', 'date'],
+            'recipient_name' => ['required', 'string', 'max:150'],
+            'recipient_phone' => ['nullable', 'string', 'max:30'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_name' => ['required', 'string', 'max:200'],
+            'items.*.unit' => ['nullable', 'string', 'max:30'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.notes' => ['nullable', 'string'],
+        ]);
+
+        DB::transaction(function () use ($deliveryNote, $data): void {
+            $note = DeliveryNote::query()
+                ->with('items')
+                ->whereKey($deliveryNote->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $note->update([
+                'note_date' => $data['note_date'],
+                'recipient_name' => $data['recipient_name'],
+                'recipient_phone' => $data['recipient_phone'] ?? null,
+                'city' => $data['city'] ?? null,
+                'address' => $data['address'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            $note->items()->delete();
+
+            foreach ($data['items'] as $row) {
+                $productId = $row['product_id'] ?? null;
+                $productCode = null;
+                $productName = $row['product_name'];
+                $unit = $row['unit'] ?? null;
+                $unitPrice = $row['unit_price'] ?? null;
+
+                if ($productId) {
+                    $product = Product::query()->find($productId);
+                    if ($product) {
+                        $productCode = $product->code;
+                        $productName = $product->name;
+                        $unit = $unit ?: $product->unit;
+                        $unitPrice = $unitPrice !== null && $unitPrice !== '' ? $unitPrice : $product->price_general;
+                    }
+                }
+
+                DeliveryNoteItem::create([
+                    'delivery_note_id' => $note->id,
+                    'product_id' => $productId,
+                    'product_code' => $productCode,
+                    'product_name' => $productName,
+                    'unit' => $unit,
+                    'quantity' => $row['quantity'],
+                    'unit_price' => $unitPrice !== null && $unitPrice !== '' ? (float) round((float) $unitPrice) : null,
+                    'notes' => $row['notes'] ?? null,
+                ]);
+            }
+        });
+
+        $deliveryNote->refresh();
+        $this->auditLogService->log(
+            'delivery.note.admin_update',
+            $deliveryNote,
+            __('txn.audit_delivery_admin_updated', ['number' => $deliveryNote->note_number]),
+            $request
+        );
+
+        return redirect()
+            ->route('delivery-notes.show', $deliveryNote)
+            ->with('success', __('txn.admin_update_saved'));
+    }
+
+    public function cancel(Request $request, DeliveryNote $deliveryNote): RedirectResponse
+    {
+        $data = $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $deliveryNote->update([
+            'is_canceled' => true,
+            'canceled_at' => now(),
+            'canceled_by_user_id' => auth()->id(),
+            'cancel_reason' => $data['cancel_reason'],
+        ]);
+
+        $this->auditLogService->log(
+            'delivery.note.cancel',
+            $deliveryNote,
+            __('txn.audit_delivery_canceled', ['number' => $deliveryNote->note_number]),
+            $request
+        );
+
+        return redirect()
+            ->route('delivery-notes.show', $deliveryNote)
+            ->with('success', __('txn.transaction_canceled_success'));
     }
 
     public function print(DeliveryNote $deliveryNote): View
@@ -218,15 +367,14 @@ class DeliveryNotePageController extends Controller
             fputcsv($handle, ['Notes', $deliveryNote->notes]);
             fputcsv($handle, []);
             fputcsv($handle, ['Items']);
-            fputcsv($handle, ['Code', 'Name', 'Unit', 'Qty', 'Unit Price', 'Notes']);
+            fputcsv($handle, ['Name', 'Unit', 'Qty', 'Unit Price', 'Notes']);
 
             foreach ($deliveryNote->items as $item) {
                 fputcsv($handle, [
-                    $item->product_code,
                     $item->product_name,
                     $item->unit,
                     $item->quantity,
-                    $item->unit_price,
+                    $item->unit_price !== null ? number_format((int) round((float) $item->unit_price), 0, ',', '.') : null,
                     $item->notes,
                 ]);
             }
@@ -303,8 +451,13 @@ class DeliveryNotePageController extends Controller
 
     private function configuredSemesterOptions()
     {
-        return collect(explode(',', (string) AppSetting::getValue('semester_period_options', '')))
+        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->filter(fn (string $item): bool => $item !== '');
+    }
+
+    private function semesterBookService(): SemesterBookService
+    {
+        return app(SemesterBookService::class);
     }
 }

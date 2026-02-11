@@ -23,6 +23,7 @@ class Customer extends Model
         'address',
         'id_card_photo_path',
         'outstanding_receivable',
+        'credit_balance',
         'notes',
     ];
 
@@ -32,7 +33,8 @@ class Customer extends Model
     protected function casts(): array
     {
         return [
-            'outstanding_receivable' => 'decimal:2',
+            'outstanding_receivable' => 'integer',
+            'credit_balance' => 'integer',
         ];
     }
 
@@ -84,3 +86,4 @@ class Customer extends Model
         return $this->hasMany(OrderNote::class);
     }
 }
+

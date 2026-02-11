@@ -31,7 +31,7 @@ class DeliveryNoteItem extends Model
     {
         return [
             'quantity' => 'integer',
-            'unit_price' => 'decimal:2',
+            'unit_price' => 'integer',
         ];
     }
 
@@ -51,3 +51,4 @@ class DeliveryNoteItem extends Model
         return $this->belongsTo(Product::class);
     }
 }
+

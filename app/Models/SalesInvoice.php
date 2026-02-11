@@ -26,6 +26,10 @@ class SalesInvoice extends Model
         'balance',
         'payment_status',
         'notes',
+        'is_canceled',
+        'canceled_at',
+        'canceled_by_user_id',
+        'cancel_reason',
     ];
 
     /**
@@ -36,10 +40,12 @@ class SalesInvoice extends Model
         return [
             'invoice_date' => 'date',
             'due_date' => 'date',
-            'subtotal' => 'decimal:2',
-            'total' => 'decimal:2',
-            'total_paid' => 'decimal:2',
-            'balance' => 'decimal:2',
+            'subtotal' => 'integer',
+            'total' => 'integer',
+            'total_paid' => 'integer',
+            'balance' => 'integer',
+            'is_canceled' => 'boolean',
+            'canceled_at' => 'datetime',
         ];
     }
 
@@ -67,3 +73,4 @@ class SalesInvoice extends Model
         return $this->hasMany(InvoicePayment::class);
     }
 }
+

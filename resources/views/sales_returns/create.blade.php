@@ -63,17 +63,18 @@
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
                 <tr>
-                    <th style="width: 40%">{{ __('txn.product') }} *</th>
-                    <th>{{ __('txn.current_stock') }}</th>
-                    <th>{{ __('txn.qty') }} *</th>
-                    <th>{{ __('txn.subtotal') }}</th>
+                    <th style="width: 36%">{{ __('txn.product') }} *</th>
+                    <th style="width: 10%">{{ __('txn.current_stock') }}</th>
+                    <th style="width: 8%">{{ __('txn.qty') }} *</th>
+                    <th style="width: 18%">{{ __('txn.price') }}</th>
+                    <th style="width: 20%">{{ __('txn.subtotal') }}</th>
                     <th></th>
                 </tr>
                 </thead>
                 <tbody></tbody>
             </table>
             <div style="margin-top: 10px; text-align: right;">
-                <strong>{{ __('txn.total_return') }}: Rp <span id="grand-total">0.00</span></strong>
+                <strong>{{ __('txn.total_return') }}: Rp <span id="grand-total">0</span></strong>
             </div>
         </div>
 
@@ -85,11 +86,34 @@
         const products = @json($products);
         const customers = @json($customers);
         const tbody = document.querySelector('#items-table tbody');
+        const productsList = document.getElementById('products-list');
         const grandTotal = document.getElementById('grand-total');
         const addBtn = document.getElementById('add-item');
         const form = document.querySelector('form');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer-id');
+        let currentCustomer = null;
+
+        function normalizeLevelLabel(value) {
+            return (value || '').toString().trim().toLowerCase();
+        }
+
+        function getPriceKeyForCustomer() {
+            if (!currentCustomer) {
+                return 'price_general';
+            }
+            const code = normalizeLevelLabel(currentCustomer.level?.code);
+            const name = normalizeLevelLabel(currentCustomer.level?.name);
+            const combined = `${code} ${name}`.trim();
+
+            if (combined.includes('agent') || combined.includes('agen')) {
+                return 'price_agent';
+            }
+            if (combined.includes('sales')) {
+                return 'price_sales';
+            }
+            return 'price_general';
+        }
 
         function customerLabel(customer) {
             const city = customer.city || '-';
@@ -108,8 +132,38 @@
                 || null;
         }
 
+        function setCurrentCustomer(customer) {
+            currentCustomer = customer;
+            customerIdField.value = customer ? customer.id : '';
+        }
+
         function productLabel(product) {
-            return `${product.code} - ${product.name}`;
+            return `${product.name}`;
+        }
+
+        function escapeAttribute(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function renderProductSuggestions(query) {
+            if (!productsList) {
+                return;
+            }
+            const normalized = (query || '').trim().toLowerCase();
+            const matches = products.filter((product) => {
+                const label = productLabel(product).toLowerCase();
+                const code = (product.code || '').toLowerCase();
+                const name = (product.name || '').toLowerCase();
+                return normalized === '' || label.includes(normalized) || code.includes(normalized) || name.includes(normalized);
+            }).slice(0, 60);
+
+            productsList.innerHTML = matches
+                .map((product) => `<option value="${escapeAttribute(productLabel(product))}"></option>`)
+                .join('');
         }
 
         function findProductByLabel(label) {
@@ -128,15 +182,26 @@
         function recalc() {
             let total = 0;
             document.querySelectorAll('#items-table tbody tr').forEach((row) => {
-                const qty = parseFloat(row.querySelector('.qty').value || 0);
+                const qty = parseInt(row.querySelector('.qty').value || 0, 10);
                 const productId = row.querySelector('.product-id')?.value;
                 const product = products.find(p => String(p.id) === String(productId));
-                const price = parseFloat((product && product.price_general) || 0);
+                const key = getPriceKeyForCustomer();
+                let price = 0;
+                if (product) {
+                    if (key === 'price_agent') {
+                        price = Math.round(Number(product.price_agent ?? product.price_general ?? 0));
+                    } else if (key === 'price_sales') {
+                        price = Math.round(Number(product.price_sales ?? product.price_general ?? 0));
+                    } else {
+                        price = Math.round(Number(product.price_general ?? 0));
+                    }
+                }
                 const line = Math.max(0, qty * price);
-                row.querySelector('.line-total').textContent = line.toFixed(2);
+                row.querySelector('.line-price').textContent = product ? new Intl.NumberFormat('id-ID').format(price) : '-';
+                row.querySelector('.line-total').textContent = new Intl.NumberFormat('id-ID').format(Math.round(line));
                 total += line;
             });
-            grandTotal.textContent = total.toFixed(2);
+            grandTotal.textContent = new Intl.NumberFormat('id-ID').format(Math.round(total));
         }
 
         function updateRowMeta(row, product) {
@@ -153,16 +218,21 @@
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                 </td>
                 <td class="stock">-</td>
-                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required></td>
-                <td>Rp <span class="line-total">0.00</span></td>
+                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required style="max-width: 88px;"></td>
+                <td style="white-space: nowrap; text-align: right;">Rp <span class="line-price">-</span></td>
+                <td style="white-space: nowrap; text-align: right;">Rp <span class="line-total">0</span></td>
                 <td><button type="button" class="btn secondary remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
 
             tr.querySelector('.product-search').addEventListener('input', (event) => {
+                renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 updateRowMeta(tr, product);
+            });
+            tr.querySelector('.product-search').addEventListener('focus', (event) => {
+                renderProductSuggestions(event.currentTarget.value);
             });
             tr.querySelectorAll('.qty').forEach((el) => el.addEventListener('input', recalc));
             tr.querySelector('.remove').addEventListener('click', () => {
@@ -172,23 +242,24 @@
         }
 
         addBtn.addEventListener('click', addRow);
+        renderProductSuggestions('');
         if (customerSearch) {
             const bootCustomer = customerIdField.value
                 ? customers.find(c => String(c.id) === String(customerIdField.value))
                 : findCustomerByLabel(customerSearch.value);
-            if (bootCustomer) {
-                customerIdField.value = bootCustomer.id;
-            }
+            setCurrentCustomer(bootCustomer);
             customerSearch.addEventListener('input', (event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value);
-                customerIdField.value = customer ? customer.id : '';
+                setCurrentCustomer(customer);
+                recalc();
             });
             customerSearch.addEventListener('change', (event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value);
-                customerIdField.value = customer ? customer.id : '';
+                setCurrentCustomer(customer);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
                 }
+                recalc();
             });
         }
         if (form) {
@@ -206,7 +277,8 @@
 
     <datalist id="products-list">
         @foreach($products as $product)
-            <option value="{{ $product->code }} - {{ $product->name }}"></option>
+            <option value="{{ $product->name }}"></option>
         @endforeach
     </datalist>
 @endsection
+

@@ -8,51 +8,51 @@
     <div class="grid">
         <div class="stat">
             <div class="stat-label">{{ __('ui.dashboard_total_products') }}</div>
-            <div class="stat-value">{{ number_format($summary['total_products']) }}</div>
+            <div class="stat-value">{{ (int) round($summary['total_products']) }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">{{ __('ui.dashboard_total_customers') }}</div>
-            <div class="stat-value">{{ number_format($summary['total_customers']) }}</div>
+            <div class="stat-value">{{ (int) round($summary['total_customers']) }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">{{ __('ui.dashboard_global_receivable') }}</div>
-            <div class="stat-value">Rp {{ number_format($summary['total_receivable'], 2) }}</div>
+            <div class="stat-value">Rp {{ number_format((int) round($summary['total_receivable']), 0, ',', '.') }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">{{ __('ui.dashboard_invoice_this_month') }}</div>
-            <div class="stat-value">Rp {{ number_format($summary['invoice_this_month'], 2) }}</div>
+            <div class="stat-value">Rp {{ number_format((int) round($summary['invoice_this_month']), 0, ',', '.') }}</div>
         </div>
     </div>
 
-    <div class="card">
-        <h3>{{ __('ui.dashboard_recent_invoices') }}</h3>
-        <table>
-            <thead>
-            <tr>
-                <th>{{ __('txn.no') }}</th>
-                <th>{{ __('txn.date') }}</th>
-                <th>{{ __('txn.customer') }}</th>
-                <th>{{ __('txn.total') }}</th>
-                <th>{{ __('txn.balance') }}</th>
-                <th>{{ __('txn.status') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse ($recentInvoices as $invoice)
-                <tr>
-                    <td><a href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a></td>
-                    <td>{{ $invoice->invoice_date->format('d-m-Y') }}</td>
-                    <td>{{ $invoice->customer->name }}</td>
-                    <td>Rp {{ number_format($invoice->total, 2) }}</td>
-                    <td>Rp {{ number_format($invoice->balance, 2) }}</td>
-                    <td>{{ strtoupper($invoice->payment_status) }}</td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="6" class="muted">{{ __('ui.dashboard_no_invoices') }}</td>
-                </tr>
-            @endforelse
-            </tbody>
-        </table>
+    <div class="row" style="margin-top: 8px;">
+        <div class="col-6">
+            <div class="card">
+                <h3>{{ __('ui.dashboard_uncollected_receivables') }}</h3>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>{{ __('ui.customer') }}</th>
+                        <th>{{ __('ui.city') }}</th>
+                        <th>{{ __('ui.dashboard_global_receivable') }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @forelse ($uncollectedCustomers as $customer)
+                        <tr>
+                            <td>{{ $customer->name }}</td>
+                            <td>{{ $customer->city ?: '-' }}</td>
+                            <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="muted">{{ __('ui.dashboard_no_uncollected_receivables') }}</td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 @endsection
+
+

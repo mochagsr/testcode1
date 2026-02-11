@@ -9,8 +9,8 @@
     </div>
 
     <div class="card">
-        <form method="get" class="flex">
-            <input type="text" name="search" placeholder="{{ __('ui.search_item_categories_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+        <form id="item-categories-search-form" method="get" class="flex">
+            <input id="item-categories-search-input" type="text" name="search" placeholder="{{ __('ui.search_item_categories_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <button type="submit">{{ __('ui.search') }}</button>
         </form>
     </div>
@@ -50,4 +50,24 @@
             {{ $categories->links() }}
         </div>
     </div>
+
+    <script>
+        (function () {
+            const form = document.getElementById('item-categories-search-form');
+            const searchInput = document.getElementById('item-categories-search-input');
+            if (!form || !searchInput) {
+                return;
+            }
+
+            let debounceTimer = null;
+            searchInput.addEventListener('input', () => {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+                debounceTimer = setTimeout(() => {
+                    form.requestSubmit();
+                }, 100);
+            });
+        })();
+    </script>
 @endsection

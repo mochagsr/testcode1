@@ -24,6 +24,10 @@ class DeliveryNote extends Model
         'address',
         'notes',
         'created_by_name',
+        'is_canceled',
+        'canceled_at',
+        'canceled_by_user_id',
+        'cancel_reason',
     ];
 
     /**
@@ -33,6 +37,8 @@ class DeliveryNote extends Model
     {
         return [
             'note_date' => 'date',
+            'is_canceled' => 'boolean',
+            'canceled_at' => 'datetime',
         ];
     }
 

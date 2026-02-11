@@ -9,41 +9,46 @@
     </div>
 
     <div class="card">
-        <form method="get" class="flex">
-            <input type="text" name="search" placeholder="{{ __('txn.search_invoice_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <select name="semester" style="max-width: 180px;">
+        <form id="sales-invoices-filter-form" method="get" class="flex">
+            <input id="sales-invoices-search-input" type="text" name="search" placeholder="{{ __('txn.search_invoice_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+            <input id="sales-invoices-date-input" type="date" name="invoice_date" value="{{ $selectedInvoiceDate }}" style="max-width: 180px;">
+            <select id="sales-invoices-semester-input" name="semester" style="max-width: 180px;">
                 <option value="">{{ __('txn.all_semesters') }}</option>
                 @foreach($semesterOptions as $semester)
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
                 @endforeach
             </select>
+            <select id="sales-invoices-status-input" name="status" style="max-width: 180px;">
+                <option value="">{{ __('txn.all_statuses') }}</option>
+                <option value="active" @selected($selectedStatus === 'active')>{{ __('txn.status_active') }}</option>
+                <option value="canceled" @selected($selectedStatus === 'canceled')>{{ __('txn.status_canceled') }}</option>
+            </select>
             <button type="submit">{{ __('txn.search') }}</button>
+            <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
+                <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'status' => $selectedStatus, 'invoice_date' => $selectedInvoiceDate]) }}">{{ __('txn.all') }}</a>
+                <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'semester' => $currentSemester, 'status' => $selectedStatus, 'invoice_date' => $selectedInvoiceDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
+                <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'semester' => $previousSemester, 'status' => $selectedStatus, 'invoice_date' => $selectedInvoiceDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
+            </div>
         </form>
-        <div class="flex" style="margin-top: 10px; gap: 8px;">
-            <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search]) }}">{{ __('txn.all') }}</a>
-            <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'semester' => $currentSemester]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
-            <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'semester' => $previousSemester]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
-        </div>
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.summary') }} {{ $selectedSemester ?: __('txn.all_semesters') }}</strong>
             <div class="muted">
-                {{ __('txn.summary_total_invoices') }}: {{ number_format((int) ($semesterSummary->total_invoice ?? 0)) }} |
-                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((float) ($semesterSummary->grand_total ?? 0), 2) }} |
-                {{ __('txn.summary_paid') }}: Rp {{ number_format((float) ($semesterSummary->paid_total ?? 0), 2) }} |
-                {{ __('txn.summary_balance') }}: Rp {{ number_format((float) ($semesterSummary->balance_total ?? 0), 2) }}
+                {{ __('txn.summary_total_invoices') }}: {{ (int) round((int) ($semesterSummary->total_invoice ?? 0)) }} |
+                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((int) round((float) ($semesterSummary->grand_total ?? 0), 0), 0, ',', '.') }}
             </div>
         </div>
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_sales_invoices') }}</strong>
-            <div class="flex">
-                <a class="btn secondary" target="_blank" href="{{ route('reports.print', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</a>
-                <a class="btn secondary" href="{{ route('reports.export.pdf', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</a>
-                <a class="btn" href="{{ route('reports.export.csv', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.excel') }}</a>
-            </div>
+            <select style="max-width: 220px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                <option value="">{{ __('txn.action') }}</option>
+                <option value="{{ route('reports.print', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</option>
+                <option value="{{ route('reports.export.pdf', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
+                <option value="{{ route('reports.export.csv', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.excel') }}</option>
+            </select>
         </div>
     </div>
 
@@ -55,34 +60,50 @@
                 <th>{{ __('txn.date') }}</th>
                 <th>{{ __('txn.customer') }}</th>
                 <th>{{ __('txn.total') }}</th>
-                <th>{{ __('txn.paid') }}</th>
-                <th>{{ __('txn.balance') }}</th>
-                <th>{{ __('txn.status') }}</th>
                 <th>{{ __('txn.action') }}</th>
             </tr>
             </thead>
             <tbody>
             @forelse ($invoices as $invoice)
+                @php
+                    $lockKey = ((int) $invoice->customer_id).':'.(string) $invoice->semester_period;
+                    $lockState = $customerSemesterLockMap[$lockKey] ?? ['locked' => false, 'manual' => false, 'auto' => false];
+                @endphp
                 <tr>
                     <td><a href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a></td>
                     <td>{{ $invoice->invoice_date->format('d-m-Y') }}</td>
-                    <td>{{ $invoice->customer->name }} <span class="muted">({{ $invoice->customer->city }})</span></td>
-                    <td>Rp {{ number_format($invoice->total, 2) }}</td>
-                    <td>Rp {{ number_format($invoice->total_paid, 2) }}</td>
-                    <td>Rp {{ number_format($invoice->balance, 2) }}</td>
-                    <td>{{ strtoupper($invoice->payment_status) }}</td>
+                    <td>
+                        {{ $invoice->customer->name }} <span class="muted">({{ $invoice->customer->city }})</span>
+                        @if((bool) ($lockState['locked'] ?? false))
+                            <div style="margin-top: 4px;">
+                                <span class="badge danger">
+                                    @if((bool) ($lockState['auto'] ?? false))
+                                        {{ __('receivable.customer_semester_locked_auto') }}
+                                    @elseif((bool) ($lockState['manual'] ?? false))
+                                        {{ __('receivable.customer_semester_locked_manual') }}
+                                    @else
+                                        {{ __('receivable.customer_semester_closed') }}
+                                    @endif
+                                </span>
+                            </div>
+                        @endif
+                    </td>
+                    <td>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</td>
                     <td>
                         <div class="flex">
                             <a class="btn secondary" href="{{ route('sales-invoices.show', $invoice) }}">{{ __('txn.detail') }}</a>
-                            <a class="btn secondary" target="_blank" href="{{ route('sales-invoices.print', $invoice) }}">{{ __('txn.print') }}</a>
-                            <a class="btn secondary" href="{{ route('sales-invoices.export.pdf', $invoice) }}">{{ __('txn.pdf') }}</a>
-                            <a class="btn" href="{{ route('sales-invoices.export.excel', $invoice) }}">{{ __('txn.excel') }}</a>
+                            <select style="max-width: 160px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                                <option value="">{{ __('txn.action') }}</option>
+                                <option value="{{ route('sales-invoices.print', $invoice) }}">{{ __('txn.print') }}</option>
+                                <option value="{{ route('sales-invoices.export.pdf', $invoice) }}">{{ __('txn.pdf') }}</option>
+                                <option value="{{ route('sales-invoices.export.excel', $invoice) }}">{{ __('txn.excel') }}</option>
+                            </select>
                         </div>
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="muted">{{ __('txn.no_data_found') }}</td>
+                    <td colspan="5" class="muted">{{ __('txn.no_data_found') }}</td>
                 </tr>
             @endforelse
             </tbody>
@@ -92,4 +113,35 @@
             {{ $invoices->links() }}
         </div>
     </div>
+
+    <script>
+        (function () {
+            const form = document.getElementById('sales-invoices-filter-form');
+            const searchInput = document.getElementById('sales-invoices-search-input');
+            const dateInput = document.getElementById('sales-invoices-date-input');
+            const semesterInput = document.getElementById('sales-invoices-semester-input');
+            const statusInput = document.getElementById('sales-invoices-status-input');
+
+            if (!form || !searchInput || !dateInput || !semesterInput || !statusInput) {
+                return;
+            }
+
+            let debounceTimer = null;
+            searchInput.addEventListener('input', () => {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+
+                debounceTimer = setTimeout(() => {
+                    form.requestSubmit();
+                }, 100);
+            });
+
+            dateInput.addEventListener('change', () => form.requestSubmit());
+            semesterInput.addEventListener('change', () => form.requestSubmit());
+            statusInput.addEventListener('change', () => form.requestSubmit());
+        })();
+    </script>
 @endsection
+
+

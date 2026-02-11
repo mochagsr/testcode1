@@ -24,6 +24,10 @@ class ReceivablePayment extends Model
         'user_signature',
         'notes',
         'created_by_user_id',
+        'is_canceled',
+        'canceled_at',
+        'canceled_by_user_id',
+        'cancel_reason',
     ];
 
     /**
@@ -33,7 +37,9 @@ class ReceivablePayment extends Model
     {
         return [
             'payment_date' => 'date',
-            'amount' => 'decimal:2',
+            'amount' => 'integer',
+            'is_canceled' => 'boolean',
+            'canceled_at' => 'datetime',
         ];
     }
 
@@ -53,3 +59,4 @@ class ReceivablePayment extends Model
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }
+

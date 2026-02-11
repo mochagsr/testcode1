@@ -1,0 +1,67 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Models\ItemCategory;
+use App\Models\Product;
+use App\Support\ProductCodeGenerator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ProductCodeGeneratorTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_generate_base_builds_expected_short_code_pattern(): void
+    {
+        $generator = app(ProductCodeGenerator::class);
+
+        $code = $generator->generateBase('matematika 1 edisi 5 semester 1 tahun ajar 2025-2026');
+
+        $this->assertSame('mt1e5s156', $code);
+    }
+
+    public function test_generate_base_supports_abbreviated_edition_semester_and_short_year(): void
+    {
+        $generator = app(ProductCodeGenerator::class);
+
+        $code = $generator->generateBase('matematika 1 ed 5 smt 1 25/26');
+
+        $this->assertSame('mt1e5s156', $code);
+    }
+
+    public function test_normalize_input_cleans_manual_code(): void
+    {
+        $generator = app(ProductCodeGenerator::class);
+
+        $normalized = $generator->normalizeInput('  MANUAL -- 001 !! ');
+
+        $this->assertSame('manual-001', $normalized);
+    }
+
+    public function test_resolve_appends_sequence_for_conflicting_generated_code(): void
+    {
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-01',
+            'name' => 'Kategori',
+        ]);
+
+        Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'mt1e5s156',
+            'name' => 'Existing',
+            'unit' => 'pcs',
+            'stock' => 1,
+            'price_agent' => 1000,
+            'price_sales' => 1000,
+            'price_general' => 1000,
+            'is_active' => true,
+        ]);
+
+        $generator = app(ProductCodeGenerator::class);
+
+        $resolved = $generator->resolve('', 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026');
+
+        $this->assertSame('mt1e5s15601', $resolved);
+    }
+}

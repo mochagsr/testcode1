@@ -22,6 +22,14 @@
             --alert-error-bg: #fff0f0;
             --alert-error-border: #f1a5a5;
             --alert-error-text: #3a1515;
+            --badge-neutral-bg: #eceff3;
+            --badge-neutral-text: #243447;
+            --badge-success-bg: #e8f7ed;
+            --badge-success-text: #1f6b3d;
+            --badge-warning-bg: #fff4dc;
+            --badge-warning-text: #7a4b00;
+            --badge-danger-bg: #ffe7e7;
+            --badge-danger-text: #8d1f1f;
         }
         * { box-sizing: border-box; }
         body {
@@ -164,6 +172,15 @@
             border-radius: 8px;
             font: inherit;
             background: #fff;
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
         }
         /* Form fields: vertical stack, 10px spacing */
         form .row {
@@ -312,6 +329,32 @@
             align-items: center;
             flex-wrap: wrap;
         }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.2;
+            white-space: nowrap;
+            background: var(--badge-neutral-bg);
+            color: var(--badge-neutral-text);
+            border: 1px solid transparent;
+        }
+        .badge.success {
+            background: var(--badge-success-bg);
+            color: var(--badge-success-text);
+        }
+        .badge.warning {
+            background: var(--badge-warning-bg);
+            color: var(--badge-warning-text);
+        }
+        .badge.danger {
+            background: var(--badge-danger-bg);
+            color: var(--badge-danger-text);
+        }
         @media (max-width: 900px) {
             .wrap { grid-template-columns: 1fr; }
             .sidebar { position: sticky; top: 0; z-index: 10; }
@@ -330,7 +373,7 @@
 @php
     $isDark = auth()->check() && auth()->user()->theme === 'dark';
 @endphp
-<body @if($isDark) style="--bg:#111;--card:#1b1b1b;--text:#f2f2f2;--muted:#b3b3b3;--border:#333;--accent:#fff;--btn-primary-bg:#f2f2f2;--btn-primary-text:#111111;--btn-secondary-bg:#1b1b1b;--btn-secondary-text:#f2f2f2;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;" @endif>
+<body @if($isDark) style="--bg:#111;--card:#1b1b1b;--text:#f2f2f2;--muted:#b3b3b3;--border:#333;--accent:#fff;--btn-primary-bg:#f2f2f2;--btn-primary-text:#111111;--btn-secondary-bg:#1b1b1b;--btn-secondary-text:#f2f2f2;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
 <div class="wrap">
     <aside class="sidebar">
         <div class="brand">PgPOS ERP</div>
@@ -407,6 +450,11 @@
                     @endforeach
                 </ul>
             </div>
+        @endif
+        @if (session('error_popup'))
+            <script>
+                alert(@json((string) session('error_popup')));
+            </script>
         @endif
         @yield('content')
     </main>

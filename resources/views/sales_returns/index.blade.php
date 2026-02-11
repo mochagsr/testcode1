@@ -9,39 +9,46 @@
     </div>
 
     <div class="card">
-        <form method="get" class="flex">
-            <input type="text" name="search" placeholder="{{ __('txn.search_return_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <select name="semester" style="max-width: 180px;">
+        <form id="sales-returns-filter-form" method="get" class="flex">
+            <input id="sales-returns-search-input" type="text" name="search" placeholder="{{ __('txn.search_return_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+            <input id="sales-returns-date-input" type="date" name="return_date" value="{{ $selectedReturnDate }}" style="max-width: 180px;">
+            <select id="sales-returns-semester-input" name="semester" style="max-width: 180px;">
                 <option value="">{{ __('txn.all_semesters') }}</option>
                 @foreach($semesterOptions as $semester)
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
                 @endforeach
             </select>
+            <select id="sales-returns-status-input" name="status" style="max-width: 180px;">
+                <option value="">{{ __('txn.all_statuses') }}</option>
+                <option value="active" @selected($selectedStatus === 'active')>{{ __('txn.status_active') }}</option>
+                <option value="canceled" @selected($selectedStatus === 'canceled')>{{ __('txn.status_canceled') }}</option>
+            </select>
             <button type="submit">{{ __('txn.search') }}</button>
+            <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
+                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.all') }}</a>
+                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $currentSemester, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
+                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $previousSemester, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
+            </div>
         </form>
-        <div class="flex" style="margin-top: 10px; gap: 8px;">
-            <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search]) }}">{{ __('txn.all') }}</a>
-            <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $currentSemester]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
-            <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $previousSemester]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
-        </div>
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.summary') }} {{ $selectedSemester ?: __('txn.all_semesters') }}</strong>
             <div class="muted">
-                {{ __('txn.summary_total_returns') }}: {{ number_format((int) ($semesterSummary->total_return ?? 0)) }} |
-                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((float) ($semesterSummary->grand_total ?? 0), 2) }}
+                {{ __('txn.summary_total_returns') }}: {{ (int) round((int) ($semesterSummary->total_return ?? 0)) }} |
+                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((int) round((float) ($semesterSummary->grand_total ?? 0), 0), 0, ',', '.') }}
             </div>
         </div>
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_sales_returns') }}</strong>
-            <div class="flex">
-                <a class="btn secondary" target="_blank" href="{{ route('reports.print', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</a>
-                <a class="btn secondary" href="{{ route('reports.export.pdf', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</a>
-                <a class="btn" href="{{ route('reports.export.csv', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">{{ __('txn.excel') }}</a>
-            </div>
+            <select style="max-width: 220px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                <option value="">{{ __('txn.action') }}</option>
+                <option value="{{ route('reports.print', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</option>
+                <option value="{{ route('reports.export.pdf', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
+                <option value="{{ route('reports.export.csv', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">{{ __('txn.excel') }}</option>
+            </select>
         </div>
     </div>
 
@@ -53,27 +60,51 @@
                 <th>{{ __('txn.date') }}</th>
                 <th>{{ __('txn.customer') }}</th>
                 <th>{{ __('txn.total_return') }}</th>
+                <th>{{ __('txn.status') }}</th>
                 <th>{{ __('txn.action') }}</th>
             </tr>
             </thead>
             <tbody>
             @forelse ($returns as $row)
+                @php
+                    $lockKey = ((int) $row->customer_id).':'.(string) $row->semester_period;
+                    $lockState = $customerSemesterLockMap[$lockKey] ?? ['locked' => false, 'manual' => false, 'auto' => false];
+                @endphp
                 <tr>
                     <td><a href="{{ route('sales-returns.show', $row) }}">{{ $row->return_number }}</a></td>
                     <td>{{ $row->return_date->format('d-m-Y') }}</td>
-                    <td>{{ $row->customer->name }} <span class="muted">({{ $row->customer->city }})</span></td>
-                    <td>Rp {{ number_format($row->total, 2) }}</td>
+                    <td>
+                        {{ $row->customer->name }} <span class="muted">({{ $row->customer->city }})</span>
+                        @if((bool) ($lockState['locked'] ?? false))
+                            <div style="margin-top: 4px;">
+                                <span class="badge danger">
+                                    @if((bool) ($lockState['auto'] ?? false))
+                                        {{ __('receivable.customer_semester_locked_auto') }}
+                                    @elseif((bool) ($lockState['manual'] ?? false))
+                                        {{ __('receivable.customer_semester_locked_manual') }}
+                                    @else
+                                        {{ __('receivable.customer_semester_closed') }}
+                                    @endif
+                                </span>
+                            </div>
+                        @endif
+                    </td>
+                    <td>Rp {{ number_format((int) round($row->total), 0, ',', '.') }}</td>
+                    <td>{{ $row->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
                     <td>
                         <div class="flex">
                             <a class="btn secondary" href="{{ route('sales-returns.show', $row) }}">{{ __('txn.detail') }}</a>
-                            <a class="btn secondary" target="_blank" href="{{ route('sales-returns.print', $row) }}">{{ __('txn.print') }}</a>
-                            <a class="btn secondary" href="{{ route('sales-returns.export.pdf', $row) }}">{{ __('txn.pdf') }}</a>
-                            <a class="btn" href="{{ route('sales-returns.export.excel', $row) }}">{{ __('txn.excel') }}</a>
+                            <select style="max-width: 160px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                                <option value="">{{ __('txn.action') }}</option>
+                                <option value="{{ route('sales-returns.print', $row) }}">{{ __('txn.print') }}</option>
+                                <option value="{{ route('sales-returns.export.pdf', $row) }}">{{ __('txn.pdf') }}</option>
+                                <option value="{{ route('sales-returns.export.excel', $row) }}">{{ __('txn.excel') }}</option>
+                            </select>
                         </div>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="muted">{{ __('txn.no_returns_found') }}</td></tr>
+                <tr><td colspan="6" class="muted">{{ __('txn.no_returns_found') }}</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -82,4 +113,35 @@
             {{ $returns->links() }}
         </div>
     </div>
+
+    <script>
+        (function () {
+            const form = document.getElementById('sales-returns-filter-form');
+            const searchInput = document.getElementById('sales-returns-search-input');
+            const dateInput = document.getElementById('sales-returns-date-input');
+            const semesterInput = document.getElementById('sales-returns-semester-input');
+            const statusInput = document.getElementById('sales-returns-status-input');
+
+            if (!form || !searchInput || !dateInput || !semesterInput || !statusInput) {
+                return;
+            }
+
+            let debounceTimer = null;
+            searchInput.addEventListener('input', () => {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+
+                debounceTimer = setTimeout(() => {
+                    form.requestSubmit();
+                }, 100);
+            });
+
+            dateInput.addEventListener('change', () => form.requestSubmit());
+            semesterInput.addEventListener('change', () => form.requestSubmit());
+            statusInput.addEventListener('change', () => form.requestSubmit());
+        })();
+    </script>
 @endsection
+
+

@@ -7,6 +7,8 @@ use App\Models\Customer;
 use App\Models\OrderNote;
 use App\Models\OrderNoteItem;
 use App\Models\Product;
+use App\Services\AuditLogService;
+use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -17,11 +19,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderNotePageController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogService $auditLogService
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $search = trim((string) $request->string('search', ''));
         $semester = trim((string) $request->string('semester', ''));
+        $status = trim((string) $request->string('status', ''));
+        $noteDate = trim((string) $request->string('note_date', ''));
+        $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
         $selectedSemester = $semester !== '' ? $semester : null;
+        $selectedNoteDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $noteDate) === 1 ? $noteDate : null;
 
         $currentSemester = $this->currentSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
@@ -38,6 +49,11 @@ class OrderNotePageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
+        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
+            $selectedSemester = null;
+            $semesterRange = null;
+        }
 
         $notes = OrderNote::query()
             ->with('customer:id,name,city')
@@ -51,6 +67,12 @@ class OrderNotePageController extends Controller
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
             })
+            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                $query->where('is_canceled', $selectedStatus === 'canceled');
+            })
+            ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
+                $query->whereDate('note_date', $selectedNoteDate);
+            })
             ->latest('note_date')
             ->latest('id')
             ->paginate(25)
@@ -59,6 +81,12 @@ class OrderNotePageController extends Controller
         $summaryQuery = OrderNote::query()
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
+            })
+            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                $query->where('is_canceled', $selectedStatus === 'canceled');
+            })
+            ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
+                $query->whereDate('note_date', $selectedNoteDate);
             });
 
         $summary = (object) [
@@ -68,6 +96,12 @@ class OrderNotePageController extends Controller
                 ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                     $query->whereBetween('order_notes.note_date', [$semesterRange['start'], $semesterRange['end']]);
                 })
+                ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                    $query->where('order_notes.is_canceled', $selectedStatus === 'canceled');
+                })
+                ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
+                    $query->whereDate('order_notes.note_date', $selectedNoteDate);
+                })
                 ->sum('order_note_items.quantity'),
         ];
 
@@ -76,6 +110,8 @@ class OrderNotePageController extends Controller
             'search' => $search,
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
+            'selectedStatus' => $selectedStatus,
+            'selectedNoteDate' => $selectedNoteDate,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'summary' => $summary,
@@ -101,7 +137,6 @@ class OrderNotePageController extends Controller
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
             'city' => ['nullable', 'string', 'max:100'],
-            'created_by_name' => ['nullable', 'string', 'max:150'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -122,7 +157,7 @@ class OrderNotePageController extends Controller
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'city' => $data['city'] ?? null,
-                'created_by_name' => $data['created_by_name'] ?? 'System',
+                'created_by_name' => auth()->user()?->name ?? __('txn.system_user'),
                 'notes' => $data['notes'] ?? null,
             ]);
 
@@ -152,9 +187,16 @@ class OrderNotePageController extends Controller
             return $note;
         });
 
+        $this->auditLogService->log(
+            'order.note.create',
+            $note,
+            __('txn.audit_order_created', ['number' => $note->note_number]),
+            $request
+        );
+
         return redirect()
             ->route('order-notes.show', $note)
-            ->with('success', "Order note {$note->note_number} has been created.");
+            ->with('success', __('txn.order_note_created_success', ['number' => $note->note_number]));
     }
 
     public function show(OrderNote $orderNote): View
@@ -163,7 +205,103 @@ class OrderNotePageController extends Controller
 
         return view('order_notes.show', [
             'note' => $orderNote,
+            'products' => Product::query()
+                ->orderBy('name')
+                ->get(['id', 'code', 'name']),
         ]);
+    }
+
+    public function adminUpdate(Request $request, OrderNote $orderNote): RedirectResponse
+    {
+        $data = $request->validate([
+            'note_date' => ['required', 'date'],
+            'customer_name' => ['required', 'string', 'max:150'],
+            'customer_phone' => ['nullable', 'string', 'max:30'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_name' => ['required', 'string', 'max:200'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.notes' => ['nullable', 'string'],
+        ]);
+
+        DB::transaction(function () use ($orderNote, $data): void {
+            $note = OrderNote::query()
+                ->with('items')
+                ->whereKey($orderNote->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $note->update([
+                'note_date' => $data['note_date'],
+                'customer_name' => $data['customer_name'],
+                'customer_phone' => $data['customer_phone'] ?? null,
+                'city' => $data['city'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            $note->items()->delete();
+
+            foreach ($data['items'] as $row) {
+                $productId = $row['product_id'] ?? null;
+                $productCode = null;
+                $productName = $row['product_name'];
+                if ($productId) {
+                    $product = Product::query()->find($productId);
+                    if ($product) {
+                        $productCode = $product->code;
+                        $productName = $product->name;
+                    }
+                }
+
+                OrderNoteItem::create([
+                    'order_note_id' => $note->id,
+                    'product_id' => $productId,
+                    'product_code' => $productCode,
+                    'product_name' => $productName,
+                    'quantity' => $row['quantity'],
+                    'notes' => $row['notes'] ?? null,
+                ]);
+            }
+        });
+
+        $orderNote->refresh();
+        $this->auditLogService->log(
+            'order.note.admin_update',
+            $orderNote,
+            __('txn.audit_order_admin_updated', ['number' => $orderNote->note_number]),
+            $request
+        );
+
+        return redirect()
+            ->route('order-notes.show', $orderNote)
+            ->with('success', __('txn.admin_update_saved'));
+    }
+
+    public function cancel(Request $request, OrderNote $orderNote): RedirectResponse
+    {
+        $data = $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $orderNote->update([
+            'is_canceled' => true,
+            'canceled_at' => now(),
+            'canceled_by_user_id' => auth()->id(),
+            'cancel_reason' => $data['cancel_reason'],
+        ]);
+
+        $this->auditLogService->log(
+            'order.note.cancel',
+            $orderNote,
+            __('txn.audit_order_canceled', ['number' => $orderNote->note_number]),
+            $request
+        );
+
+        return redirect()
+            ->route('order-notes.show', $orderNote)
+            ->with('success', __('txn.transaction_canceled_success'));
     }
 
     public function print(OrderNote $orderNote): View
@@ -208,11 +346,10 @@ class OrderNotePageController extends Controller
             fputcsv($handle, ['Notes', $orderNote->notes]);
             fputcsv($handle, []);
             fputcsv($handle, ['Items']);
-            fputcsv($handle, ['Code', 'Name', 'Qty', 'Notes']);
+            fputcsv($handle, ['Name', 'Qty', 'Notes']);
 
             foreach ($orderNote->items as $item) {
                 fputcsv($handle, [
-                    $item->product_code,
                     $item->product_name,
                     $item->quantity,
                     $item->notes,
@@ -291,8 +428,13 @@ class OrderNotePageController extends Controller
 
     private function configuredSemesterOptions()
     {
-        return collect(explode(',', (string) AppSetting::getValue('semester_period_options', '')))
+        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->filter(fn (string $item): bool => $item !== '');
+    }
+
+    private function semesterBookService(): SemesterBookService
+    {
+        return app(SemesterBookService::class);
     }
 }

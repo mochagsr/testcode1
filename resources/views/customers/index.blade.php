@@ -9,8 +9,8 @@
     </div>
 
     <div class="card">
-        <form method="get" class="flex">
-            <input type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+        <form id="customers-search-form" method="get" class="flex">
+            <input id="customers-search-input" type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <button type="submit">{{ __('ui.search') }}</button>
         </form>
     </div>
@@ -35,10 +35,10 @@
                     <td>{{ $customer->level?->code ?: '-' }}</td>
                     <td>{{ $customer->phone ?: '-' }}</td>
                     <td>{{ $customer->city ?: '-' }}</td>
-                    <td>Rp {{ number_format($customer->outstanding_receivable, 2) }}</td>
+                    <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
                     <td>
                         @if($customer->id_card_photo_path)
-                            <a class="btn secondary" target="_blank" href="{{ asset('storage/'.$customer->id_card_photo_path) }}">{{ __('ui.view') }}</a>
+                            <a class="btn secondary id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$customer->id_card_photo_path) }}">{{ __('ui.view') }}</a>
                         @else
                             -
                         @endif
@@ -64,4 +64,54 @@
             {{ $customers->links() }}
         </div>
     </div>
+
+    <div id="id-card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; align-items:center; justify-content:center;">
+        <img id="id-card-modal-image" src="" alt="ID Card" style="max-width:25vw; max-height:25vh; width:auto; height:auto; border:2px solid #fff; border-radius:8px; background:#fff;">
+    </div>
+
+    <script>
+        (function () {
+            const searchForm = document.getElementById('customers-search-form');
+            const searchInput = document.getElementById('customers-search-input');
+            const modal = document.getElementById('id-card-modal');
+            const modalImage = document.getElementById('id-card-modal-image');
+            const triggers = document.querySelectorAll('.id-card-preview-trigger');
+            if (searchForm && searchInput) {
+                let debounceTimer = null;
+                searchInput.addEventListener('input', () => {
+                    if (debounceTimer) {
+                        clearTimeout(debounceTimer);
+                    }
+                    debounceTimer = setTimeout(() => {
+                        searchForm.requestSubmit();
+                    }, 100);
+                });
+            }
+            if (!modal || !modalImage || !triggers.length) {
+                return;
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+                modalImage.setAttribute('src', '');
+            }
+
+            triggers.forEach((trigger) => {
+                trigger.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    const image = trigger.getAttribute('data-image');
+                    if (!image) {
+                        return;
+                    }
+                    modalImage.setAttribute('src', image);
+                    modal.style.display = 'flex';
+                });
+            });
+
+            modal.addEventListener('click', closeModal);
+            modalImage.addEventListener('click', closeModal);
+        })();
+    </script>
 @endsection
+
+

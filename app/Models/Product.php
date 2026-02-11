@@ -33,9 +33,9 @@ class Product extends Model
     {
         return [
             'stock' => 'integer',
-            'price_agent' => 'decimal:2',
-            'price_sales' => 'decimal:2',
-            'price_general' => 'decimal:2',
+            'price_agent' => 'integer',
+            'price_sales' => 'integer',
+            'price_general' => 'integer',
             'is_active' => 'boolean',
         ];
     }
@@ -80,3 +80,4 @@ class Product extends Model
         return $this->hasMany(OrderNoteItem::class);
     }
 }
+

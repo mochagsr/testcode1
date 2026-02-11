@@ -30,8 +30,8 @@ class SalesReturnItem extends Model
     {
         return [
             'quantity' => 'integer',
-            'unit_price' => 'decimal:2',
-            'line_total' => 'decimal:2',
+            'unit_price' => 'integer',
+            'line_total' => 'integer',
         ];
     }
 
@@ -51,3 +51,4 @@ class SalesReturnItem extends Model
         return $this->belongsTo(Product::class);
     }
 }
+

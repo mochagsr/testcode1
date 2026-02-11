@@ -23,6 +23,10 @@ class OrderNote extends Model
         'city',
         'created_by_name',
         'notes',
+        'is_canceled',
+        'canceled_at',
+        'canceled_by_user_id',
+        'cancel_reason',
     ];
 
     /**
@@ -32,6 +36,8 @@ class OrderNote extends Model
     {
         return [
             'note_date' => 'date',
+            'is_canceled' => 'boolean',
+            'canceled_at' => 'datetime',
         ];
     }
 

@@ -22,6 +22,10 @@ class SalesReturn extends Model
         'semester_period',
         'total',
         'reason',
+        'is_canceled',
+        'canceled_at',
+        'canceled_by_user_id',
+        'cancel_reason',
     ];
 
     /**
@@ -31,7 +35,9 @@ class SalesReturn extends Model
     {
         return [
             'return_date' => 'date',
-            'total' => 'decimal:2',
+            'total' => 'integer',
+            'is_canceled' => 'boolean',
+            'canceled_at' => 'datetime',
         ];
     }
 
@@ -59,3 +65,4 @@ class SalesReturn extends Model
         return $this->hasMany(SalesReturnItem::class);
     }
 }
+

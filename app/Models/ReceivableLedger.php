@@ -31,9 +31,9 @@ class ReceivableLedger extends Model
     {
         return [
             'entry_date' => 'date',
-            'debit' => 'decimal:2',
-            'credit' => 'decimal:2',
-            'balance_after' => 'decimal:2',
+            'debit' => 'integer',
+            'credit' => 'integer',
+            'balance_after' => 'integer',
         ];
     }
 
@@ -53,3 +53,4 @@ class ReceivableLedger extends Model
         return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id');
     }
 }
+

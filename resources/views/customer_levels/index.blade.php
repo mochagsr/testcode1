@@ -9,8 +9,8 @@
     </div>
 
     <div class="card">
-        <form method="get" class="flex">
-            <input type="text" name="search" placeholder="{{ __('ui.search_customer_levels_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+        <form id="customer-levels-search-form" method="get" class="flex">
+            <input id="customer-levels-search-input" type="text" name="search" placeholder="{{ __('ui.search_customer_levels_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <button type="submit">{{ __('ui.search') }}</button>
         </form>
     </div>
@@ -49,4 +49,24 @@
             {{ $levels->links() }}
         </div>
     </div>
+
+    <script>
+        (function () {
+            const form = document.getElementById('customer-levels-search-form');
+            const searchInput = document.getElementById('customer-levels-search-input');
+            if (!form || !searchInput) {
+                return;
+            }
+
+            let debounceTimer = null;
+            searchInput.addEventListener('input', () => {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+                debounceTimer = setTimeout(() => {
+                    form.requestSubmit();
+                }, 100);
+            });
+        })();
+    </script>
 @endsection

@@ -63,9 +63,9 @@
                         <div class="row">
                             <div class="col-12">
                                 <label>{{ __('txn.payment_method') }}</label>
-                                <select name="payment_method">
-                                    <option value="cash" @selected(old('payment_method', 'cash') === 'cash')>{{ __('txn.cash') }}</option>
-                                    <option value="bank_transfer" @selected(old('payment_method') === 'bank_transfer')>{{ __('txn.bank_transfer') }}</option>
+                                <select name="payment_method" required>
+                                    <option value="tunai" @selected(old('payment_method', 'tunai') === 'tunai')>{{ __('txn.cash') }}</option>
+                                    <option value="kredit" @selected(old('payment_method') === 'kredit')>{{ __('txn.credit') }}</option>
                                 </select>
                             </div>
                             <div class="col-12">
@@ -86,19 +86,19 @@
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
                 <tr>
-                    <th style="width: 40%">{{ __('txn.product') }} *</th>
-                    <th>{{ __('txn.current_stock') }}</th>
-                    <th>{{ __('txn.qty') }} *</th>
-                    <th>{{ __('txn.price') }} *</th>
-                    <th>{{ __('txn.discount') }}</th>
-                    <th>{{ __('txn.subtotal') }}</th>
+                    <th style="width: 39%">{{ __('txn.product') }} *</th>
+                    <th style="width: 9%">{{ __('txn.current_stock') }}</th>
+                    <th style="width: 7%">{{ __('txn.qty') }} *</th>
+                    <th style="width: 11%">{{ __('txn.price') }} *</th>
+                    <th style="width: 10%">{{ __('txn.discount') }} (%)</th>
+                    <th style="width: 22%">{{ __('txn.subtotal') }}</th>
                     <th></th>
                 </tr>
                 </thead>
                 <tbody></tbody>
             </table>
             <div style="margin-top: 10px; text-align: right;">
-                <strong>{{ __('txn.total') }}: Rp <span id="grand-total">0.00</span></strong>
+                <strong>{{ __('txn.total') }}: Rp <span id="grand-total">0</span></strong>
             </div>
         </div>
 
@@ -111,6 +111,7 @@
         const customers = @json($customers);
         const selectProductLabel = @json(__('txn.select_product'));
         const tbody = document.querySelector('#items-table tbody');
+        const productsList = document.getElementById('products-list');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer-id');
         const grandTotal = document.getElementById('grand-total');
@@ -166,7 +167,32 @@
         }
 
         function productLabel(product) {
-            return `${product.code} - ${product.name}`;
+            return `${product.name}`;
+        }
+
+        function escapeAttribute(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function renderProductSuggestions(query) {
+            if (!productsList) {
+                return;
+            }
+            const normalized = (query || '').trim().toLowerCase();
+            const matches = products.filter((product) => {
+                const label = productLabel(product).toLowerCase();
+                const code = (product.code || '').toLowerCase();
+                const name = (product.name || '').toLowerCase();
+                return normalized === '' || label.includes(normalized) || code.includes(normalized) || name.includes(normalized);
+            }).slice(0, 60);
+
+            productsList.innerHTML = matches
+                .map((product) => `<option value="${escapeAttribute(productLabel(product))}"></option>`)
+                .join('');
         }
 
         function findProductByLabel(label) {
@@ -214,12 +240,14 @@
             document.querySelectorAll('#items-table tbody tr').forEach((row) => {
                 const qty = parseFloat(row.querySelector('.qty').value || 0);
                 const price = parseFloat(row.querySelector('.price').value || 0);
-                const discount = parseFloat(row.querySelector('.discount').value || 0);
-                const line = Math.max(0, (qty * price) - discount);
-                row.querySelector('.line-total').textContent = line.toFixed(2);
+                const discountPercent = Math.max(0, Math.min(100, parseFloat(row.querySelector('.discount').value || 0)));
+                const gross = qty * price;
+                const discountAmount = gross * (discountPercent / 100);
+                const line = Math.max(0, gross - discountAmount);
+                row.querySelector('.line-total').textContent = line.toFixed(0);
                 total += line;
             });
-            grandTotal.textContent = total.toFixed(2);
+            grandTotal.textContent = total.toFixed(0);
         }
 
         function updateRowMeta(row, product) {
@@ -239,18 +267,40 @@
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                 </td>
                 <td class="stock">-</td>
-                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required></td>
-                <td><input class="price" type="number" min="0" step="0.01" name="items[${index}][unit_price]" value="0" required></td>
-                <td><input class="discount" type="number" min="0" step="0.01" name="items[${index}][discount]" value="0"></td>
-                <td>Rp <span class="line-total">0.00</span></td>
+                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required style="max-width: 88px;"></td>
+                <td><input class="price" type="number" min="0" step="1" name="items[${index}][unit_price]" value="0" required style="max-width: 88px;"></td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:4px;">
+                        <input class="discount" type="number" min="0" max="100" step="1" name="items[${index}][discount]" value="0" style="max-width: 54px;">
+                        <span>%</span>
+                    </div>
+                </td>
+                <td style="white-space: nowrap; text-align: right;">Rp <span class="line-total">0</span></td>
                 <td><button type="button" class="btn secondary remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
 
             tr.querySelector('.product-search').addEventListener('input', (event) => {
+                renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 updateRowMeta(tr, product);
+            });
+            tr.querySelector('.product-search').addEventListener('focus', (event) => {
+                renderProductSuggestions(event.currentTarget.value);
+            });
+            tr.querySelector('.discount').addEventListener('input', (event) => {
+                const current = parseFloat(event.currentTarget.value || 0);
+                if (Number.isNaN(current)) {
+                    return;
+                }
+                if (current < 0) {
+                    event.currentTarget.value = 0;
+                    return;
+                }
+                if (current > 100) {
+                    event.currentTarget.value = 100;
+                }
             });
             tr.querySelectorAll('.qty,.price,.discount').forEach((el) => el.addEventListener('input', recalc));
             tr.querySelector('.price').addEventListener('input', (event) => {
@@ -263,6 +313,7 @@
         }
 
         addBtn.addEventListener('click', addRow);
+        renderProductSuggestions('');
         if (customerSearch) {
             const bootCustomer = customerIdField.value
                 ? customers.find(c => String(c.id) === String(customerIdField.value))
@@ -297,7 +348,8 @@
 
     <datalist id="products-list">
         @foreach($products as $product)
-            <option value="{{ $product->code }} - {{ $product->name }}"></option>
+            <option value="{{ $product->name }}"></option>
         @endforeach
     </datalist>
 @endsection
+

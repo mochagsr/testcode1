@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\ApplyUserPreferences;
 use App\Http\Middleware\EnsureFinanceUnlocked;
+use App\Http\Middleware\EnsureSemesterOpen;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureAdmin::class,
             'prefs' => ApplyUserPreferences::class,
             'finance.unlocked' => EnsureFinanceUnlocked::class,
+            'semester.open' => EnsureSemesterOpen::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
