@@ -39,6 +39,7 @@ return [
     'summary' => 'Ringkasan',
     'report' => 'Laporan',
     'action' => 'Aksi',
+    'action_menu' => 'Pilih Menu',
     'date' => 'Tanggal',
     'customer' => 'Customer',
     'city' => 'Kota',

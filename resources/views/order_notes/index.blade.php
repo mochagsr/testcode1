@@ -56,7 +56,7 @@
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_order_notes') }}</strong>
             <select style="max-width: 180px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                <option value="" selected disabled hidden></option>
+                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('reports.print', ['dataset' => 'order_notes', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('reports.export.pdf', ['dataset' => 'order_notes', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
                 <option value="{{ route('reports.export.csv', ['dataset' => 'order_notes', 'semester' => $selectedSemester]) }}">{{ __('txn.excel') }}</option>
@@ -89,7 +89,7 @@
                     <td>
                         <div class="flex">
                             <select style="max-width: 130px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="" selected disabled hidden></option>
+                                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                 <option value="{{ route('order-notes.print', $note) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('order-notes.export.pdf', $note) }}">{{ __('txn.pdf') }}</option>
                                 <option value="{{ route('order-notes.export.excel', $note) }}">{{ __('txn.excel') }}</option>
@@ -137,6 +137,7 @@
         })();
     </script>
 @endsection
+
 
 
 

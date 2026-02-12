@@ -73,7 +73,7 @@
                 <button type="button" class="btn secondary" onclick="alert(@js(__('txn.contact_admin_to_edit_locked')))">{{ __('txn.edit_transaction') }}</button>
             @endif
             <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                <option value="" selected disabled hidden></option>
+                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('sales-invoices.print', $invoice) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('sales-invoices.export.pdf', $invoice) }}">{{ __('txn.pdf') }}</option>
                 <option value="{{ route('sales-invoices.export.excel', $invoice) }}">{{ __('txn.excel') }}</option>
@@ -522,6 +522,7 @@
         </script>
     @endif
 @endsection
+
 
 
 

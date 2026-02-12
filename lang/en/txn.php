@@ -39,6 +39,7 @@ return [
     'summary' => 'Summary',
     'report' => 'Report',
     'action' => 'Action',
+    'action_menu' => 'Select Menu',
     'date' => 'Date',
     'customer' => 'Customer',
     'city' => 'City',

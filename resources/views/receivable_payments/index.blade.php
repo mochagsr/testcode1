@@ -44,7 +44,7 @@
                         <div class="flex">
                             <a class="btn secondary" href="{{ route('receivable-payments.show', $payment) }}">{{ __('txn.detail') }}</a>
                             <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="" selected disabled hidden></option>
+                                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                 <option value="{{ route('receivable-payments.print', $payment) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('receivable-payments.export.pdf', $payment) }}">{{ __('txn.pdf') }}</option>
                             </select>
@@ -87,6 +87,7 @@
         })();
     </script>
 @endsection
+
 
 
 
