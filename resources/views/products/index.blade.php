@@ -3,6 +3,13 @@
 @section('title', __('ui.products_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .product-action-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+    </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.products_title') }}</h1>
         <a class="btn" href="{{ route('products.create') }}">{{ __('ui.add_product') }}</a>
@@ -12,6 +19,9 @@
         <form id="products-search-form" method="get" class="flex">
             <input id="products-search-input" type="text" name="search" placeholder="{{ __('ui.search_products_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <button type="submit">{{ __('ui.search') }}</button>
+            <div style="margin-left: auto;">
+                <a class="btn secondary product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">{{ __('txn.excel') }}</a>
+            </div>
         </form>
     </div>
 
@@ -19,6 +29,7 @@
         <table>
             <thead>
             <tr>
+                <th>{{ __('ui.code') }}</th>
                 <th>{{ __('ui.name') }}</th>
                 <th>{{ __('ui.category') }}</th>
                 <th>{{ __('ui.stock') }}</th>
@@ -31,6 +42,7 @@
             <tbody>
             @forelse($products as $product)
                 <tr>
+                    <td>{{ $product->code ?: '-' }}</td>
                     <td>{{ $product->name }}</td>
                     <td>{{ $product->category?->name ?: '-' }}</td>
                     <td>{{ (int) round($product->stock) }}</td>
@@ -39,17 +51,17 @@
                     <td>Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
+                            <a class="btn secondary product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('products.destroy', $product) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_product') }}');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn">{{ __('ui.delete') }}</button>
+                                <button type="submit" class="btn product-action-btn">{{ __('ui.delete') }}</button>
                             </form>
                         </div>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">{{ __('ui.no_products') }}</td></tr>
+                <tr><td colspan="8" class="muted">{{ __('ui.no_products') }}</td></tr>
             @endforelse
             </tbody>
         </table>

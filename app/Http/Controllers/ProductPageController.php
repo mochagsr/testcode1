@@ -6,11 +6,13 @@ use App\Models\AppSetting;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Services\AuditLogService;
+use App\Support\ExcelCsv;
 use App\Support\ProductCodeGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductPageController extends Controller
 {
@@ -28,19 +30,58 @@ class ProductPageController extends Controller
             ->with('category:id,code,name')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
+                    $subQuery->where('code', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%")
                         ->orWhereHas('category', function ($categoryQuery) use ($search): void {
                             $categoryQuery->where('name', 'like', "%{$search}%");
                         });
                 });
             })
             ->orderBy('name')
-            ->paginate(25)
+            ->paginate(20)
             ->withQueryString();
 
         return view('products.index', [
             'products' => $products,
             'search' => $search,
+        ]);
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $search = trim((string) $request->string('search', ''));
+        $filename = 'products-'.now()->format('Ymd-His').'.csv';
+
+        $products = Product::query()
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($subQuery) use ($search): void {
+                    $subQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('name')
+            ->get(['code', 'name', 'stock']);
+
+        return response()->streamDownload(function () use ($products): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                return;
+            }
+
+            ExcelCsv::start($handle);
+            ExcelCsv::row($handle, [__('ui.code'), __('ui.name'), __('ui.stock')]);
+
+            foreach ($products as $product) {
+                ExcelCsv::row($handle, [
+                    (string) ($product->code ?: '-'),
+                    (string) $product->name,
+                    (int) round((float) $product->stock),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

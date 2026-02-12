@@ -18,14 +18,15 @@ class ProductController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $perPage = min(max((int) $request->integer('per_page', 25), 1), 25);
+        $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
         $search = trim((string) $request->string('search', ''));
 
         $products = Product::query()
             ->with('category:id,code,name')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
+                    $subQuery->where('code', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%")
                         ->orWhereHas('category', function ($categoryQuery) use ($search): void {
                             $categoryQuery->where('name', 'like', "%{$search}%");
                         });

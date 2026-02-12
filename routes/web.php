@@ -152,6 +152,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::delete('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'destroy'])->name('item-categories.destroy');
 
         Route::get('/products', [ProductPageController::class, 'index'])->name('products.index');
+        Route::get('/products/export.csv', [ProductPageController::class, 'exportCsv'])->name('products.export.csv');
         Route::get('/products/create', [ProductPageController::class, 'create'])->name('products.create');
         Route::post('/products', [ProductPageController::class, 'store'])->name('products.store');
         Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->name('products.edit');
@@ -166,6 +167,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::delete('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'destroy'])->name('customer-levels-web.destroy');
 
         Route::get('/customers-web', [CustomerPageController::class, 'index'])->name('customers-web.index');
+        Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->name('customers-web.export.csv');
         Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->name('customers-web.create');
         Route::post('/customers-web', [CustomerPageController::class, 'store'])->name('customers-web.store');
         Route::get('/customers-web/{customer}/edit', [CustomerPageController::class, 'edit'])->name('customers-web.edit');

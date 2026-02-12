@@ -12,6 +12,9 @@
         <form id="customers-search-form" method="get" class="flex">
             <input id="customers-search-input" type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <button type="submit">{{ __('ui.search') }}</button>
+            <div style="margin-left: auto;">
+                <a class="btn secondary" href="{{ route('customers-web.export.csv', ['search' => $search]) }}">{{ __('txn.excel') }}</a>
+            </div>
         </form>
     </div>
 
