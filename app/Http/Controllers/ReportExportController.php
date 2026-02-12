@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
@@ -57,15 +58,14 @@ class ReportExportController extends Controller
             }
 
             // UTF-8 BOM + separator hint to keep Excel import stable.
-            fwrite($handle, "\xEF\xBB\xBF");
-            fwrite($handle, "sep=,\n");
+            ExcelCsv::start($handle);
 
-            fputcsv($handle, [$report['title']]);
-            fputcsv($handle, [__('report.printed'), now()->format('d-m-Y H:i:s')]);
+            ExcelCsv::row($handle, [$report['title']]);
+            ExcelCsv::row($handle, [__('report.printed'), now()->format('d-m-Y H:i:s')]);
 
             if (! empty($report['filters'])) {
                 foreach ($report['filters'] as $filter) {
-                    fputcsv($handle, [$filter['label'], $filter['value']]);
+                    ExcelCsv::row($handle, [$filter['label'], $filter['value']]);
                 }
             }
 
@@ -75,12 +75,12 @@ class ReportExportController extends Controller
                         ? 'Rp '.number_format((int) round((float) ($item['value'] ?? 0)), 0, ',', '.')
                         : (int) round((float) ($item['value'] ?? 0));
 
-                    fputcsv($handle, [$item['label'], $value]);
+                    ExcelCsv::row($handle, [$item['label'], $value]);
                 }
             }
 
-            fputcsv($handle, []);
-            fputcsv($handle, $report['headers']);
+            ExcelCsv::row($handle, []);
+            ExcelCsv::row($handle, $report['headers']);
             foreach ($report['rows'] as $row) {
                 $formatted = [];
                 $isReceivableRecap = ($report['layout'] ?? null) === 'receivable_recap';
@@ -103,7 +103,7 @@ class ReportExportController extends Controller
 
                     $formatted[] = $text;
                 }
-                fputcsv($handle, $formatted);
+                ExcelCsv::row($handle, $formatted);
             }
             fclose($handle);
         }, $filename, [

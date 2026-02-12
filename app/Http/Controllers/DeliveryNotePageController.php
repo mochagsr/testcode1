@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
@@ -357,20 +358,21 @@ class DeliveryNotePageController extends Controller
                 return;
             }
 
-            fputcsv($handle, [__('txn.delivery_notes_title').' '.__('txn.note_number'), $deliveryNote->note_number]);
-            fputcsv($handle, [__('txn.date'), $deliveryNote->note_date?->format('d-m-Y')]);
-            fputcsv($handle, [__('txn.recipient'), $deliveryNote->recipient_name]);
-            fputcsv($handle, [__('txn.phone'), $deliveryNote->recipient_phone]);
-            fputcsv($handle, [__('txn.city'), $deliveryNote->city]);
-            fputcsv($handle, [__('txn.address'), $deliveryNote->address]);
-            fputcsv($handle, [__('txn.created_by'), $deliveryNote->created_by_name]);
-            fputcsv($handle, [__('txn.notes'), $deliveryNote->notes]);
-            fputcsv($handle, []);
-            fputcsv($handle, [__('txn.items')]);
-            fputcsv($handle, [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.notes')]);
+            ExcelCsv::start($handle);
+            ExcelCsv::row($handle, [__('txn.delivery_notes_title').' '.__('txn.note_number'), $deliveryNote->note_number]);
+            ExcelCsv::row($handle, [__('txn.date'), $deliveryNote->note_date?->format('d-m-Y')]);
+            ExcelCsv::row($handle, [__('txn.recipient'), $deliveryNote->recipient_name]);
+            ExcelCsv::row($handle, [__('txn.phone'), $deliveryNote->recipient_phone]);
+            ExcelCsv::row($handle, [__('txn.city'), $deliveryNote->city]);
+            ExcelCsv::row($handle, [__('txn.address'), $deliveryNote->address]);
+            ExcelCsv::row($handle, [__('txn.created_by'), $deliveryNote->created_by_name]);
+            ExcelCsv::row($handle, [__('txn.notes'), $deliveryNote->notes]);
+            ExcelCsv::row($handle, []);
+            ExcelCsv::row($handle, [__('txn.items')]);
+            ExcelCsv::row($handle, [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.notes')]);
 
             foreach ($deliveryNote->items as $item) {
-                fputcsv($handle, [
+                ExcelCsv::row($handle, [
                     $item->product_name,
                     $item->unit,
                     $item->quantity,

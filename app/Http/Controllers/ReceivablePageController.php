@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\InvoicePayment;
@@ -321,17 +322,16 @@ class ReceivablePageController extends Controller
                 return;
             }
 
-            fwrite($handle, "\xEF\xBB\xBF");
-            fwrite($handle, "sep=,\n");
+            ExcelCsv::start($handle);
 
-            fputcsv($handle, [__('receivable.customer_bill_title')]);
-            fputcsv($handle, [__('receivable.customer'), $data['customer']->name ?? '']);
-            fputcsv($handle, [__('txn.address'), $data['customer']->address ?: ($data['customer']->city ?: '-')]);
+            ExcelCsv::row($handle, [__('receivable.customer_bill_title')]);
+            ExcelCsv::row($handle, [__('receivable.customer'), $data['customer']->name ?? '']);
+            ExcelCsv::row($handle, [__('txn.address'), $data['customer']->address ?: ($data['customer']->city ?: '-')]);
             if (!empty($data['selectedSemester'])) {
-                fputcsv($handle, [__('txn.semester_period'), (string) $data['selectedSemester']]);
+                ExcelCsv::row($handle, [__('txn.semester_period'), (string) $data['selectedSemester']]);
             }
-            fputcsv($handle, []);
-            fputcsv($handle, [
+            ExcelCsv::row($handle, []);
+            ExcelCsv::row($handle, [
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
                 __('receivable.bill_credit_sales'),
@@ -341,7 +341,7 @@ class ReceivablePageController extends Controller
             ]);
 
             foreach ($rows as $row) {
-                fputcsv($handle, [
+                ExcelCsv::row($handle, [
                     (string) ($row['date_label'] ?? ''),
                     (string) ($row['proof_number'] ?? ''),
                     number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.'),
@@ -352,7 +352,7 @@ class ReceivablePageController extends Controller
             }
 
             $totals = (array) ($data['totals'] ?? []);
-            fputcsv($handle, [
+            ExcelCsv::row($handle, [
                 '',
                 __('receivable.bill_total'),
                 number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.'),
@@ -360,7 +360,7 @@ class ReceivablePageController extends Controller
                 number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
             ]);
-            fputcsv($handle, [
+            ExcelCsv::row($handle, [
                 '',
                 '',
                 '',

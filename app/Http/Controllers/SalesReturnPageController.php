@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Customer;
@@ -674,19 +675,20 @@ class SalesReturnPageController extends Controller
                 return;
             }
 
-            fputcsv($handle, [__('txn.return').' '.__('txn.note_number'), $salesReturn->return_number]);
-            fputcsv($handle, [__('txn.return_date'), $salesReturn->return_date?->format('d-m-Y')]);
-            fputcsv($handle, [__('txn.customer'), $salesReturn->customer?->name]);
-            fputcsv($handle, [__('txn.city'), $salesReturn->customer?->city]);
-            fputcsv($handle, [__('txn.semester_period'), $salesReturn->semester_period]);
-            fputcsv($handle, [__('txn.total'), number_format((int) round((float) $salesReturn->total), 0, ',', '.')]);
-            fputcsv($handle, [__('txn.reason'), $salesReturn->reason]);
-            fputcsv($handle, []);
-            fputcsv($handle, [__('txn.items')]);
-            fputcsv($handle, [__('txn.name'), __('txn.qty'), __('txn.line_total')]);
+            ExcelCsv::start($handle);
+            ExcelCsv::row($handle, [__('txn.return').' '.__('txn.note_number'), $salesReturn->return_number]);
+            ExcelCsv::row($handle, [__('txn.return_date'), $salesReturn->return_date?->format('d-m-Y')]);
+            ExcelCsv::row($handle, [__('txn.customer'), $salesReturn->customer?->name]);
+            ExcelCsv::row($handle, [__('txn.city'), $salesReturn->customer?->city]);
+            ExcelCsv::row($handle, [__('txn.semester_period'), $salesReturn->semester_period]);
+            ExcelCsv::row($handle, [__('txn.total'), number_format((int) round((float) $salesReturn->total), 0, ',', '.')]);
+            ExcelCsv::row($handle, [__('txn.reason'), $salesReturn->reason]);
+            ExcelCsv::row($handle, []);
+            ExcelCsv::row($handle, [__('txn.items')]);
+            ExcelCsv::row($handle, [__('txn.name'), __('txn.qty'), __('txn.line_total')]);
 
             foreach ($salesReturn->items as $item) {
-                fputcsv($handle, [
+                ExcelCsv::row($handle, [
                     $item->product_name,
                     $item->quantity,
                     number_format((int) round((float) $item->line_total), 0, ',', '.'),

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ExcelCsv;
 use App\Models\Customer;
 use App\Models\AuditLog;
 use App\Models\InvoicePayment;
@@ -777,32 +778,33 @@ class SalesInvoicePageController extends Controller
                 return;
             }
 
-            fputcsv($handle, [__('txn.note_number'), $salesInvoice->invoice_number]);
-            fputcsv($handle, [__('txn.invoice_date'), $salesInvoice->invoice_date?->format('d-m-Y')]);
-            fputcsv($handle, [__('txn.customer'), $salesInvoice->customer?->name]);
-            fputcsv($handle, [__('txn.city'), $salesInvoice->customer?->city]);
+            ExcelCsv::start($handle);
+            ExcelCsv::row($handle, [__('txn.note_number'), $salesInvoice->invoice_number]);
+            ExcelCsv::row($handle, [__('txn.invoice_date'), $salesInvoice->invoice_date?->format('d-m-Y')]);
+            ExcelCsv::row($handle, [__('txn.customer'), $salesInvoice->customer?->name]);
+            ExcelCsv::row($handle, [__('txn.city'), $salesInvoice->customer?->city]);
             $paymentStatusLabel = match ((string) $salesInvoice->payment_status) {
                 'paid' => __('txn.status_paid'),
                 default => __('txn.status_unpaid'),
             };
-            fputcsv($handle, [__('txn.status'), $paymentStatusLabel]);
+            ExcelCsv::row($handle, [__('txn.status'), $paymentStatusLabel]);
             $paidFromCustomerBalance = (float) $salesInvoice->payments
                 ->where('method', 'customer_balance')
                 ->sum('amount');
             $paidCash = max(0, (float) $salesInvoice->total_paid - $paidFromCustomerBalance);
-            fputcsv($handle, [__('txn.total'), number_format((int) round((float) $salesInvoice->total), 0, ',', '.')]);
-            fputcsv($handle, [__('txn.paid'), number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')]);
-            fputcsv($handle, [__('txn.paid_cash'), number_format((int) round($paidCash), 0, ',', '.')]);
-            fputcsv($handle, [__('txn.paid_customer_balance'), number_format((int) round($paidFromCustomerBalance), 0, ',', '.')]);
-            fputcsv($handle, [__('txn.balance'), number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')]);
-            fputcsv($handle, []);
-            fputcsv($handle, [__('txn.items')]);
-            fputcsv($handle, [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount').' (%)', __('txn.line_total')]);
+            ExcelCsv::row($handle, [__('txn.total'), number_format((int) round((float) $salesInvoice->total), 0, ',', '.')]);
+            ExcelCsv::row($handle, [__('txn.paid'), number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')]);
+            ExcelCsv::row($handle, [__('txn.paid_cash'), number_format((int) round($paidCash), 0, ',', '.')]);
+            ExcelCsv::row($handle, [__('txn.paid_customer_balance'), number_format((int) round($paidFromCustomerBalance), 0, ',', '.')]);
+            ExcelCsv::row($handle, [__('txn.balance'), number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')]);
+            ExcelCsv::row($handle, []);
+            ExcelCsv::row($handle, [__('txn.items')]);
+            ExcelCsv::row($handle, [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount').' (%)', __('txn.line_total')]);
 
             foreach ($salesInvoice->items as $item) {
                 $gross = (float) $item->quantity * (float) $item->unit_price;
                 $discountPercent = $gross > 0 ? (float) $item->discount / $gross * 100 : 0;
-                fputcsv($handle, [
+                ExcelCsv::row($handle, [
                     $item->product_name,
                     $item->quantity,
                     number_format((int) round((float) $item->unit_price), 0, ',', '.'),
@@ -811,11 +813,11 @@ class SalesInvoicePageController extends Controller
                 ]);
             }
 
-            fputcsv($handle, []);
-            fputcsv($handle, [__('txn.record_payment')]);
-            fputcsv($handle, [__('txn.date'), __('txn.method'), __('txn.amount'), __('txn.notes')]);
+            ExcelCsv::row($handle, []);
+            ExcelCsv::row($handle, [__('txn.record_payment')]);
+            ExcelCsv::row($handle, [__('txn.date'), __('txn.method'), __('txn.amount'), __('txn.notes')]);
             foreach ($salesInvoice->payments as $payment) {
-                fputcsv($handle, [
+                ExcelCsv::row($handle, [
                     $payment->payment_date?->format('d-m-Y'),
                     $this->paymentMethodLabel((string) $payment->method),
                     number_format((int) round((float) $payment->amount), 0, ',', '.'),

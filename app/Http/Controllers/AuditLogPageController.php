@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ExcelCsv;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
@@ -55,9 +56,8 @@ class AuditLogPageController extends Controller
                 return;
             }
 
-            fwrite($handle, "\xEF\xBB\xBF");
-            fwrite($handle, "sep=,\n");
-            fputcsv($handle, [
+            ExcelCsv::start($handle);
+            ExcelCsv::row($handle, [
                 __('txn.date'),
                 __('ui.user'),
                 __('ui.actions'),
@@ -71,7 +71,7 @@ class AuditLogPageController extends Controller
                 if ($log->subject_id) {
                     $subject .= ' #'.$log->subject_id;
                 }
-                fputcsv($handle, [
+                ExcelCsv::row($handle, [
                     (string) optional($log->created_at)->format('d-m-Y H:i:s'),
                     (string) ($log->user?->name ?? '-'),
                     (string) $log->action,

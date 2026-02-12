@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\OrderNote;
@@ -337,19 +338,20 @@ class OrderNotePageController extends Controller
                 return;
             }
 
-            fputcsv($handle, [__('txn.order_notes_title').' '.__('txn.note_number'), $orderNote->note_number]);
-            fputcsv($handle, [__('txn.date'), $orderNote->note_date?->format('d-m-Y')]);
-            fputcsv($handle, [__('txn.customer'), $orderNote->customer_name]);
-            fputcsv($handle, [__('txn.phone'), $orderNote->customer_phone]);
-            fputcsv($handle, [__('txn.city'), $orderNote->city]);
-            fputcsv($handle, [__('txn.created_by'), $orderNote->created_by_name]);
-            fputcsv($handle, [__('txn.notes'), $orderNote->notes]);
-            fputcsv($handle, []);
-            fputcsv($handle, [__('txn.items')]);
-            fputcsv($handle, [__('txn.name'), __('txn.qty'), __('txn.notes')]);
+            ExcelCsv::start($handle);
+            ExcelCsv::row($handle, [__('txn.order_notes_title').' '.__('txn.note_number'), $orderNote->note_number]);
+            ExcelCsv::row($handle, [__('txn.date'), $orderNote->note_date?->format('d-m-Y')]);
+            ExcelCsv::row($handle, [__('txn.customer'), $orderNote->customer_name]);
+            ExcelCsv::row($handle, [__('txn.phone'), $orderNote->customer_phone]);
+            ExcelCsv::row($handle, [__('txn.city'), $orderNote->city]);
+            ExcelCsv::row($handle, [__('txn.created_by'), $orderNote->created_by_name]);
+            ExcelCsv::row($handle, [__('txn.notes'), $orderNote->notes]);
+            ExcelCsv::row($handle, []);
+            ExcelCsv::row($handle, [__('txn.items')]);
+            ExcelCsv::row($handle, [__('txn.name'), __('txn.qty'), __('txn.notes')]);
 
             foreach ($orderNote->items as $item) {
-                fputcsv($handle, [
+                ExcelCsv::row($handle, [
                     $item->product_name,
                     $item->quantity,
                     $item->notes,
