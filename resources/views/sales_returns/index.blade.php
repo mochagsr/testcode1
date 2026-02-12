@@ -69,25 +69,27 @@
                 @php
                     $lockKey = ((int) $row->customer_id).':'.(string) $row->semester_period;
                     $lockState = $customerSemesterLockMap[$lockKey] ?? ['locked' => false, 'manual' => false, 'auto' => false];
+                    $adminAction = $returnAdminActionMap[(int) $row->id] ?? ['edited' => false, 'canceled' => false];
                 @endphp
                 <tr>
-                    <td><a href="{{ route('sales-returns.show', $row) }}">{{ $row->return_number }}</a></td>
+                    <td>
+                        <a href="{{ route('sales-returns.show', $row) }}">{{ $row->return_number }}</a>
+                        @if((bool) ($lockState['auto'] ?? false))
+                            <span class="badge danger" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_auto') }}</span>
+                        @endif
+                        @if((bool) ($lockState['manual'] ?? false))
+                            <span class="badge warning" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_manual') }}</span>
+                        @endif
+                        @if((bool) ($adminAction['edited'] ?? false))
+                            <span class="badge warning" style="margin-left: 6px;">ADMIN EDIT</span>
+                        @endif
+                        @if((bool) ($adminAction['canceled'] ?? false))
+                            <span class="badge danger" style="margin-left: 6px;">ADMIN BATAL</span>
+                        @endif
+                    </td>
                     <td>{{ $row->return_date->format('d-m-Y') }}</td>
                     <td>
                         {{ $row->customer->name }} <span class="muted">({{ $row->customer->city }})</span>
-                        @if((bool) ($lockState['locked'] ?? false))
-                            <div style="margin-top: 4px;">
-                                <span class="badge danger">
-                                    @if((bool) ($lockState['auto'] ?? false))
-                                        {{ __('receivable.customer_semester_locked_auto') }}
-                                    @elseif((bool) ($lockState['manual'] ?? false))
-                                        {{ __('receivable.customer_semester_locked_manual') }}
-                                    @else
-                                        {{ __('receivable.customer_semester_closed') }}
-                                    @endif
-                                </span>
-                            </div>
-                        @endif
                     </td>
                     <td>Rp {{ number_format((int) round($row->total), 0, ',', '.') }}</td>
                     <td>{{ $row->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>

@@ -3,6 +3,17 @@
 @section('title', __('txn.sales_invoices_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .invoice-list-card {
+            padding: 12px;
+        }
+        .invoice-list-card th,
+        .invoice-list-card td {
+            padding-top: 7px;
+            padding-bottom: 7px;
+        }
+    </style>
+
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.sales_invoices_title') }}</h1>
         <a class="btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice') }}</a>
@@ -52,7 +63,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card invoice-list-card">
         <table>
             <thead>
             <tr>

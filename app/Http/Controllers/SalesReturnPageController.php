@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SalesReturn;
@@ -95,6 +96,50 @@ class SalesReturnPageController extends Controller
             })
             ->first();
         $customerSemesterLockMap = $this->customerSemesterLockMap(collect($returns->items()));
+        $returnIds = collect($returns->items())
+            ->map(fn (SalesReturn $salesReturn): int => (int) $salesReturn->id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values();
+        $returnAdminActionMap = [];
+        if ($returnIds->isNotEmpty()) {
+            $actionRows = AuditLog::query()
+                ->select(['subject_id', 'action'])
+                ->where('subject_type', SalesReturn::class)
+                ->whereIn('subject_id', $returnIds->all())
+                ->whereIn('action', ['sales.return.admin_update', 'sales.return.cancel'])
+                ->get();
+
+            foreach ($actionRows as $row) {
+                $returnId = (int) ($row->subject_id ?? 0);
+                if ($returnId <= 0) {
+                    continue;
+                }
+                if (! isset($returnAdminActionMap[$returnId])) {
+                    $returnAdminActionMap[$returnId] = [
+                        'edited' => false,
+                        'canceled' => false,
+                    ];
+                }
+                if ((string) $row->action === 'sales.return.admin_update') {
+                    $returnAdminActionMap[$returnId]['edited'] = true;
+                }
+                if ((string) $row->action === 'sales.return.cancel') {
+                    $returnAdminActionMap[$returnId]['canceled'] = true;
+                }
+            }
+        }
+        foreach ($returns->items() as $returnRow) {
+            $returnId = (int) $returnRow->id;
+            if (! isset($returnAdminActionMap[$returnId])) {
+                $returnAdminActionMap[$returnId] = [
+                    'edited' => false,
+                    'canceled' => false,
+                ];
+            }
+            if ((bool) $returnRow->is_canceled) {
+                $returnAdminActionMap[$returnId]['canceled'] = true;
+            }
+        }
 
         return view('sales_returns.index', [
             'returns' => $returns,
@@ -107,6 +152,7 @@ class SalesReturnPageController extends Controller
             'previousSemester' => $previousSemester,
             'semesterSummary' => $semesterSummary,
             'customerSemesterLockMap' => $customerSemesterLockMap,
+            'returnAdminActionMap' => $returnAdminActionMap,
         ]);
     }
 
