@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\AuditLog;
 use App\Models\InvoicePayment;
 use App\Models\Product;
 use App\Models\AppSetting;
@@ -96,6 +97,50 @@ class SalesInvoicePageController extends Controller
             })
             ->first();
         $customerSemesterLockMap = $this->customerSemesterLockMap(collect($invoices->items()));
+        $invoiceIds = collect($invoices->items())
+            ->map(fn (SalesInvoice $invoice): int => (int) $invoice->id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values();
+        $invoiceAdminActionMap = [];
+        if ($invoiceIds->isNotEmpty()) {
+            $actionRows = AuditLog::query()
+                ->select(['subject_id', 'action'])
+                ->where('subject_type', SalesInvoice::class)
+                ->whereIn('subject_id', $invoiceIds->all())
+                ->whereIn('action', ['sales.invoice.admin_update', 'sales.invoice.cancel'])
+                ->get();
+
+            foreach ($actionRows as $row) {
+                $invoiceId = (int) ($row->subject_id ?? 0);
+                if ($invoiceId <= 0) {
+                    continue;
+                }
+                if (! isset($invoiceAdminActionMap[$invoiceId])) {
+                    $invoiceAdminActionMap[$invoiceId] = [
+                        'edited' => false,
+                        'canceled' => false,
+                    ];
+                }
+                if ((string) $row->action === 'sales.invoice.admin_update') {
+                    $invoiceAdminActionMap[$invoiceId]['edited'] = true;
+                }
+                if ((string) $row->action === 'sales.invoice.cancel') {
+                    $invoiceAdminActionMap[$invoiceId]['canceled'] = true;
+                }
+            }
+        }
+        foreach ($invoices->items() as $invoiceRow) {
+            $invoiceId = (int) $invoiceRow->id;
+            if (! isset($invoiceAdminActionMap[$invoiceId])) {
+                $invoiceAdminActionMap[$invoiceId] = [
+                    'edited' => false,
+                    'canceled' => false,
+                ];
+            }
+            if ((bool) $invoiceRow->is_canceled) {
+                $invoiceAdminActionMap[$invoiceId]['canceled'] = true;
+            }
+        }
 
         return view('sales_invoices.index', [
             'invoices' => $invoices,
@@ -108,6 +153,7 @@ class SalesInvoicePageController extends Controller
             'previousSemester' => $previousSemester,
             'semesterSummary' => $semesterSummary,
             'customerSemesterLockMap' => $customerSemesterLockMap,
+            'invoiceAdminActionMap' => $invoiceAdminActionMap,
         ]);
     }
 

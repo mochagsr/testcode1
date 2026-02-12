@@ -68,9 +68,18 @@
                 @php
                     $lockKey = ((int) $invoice->customer_id).':'.(string) $invoice->semester_period;
                     $lockState = $customerSemesterLockMap[$lockKey] ?? ['locked' => false, 'manual' => false, 'auto' => false];
+                    $adminAction = $invoiceAdminActionMap[(int) $invoice->id] ?? ['edited' => false, 'canceled' => false];
                 @endphp
                 <tr>
-                    <td><a href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a></td>
+                    <td>
+                        <a href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a>
+                        @if((bool) ($adminAction['edited'] ?? false))
+                            <span class="badge warning" style="margin-left: 6px;">ADMIN EDIT</span>
+                        @endif
+                        @if((bool) ($adminAction['canceled'] ?? false))
+                            <span class="badge danger" style="margin-left: 6px;">ADMIN BATAL</span>
+                        @endif
+                    </td>
                     <td>{{ $invoice->invoice_date->format('d-m-Y') }}</td>
                     <td>
                         {{ $invoice->customer->name }} <span class="muted">({{ $invoice->customer->city }})</span>
