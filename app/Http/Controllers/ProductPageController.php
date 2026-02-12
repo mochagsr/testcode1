@@ -10,8 +10,12 @@ use App\Support\ProductCodeGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductPageController extends Controller
 {
@@ -46,10 +50,10 @@ class ProductPageController extends Controller
         ]);
     }
 
-    public function exportCsv(Request $request): Response
+    public function exportCsv(Request $request): StreamedResponse
     {
         $search = trim((string) $request->string('search', ''));
-        $filename = 'products-'.now()->format('Ymd-His').'.xls';
+        $filename = 'products-'.now()->format('Ymd-His').'.xlsx';
 
         $products = Product::query()
             ->when($search !== '', function ($query) use ($search): void {
@@ -61,14 +65,44 @@ class ProductPageController extends Controller
             ->orderBy('name')
             ->get(['code', 'name', 'stock']);
 
-        $html = view('products.export_excel', [
-            'products' => $products,
-            'printedAt' => now(),
-        ])->render();
+        return response()->streamDownload(function () use ($products): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Barang');
 
-        return response($html, 200, [
-            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            $sheet->setCellValue('A1', __('ui.products_title'));
+            $sheet->setCellValue('A2', __('report.printed').': '.now()->format('d-m-Y H:i:s'));
+            $sheet->setCellValue('A4', 'No');
+            $sheet->setCellValue('B4', __('ui.code'));
+            $sheet->setCellValue('C4', __('ui.name'));
+            $sheet->setCellValue('D4', __('ui.stock'));
+
+            $row = 5;
+            $number = 1;
+            foreach ($products as $product) {
+                $sheet->setCellValue('A'.$row, $number++);
+                $sheet->setCellValue('B'.$row, (string) ($product->code ?: '-'));
+                $sheet->setCellValue('C'.$row, (string) $product->name);
+                $sheet->setCellValue('D'.$row, (int) round((float) $product->stock));
+                $row++;
+            }
+
+            $lastRow = max(4, $row - 1);
+            $sheet->getStyle('A4:D4')->getFont()->setBold(true);
+            $sheet->getStyle('A4:D'.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle('D5:D'.$lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
+
+            $sheet->getColumnDimension('A')->setWidth(8);
+            $sheet->getColumnDimension('B')->setWidth(26);
+            $sheet->getColumnDimension('C')->setWidth(70);
+            $sheet->getColumnDimension('D')->setWidth(14);
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
