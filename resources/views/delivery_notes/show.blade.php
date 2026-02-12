@@ -189,6 +189,7 @@
                     'unit' => (string) ($product->unit ?? ''),
                     'price_general' => (int) round((float) ($product->price_general ?? 0)),
                 ])->values()->all());
+                const SEARCH_DEBOUNCE_MS = 100;
 
                 function productLabel(product) {
                     const code = String(product.code || '').trim();
@@ -196,6 +197,14 @@
                         return `${code} - ${product.name}`;
                     }
                     return String(product.name || '');
+                }
+
+                function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
+                    let timeoutId = null;
+                    return (...args) => {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => fn(...args), wait);
+                    };
                 }
 
                 function findProductByLabel(label) {
@@ -250,7 +259,7 @@
                 function bindRow(row) {
                     const searchInput = row.querySelector('.admin-delivery-item-search');
                     const productIdInput = row.querySelector('.admin-delivery-item-product-id');
-                    searchInput?.addEventListener('input', (event) => {
+                    const onSearchInput = debounce((event) => {
                         renderProductSuggestions(event.currentTarget);
                         const selected = findProductByLabel(event.currentTarget.value);
                         if (!selected) {
@@ -265,6 +274,7 @@
                             row.querySelector('.admin-delivery-item-price').value = selected.price_general || 0;
                         }
                     });
+                    searchInput?.addEventListener('input', onSearchInput);
                     searchInput?.addEventListener('focus', (event) => {
                         renderProductSuggestions(event.currentTarget);
                     });

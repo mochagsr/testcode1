@@ -337,9 +337,18 @@
                 }
 
                 const products = @json($adminProducts);
+                const SEARCH_DEBOUNCE_MS = 100;
 
                 function numberFormat(value) {
                     return new Intl.NumberFormat('id-ID').format(Math.round(Number(value || 0)));
+                }
+
+                function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
+                    let timeoutId = null;
+                    return (...args) => {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => fn(...args), wait);
+                    };
                 }
 
                 function escapeAttribute(value) {
@@ -428,7 +437,7 @@
                     });
                     const searchInput = row.querySelector('.admin-item-product-search');
                     const productIdInput = row.querySelector('.admin-item-product');
-                    searchInput?.addEventListener('input', (event) => {
+                    const onSearchInput = debounce((event) => {
                         renderProductSuggestions(event.currentTarget);
                         const selected = findProductByLabel(event.currentTarget.value);
                         if (!selected) {
@@ -437,6 +446,7 @@
                         }
                         productIdInput.value = selected.id;
                     });
+                    searchInput?.addEventListener('input', onSearchInput);
                     searchInput?.addEventListener('focus', (event) => {
                         renderProductSuggestions(event.currentTarget);
                     });
