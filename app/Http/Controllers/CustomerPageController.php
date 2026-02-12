@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\ExcelCsv;
 use App\Models\Customer;
 use App\Models\CustomerLevel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerPageController extends Controller
 {
@@ -36,10 +35,10 @@ class CustomerPageController extends Controller
         ]);
     }
 
-    public function exportCsv(Request $request): StreamedResponse
+    public function exportCsv(Request $request): Response
     {
         $search = trim((string) $request->string('search', ''));
-        $filename = 'customers-'.now()->format('Ymd-His').'.csv';
+        $filename = 'customers-'.now()->format('Ymd-His').'.xls';
 
         $customers = Customer::query()
             ->when($search !== '', function ($query) use ($search): void {
@@ -52,34 +51,14 @@ class CustomerPageController extends Controller
             ->orderBy('name')
             ->get(['name', 'phone', 'city', 'address', 'outstanding_receivable']);
 
-        return response()->streamDownload(function () use ($customers): void {
-            $handle = fopen('php://output', 'w');
-            if ($handle === false) {
-                return;
-            }
+        $html = view('customers.export_excel', [
+            'customers' => $customers,
+            'printedAt' => now(),
+        ])->render();
 
-            ExcelCsv::start($handle);
-            ExcelCsv::row($handle, [
-                __('ui.name'),
-                __('ui.phone'),
-                __('ui.city'),
-                __('ui.address'),
-                __('ui.receivable'),
-            ]);
-
-            foreach ($customers as $customer) {
-                ExcelCsv::row($handle, [
-                    (string) $customer->name,
-                    (string) ($customer->phone ?: '-'),
-                    (string) ($customer->city ?: '-'),
-                    (string) ($customer->address ?: '-'),
-                    (int) round((float) $customer->outstanding_receivable),
-                ]);
-            }
-
-            fclose($handle);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+        return response($html, 200, [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
