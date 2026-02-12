@@ -55,7 +55,7 @@
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_delivery_notes') }}</strong>
-            <select style="max-width: 220px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+            <select style="max-width: 180px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled hidden></option>
                 <option value="{{ route('reports.print', ['dataset' => 'delivery_notes', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('reports.export.pdf', ['dataset' => 'delivery_notes', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
@@ -88,7 +88,7 @@
                     <td>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
                     <td>
                         <div class="flex">
-                            <select style="max-width: 160px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                            <select style="max-width: 130px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled hidden></option>
                                 <option value="{{ route('delivery-notes.print', $note) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('delivery-notes.export.pdf', $note) }}">{{ __('txn.pdf') }}</option>
@@ -137,6 +137,7 @@
         })();
     </script>
 @endsection
+
 
 
 

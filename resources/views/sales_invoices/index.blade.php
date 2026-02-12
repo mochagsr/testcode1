@@ -54,7 +54,7 @@
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_sales_invoices') }}</strong>
-            <select style="max-width: 220px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+            <select style="max-width: 180px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled hidden></option>
                 <option value="{{ route('reports.print', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('reports.export.pdf', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
@@ -104,7 +104,7 @@
                     <td>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</td>
                     <td>
                         <div class="flex">
-                            <select style="max-width: 160px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                            <select style="max-width: 130px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled hidden></option>
                                 <option value="{{ route('sales-invoices.print', $invoice) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('sales-invoices.export.pdf', $invoice) }}">{{ __('txn.pdf') }}</option>
@@ -155,6 +155,7 @@
         })();
     </script>
 @endsection
+
 
 
 

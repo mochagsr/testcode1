@@ -8,14 +8,14 @@
     <div class="card">
         <form method="get" class="flex" style="margin-bottom: 10px;">
             <label for="semester" style="min-width: 130px; align-self: center;">{{ __('report.semester_filter') }}</label>
-            <select id="semester" name="semester" style="max-width: 220px;">
+            <select id="semester" name="semester" style="max-width: 180px;">
                 <option value="">{{ __('report.all_semesters') }}</option>
                 @foreach($semesterOptions as $semester)
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
                 @endforeach
             </select>
             <label for="customer_id" style="min-width: 130px; align-self: center;">{{ __('report.customer_filter') }}</label>
-            <select id="customer_id" name="customer_id" style="max-width: 260px;">
+            <select id="customer_id" name="customer_id" style="max-width: 140px;">
                 <option value="">{{ __('report.all_customers') }}</option>
                 @foreach($receivableCustomers as $customer)
                     <option value="{{ $customer->id }}" @selected($selectedCustomerId === $customer->id)>{{ $customer->name }}</option>
@@ -66,7 +66,7 @@
                 <tr>
                     <td>{{ $label }}</td>
                     <td>
-                        <select style="max-width: 260px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                        <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                             <option value="" selected disabled hidden></option>
                             <option value="{{ route('reports.print', $query) }}">{{ __('report.open_print') }}</option>
                             <option value="{{ route('reports.export.pdf', $query) }}">{{ __('report.download_pdf') }}</option>
@@ -79,5 +79,6 @@
         </table>
     </div>
 @endsection
+
 
 

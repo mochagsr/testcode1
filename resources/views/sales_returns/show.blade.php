@@ -10,7 +10,7 @@
             @if((auth()->user()?->role ?? '') === 'admin')
                 <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
             @endif
-            <select style="max-width: 170px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+            <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled hidden></option>
                 <option value="{{ route('sales-returns.print', $salesReturn) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('sales-returns.export.pdf', $salesReturn) }}">{{ __('txn.pdf') }}</option>
@@ -363,6 +363,7 @@
         </script>
     @endif
 @endsection
+
 
 
 

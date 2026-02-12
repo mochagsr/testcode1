@@ -22,7 +22,7 @@
             @if((auth()->user()?->role ?? '') === 'admin')
                 <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
             @endif
-            <select style="max-width: 170px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+            <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled hidden></option>
                 <option value="{{ route('order-notes.print', $note) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('order-notes.export.pdf', $note) }}">{{ __('txn.pdf') }}</option>
@@ -118,7 +118,7 @@
                             @foreach($note->items as $index => $item)
                                 <tr>
                                     <td>
-                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="{{ $item->product_name }}" style="max-width: 260px;" required>
+                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="{{ $item->product_name }}" style="max-width: 140px;" required>
                                         <input type="hidden" class="admin-order-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
                                     </td>
                                     <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" style="max-width: 90px;" required></td>
@@ -275,7 +275,7 @@
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>
-                            <input type="text" name="items[${index}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="" style="max-width: 260px;" required>
+                            <input type="text" name="items[${index}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="" style="max-width: 140px;" required>
                             <input type="hidden" class="admin-order-item-product-id" name="items[${index}][product_id]" value="">
                         </td>
                         <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="1" style="max-width: 90px;" required></td>
@@ -313,6 +313,7 @@
         </script>
     @endif
 @endsection
+
 
 
 

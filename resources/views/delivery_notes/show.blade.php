@@ -25,7 +25,7 @@
             @if((auth()->user()?->role ?? '') === 'admin')
                 <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
             @endif
-            <select style="max-width: 170px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+            <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled hidden></option>
                 <option value="{{ route('delivery-notes.print', $note) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('delivery-notes.export.pdf', $note) }}">{{ __('txn.pdf') }}</option>
@@ -128,13 +128,13 @@
                             @foreach($note->items as $index => $item)
                                 <tr>
                                     <td>
-                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="{{ $item->product_name }}" style="max-width: 260px;" required>
+                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="{{ $item->product_name }}" style="max-width: 140px;" required>
                                         <input type="hidden" class="admin-delivery-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
                                     </td>
                                     <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-delivery-item-qty qty-input" value="{{ (int) round($item->quantity) }}" style="max-width: 104px;" required></td>
                                     <td><input type="text" name="items[{{ $index }}][unit]" class="admin-delivery-item-unit" value="{{ $item->unit }}" style="max-width: 72px;"></td>
                                     <td><input type="number" min="0" step="1" name="items[{{ $index }}][unit_price]" class="admin-delivery-item-price price-input" value="{{ $item->unit_price !== null ? (int) round((float) $item->unit_price) : '' }}" style="max-width: 104px;"></td>
-                                    <td><input type="text" name="items[{{ $index }}][notes]" class="admin-delivery-item-notes" value="{{ $item->notes }}" style="max-width: 160px;"></td>
+                                    <td><input type="text" name="items[{{ $index }}][notes]" class="admin-delivery-item-notes" value="{{ $item->notes }}" style="max-width: 130px;"></td>
                                     <td><button type="button" class="btn secondary admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
                                 </tr>
                             @endforeach
@@ -307,13 +307,13 @@
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>
-                            <input type="text" name="items[${index}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="" style="max-width: 260px;" required>
+                            <input type="text" name="items[${index}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="" style="max-width: 140px;" required>
                             <input type="hidden" class="admin-delivery-item-product-id" name="items[${index}][product_id]" value="">
                         </td>
                         <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-delivery-item-qty qty-input" value="1" style="max-width: 104px;" required></td>
                         <td><input type="text" name="items[${index}][unit]" class="admin-delivery-item-unit" value="" style="max-width: 72px;"></td>
                         <td><input type="number" min="0" step="1" name="items[${index}][unit_price]" class="admin-delivery-item-price price-input" value="" style="max-width: 104px;"></td>
-                        <td><input type="text" name="items[${index}][notes]" class="admin-delivery-item-notes" value="" style="max-width: 160px;"></td>
+                        <td><input type="text" name="items[${index}][notes]" class="admin-delivery-item-notes" value="" style="max-width: 130px;"></td>
                         <td><button type="button" class="btn secondary admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
@@ -347,6 +347,7 @@
         </script>
     @endif
 @endsection
+
 
 
 
