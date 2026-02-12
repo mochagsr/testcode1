@@ -69,7 +69,7 @@
                         <span>{{ __('receivable.report_all_unpaid') }}</span>
                         <span class="flex" style="gap:6px;">
                             <select style="max-width: 200px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="">{{ __('receivable.action') }}</option>
+                                <option value=""></option>
                                 <option value="{{ route('reports.print', ['dataset' => 'receivables']) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables']) }}">{{ __('txn.pdf') }}</option>
                                 <option value="{{ route('reports.export.csv', ['dataset' => 'receivables']) }}">{{ __('txn.excel') }}</option>
@@ -80,7 +80,7 @@
                         <span>{{ __('receivable.report_by_semester') }} ({{ $activeSemesterForReport }})</span>
                         <span class="flex" style="gap:6px;">
                             <select style="max-width: 200px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="">{{ __('receivable.action') }}</option>
+                                <option value=""></option>
                                 <option value="{{ route('reports.print', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('txn.pdf') }}</option>
                                 <option value="{{ route('reports.export.csv', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('txn.excel') }}</option>
@@ -97,7 +97,7 @@
                         <span class="flex" style="gap:6px;">
                             @if($selectedCustomerId > 0)
                                 <select style="max-width: 200px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                    <option value="">{{ __('receivable.action') }}</option>
+                                    <option value=""></option>
                                     <option value="{{ route('reports.print', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('txn.print') }}</option>
                                     <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('txn.pdf') }}</option>
                                     <option value="{{ route('reports.export.csv', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('txn.excel') }}</option>
@@ -348,7 +348,7 @@
                     @endif
                     <div style="margin-bottom: 10px; text-align: right;">
                         <select style="max-width: 240px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                            <option value="">{{ __('receivable.action') }}</option>
+                            <option value=""></option>
                             <option value="{{ route('receivables.print-customer-bill', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('receivable.print_customer_bill') }}</option>
                             <option value="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
                             <option value="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('txn.excel') }}</option>
@@ -600,5 +600,6 @@
         })();
     </script>
 @endsection
+
 
 

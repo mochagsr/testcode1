@@ -26,7 +26,7 @@
                 <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
             @endif
             <select style="max-width: 170px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                <option value="">{{ __('txn.action') }}</option>
+                <option value=""></option>
                 <option value="{{ route('delivery-notes.print', $note) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('delivery-notes.export.pdf', $note) }}">{{ __('txn.pdf') }}</option>
                 <option value="{{ route('delivery-notes.export.excel', $note) }}">{{ __('txn.excel') }}</option>
@@ -347,5 +347,6 @@
         </script>
     @endif
 @endsection
+
 
 

@@ -67,7 +67,7 @@
                     <td>{{ $label }}</td>
                     <td>
                         <select style="max-width: 260px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                            <option value="">{{ __('txn.action') }}</option>
+                            <option value=""></option>
                             <option value="{{ route('reports.print', $query) }}">{{ __('report.open_print') }}</option>
                             <option value="{{ route('reports.export.pdf', $query) }}">{{ __('report.download_pdf') }}</option>
                             <option value="{{ route('reports.export.csv', $query) }}">{{ __('report.download_csv') }}</option>
@@ -79,3 +79,4 @@
         </table>
     </div>
 @endsection
+

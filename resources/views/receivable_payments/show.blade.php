@@ -11,7 +11,7 @@
             @endif
             <a class="btn secondary" href="{{ route('receivable-payments.index') }}">{{ __('receivable.back_to_payments') }}</a>
             <select style="max-width: 170px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                <option value="">{{ __('txn.action') }}</option>
+                <option value=""></option>
                 <option value="{{ route('receivable-payments.print', $payment) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('receivable-payments.export.pdf', $payment) }}">{{ __('txn.pdf') }}</option>
             </select>
@@ -84,5 +84,6 @@
         </div>
     @endif
 @endsection
+
 
 
