@@ -50,6 +50,11 @@
                     @endforelse
                     </tbody>
                 </table>
+                @if(method_exists($uncollectedCustomers, 'links'))
+                    <div style="margin-top: 12px;">
+                        {{ $uncollectedCustomers->links() }}
+                    </div>
+                @endif
             </div>
         </div>
     </div>

@@ -84,17 +84,12 @@ class SalesReturnPageController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $semesterSummary = SalesReturn::query()
+        $todaySummary = SalesReturn::query()
             ->selectRaw('COUNT(*) as total_return, COALESCE(SUM(total), 0) as grand_total')
-            ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
-            })
             ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                 $query->where('is_canceled', $selectedStatus === 'canceled');
             })
-            ->when($selectedReturnDate !== null, function ($query) use ($selectedReturnDate): void {
-                $query->whereDate('return_date', $selectedReturnDate);
-            })
+            ->whereDate('return_date', now()->toDateString())
             ->first();
         $customerSemesterLockMap = $this->customerSemesterLockMap(collect($returns->items()));
         $returnIds = collect($returns->items())
@@ -151,7 +146,7 @@ class SalesReturnPageController extends Controller
             'selectedReturnDate' => $selectedReturnDate,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
-            'semesterSummary' => $semesterSummary,
+            'todaySummary' => $todaySummary,
             'customerSemesterLockMap' => $customerSemesterLockMap,
             'returnAdminActionMap' => $returnAdminActionMap,
         ]);

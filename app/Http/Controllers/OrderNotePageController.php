@@ -79,29 +79,18 @@ class OrderNotePageController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $summaryQuery = OrderNote::query()
-            ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
-                $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
-            })
-            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                $query->where('is_canceled', $selectedStatus === 'canceled');
-            })
-            ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
-                $query->whereDate('note_date', $selectedNoteDate);
-            });
-
-        $summary = (object) [
-            'total_notes' => (int) $summaryQuery->count(),
+        $todaySummary = (object) [
+            'total_notes' => (int) OrderNote::query()
+                ->whereDate('note_date', now()->toDateString())
+                ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                    $query->where('is_canceled', $selectedStatus === 'canceled');
+                })
+                ->count(),
             'total_qty' => (int) OrderNoteItem::query()
                 ->join('order_notes', 'order_note_items.order_note_id', '=', 'order_notes.id')
-                ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
-                    $query->whereBetween('order_notes.note_date', [$semesterRange['start'], $semesterRange['end']]);
-                })
+                ->whereDate('order_notes.note_date', now()->toDateString())
                 ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                     $query->where('order_notes.is_canceled', $selectedStatus === 'canceled');
-                })
-                ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
-                    $query->whereDate('order_notes.note_date', $selectedNoteDate);
                 })
                 ->sum('order_note_items.quantity'),
         ];
@@ -115,7 +104,7 @@ class OrderNotePageController extends Controller
             'selectedNoteDate' => $selectedNoteDate,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
-            'summary' => $summary,
+            'todaySummary' => $todaySummary,
         ]);
     }
 

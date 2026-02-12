@@ -45,10 +45,10 @@
 
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
-            <strong>{{ __('txn.summary') }} {{ $selectedSemester ?: __('txn.all_semesters') }}</strong>
+            <strong>{{ __('txn.summary') }} {{ __('txn.date') }} {{ now()->format('d-m-Y') }}</strong>
             <div class="muted">
-                {{ __('txn.summary_total_order_notes') }}: {{ (int) round((int) ($summary->total_notes ?? 0)) }} |
-                {{ __('txn.summary_total_qty') }}: {{ (int) round((int) ($summary->total_qty ?? 0)) }}
+                {{ __('txn.summary_total_order_notes') }}: {{ (int) round((int) ($todaySummary->total_notes ?? 0)) }} |
+                {{ __('txn.summary_total_qty') }}: {{ (int) round((int) ($todaySummary->total_qty ?? 0)) }}
             </div>
         </div>
     </div>

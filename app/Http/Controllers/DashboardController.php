@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
@@ -20,7 +21,13 @@ class DashboardController extends Controller
                     'total_receivable' => 0,
                     'invoice_this_month' => 0,
                 ],
-                'uncollectedCustomers' => collect(),
+                'uncollectedCustomers' => new LengthAwarePaginator(
+                    items: [],
+                    total: 0,
+                    perPage: 20,
+                    currentPage: 1,
+                    options: ['path' => request()->url(), 'query' => request()->query()]
+                ),
             ]);
         }
 
@@ -37,10 +44,9 @@ class DashboardController extends Controller
         $uncollectedCustomers = Customer::query()
             ->select(['id', 'name', 'city', 'outstanding_receivable'])
             ->where('outstanding_receivable', '>', 0)
-            ->orderByDesc('outstanding_receivable')
             ->orderBy('name')
-            ->limit(15)
-            ->get();
+            ->paginate(20)
+            ->withQueryString();
 
         return view('dashboard', [
             'summary' => $summary,
