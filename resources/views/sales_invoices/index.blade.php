@@ -73,6 +73,12 @@
                 <tr>
                     <td>
                         <a href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a>
+                        @if((bool) ($lockState['auto'] ?? false))
+                            <span class="badge danger" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_auto') }}</span>
+                        @endif
+                        @if((bool) ($lockState['manual'] ?? false))
+                            <span class="badge warning" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_manual') }}</span>
+                        @endif
                         @if((bool) ($adminAction['edited'] ?? false))
                             <span class="badge warning" style="margin-left: 6px;">ADMIN EDIT</span>
                         @endif
@@ -83,19 +89,6 @@
                     <td>{{ $invoice->invoice_date->format('d-m-Y') }}</td>
                     <td>
                         {{ $invoice->customer->name }} <span class="muted">({{ $invoice->customer->city }})</span>
-                        @if((bool) ($lockState['locked'] ?? false))
-                            <div style="margin-top: 4px;">
-                                <span class="badge danger">
-                                    @if((bool) ($lockState['auto'] ?? false))
-                                        {{ __('receivable.customer_semester_locked_auto') }}
-                                    @elseif((bool) ($lockState['manual'] ?? false))
-                                        {{ __('receivable.customer_semester_locked_manual') }}
-                                    @else
-                                        {{ __('receivable.customer_semester_closed') }}
-                                    @endif
-                                </span>
-                            </div>
-                        @endif
                     </td>
                     <td>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</td>
                     <td>
