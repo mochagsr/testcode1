@@ -68,7 +68,7 @@
                     <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
                         <span>{{ __('receivable.report_all_unpaid') }}</span>
                         <span class="flex" style="gap:6px;">
-                            <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                            <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                 <option value="{{ route('reports.print', ['dataset' => 'receivables']) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables']) }}">{{ __('txn.pdf') }}</option>
@@ -79,7 +79,7 @@
                     <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
                         <span>{{ __('receivable.report_by_semester') }} ({{ $activeSemesterForReport }})</span>
                         <span class="flex" style="gap:6px;">
-                            <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                            <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                 <option value="{{ route('reports.print', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('txn.print') }}</option>
                                 <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('txn.pdf') }}</option>
@@ -96,7 +96,7 @@
                         </span>
                         <span class="flex" style="gap:6px;">
                             @if($selectedCustomerId > 0)
-                                <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                                <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                     <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                     <option value="{{ route('reports.print', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('txn.print') }}</option>
                                     <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('txn.pdf') }}</option>
@@ -347,7 +347,7 @@
                         </div>
                     @endif
                     <div style="margin-bottom: 10px; text-align: right;">
-                        <select style="max-width: 190px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                        <select class="action-menu action-menu-lg" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                             <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                             <option value="{{ route('receivables.print-customer-bill', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('receivable.print_customer_bill') }}</option>
                             <option value="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
@@ -600,6 +600,7 @@
         })();
     </script>
 @endsection
+
 
 
 

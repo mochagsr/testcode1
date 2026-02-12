@@ -10,7 +10,7 @@
                 <a class="btn secondary" href="{{ $returnTo }}">{{ __('receivable.back_to_receivables') }}</a>
             @endif
             <a class="btn secondary" href="{{ route('receivable-payments.index') }}">{{ __('receivable.back_to_payments') }}</a>
-            <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+            <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('receivable-payments.print', $payment) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('receivable-payments.export.pdf', $payment) }}">{{ __('txn.pdf') }}</option>
@@ -84,6 +84,7 @@
         </div>
     @endif
 @endsection
+
 
 
 

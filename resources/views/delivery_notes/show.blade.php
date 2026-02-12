@@ -25,7 +25,7 @@
             @if((auth()->user()?->role ?? '') === 'admin')
                 <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
             @endif
-            <select style="max-width: 140px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+            <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('delivery-notes.print', $note) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('delivery-notes.export.pdf', $note) }}">{{ __('txn.pdf') }}</option>
@@ -347,6 +347,7 @@
         </script>
     @endif
 @endsection
+
 
 
 

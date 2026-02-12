@@ -355,6 +355,22 @@
             background: var(--badge-danger-bg);
             color: var(--badge-danger-text);
         }
+        .action-menu {
+            width: auto;
+            min-width: 120px;
+            max-width: 140px;
+            padding: 7px 8px;
+            font-size: 13px;
+        }
+        .action-menu-sm {
+            max-width: 130px;
+        }
+        .action-menu-md {
+            max-width: 180px;
+        }
+        .action-menu-lg {
+            max-width: 190px;
+        }
         @media (max-width: 900px) {
             .wrap { grid-template-columns: 1fr; }
             .sidebar { position: sticky; top: 0; z-index: 10; }
