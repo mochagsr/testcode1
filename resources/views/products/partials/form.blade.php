@@ -133,6 +133,7 @@
         const previewNode = document.getElementById('product-code-preview');
         const resetButton = document.getElementById('product-code-reset');
         const categories = @json($categoriesJson);
+        const SEARCH_DEBOUNCE_MS = 100;
         const autoPreviewTemplate = @json(__('ui.product_code_auto_preview', ['code' => '__CODE__']));
         const manualPreviewTemplate = @json(__('ui.product_code_auto_preview_manual', ['code' => '__CODE__']));
         if (!nameInput || !codeInput || !categoryInput || !categorySearchInput || !previewNode || !resetButton) {
@@ -272,8 +273,16 @@
             sync();
         }
 
+        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
+            let timeoutId = null;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn(...args), wait);
+            };
+        }
+
         nameInput.addEventListener('input', syncCode);
-        categorySearchInput.addEventListener('input', function () {
+        const onCategoryInput = debounce(function () {
             const category = findCategoryByLabel(categorySearchInput.value);
             categoryInput.value = category ? category.id : '';
             if (category) {
@@ -281,6 +290,7 @@
             }
             syncCode();
         });
+        categorySearchInput.addEventListener('input', onCategoryInput);
         categorySearchInput.addEventListener('change', function () {
             const category = findCategoryByLabel(categorySearchInput.value);
             categoryInput.value = category ? category.id : '';

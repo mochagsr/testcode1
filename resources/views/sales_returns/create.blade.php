@@ -92,7 +92,16 @@
         const form = document.querySelector('form');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer-id');
+        const SEARCH_DEBOUNCE_MS = 100;
         let currentCustomer = null;
+
+        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
+            let timeoutId = null;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn(...args), wait);
+            };
+        }
 
         function normalizeLevelLabel(value) {
             return (value || '').toString().trim().toLowerCase();
@@ -245,12 +254,13 @@
             `;
             tbody.appendChild(tr);
 
-            tr.querySelector('.product-search').addEventListener('input', (event) => {
+            const onProductInput = debounce((event) => {
                 renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 updateRowMeta(tr, product);
             });
+            tr.querySelector('.product-search').addEventListener('input', onProductInput);
             tr.querySelector('.product-search').addEventListener('focus', (event) => {
                 renderProductSuggestions(event.currentTarget.value);
             });
@@ -276,11 +286,12 @@
                 ? customers.find(c => String(c.id) === String(customerIdField.value))
                 : findCustomerByLabel(customerSearch.value);
             setCurrentCustomer(bootCustomer);
-            customerSearch.addEventListener('input', (event) => {
+            const onCustomerInput = debounce((event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 setCurrentCustomer(customer);
                 recalc();
             });
+            customerSearch.addEventListener('input', onCustomerInput);
             customerSearch.addEventListener('change', (event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
                 setCurrentCustomer(customer);

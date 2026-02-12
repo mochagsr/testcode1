@@ -90,6 +90,15 @@
         const paymentAmountField = document.getElementById('payment-amount');
         const paymentAmountFeedback = document.getElementById('payment-amount-feedback');
         const amountInWordsField = document.getElementById('amount-in-words');
+        const SEARCH_DEBOUNCE_MS = 100;
+
+        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
+            let timeoutId = null;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn(...args), wait);
+            };
+        }
 
         function customerLabel(customer) {
             const city = customer.city || '-';
@@ -225,9 +234,10 @@
                 : findCustomerByLabel(customerSearch.value);
             const hasPresetAmount = String(paymentAmountField.value || '').trim() !== '';
             bindCustomer(bootCustomer, hasPresetAmount);
-            customerSearch.addEventListener('input', (event) => {
+            const onCustomerInput = debounce((event) => {
                 bindCustomer(findCustomerByLabel(event.currentTarget.value));
             });
+            customerSearch.addEventListener('input', onCustomerInput);
             customerSearch.addEventListener('change', (event) => {
                 bindCustomer(findCustomerByLabel(event.currentTarget.value));
             });

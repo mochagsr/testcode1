@@ -98,6 +98,15 @@
         const addBtn = document.getElementById('add-item');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
+        const SEARCH_DEBOUNCE_MS = 100;
+
+        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
+            let timeoutId = null;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn(...args), wait);
+            };
+        }
 
         function customerLabel(customer) {
             const city = customer.city || '-';
@@ -192,11 +201,12 @@
             `;
             tbody.appendChild(tr);
 
-            tr.querySelector('.product-search').addEventListener('input', (event) => {
+            const onProductInput = debounce((event) => {
                 renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
             });
+            tr.querySelector('.product-search').addEventListener('input', onProductInput);
             tr.querySelector('.product-search').addEventListener('focus', (event) => {
                 renderProductSuggestions(event.currentTarget.value);
             });
@@ -217,7 +227,7 @@
             if (bootCustomer) {
                 customerIdField.value = bootCustomer.id;
             }
-            customerSearch.addEventListener('input', (event) => {
+            const onCustomerInput = debounce((event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 customerIdField.value = customer ? customer.id : '';
                 if (customer) {
@@ -225,6 +235,7 @@
                     document.getElementById('city').value = customer.city || '';
                 }
             });
+            customerSearch.addEventListener('input', onCustomerInput);
             customerSearch.addEventListener('change', (event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
                 customerIdField.value = customer ? customer.id : '';
