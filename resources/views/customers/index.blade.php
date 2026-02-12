@@ -26,6 +26,7 @@
                 <th>{{ __('ui.level') }}</th>
                 <th>{{ __('ui.phone') }}</th>
                 <th>{{ __('ui.city') }}</th>
+                <th>{{ __('ui.address') }}</th>
                 <th>{{ __('ui.receivable') }}</th>
                 <th>{{ __('ui.id_card') }}</th>
                 <th>{{ __('ui.actions') }}</th>
@@ -38,6 +39,7 @@
                     <td>{{ $customer->level?->code ?: '-' }}</td>
                     <td>{{ $customer->phone ?: '-' }}</td>
                     <td>{{ $customer->city ?: '-' }}</td>
+                    <td>{{ $customer->address ?: '-' }}</td>
                     <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
                     <td>
                         @if($customer->id_card_photo_path)
@@ -58,7 +60,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">{{ __('ui.no_customers') }}</td></tr>
+                <tr><td colspan="8" class="muted">{{ __('ui.no_customers') }}</td></tr>
             @endforelse
             </tbody>
         </table>
