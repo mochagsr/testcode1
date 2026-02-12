@@ -111,12 +111,24 @@
             const normalized = label.trim().toLowerCase();
             return customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
                 || customers.find((customer) => customer.name.toLowerCase() === normalized)
-                || customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
+                || null;
+        }
+
+        function findCustomerLoose(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = label.trim().toLowerCase();
+            return customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
                 || customers.find((customer) => customer.name.toLowerCase().includes(normalized))
                 || null;
         }
 
         function productLabel(product) {
+            const code = (product.code || '').trim();
+            if (code !== '') {
+                return `${code} - ${product.name}`;
+            }
             return `${product.name}`;
         }
 
@@ -153,7 +165,15 @@
             return products.find((product) => productLabel(product).toLowerCase() === normalized)
                 || products.find((product) => product.code.toLowerCase() === normalized)
                 || products.find((product) => product.name.toLowerCase() === normalized)
-                || products.find((product) => productLabel(product).toLowerCase().includes(normalized))
+                || null;
+        }
+
+        function findProductLoose(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = label.trim().toLowerCase();
+            return products.find((product) => productLabel(product).toLowerCase().includes(normalized))
                 || products.find((product) => product.name.toLowerCase().includes(normalized))
                 || null;
         }
@@ -176,13 +196,16 @@
                 renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
-                if (!product) {
-                    return;
-                }
-                tr.querySelector('.product-search').value = product.name || '';
             });
             tr.querySelector('.product-search').addEventListener('focus', (event) => {
                 renderProductSuggestions(event.currentTarget.value);
+            });
+            tr.querySelector('.product-search').addEventListener('change', (event) => {
+                const product = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
+                tr.querySelector('.product-id').value = product ? product.id : '';
+                if (product) {
+                    tr.querySelector('.product-search').value = productLabel(product);
+                }
             });
             tr.querySelector('.remove').addEventListener('click', () => tr.remove());
         }
@@ -197,18 +220,18 @@
             customerSearch.addEventListener('input', (event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 customerIdField.value = customer ? customer.id : '';
-                if (!customer) {
-                    return;
+                if (customer) {
+                    document.getElementById('customer_phone').value = customer.phone || '';
+                    document.getElementById('city').value = customer.city || '';
                 }
-                customerSearch.value = customer.name || '';
-                document.getElementById('customer_phone').value = customer.phone || '';
-                document.getElementById('city').value = customer.city || '';
             });
             customerSearch.addEventListener('change', (event) => {
-                const customer = findCustomerByLabel(event.currentTarget.value);
+                const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
                 customerIdField.value = customer ? customer.id : '';
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
+                    document.getElementById('customer_phone').value = customer.phone || '';
+                    document.getElementById('city').value = customer.city || '';
                 }
             });
         }
@@ -220,7 +243,7 @@
 
     <datalist id="products-list">
         @foreach($products as $product)
-            <option value="{{ $product->name }}"></option>
+            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
         @endforeach
     </datalist>
 @endsection

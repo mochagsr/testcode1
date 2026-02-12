@@ -258,7 +258,7 @@ class SalesInvoicePageController extends Controller
                 entryDate: $invoiceDate,
                 amount: $subtotal,
                 periodCode: $invoice->semester_period,
-                description: "Invoice {$invoice->invoice_number}"
+                description: __('receivable.invoice_label').' '.$invoice->invoice_number
             );
 
             $initialPayment = $data['payment_method'] === 'tunai' ? (float) $invoice->total : 0.0;
@@ -284,7 +284,9 @@ class SalesInvoicePageController extends Controller
                     entryDate: $invoiceDate,
                     amount: $initialPayment,
                     periodCode: $invoice->semester_period,
-                    description: "Payment for {$invoice->invoice_number}"
+                    description: __('receivable.payment_for_invoice', [
+                        'invoice' => $invoice->invoice_number,
+                    ])
                 );
             }
 
@@ -350,6 +352,24 @@ class SalesInvoicePageController extends Controller
             'items.product:id,code,name',
             'payments',
         ]);
+        $currentSemester = $this->defaultSemesterPeriod();
+        $previousSemester = $this->previousSemesterPeriod($currentSemester);
+        $semesterOptions = SalesInvoice::query()
+            ->whereNotNull('semester_period')
+            ->where('semester_period', '!=', '')
+            ->distinct()
+            ->pluck('semester_period')
+            ->merge($this->configuredSemesterOptions())
+            ->push($currentSemester)
+            ->push($previousSemester)
+            ->push((string) $salesInvoice->semester_period)
+            ->unique()
+            ->sortDesc()
+            ->values();
+        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        if (! $semesterOptions->contains((string) $salesInvoice->semester_period)) {
+            $semesterOptions = $semesterOptions->push((string) $salesInvoice->semester_period)->unique()->values();
+        }
         $customerSemesterLockState = $this->customerSemesterLockState(
             (int) $salesInvoice->customer_id,
             (string) $salesInvoice->semester_period
@@ -358,6 +378,7 @@ class SalesInvoicePageController extends Controller
         return view('sales_invoices.show', [
             'invoice' => $salesInvoice,
             'customerSemesterLockState' => $customerSemesterLockState,
+            'semesterOptions' => $semesterOptions,
             'products' => Product::query()
                 ->orderBy('name')
                 ->get(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general']),
@@ -710,27 +731,27 @@ class SalesInvoicePageController extends Controller
                 return;
             }
 
-            fputcsv($handle, ['Invoice Number', $salesInvoice->invoice_number]);
-            fputcsv($handle, ['Invoice Date', $salesInvoice->invoice_date?->format('d-m-Y')]);
-            fputcsv($handle, ['Customer', $salesInvoice->customer?->name]);
-            fputcsv($handle, ['City', $salesInvoice->customer?->city]);
+            fputcsv($handle, [__('txn.note_number'), $salesInvoice->invoice_number]);
+            fputcsv($handle, [__('txn.invoice_date'), $salesInvoice->invoice_date?->format('d-m-Y')]);
+            fputcsv($handle, [__('txn.customer'), $salesInvoice->customer?->name]);
+            fputcsv($handle, [__('txn.city'), $salesInvoice->customer?->city]);
             $paymentStatusLabel = match ((string) $salesInvoice->payment_status) {
                 'paid' => __('txn.status_paid'),
                 default => __('txn.status_unpaid'),
             };
-            fputcsv($handle, ['Status', $paymentStatusLabel]);
+            fputcsv($handle, [__('txn.status'), $paymentStatusLabel]);
             $paidFromCustomerBalance = (float) $salesInvoice->payments
                 ->where('method', 'customer_balance')
                 ->sum('amount');
             $paidCash = max(0, (float) $salesInvoice->total_paid - $paidFromCustomerBalance);
-            fputcsv($handle, ['Total', number_format((int) round((float) $salesInvoice->total), 0, ',', '.')]);
-            fputcsv($handle, ['Paid', number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')]);
-            fputcsv($handle, ['Paid (Cash)', number_format((int) round($paidCash), 0, ',', '.')]);
-            fputcsv($handle, ['Paid (Customer Balance)', number_format((int) round($paidFromCustomerBalance), 0, ',', '.')]);
-            fputcsv($handle, ['Balance', number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')]);
+            fputcsv($handle, [__('txn.total'), number_format((int) round((float) $salesInvoice->total), 0, ',', '.')]);
+            fputcsv($handle, [__('txn.paid'), number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')]);
+            fputcsv($handle, [__('txn.paid_cash'), number_format((int) round($paidCash), 0, ',', '.')]);
+            fputcsv($handle, [__('txn.paid_customer_balance'), number_format((int) round($paidFromCustomerBalance), 0, ',', '.')]);
+            fputcsv($handle, [__('txn.balance'), number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')]);
             fputcsv($handle, []);
-            fputcsv($handle, ['Items']);
-            fputcsv($handle, ['Name', 'Qty', 'Unit Price', 'Discount (%)', 'Line Total']);
+            fputcsv($handle, [__('txn.items')]);
+            fputcsv($handle, [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount').' (%)', __('txn.line_total')]);
 
             foreach ($salesInvoice->items as $item) {
                 $gross = (float) $item->quantity * (float) $item->unit_price;
@@ -745,8 +766,8 @@ class SalesInvoicePageController extends Controller
             }
 
             fputcsv($handle, []);
-            fputcsv($handle, ['Payments']);
-            fputcsv($handle, ['Date', 'Method', 'Amount', 'Notes']);
+            fputcsv($handle, [__('txn.record_payment')]);
+            fputcsv($handle, [__('txn.date'), __('txn.method'), __('txn.amount'), __('txn.notes')]);
             foreach ($salesInvoice->payments as $payment) {
                 fputcsv($handle, [
                     $payment->payment_date?->format('d-m-Y'),

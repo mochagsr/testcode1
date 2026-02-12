@@ -142,7 +142,7 @@
                         </table>
                         <datalist id="admin-delivery-products-list">
                             @foreach($products as $productOption)
-                                <option value="{{ $productOption->name }}"></option>
+                                <option value="{{ $productOption->code ? $productOption->code.' - '.$productOption->name : $productOption->name }}"></option>
                             @endforeach
                         </datalist>
                     </div>
@@ -190,13 +190,31 @@
                     'price_general' => (int) round((float) ($product->price_general ?? 0)),
                 ])->values()->all());
 
+                function productLabel(product) {
+                    const code = String(product.code || '').trim();
+                    if (code !== '') {
+                        return `${code} - ${product.name}`;
+                    }
+                    return String(product.name || '');
+                }
+
                 function findProductByLabel(label) {
                     if (!label) {
                         return null;
                     }
                     const normalized = String(label).trim().toLowerCase();
-                    return products.find((product) => product.name.toLowerCase() === normalized)
+                    return products.find((product) => productLabel(product).toLowerCase() === normalized)
                         || products.find((product) => String(product.code || '').toLowerCase() === normalized)
+                        || products.find((product) => product.name.toLowerCase() === normalized)
+                        || null;
+                }
+
+                function findProductLoose(label) {
+                    if (!label) {
+                        return null;
+                    }
+                    const normalized = String(label).trim().toLowerCase();
+                    return products.find((product) => productLabel(product).toLowerCase().includes(normalized))
                         || products.find((product) => product.name.toLowerCase().includes(normalized))
                         || null;
                 }
@@ -208,12 +226,13 @@
                     }
                     const normalized = String(input?.value || '').trim().toLowerCase();
                     const matches = products.filter((product) => {
-                        const name = product.name.toLowerCase();
+                        const label = productLabel(product).toLowerCase();
                         const code = String(product.code || '').toLowerCase();
-                        return normalized === '' || name.includes(normalized) || code.includes(normalized);
+                        const name = product.name.toLowerCase();
+                        return normalized === '' || label.includes(normalized) || code.includes(normalized) || name.includes(normalized);
                     }).slice(0, 60);
                     list.innerHTML = matches
-                        .map((product) => `<option value="${String(product.name).replace(/"/g, '&quot;')}"></option>`)
+                        .map((product) => `<option value="${String(productLabel(product)).replace(/"/g, '&quot;')}"></option>`)
                         .join('');
                 }
 
@@ -238,7 +257,6 @@
                             productIdInput.value = '';
                             return;
                         }
-                        searchInput.value = selected.name;
                         productIdInput.value = selected.id;
                         if (!row.querySelector('.admin-delivery-item-unit').value) {
                             row.querySelector('.admin-delivery-item-unit').value = selected.unit || '';
@@ -249,6 +267,21 @@
                     });
                     searchInput?.addEventListener('focus', (event) => {
                         renderProductSuggestions(event.currentTarget);
+                    });
+                    searchInput?.addEventListener('change', (event) => {
+                        const selected = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
+                        if (!selected) {
+                            productIdInput.value = '';
+                            return;
+                        }
+                        productIdInput.value = selected.id;
+                        searchInput.value = productLabel(selected);
+                        if (!row.querySelector('.admin-delivery-item-unit').value) {
+                            row.querySelector('.admin-delivery-item-unit').value = selected.unit || '';
+                        }
+                        if (!row.querySelector('.admin-delivery-item-price').value) {
+                            row.querySelector('.admin-delivery-item-price').value = selected.price_general || 0;
+                        }
                     });
                     row.querySelector('.admin-remove-delivery-item')?.addEventListener('click', () => {
                         row.remove();

@@ -226,7 +226,7 @@ class SalesReturnPageController extends Controller
                     'reference_id' => $salesReturn->id,
                     'mutation_type' => 'in',
                     'quantity' => $row['quantity'],
-                    'notes' => "Sales return {$salesReturn->return_number}",
+                    'notes' => __('txn.return').' '.$salesReturn->return_number,
                     'created_by_user_id' => null,
                 ]);
             }
@@ -237,7 +237,7 @@ class SalesReturnPageController extends Controller
                 entryDate: $returnDate,
                 amount: $total,
                 periodCode: $salesReturn->semester_period,
-                description: "Sales return {$salesReturn->return_number}"
+                description: __('txn.return').' '.$salesReturn->return_number
             );
 
             return $salesReturn;
@@ -261,6 +261,24 @@ class SalesReturnPageController extends Controller
             'customer:id,name,city,phone',
             'items',
         ]);
+        $currentSemester = $this->defaultSemesterPeriod();
+        $previousSemester = $this->previousSemesterPeriod($currentSemester);
+        $semesterOptions = SalesReturn::query()
+            ->whereNotNull('semester_period')
+            ->where('semester_period', '!=', '')
+            ->distinct()
+            ->pluck('semester_period')
+            ->merge($this->configuredSemesterOptions())
+            ->push($currentSemester)
+            ->push($previousSemester)
+            ->push((string) $salesReturn->semester_period)
+            ->unique()
+            ->sortDesc()
+            ->values();
+        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        if (! $semesterOptions->contains((string) $salesReturn->semester_period)) {
+            $semesterOptions = $semesterOptions->push((string) $salesReturn->semester_period)->unique()->values();
+        }
         $customerSemesterLockState = $this->customerSemesterLockState(
             (int) $salesReturn->customer_id,
             (string) $salesReturn->semester_period
@@ -269,6 +287,7 @@ class SalesReturnPageController extends Controller
         return view('sales_returns.show', [
             'salesReturn' => $salesReturn,
             'customerSemesterLockState' => $customerSemesterLockState,
+            'semesterOptions' => $semesterOptions,
             'products' => Product::query()
                 ->orderBy('name')
                 ->get(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general']),
@@ -378,7 +397,8 @@ class SalesReturnPageController extends Controller
                         'reference_id' => $return->id,
                         'mutation_type' => 'out',
                         'quantity' => $delta,
-                        'notes' => "Admin edit sales return {$return->return_number}",
+                        'notes' => '[ADMIN EDIT '.strtoupper(__('txn.return')).'] '
+                            .__('txn.return').' '.$return->return_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 } else {
@@ -390,7 +410,8 @@ class SalesReturnPageController extends Controller
                         'reference_id' => $return->id,
                         'mutation_type' => 'in',
                         'quantity' => $inQty,
-                        'notes' => "Admin edit sales return {$return->return_number}",
+                        'notes' => '[ADMIN EDIT '.strtoupper(__('txn.return')).'] '
+                            .__('txn.return').' '.$return->return_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 }
@@ -449,7 +470,8 @@ class SalesReturnPageController extends Controller
                     entryDate: Carbon::parse((string) $data['return_date']),
                     amount: $difference,
                     periodCode: $return->semester_period,
-                    description: "Admin edit sales return {$return->return_number} (+)",
+                    description: '[ADMIN EDIT '.strtoupper(__('txn.return'))." +] "
+                        .__('txn.return').' '.$return->return_number,
                 );
             } elseif ($difference < 0) {
                 $this->receivableLedgerService->addDebit(
@@ -458,7 +480,8 @@ class SalesReturnPageController extends Controller
                     entryDate: Carbon::parse((string) $data['return_date']),
                     amount: abs($difference),
                     periodCode: $return->semester_period,
-                    description: "Admin edit sales return {$return->return_number} (-)",
+                    description: '[ADMIN EDIT '.strtoupper(__('txn.return'))." -] "
+                        .__('txn.return').' '.$return->return_number,
                 );
             }
         });
@@ -525,7 +548,7 @@ class SalesReturnPageController extends Controller
                     'reference_id' => $return->id,
                     'mutation_type' => 'out',
                     'quantity' => (int) $item->quantity,
-                    'notes' => "Cancel sales return {$return->return_number}",
+                    'notes' => __('txn.cancel').' '.__('txn.return').' '.$return->return_number,
                     'created_by_user_id' => auth()->id(),
                 ]);
             }

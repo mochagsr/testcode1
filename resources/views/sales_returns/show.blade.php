@@ -98,7 +98,11 @@
                     </div>
                     <div class="col-4">
                         <label>{{ __('txn.semester_period') }}</label>
-                        <input type="text" name="semester_period" value="{{ old('semester_period', $salesReturn->semester_period) }}">
+                        <select name="semester_period">
+                            @foreach($semesterOptions as $semester)
+                                <option value="{{ $semester }}" @selected(old('semester_period', $salesReturn->semester_period) === $semester)>{{ $semester }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-12">
                         <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
@@ -119,13 +123,14 @@
                             @foreach($salesReturn->items as $index => $item)
                                 <tr>
                                     <td>
-                                        <select name="items[{{ $index }}][product_id]" class="admin-return-item-product" required style="max-width: 280px;">
-                                            @foreach($products as $productOption)
-                                                <option value="{{ $productOption->id }}" @selected((int) $item->product_id === (int) $productOption->id)>
-                                                    {{ $productOption->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
+                                        @php
+                                            $itemProduct = $products->firstWhere('id', (int) $item->product_id);
+                                            $itemCode = trim((string) ($itemProduct?->code ?? ''));
+                                            $itemName = trim((string) ($itemProduct?->name ?? $item->product_name));
+                                            $itemLabel = $itemCode !== '' ? $itemCode.' - '.$itemName : $itemName;
+                                        @endphp
+                                        <input type="text" class="admin-return-item-product-search" list="admin-return-products-list" name="items[{{ $index }}][product_name]" value="{{ $itemLabel }}" required style="max-width: 280px;">
+                                        <input type="hidden" class="admin-return-item-product" name="items[{{ $index }}][product_id]" value="{{ (int) $item->product_id }}">
                                     </td>
                                     <td><input type="number" min="1" class="admin-return-item-qty" name="items[{{ $index }}][quantity]" value="{{ (int) round($item->quantity) }}" style="max-width: 90px;" required></td>
                                     <td><input type="number" min="0" step="1" class="admin-return-item-price" name="items[{{ $index }}][unit_price]" value="{{ (int) round($item->unit_price) }}" style="max-width: 120px;" required></td>
@@ -135,6 +140,11 @@
                             @endforeach
                             </tbody>
                         </table>
+                        <datalist id="admin-return-products-list">
+                            @foreach($products as $productOption)
+                                <option value="{{ $productOption->code ? $productOption->code.' - '.$productOption->name : $productOption->name }}"></option>
+                            @endforeach
+                        </datalist>
                     </div>
                     <div class="col-12">
                         <label>{{ __('txn.reason') }}</label>
@@ -170,6 +180,7 @@
 
                 const products = @json($products->map(fn ($product) => [
                     'id' => (int) $product->id,
+                    'code' => (string) ($product->code ?? ''),
                     'name' => (string) $product->name,
                     'price_general' => (int) round((float) ($product->price_general ?? 0)),
                 ])->values()->all());
@@ -178,18 +189,65 @@
                     return new Intl.NumberFormat('id-ID').format(Math.round(Number(value || 0)));
                 }
 
-                function buildProductOptions(selectedId) {
-                    return products.map((product) => {
-                        const selected = Number(selectedId) === Number(product.id) ? 'selected' : '';
-                        return `<option value="${product.id}" ${selected}>${product.name}</option>`;
-                    }).join('');
+                function escapeAttribute(value) {
+                    return String(value)
+                        .replace(/&/g, '&amp;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                }
+
+                function productLabel(product) {
+                    const code = String(product.code || '').trim();
+                    const name = String(product.name || '').trim();
+                    return code !== '' ? `${code} - ${name}` : name;
+                }
+
+                function findProductByLabel(label) {
+                    if (!label) {
+                        return null;
+                    }
+                    const normalized = String(label).trim().toLowerCase();
+                    return products.find((product) => productLabel(product).toLowerCase() === normalized)
+                        || products.find((product) => String(product.code || '').toLowerCase() === normalized)
+                        || products.find((product) => String(product.name || '').toLowerCase() === normalized)
+                        || null;
+                }
+
+                function findProductLoose(label) {
+                    if (!label) {
+                        return null;
+                    }
+                    const normalized = String(label).trim().toLowerCase();
+                    return products.find((product) => productLabel(product).toLowerCase().includes(normalized))
+                        || products.find((product) => String(product.name || '').toLowerCase().includes(normalized))
+                        || null;
+                }
+
+                function renderProductSuggestions(input) {
+                    const list = document.getElementById('admin-return-products-list');
+                    if (!list) {
+                        return;
+                    }
+                    const normalized = String(input?.value || '').trim().toLowerCase();
+                    const matches = products.filter((product) => {
+                        const label = productLabel(product).toLowerCase();
+                        const code = String(product.code || '').toLowerCase();
+                        const name = String(product.name || '').toLowerCase();
+                        return normalized === '' || label.includes(normalized) || code.includes(normalized) || name.includes(normalized);
+                    }).slice(0, 80);
+                    list.innerHTML = matches
+                        .map((product) => `<option value="${escapeAttribute(productLabel(product))}"></option>`)
+                        .join('');
                 }
 
                 function reindexRows() {
                     Array.from(tbody.querySelectorAll('tr')).forEach((row, index) => {
+                        const productSearch = row.querySelector('.admin-return-item-product-search');
                         const product = row.querySelector('.admin-return-item-product');
                         const qty = row.querySelector('.admin-return-item-qty');
                         const price = row.querySelector('.admin-return-item-price');
+                        if (productSearch) productSearch.name = `items[${index}][product_name]`;
                         if (product) product.name = `items[${index}][product_id]`;
                         if (qty) qty.name = `items[${index}][quantity]`;
                         if (price) price.name = `items[${index}][unit_price]`;
@@ -210,8 +268,28 @@
                     row.querySelectorAll('.admin-return-item-qty, .admin-return-item-price').forEach((input) => {
                         input.addEventListener('input', () => recalcRow(row));
                     });
-                    row.querySelector('.admin-return-item-product')?.addEventListener('change', (event) => {
-                        const selected = products.find((product) => Number(product.id) === Number(event.currentTarget.value));
+                    const searchInput = row.querySelector('.admin-return-item-product-search');
+                    const productIdInput = row.querySelector('.admin-return-item-product');
+                    searchInput?.addEventListener('input', (event) => {
+                        renderProductSuggestions(event.currentTarget);
+                        const selected = findProductByLabel(event.currentTarget.value);
+                        if (!selected) {
+                            productIdInput.value = '';
+                            return;
+                        }
+                        productIdInput.value = selected.id;
+                    });
+                    searchInput?.addEventListener('focus', (event) => {
+                        renderProductSuggestions(event.currentTarget);
+                    });
+                    searchInput?.addEventListener('change', (event) => {
+                        const selected = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
+                        if (!selected) {
+                            productIdInput.value = '';
+                            return;
+                        }
+                        productIdInput.value = selected.id;
+                        searchInput.value = productLabel(selected);
                         const priceInput = row.querySelector('.admin-return-item-price');
                         if (selected && priceInput && Number(priceInput.value || 0) <= 0) {
                             priceInput.value = selected.price_general || 0;
@@ -234,9 +312,8 @@
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>
-                            <select name="items[${index}][product_id]" class="admin-return-item-product" required style="max-width: 280px;">
-                                ${buildProductOptions(defaultProduct ? defaultProduct.id : null)}
-                            </select>
+                            <input type="text" class="admin-return-item-product-search" list="admin-return-products-list" name="items[${index}][product_name]" value="${defaultProduct ? escapeAttribute(productLabel(defaultProduct)) : ''}" required style="max-width: 280px;">
+                            <input type="hidden" class="admin-return-item-product" name="items[${index}][product_id]" value="${defaultProduct ? defaultProduct.id : ''}">
                         </td>
                         <td><input type="number" min="1" class="admin-return-item-qty" name="items[${index}][quantity]" value="1" style="max-width: 90px;" required></td>
                         <td><input type="number" min="0" step="1" class="admin-return-item-price" name="items[${index}][unit_price]" value="${defaultProduct ? (defaultProduct.price_general || 0) : 0}" style="max-width: 120px;" required></td>
@@ -249,6 +326,7 @@
                 }
 
                 Array.from(tbody.querySelectorAll('tr')).forEach(bindRow);
+                renderProductSuggestions(null);
                 reindexRows();
                 addButton.addEventListener('click', addRow);
 

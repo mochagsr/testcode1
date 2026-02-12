@@ -152,7 +152,15 @@
             const normalized = label.trim().toLowerCase();
             return customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
                 || customers.find((customer) => customer.name.toLowerCase() === normalized)
-                || customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
+                || null;
+        }
+
+        function findCustomerLoose(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = label.trim().toLowerCase();
+            return customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
                 || customers.find((customer) => customer.name.toLowerCase().includes(normalized))
                 || null;
         }
@@ -167,6 +175,10 @@
         }
 
         function productLabel(product) {
+            const code = (product.code || '').trim();
+            if (code !== '') {
+                return `${code} - ${product.name}`;
+            }
             return `${product.name}`;
         }
 
@@ -203,7 +215,15 @@
             return products.find((product) => productLabel(product).toLowerCase() === normalized)
                 || products.find((product) => product.code.toLowerCase() === normalized)
                 || products.find((product) => product.name.toLowerCase() === normalized)
-                || products.find((product) => productLabel(product).toLowerCase().includes(normalized))
+                || null;
+        }
+
+        function findProductLoose(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = label.trim().toLowerCase();
+            return products.find((product) => productLabel(product).toLowerCase().includes(normalized))
                 || products.find((product) => product.name.toLowerCase().includes(normalized))
                 || null;
         }
@@ -289,6 +309,14 @@
             tr.querySelector('.product-search').addEventListener('focus', (event) => {
                 renderProductSuggestions(event.currentTarget.value);
             });
+            tr.querySelector('.product-search').addEventListener('change', (event) => {
+                const product = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
+                tr.querySelector('.product-id').value = product ? product.id : '';
+                if (product) {
+                    tr.querySelector('.product-search').value = productLabel(product);
+                }
+                updateRowMeta(tr, product);
+            });
             tr.querySelector('.discount').addEventListener('input', (event) => {
                 const current = parseFloat(event.currentTarget.value || 0);
                 if (Number.isNaN(current)) {
@@ -325,7 +353,7 @@
                 applyCustomerPricing();
             });
             customerSearch.addEventListener('change', (event) => {
-                const customer = findCustomerByLabel(event.currentTarget.value);
+                const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
                 setCurrentCustomer(customer);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
@@ -348,7 +376,7 @@
 
     <datalist id="products-list">
         @foreach($products as $product)
-            <option value="{{ $product->name }}"></option>
+            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
         @endforeach
     </datalist>
 @endsection
