@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('receivable.customer_bill_title') }} - {{ $customer->name }}</title>
     <style>
+        @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
         .head { display: grid; grid-template-columns: minmax(0, 1.7fr) auto minmax(0, 1fr); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
@@ -29,6 +30,18 @@
         .transfer-title { font-weight: 700; margin-bottom: 4px; }
         .transfer-line { white-space: pre-line; }
         .muted { color: #444; }
+        .pdf-mode { font-size: 10px; }
+        .pdf-mode .container { max-width: 100%; }
+        .pdf-mode .head { display: table; width: 100%; table-layout: fixed; }
+        .pdf-mode .company-left,
+        .pdf-mode .doc-center,
+        .pdf-mode .doc-right { display: table-cell; vertical-align: top; }
+        .pdf-mode .company-left { width: 48%; padding-right: 8px; }
+        .pdf-mode .doc-center { width: 18%; padding: 0 6px; margin-left: 0; }
+        .pdf-mode .doc-right { width: 34%; min-width: 0; padding-left: 8px; }
+        .pdf-mode .company-name { font-size: 14px; }
+        .pdf-mode .doc-title { font-size: 16px; }
+        .pdf-mode th, .pdf-mode td { padding: 3px; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
@@ -36,7 +49,7 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
 <div class="container">
     @php
         $companyName = trim((string) ($companyName ?? 'CV. PUSTAKA GRAFIKA'));

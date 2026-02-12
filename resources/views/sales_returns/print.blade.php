@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('txn.print') }} {{ $salesReturn->return_number }}</title>
     <style>
+        @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
         .company-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
@@ -24,6 +25,13 @@
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
         .signature-name { font-weight: 600; }
+        .pdf-mode { font-size: 10px; }
+        .pdf-mode .container { max-width: 100%; }
+        .pdf-mode .company-name { font-size: 14px; }
+        .pdf-mode .doc-title { font-size: 16px; }
+        .pdf-mode .doc-meta-right { min-width: 0; max-width: 36%; }
+        .pdf-mode .company-left { max-width: 62%; }
+        .pdf-mode th, .pdf-mode td { padding: 3px; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
@@ -31,7 +39,7 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
 <div class="container">
     @php
         $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');

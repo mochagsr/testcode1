@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('txn.print') }} {{ $payment->payment_number }}</title>
     <style>
+        @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.3; color: #111; }
         .container { max-width: 760px; margin: 0 auto; }
         .receipt { border: 1px solid #111; padding: 12px; }
@@ -32,6 +33,11 @@
         .sign-space { height: 30px; }
         .sign-name { border-top: 1px solid #111; padding-top: 3px; }
         .muted { color: #333; }
+        .pdf-mode { font-size: 10px; }
+        .pdf-mode .container { max-width: 100%; }
+        .pdf-mode .receipt { padding: 10px; }
+        .pdf-mode .company-name { font-size: 13px; }
+        .pdf-mode .kwitansi-title { font-size: 16px; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
@@ -39,7 +45,7 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
 <div class="container">
     @php
         $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');

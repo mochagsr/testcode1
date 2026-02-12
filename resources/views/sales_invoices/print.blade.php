@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('txn.print') }} {{ $invoice->invoice_number }}</title>
     <style>
+        @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
         .company-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
@@ -27,6 +28,18 @@
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
         .signature-name { font-weight: 600; }
+        .pdf-mode { font-size: 10px; }
+        .pdf-mode .container { max-width: 100%; }
+        .pdf-mode .company-head { display: table; width: 100%; table-layout: fixed; border-collapse: collapse; }
+        .pdf-mode .company-left,
+        .pdf-mode .doc-title-center,
+        .pdf-mode .doc-meta-right { display: table-cell; vertical-align: top; }
+        .pdf-mode .company-left { width: 44%; padding-right: 8px; }
+        .pdf-mode .doc-title-center { width: 20%; padding: 0 6px; text-align: center; }
+        .pdf-mode .doc-meta-right { width: 36%; padding-left: 8px; min-width: 0; }
+        .pdf-mode .company-name { font-size: 14px; }
+        .pdf-mode .doc-title { font-size: 16px; }
+        .pdf-mode th, .pdf-mode td { padding: 3px; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
@@ -34,7 +47,7 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
 <div class="container">
     @php
         $discountTotal = (float) $invoice->items->sum('discount');
