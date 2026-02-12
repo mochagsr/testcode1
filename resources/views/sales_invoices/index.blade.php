@@ -5,12 +5,12 @@
 @section('content')
     <style>
         .invoice-list-card {
-            padding: 10px;
+            padding: 8px;
         }
         .invoice-list-card th,
         .invoice-list-card td {
-            padding-top: 6px;
-            padding-bottom: 6px;
+            padding-top: 4px;
+            padding-bottom: 4px;
         }
     </style>
 
