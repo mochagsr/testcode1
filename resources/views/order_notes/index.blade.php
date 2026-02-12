@@ -3,12 +3,23 @@
 @section('title', __('txn.order_notes_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .order-list-card {
+            padding: 10px;
+        }
+        .order-list-card th,
+        .order-list-card td {
+            padding-top: 6px;
+            padding-bottom: 6px;
+        }
+    </style>
+
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }}</h1>
         <a class="btn" href="{{ route('order-notes.create') }}">{{ __('txn.create_order_note') }}</a>
     </div>
 
-    <div class="card">
+    <div class="card order-list-card">
         <form id="order-notes-filter-form" method="get" class="flex">
             <input id="order-notes-search-input" type="text" name="search" placeholder="{{ __('txn.search_order_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <input id="order-notes-date-input" type="date" name="note_date" value="{{ $selectedNoteDate }}" style="max-width: 180px;">
@@ -77,7 +88,6 @@
                     <td>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('order-notes.show', $note) }}">{{ __('txn.detail') }}</a>
                             <select style="max-width: 160px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="">{{ __('txn.action') }}</option>
                                 <option value="{{ route('order-notes.print', $note) }}">{{ __('txn.print') }}</option>

@@ -3,12 +3,23 @@
 @section('title', __('txn.delivery_notes_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .delivery-list-card {
+            padding: 10px;
+        }
+        .delivery-list-card th,
+        .delivery-list-card td {
+            padding-top: 6px;
+            padding-bottom: 6px;
+        }
+    </style>
+
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.delivery_notes_title') }}</h1>
         <a class="btn" href="{{ route('delivery-notes.create') }}">{{ __('txn.create_delivery_note') }}</a>
     </div>
 
-    <div class="card">
+    <div class="card delivery-list-card">
         <form id="delivery-notes-filter-form" method="get" class="flex">
             <input id="delivery-notes-search-input" type="text" name="search" placeholder="{{ __('txn.search_delivery_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <input id="delivery-notes-date-input" type="date" name="note_date" value="{{ $selectedNoteDate }}" style="max-width: 180px;">
@@ -77,7 +88,6 @@
                     <td>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('delivery-notes.show', $note) }}">{{ __('txn.detail') }}</a>
                             <select style="max-width: 160px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="">{{ __('txn.action') }}</option>
                                 <option value="{{ route('delivery-notes.print', $note) }}">{{ __('txn.print') }}</option>
