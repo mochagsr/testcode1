@@ -85,17 +85,12 @@ class SalesInvoicePageController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $semesterSummary = SalesInvoice::query()
+        $todaySummary = SalesInvoice::query()
             ->selectRaw('COUNT(*) as total_invoice, COALESCE(SUM(total), 0) as grand_total')
-            ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
-            })
             ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                 $query->where('is_canceled', $selectedStatus === 'canceled');
             })
-            ->when($selectedInvoiceDate !== null, function ($query) use ($selectedInvoiceDate): void {
-                $query->whereDate('invoice_date', $selectedInvoiceDate);
-            })
+            ->whereDate('invoice_date', now()->toDateString())
             ->first();
         $customerSemesterLockMap = $this->customerSemesterLockMap(collect($invoices->items()));
         $invoiceIds = collect($invoices->items())
@@ -152,7 +147,7 @@ class SalesInvoicePageController extends Controller
             'selectedInvoiceDate' => $selectedInvoiceDate,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
-            'semesterSummary' => $semesterSummary,
+            'todaySummary' => $todaySummary,
             'customerSemesterLockMap' => $customerSemesterLockMap,
             'invoiceAdminActionMap' => $invoiceAdminActionMap,
         ]);

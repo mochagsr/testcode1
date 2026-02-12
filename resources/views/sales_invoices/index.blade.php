@@ -44,10 +44,10 @@
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
-            <strong>{{ __('txn.summary') }} {{ $selectedSemester ?: __('txn.all_semesters') }}</strong>
+            <strong>{{ __('txn.summary') }} {{ __('txn.date') }} {{ now()->format('d-m-Y') }}</strong>
             <div class="muted">
-                {{ __('txn.summary_total_invoices') }}: {{ (int) round((int) ($semesterSummary->total_invoice ?? 0)) }} |
-                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((int) round((float) ($semesterSummary->grand_total ?? 0), 0), 0, ',', '.') }}
+                {{ __('txn.summary_total_invoices') }}: {{ (int) round((int) ($todaySummary->total_invoice ?? 0)) }} |
+                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((int) round((float) ($todaySummary->grand_total ?? 0), 0), 0, ',', '.') }}
             </div>
         </div>
     </div>

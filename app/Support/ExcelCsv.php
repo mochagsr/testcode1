@@ -5,6 +5,7 @@ namespace App\Support;
 final class ExcelCsv
 {
     private const DELIMITER = ';';
+    private const EOL = "\r\n";
 
     /**
      * @param resource $handle
@@ -12,7 +13,7 @@ final class ExcelCsv
     public static function start($handle): void
     {
         fwrite($handle, "\xEF\xBB\xBF");
-        fwrite($handle, 'sep='.self::DELIMITER."\r\n");
+        fwrite($handle, 'sep='.self::DELIMITER.self::EOL);
     }
 
     /**
@@ -21,6 +22,6 @@ final class ExcelCsv
      */
     public static function row($handle, array $row): void
     {
-        fputcsv($handle, $row, self::DELIMITER, '"', '');
+        fputcsv($handle, $row, self::DELIMITER, '"', '', self::EOL);
     }
 }
