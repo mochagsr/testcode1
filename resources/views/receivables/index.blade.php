@@ -281,11 +281,11 @@
                             <td>Rp {{ number_format((int) round($row->balance_after), 0, ',', '.') }}</td>
                             <td>
                                 @if($isAdminCancelInvoice)
-                                    <span class="badge danger">ADMIN BATAL</span>
+                                    <span class="badge danger">{{ __('txn.admin_badge_cancel') }}</span>
                                 @elseif($isAdminEditIncrease)
-                                    <span class="badge warning">ADMIN EDIT +</span>
+                                    <span class="badge warning">{{ __('txn.admin_badge_edit_plus') }}</span>
                                 @elseif($isAdminEditDecrease)
-                                    <span class="badge warning">ADMIN EDIT -</span>
+                                    <span class="badge warning">{{ __('txn.admin_badge_edit_minus') }}</span>
                                 @elseif($canPay)
                                     <a
                                         class="btn secondary"

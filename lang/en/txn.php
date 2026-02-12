@@ -183,4 +183,8 @@ return [
     'audit_order_created' => 'Order note created: :number',
     'audit_order_admin_updated' => 'Admin updated order note: :number',
     'audit_order_canceled' => 'Order note canceled: :number',
+    'admin_badge_edit' => 'ADMIN EDIT',
+    'admin_badge_cancel' => 'ADMIN CANCEL',
+    'admin_badge_edit_plus' => 'ADMIN EDIT +',
+    'admin_badge_edit_minus' => 'ADMIN EDIT -',
 ];

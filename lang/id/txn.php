@@ -183,4 +183,8 @@ return [
     'audit_order_created' => 'Surat pesanan dibuat: :number',
     'audit_order_admin_updated' => 'Admin mengubah surat pesanan: :number',
     'audit_order_canceled' => 'Surat pesanan dibatalkan: :number',
+    'admin_badge_edit' => 'ADMIN EDIT',
+    'admin_badge_cancel' => 'ADMIN BATAL',
+    'admin_badge_edit_plus' => 'ADMIN EDIT +',
+    'admin_badge_edit_minus' => 'ADMIN EDIT -',
 ];

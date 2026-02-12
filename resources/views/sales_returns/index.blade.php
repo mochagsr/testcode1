@@ -81,10 +81,10 @@
                             <span class="badge warning" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_manual') }}</span>
                         @endif
                         @if((bool) ($adminAction['edited'] ?? false))
-                            <span class="badge warning" style="margin-left: 6px;">ADMIN EDIT</span>
+                            <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
                         @endif
                         @if((bool) ($adminAction['canceled'] ?? false))
-                            <span class="badge danger" style="margin-left: 6px;">ADMIN BATAL</span>
+                            <span class="badge danger" style="margin-left: 6px;">{{ __('txn.admin_badge_cancel') }}</span>
                         @endif
                     </td>
                     <td>{{ $row->return_date->format('d-m-Y') }}</td>
