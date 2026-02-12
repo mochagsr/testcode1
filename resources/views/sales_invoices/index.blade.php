@@ -5,12 +5,12 @@
 @section('content')
     <style>
         .invoice-list-card {
-            padding: 12px;
+            padding: 10px;
         }
         .invoice-list-card th,
         .invoice-list-card td {
-            padding-top: 7px;
-            padding-bottom: 7px;
+            padding-top: 6px;
+            padding-bottom: 6px;
         }
     </style>
 
@@ -104,7 +104,6 @@
                     <td>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('sales-invoices.show', $invoice) }}">{{ __('txn.detail') }}</a>
                             <select style="max-width: 160px;" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="">{{ __('txn.action') }}</option>
                                 <option value="{{ route('sales-invoices.print', $invoice) }}">{{ __('txn.print') }}</option>
