@@ -357,17 +357,17 @@ class DeliveryNotePageController extends Controller
                 return;
             }
 
-            fputcsv($handle, ['Delivery Note Number', $deliveryNote->note_number]);
-            fputcsv($handle, ['Date', $deliveryNote->note_date?->format('d-m-Y')]);
-            fputcsv($handle, ['Recipient', $deliveryNote->recipient_name]);
-            fputcsv($handle, ['Phone', $deliveryNote->recipient_phone]);
-            fputcsv($handle, ['City', $deliveryNote->city]);
-            fputcsv($handle, ['Address', $deliveryNote->address]);
-            fputcsv($handle, ['Created By', $deliveryNote->created_by_name]);
-            fputcsv($handle, ['Notes', $deliveryNote->notes]);
+            fputcsv($handle, [__('txn.delivery_notes_title').' '.__('txn.note_number'), $deliveryNote->note_number]);
+            fputcsv($handle, [__('txn.date'), $deliveryNote->note_date?->format('d-m-Y')]);
+            fputcsv($handle, [__('txn.recipient'), $deliveryNote->recipient_name]);
+            fputcsv($handle, [__('txn.phone'), $deliveryNote->recipient_phone]);
+            fputcsv($handle, [__('txn.city'), $deliveryNote->city]);
+            fputcsv($handle, [__('txn.address'), $deliveryNote->address]);
+            fputcsv($handle, [__('txn.created_by'), $deliveryNote->created_by_name]);
+            fputcsv($handle, [__('txn.notes'), $deliveryNote->notes]);
             fputcsv($handle, []);
-            fputcsv($handle, ['Items']);
-            fputcsv($handle, ['Name', 'Unit', 'Qty', 'Unit Price', 'Notes']);
+            fputcsv($handle, [__('txn.items')]);
+            fputcsv($handle, [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.notes')]);
 
             foreach ($deliveryNote->items as $item) {
                 fputcsv($handle, [

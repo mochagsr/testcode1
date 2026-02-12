@@ -628,16 +628,16 @@ class SalesReturnPageController extends Controller
                 return;
             }
 
-            fputcsv($handle, ['Return Number', $salesReturn->return_number]);
-            fputcsv($handle, ['Return Date', $salesReturn->return_date?->format('d-m-Y')]);
-            fputcsv($handle, ['Customer', $salesReturn->customer?->name]);
-            fputcsv($handle, ['City', $salesReturn->customer?->city]);
-            fputcsv($handle, ['Semester', $salesReturn->semester_period]);
-            fputcsv($handle, ['Total', number_format((int) round((float) $salesReturn->total), 0, ',', '.')]);
-            fputcsv($handle, ['Reason', $salesReturn->reason]);
+            fputcsv($handle, [__('txn.return').' '.__('txn.note_number'), $salesReturn->return_number]);
+            fputcsv($handle, [__('txn.return_date'), $salesReturn->return_date?->format('d-m-Y')]);
+            fputcsv($handle, [__('txn.customer'), $salesReturn->customer?->name]);
+            fputcsv($handle, [__('txn.city'), $salesReturn->customer?->city]);
+            fputcsv($handle, [__('txn.semester_period'), $salesReturn->semester_period]);
+            fputcsv($handle, [__('txn.total'), number_format((int) round((float) $salesReturn->total), 0, ',', '.')]);
+            fputcsv($handle, [__('txn.reason'), $salesReturn->reason]);
             fputcsv($handle, []);
-            fputcsv($handle, ['Items']);
-            fputcsv($handle, ['Name', 'Qty', 'Line Total']);
+            fputcsv($handle, [__('txn.items')]);
+            fputcsv($handle, [__('txn.name'), __('txn.qty'), __('txn.line_total')]);
 
             foreach ($salesReturn->items as $item) {
                 fputcsv($handle, [

@@ -337,16 +337,16 @@ class OrderNotePageController extends Controller
                 return;
             }
 
-            fputcsv($handle, ['Order Note Number', $orderNote->note_number]);
-            fputcsv($handle, ['Date', $orderNote->note_date?->format('d-m-Y')]);
-            fputcsv($handle, ['Customer', $orderNote->customer_name]);
-            fputcsv($handle, ['Phone', $orderNote->customer_phone]);
-            fputcsv($handle, ['City', $orderNote->city]);
-            fputcsv($handle, ['Created By', $orderNote->created_by_name]);
-            fputcsv($handle, ['Notes', $orderNote->notes]);
+            fputcsv($handle, [__('txn.order_notes_title').' '.__('txn.note_number'), $orderNote->note_number]);
+            fputcsv($handle, [__('txn.date'), $orderNote->note_date?->format('d-m-Y')]);
+            fputcsv($handle, [__('txn.customer'), $orderNote->customer_name]);
+            fputcsv($handle, [__('txn.phone'), $orderNote->customer_phone]);
+            fputcsv($handle, [__('txn.city'), $orderNote->city]);
+            fputcsv($handle, [__('txn.created_by'), $orderNote->created_by_name]);
+            fputcsv($handle, [__('txn.notes'), $orderNote->notes]);
             fputcsv($handle, []);
-            fputcsv($handle, ['Items']);
-            fputcsv($handle, ['Name', 'Qty', 'Notes']);
+            fputcsv($handle, [__('txn.items')]);
+            fputcsv($handle, [__('txn.name'), __('txn.qty'), __('txn.notes')]);
 
             foreach ($orderNote->items as $item) {
                 fputcsv($handle, [
