@@ -86,8 +86,8 @@
             <div><strong>{{ __('txn.note_number') }}</strong> : {{ $note->note_number }}</div>
             <div><strong>{{ __('txn.name') }}</strong> : {{ $note->customer_name ?: '-' }}</div>
             <div><strong>{{ __('txn.phone') }}</strong> : {{ $note->customer_phone ?: '-' }}</div>
-            <div><strong>{{ __('txn.city') }}</strong> : {{ $note->city ?: '-' }}</div>
             <div><strong>{{ __('txn.address') }}</strong> : {{ $note->address ?: '-' }}</div>
+            <div><strong>{{ __('txn.city') }}</strong> : {{ $note->city ?: '-' }}</div>
         </div>
     </div>
     @if($note->is_canceled)

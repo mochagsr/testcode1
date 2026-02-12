@@ -44,10 +44,6 @@
                 && (float) $payment->amount >= (float) $invoice->total;
         });
         $paymentMethodLabel = $hasCashOnCreate ? __('txn.cash') : __('txn.credit');
-        $paymentStatusLabel = match ($invoice->payment_status) {
-            'paid' => __('txn.status_paid'),
-            default => __('txn.status_unpaid'),
-        };
         $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');
         $companyName = trim((string) \App\Models\AppSetting::getValue('company_name', 'CV. PUSTAKA GRAFIKA'));
         $companyAddress = trim((string) \App\Models\AppSetting::getValue('company_address', ''));
@@ -99,13 +95,12 @@
         <div class="doc-meta-right">
             <div><strong>{{ __('txn.date') }}</strong> : {{ $invoice->invoice_date->format('d-m-Y') }}</div>
             <div><strong>{{ __('txn.due_date') }}</strong> : {{ $invoice->due_date?->format('d-m-Y') ?: '-' }}</div>
-            <div><strong>{{ __('txn.status') }}</strong> : {{ $paymentStatusLabel }}</div>
             <div><strong>{{ __('txn.payment_method') }}</strong> : {{ $paymentMethodLabel }}</div>
             <div><strong>{{ __('txn.semester_period') }}</strong> : {{ $invoice->semester_period ?: '-' }}</div>
             <div><strong>{{ __('txn.name') }}</strong> : {{ $invoice->customer?->name ?: '-' }}</div>
             <div><strong>{{ __('txn.phone') }}</strong> : {{ $invoice->customer?->phone ?: '-' }}</div>
-            <div><strong>{{ __('txn.city') }}</strong> : {{ $invoice->customer?->city ?: '-' }}</div>
             <div><strong>{{ __('txn.address') }}</strong> : {{ $invoice->customer?->address ?: '-' }}</div>
+            <div><strong>{{ __('txn.city') }}</strong> : {{ $invoice->customer?->city ?: '-' }}</div>
         </div>
     </div>
     @if($invoice->is_canceled)

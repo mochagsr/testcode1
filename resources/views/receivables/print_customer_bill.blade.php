@@ -100,8 +100,8 @@
             @endif
             <div><strong>{{ __('receivable.customer') }}</strong> : {{ $customer->name }}</div>
             <div><strong>{{ __('txn.phone') }}</strong> : {{ $customer->phone ?: '-' }}</div>
-            <div><strong>{{ __('txn.city') }}</strong> : {{ $customer->city ?: '-' }}</div>
             <div><strong>{{ __('txn.address') }}</strong> : {{ $customer->address ?: '-' }}</div>
+            <div><strong>{{ __('txn.city') }}</strong> : {{ $customer->city ?: '-' }}</div>
         </div>
     </div>
 

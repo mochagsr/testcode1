@@ -85,8 +85,8 @@
             <div><strong>{{ __('txn.note_number') }}</strong> : {{ $salesReturn->return_number }}</div>
             <div><strong>{{ __('txn.name') }}</strong> : {{ $salesReturn->customer?->name ?: '-' }}</div>
             <div><strong>{{ __('txn.phone') }}</strong> : {{ $salesReturn->customer?->phone ?: '-' }}</div>
-            <div><strong>{{ __('txn.city') }}</strong> : {{ $salesReturn->customer?->city ?: '-' }}</div>
             <div><strong>{{ __('txn.address') }}</strong> : {{ $salesReturn->customer?->address ?: '-' }}</div>
+            <div><strong>{{ __('txn.city') }}</strong> : {{ $salesReturn->customer?->city ?: '-' }}</div>
         </div>
     </div>
     @if($salesReturn->is_canceled)
