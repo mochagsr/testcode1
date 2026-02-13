@@ -8,6 +8,7 @@ use App\Models\InvoicePayment;
 use App\Models\ReceivableLedger;
 use App\Models\SalesInvoice;
 use App\Services\ReceivableLedgerService;
+use App\Support\AppCache;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -15,6 +16,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -39,21 +41,24 @@ class ReceivablePageController extends Controller
         $currentSemester = $this->currentSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
 
-        $semesterOptions = ReceivableLedger::query()
-            ->whereNotNull('period_code')
-            ->where('period_code', '!=', '')
-            ->distinct()
-            ->orderByDesc('period_code')
-            ->pluck('period_code')
-            ->merge($this->configuredSemesterOptions())
-            ->push($currentSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
+        $semesterOptions = Cache::remember(
+            AppCache::lookupCacheKey('receivables.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService->buildSemesterOptionCollection(
+                ReceivableLedger::query()
+                    ->whereNotNull('period_code')
+                    ->where('period_code', '!=', '')
+                    ->distinct()
+                    ->orderByDesc('period_code')
+                    ->pluck('period_code')
+                    ->merge($this->semesterBookService->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
         $semesterOptions = $isAdminUser
             ? $semesterOptions->values()
-            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+            : $this->semesterBookService->buildSemesterOptionCollection($semesterOptions->all(), true, false);
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
         }
@@ -118,12 +123,23 @@ class ReceivablePageController extends Controller
         $billStatementTotals = null;
         $selectedCustomerName = null;
         $selectedCustomer = null;
+        $selectedCustomerOption = null;
         $ledgerOutstandingTotal = null;
         $customerOutstandingTotal = null;
         $selectedCustomerSemesterClosed = false;
+        $paymentRefsWithAlloc = [];
         if ($customerId > 0) {
-            $selectedCustomer = Customer::query()->find($customerId);
+            $selectedCustomer = Customer::query()
+                ->select(['id', 'name', 'city'])
+                ->find($customerId);
             $selectedCustomerName = $selectedCustomer?->name;
+            if ($selectedCustomer !== null) {
+                $selectedCustomerOption = [
+                    'id' => (int) $selectedCustomer->id,
+                    'name' => (string) $selectedCustomer->name,
+                    'city' => (string) ($selectedCustomer->city ?? ''),
+                ];
+            }
             if ($selectedSemester !== null) {
                 $selectedCustomerSemesterClosed = $this->semesterBookService->isCustomerLocked($customerId, $selectedSemester);
             }
@@ -177,9 +193,10 @@ class ReceivablePageController extends Controller
                 ->limit(50)
                 ->get();
             $ledgerRows = $this->filterRedundantPaymentSummaryRows($ledgerRows);
+            $paymentRefsWithAlloc = $this->paymentRefsWithAlloc($ledgerRows);
 
             if ($selectedCustomer) {
-                $statementData = $this->buildCustomerBillStatement($selectedCustomer, $selectedSemester);
+                $statementData = $this->cachedCustomerBillStatement((int) $selectedCustomer->id, $selectedSemester);
                 $billStatementRows = $statementData['rows'];
                 $billStatementTotals = $statementData['totals'];
             }
@@ -206,6 +223,8 @@ class ReceivablePageController extends Controller
             'customerSemesterClosedMap' => $customerSemesterClosedMap,
             'customerSemesterAutoClosedMap' => $customerSemesterAutoClosedMap,
             'customerSemesterManualClosedMap' => $customerSemesterManualClosedMap,
+            'paymentRefsWithAlloc' => $paymentRefsWithAlloc,
+            'selectedCustomerOption' => $selectedCustomerOption,
         ]);
     }
 
@@ -278,6 +297,7 @@ class ReceivablePageController extends Controller
         ]);
 
         $this->processCustomerAdjustment($customer, $data, 'writeoff');
+        AppCache::forgetAfterFinancialMutation([(string) ($data['payment_date'] ?? now()->toDateString())]);
 
         return redirect()
             ->route('receivables.index', [
@@ -299,6 +319,7 @@ class ReceivablePageController extends Controller
         ]);
 
         $this->processCustomerAdjustment($customer, $data, 'discount');
+        AppCache::forgetAfterFinancialMutation([(string) ($data['payment_date'] ?? now()->toDateString())]);
 
         return redirect()
             ->route('receivables.index', [
@@ -502,13 +523,6 @@ class ReceivablePageController extends Controller
         return $this->semesterBookService->previousSemester($period);
     }
 
-    private function configuredSemesterOptions()
-    {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '');
-    }
-
     private function semesterDescriptionLabel(string $periodCode): string
     {
         if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $periodCode, $matches) === 1) {
@@ -521,24 +535,13 @@ class ReceivablePageController extends Controller
         return $periodCode !== '' ? $periodCode : __('txn.semester_period');
     }
 
-    private function semesterSortValue(string $periodCode): int
-    {
-        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $periodCode, $matches) === 1) {
-            $semester = (int) $matches[1];
-            $startYear = 2000 + (int) $matches[2];
-
-            return ($startYear * 10) + $semester;
-        }
-        return PHP_INT_MAX;
-    }
-
     /**
      * @return array<string, mixed>
      */
     private function customerBillViewData(Request $request, Customer $customer): array
     {
         $selectedSemester = $this->normalizeSemester((string) $request->string('semester', ''));
-        $statementData = $this->buildCustomerBillStatement($customer, $selectedSemester !== '' ? $selectedSemester : null);
+        $statementData = $this->cachedCustomerBillStatement((int) $customer->id, $selectedSemester !== '' ? $selectedSemester : null);
         $statementRows = $statementData['rows'];
         $totals = $statementData['totals'];
 
@@ -573,20 +576,34 @@ class ReceivablePageController extends Controller
         return $normalized;
     }
 
-    private function semesterBookService(): SemesterBookService
+    /**
+     * @return array{rows:Collection<int, array<string, int|string|null>>, totals:array<string, int>}
+     */
+    private function cachedCustomerBillStatement(int $customerId, ?string $selectedSemester): array
     {
-        return app(SemesterBookService::class);
+        $normalizedSemester = $selectedSemester !== null
+            ? $this->semesterBookService->normalizeSemester($selectedSemester)
+            : null;
+
+        return Cache::remember(
+            AppCache::lookupCacheKey('receivables.bill_statement', [
+                'customer_id' => $customerId,
+                'semester' => (string) ($normalizedSemester ?? ''),
+            ]),
+            now()->addSeconds(45),
+            fn () => $this->buildCustomerBillStatement($customerId, $normalizedSemester)
+        );
     }
 
     /**
      * @return array{rows:Collection<int, array<string, int|string|null>>, totals:array<string, int>}
      */
-    private function buildCustomerBillStatement(Customer $customer, ?string $selectedSemester): array
+    private function buildCustomerBillStatement(int $customerId, ?string $selectedSemester): array
     {
         $semester = $selectedSemester ?? '';
         $ledgerRows = ReceivableLedger::query()
             ->with('invoice:id,invoice_number,invoice_date')
-            ->where('customer_id', $customer->id)
+            ->where('customer_id', $customerId)
             ->when($semester !== '', function ($query) use ($semester): void {
                 $query->where('period_code', $semester);
             })
@@ -599,7 +616,7 @@ class ReceivablePageController extends Controller
             $openingBalance = (int) round((float) $first->balance_after - (float) $first->debit + (float) $first->credit);
         } else {
             $openingBalance = (int) round((float) SalesInvoice::query()
-                ->where('customer_id', $customer->id)
+                ->where('customer_id', $customerId)
                 ->where('is_canceled', false)
                 ->where('balance', '>', 0)
                 ->when($semester !== '', function ($query) use ($semester): void {
@@ -640,10 +657,12 @@ class ReceivablePageController extends Controller
             $groupKey = $invoiceId !== null
                 ? 'invoice:'.$invoiceId
                 : 'text:'.$proofNumber;
+            $dateValue = $ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date;
 
             if (!isset($groupedRows[$groupKey])) {
                 $groupedRows[$groupKey] = [
-                    'date_value' => $ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date,
+                    'date_value' => $dateValue,
+                    'date_ts' => $this->toTimestamp($dateValue),
                     'invoice_id' => $invoiceId,
                     'proof_number' => $proofNumber,
                     'credit_sales' => 0,
@@ -658,12 +677,8 @@ class ReceivablePageController extends Controller
         }
 
         uasort($groupedRows, function (array $a, array $b): int {
-            $left = $a['date_value'] instanceof Carbon
-                ? $a['date_value']->timestamp
-                : Carbon::parse((string) $a['date_value'])->timestamp;
-            $right = $b['date_value'] instanceof Carbon
-                ? $b['date_value']->timestamp
-                : Carbon::parse((string) $b['date_value'])->timestamp;
+            $left = (int) ($a['date_ts'] ?? 0);
+            $right = (int) ($b['date_ts'] ?? 0);
             if ($left === $right) {
                 return strcmp((string) ($a['proof_number'] ?? ''), (string) ($b['proof_number'] ?? ''));
             }
@@ -713,6 +728,21 @@ class ReceivablePageController extends Controller
         }
 
         return $date->format('d-m-Y');
+    }
+
+    private function toTimestamp(mixed $value): int
+    {
+        if (!$value) {
+            return 0;
+        }
+
+        try {
+            $date = $value instanceof Carbon ? $value : Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return 0;
+        }
+
+        return (int) $date->timestamp;
     }
 
     /**
@@ -782,6 +812,31 @@ class ReceivablePageController extends Controller
         }
 
         return $result->values();
+    }
+
+    /**
+     * @param Collection<int, ReceivableLedger> $rows
+     * @return array<string, bool>
+     */
+    private function paymentRefsWithAlloc(Collection $rows): array
+    {
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $refs = [];
+        foreach ($rows as $row) {
+            $description = (string) ($row->description ?? '');
+            $paymentRef = $this->extractPaymentRef($description);
+            if ($paymentRef === null) {
+                continue;
+            }
+            if ($this->isAllocationPaymentRow($row, $description)) {
+                $refs[$paymentRef] = true;
+            }
+        }
+
+        return $refs;
     }
 
     private function isAllocationPaymentRow(ReceivableLedger $row, string $description): bool

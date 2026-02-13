@@ -7,11 +7,13 @@ use App\Models\InvoicePayment;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Services\ReceivableLedgerService;
+use App\Support\AppCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ReceivablePaymentPageController extends Controller
@@ -98,11 +100,15 @@ class ReceivablePaymentPageController extends Controller
                 ->first(['id', 'invoice_number', 'balance']);
         }
         $oldCustomerId = (int) old('customer_id', $prefillCustomerId > 0 ? $prefillCustomerId : 0);
-        $customers = Customer::query()
-            ->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance'])
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $customers = Cache::remember(
+            AppCache::lookupCacheKey('forms.receivable_payments.customers', ['limit' => 20]),
+            now()->addSeconds(60),
+            fn () => Customer::query()
+                ->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance'])
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
                 ->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance'])
@@ -246,6 +252,7 @@ class ReceivablePaymentPageController extends Controller
         if ($returnTo !== null) {
             $redirect->with('receivable_payment_return_to', $returnTo);
         }
+        AppCache::forgetAfterFinancialMutation([(string) $payment->payment_date]);
 
         return $redirect
             ->with('success', __('receivable.receivable_payment_saved'));
@@ -279,6 +286,7 @@ class ReceivablePaymentPageController extends Controller
             'user_signature' => $data['user_signature'],
             'notes' => $data['notes'] ?? null,
         ]);
+        AppCache::forgetAfterFinancialMutation([(string) $receivablePayment->payment_date]);
 
         return redirect()
             ->route('receivable-payments.show', $receivablePayment)
@@ -378,6 +386,7 @@ class ReceivablePaymentPageController extends Controller
                 'cancel_reason' => $data['cancel_reason'],
             ]);
         });
+        AppCache::forgetAfterFinancialMutation([(string) $receivablePayment->payment_date]);
 
         return redirect()
             ->route('receivable-payments.show', $receivablePayment)

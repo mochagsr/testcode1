@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
 use App\Models\Product;
+use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
 use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
@@ -22,9 +24,11 @@ class ProductController extends Controller
     public function index(Request $request): JsonResponse
     {
         $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
+        $page = max(1, (int) $request->integer('page', 1));
         $search = trim((string) $request->string('search', ''));
         $hasSearch = $search !== '';
         $activeOnly = $request->boolean('active_only');
+        $itemCategoryId = $request->filled('item_category_id') ? (int) $request->integer('item_category_id') : null;
 
         $productsQuery = Product::query()
             ->select([
@@ -52,8 +56,8 @@ class ProductController extends Controller
                         });
                 });
             })
-            ->when($request->filled('item_category_id'), function ($query) use ($request): void {
-                $query->where('item_category_id', $request->integer('item_category_id'));
+            ->when($itemCategoryId !== null, function ($query) use ($itemCategoryId): void {
+                $query->where('item_category_id', $itemCategoryId);
             })
             ->orderBy('name')
             ->orderBy('id');
@@ -62,7 +66,16 @@ class ProductController extends Controller
             $productsQuery->whereRaw('1 = 0');
         }
 
-        $products = $productsQuery->paginate($perPage);
+        $cacheKey = AppCache::lookupCacheKey('lookups.products', [
+            'per_page' => $perPage,
+            'page' => $page,
+            'search' => mb_strtolower($search),
+            'active_only' => $activeOnly ? 1 : 0,
+            'item_category_id' => $itemCategoryId ?? 0,
+        ]);
+        $products = Cache::remember($cacheKey, now()->addSeconds(20), function () use ($productsQuery, $perPage) {
+            return $productsQuery->paginate($perPage)->toArray();
+        });
 
         return response()->json($products);
     }
@@ -90,6 +103,7 @@ class ProductController extends Controller
         $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name']);
         $data['is_active'] = true;
         $product = Product::create($data);
+        AppCache::bumpLookupVersion();
 
         return response()->json($product->load('category:id,code,name'), 201);
     }
@@ -127,6 +141,7 @@ class ProductController extends Controller
         $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name'], $product->id);
         $data['is_active'] = true;
         $product->update($data);
+        AppCache::bumpLookupVersion();
 
         return response()->json($product->fresh()->load('category:id,code,name'));
     }
@@ -134,6 +149,7 @@ class ProductController extends Controller
     public function destroy(Product $product): JsonResponse
     {
         $product->delete();
+        AppCache::bumpLookupVersion();
 
         return response()->json(status: 204);
     }

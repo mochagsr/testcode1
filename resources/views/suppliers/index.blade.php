@@ -59,13 +59,21 @@
             const form = document.getElementById('suppliers-search-form');
             const searchInput = document.getElementById('suppliers-search-input');
             if (!form || !searchInput) return;
-            let debounceTimer = null;
+            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+                ? window.PgposAutoSearch.debounce
+                : (fn, wait = 100) => {
+                    let timeoutId = null;
+                    return (...args) => {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => fn(...args), wait);
+                    };
+                };
+            const onInput = debounce(() => {
+                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) return;
+                form.requestSubmit();
+            }, 100);
             searchInput.addEventListener('input', () => {
-                if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) return;
-                    form.requestSubmit();
-                }, 300);
+                onInput();
             });
         })();
     </script>

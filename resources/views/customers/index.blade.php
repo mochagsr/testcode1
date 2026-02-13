@@ -82,18 +82,22 @@
             const modalImage = document.getElementById('id-card-modal-image');
             const triggers = document.querySelectorAll('.id-card-preview-trigger');
             if (searchForm && searchInput) {
-                let debounceTimer = null;
-                searchInput.addEventListener('input', () => {
-                    if (debounceTimer) {
-                        clearTimeout(debounceTimer);
+                const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+                    ? window.PgposAutoSearch.debounce
+                    : (fn, wait = 100) => {
+                        let timeoutId = null;
+                        return (...args) => {
+                            clearTimeout(timeoutId);
+                            timeoutId = setTimeout(() => fn(...args), wait);
+                        };
+                    };
+                const onSearchInput = debounce(() => {
+                    if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
+                        return;
                     }
-                    debounceTimer = setTimeout(() => {
-                        if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                            return;
-                        }
-                        searchForm.requestSubmit();
-                    }, 100);
-                });
+                    searchForm.requestSubmit();
+                }, 100);
+                searchInput.addEventListener('input', onSearchInput);
             }
             if (!modal || !modalImage || !triggers.length) {
                 return;
@@ -121,4 +125,3 @@
         })();
     </script>
 @endsection
-

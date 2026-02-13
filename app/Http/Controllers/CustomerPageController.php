@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\CustomerLevel;
+use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -57,6 +58,7 @@ class CustomerPageController extends Controller
         $filename = 'customers-'.$printedAt->format('Ymd-His').'.xlsx';
 
         $customerQuery = Customer::query()
+            ->select(['id', 'name', 'phone', 'city', 'address', 'outstanding_receivable'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")
@@ -142,6 +144,8 @@ class CustomerPageController extends Controller
 
         unset($data['id_card_photo']);
         Customer::create($data);
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()->route('customers-web.index')->with('success', 'Customer created successfully.');
     }
@@ -156,7 +160,7 @@ class CustomerPageController extends Controller
 
     public function update(Request $request, Customer $customer): RedirectResponse
     {
-        $data = $this->validatePayload($request, $customer->id);
+        $data = $this->validatePayload($request);
 
         if ($request->boolean('remove_id_card_photo') && $customer->id_card_photo_path) {
             Storage::disk('public')->delete($customer->id_card_photo_path);
@@ -172,6 +176,8 @@ class CustomerPageController extends Controller
 
         unset($data['id_card_photo'], $data['remove_id_card_photo']);
         $customer->update($data);
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()->route('customers-web.index')->with('success', 'Customer updated successfully.');
     }
@@ -182,6 +188,8 @@ class CustomerPageController extends Controller
             Storage::disk('public')->delete($customer->id_card_photo_path);
         }
         $customer->delete();
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()->route('customers-web.index')->with('success', 'Customer deleted successfully.');
     }
@@ -189,7 +197,7 @@ class CustomerPageController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatePayload(Request $request, ?int $ignoreId = null): array
+    private function validatePayload(Request $request): array
     {
         return $request->validate([
             'customer_level_id' => ['nullable', 'integer', 'exists:customer_levels,id'],

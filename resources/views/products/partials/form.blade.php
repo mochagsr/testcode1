@@ -273,13 +273,15 @@
             sync();
         }
 
-        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
-            let timeoutId = null;
-            return (...args) => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => fn(...args), wait);
+        const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+            ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
+            : (fn, wait = SEARCH_DEBOUNCE_MS) => {
+                let timeoutId = null;
+                return (...args) => {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => fn(...args), wait);
+                };
             };
-        }
 
         nameInput.addEventListener('input', syncCode);
         const onCategoryInput = debounce(function () {
@@ -333,4 +335,3 @@
         syncCode();
     })();
 </script>
-

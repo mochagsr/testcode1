@@ -16,6 +16,7 @@ class UserManagementController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $users = User::query()
+            ->select(['id', 'name', 'email', 'role', 'locale', 'theme', 'finance_locked'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")

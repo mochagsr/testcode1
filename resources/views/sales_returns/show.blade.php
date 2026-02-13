@@ -184,29 +184,38 @@
                     'name' => (string) $product->name,
                     'price_general' => (int) round((float) ($product->price_general ?? 0)),
                 ])->values()->all());
+                let productByLabel = new Map();
+                let productByCode = new Map();
+                let productByName = new Map();
                 const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
                 const LOOKUP_LIMIT = 20;
                 const SEARCH_DEBOUNCE_MS = 100;
                 let productLookupAbort = null;
-
-                function numberFormat(value) {
-                    return new Intl.NumberFormat('id-ID').format(Math.round(Number(value || 0)));
-                }
-
-                function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
-                    let timeoutId = null;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), wait);
+                let lastProductLookupQuery = '';
+                const idNumberFormatter = new Intl.NumberFormat('id-ID');
+                const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+                    ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
+                    : (fn, wait = SEARCH_DEBOUNCE_MS) => {
+                        let timeoutId = null;
+                        return (...args) => {
+                            clearTimeout(timeoutId);
+                            timeoutId = setTimeout(() => fn(...args), wait);
+                        };
                     };
-                }
-
-                function escapeAttribute(value) {
-                    return String(value)
+                const escapeAttribute = (window.PgposAutoSearch && window.PgposAutoSearch.escapeAttribute)
+                    ? window.PgposAutoSearch.escapeAttribute
+                    : (value) => String(value)
                         .replace(/&/g, '&amp;')
                         .replace(/"/g, '&quot;')
                         .replace(/</g, '&lt;')
                         .replace(/>/g, '&gt;');
+
+                function numberFormat(value) {
+                    return idNumberFormatter.format(Math.round(Number(value || 0)));
+                }
+
+                function normalizeLookup(value) {
+                    return String(value || '').trim().toLowerCase();
                 }
 
                 function productLabel(product) {
@@ -219,16 +228,37 @@
                     const byId = new Map(products.map((row) => [String(row.id), row]));
                     (rows || []).forEach((row) => byId.set(String(row.id), row));
                     products = Array.from(byId.values());
+                    rebuildProductIndexes();
+                }
+
+                function rebuildProductIndexes() {
+                    productByLabel = new Map();
+                    productByCode = new Map();
+                    productByName = new Map();
+                    products.forEach((product) => {
+                        const byLabel = normalizeLookup(productLabel(product));
+                        const byCode = normalizeLookup(product.code);
+                        const byName = normalizeLookup(product.name);
+                        if (byLabel !== '' && !productByLabel.has(byLabel)) {
+                            productByLabel.set(byLabel, product);
+                        }
+                        if (byCode !== '' && !productByCode.has(byCode)) {
+                            productByCode.set(byCode, product);
+                        }
+                        if (byName !== '' && !productByName.has(byName)) {
+                            productByName.set(byName, product);
+                        }
+                    });
                 }
 
                 function findProductByLabel(label) {
                     if (!label) {
                         return null;
                     }
-                    const normalized = String(label).trim().toLowerCase();
-                    return products.find((product) => productLabel(product).toLowerCase() === normalized)
-                        || products.find((product) => String(product.code || '').toLowerCase() === normalized)
-                        || products.find((product) => String(product.name || '').toLowerCase() === normalized)
+                    const normalized = normalizeLookup(label);
+                    return productByLabel.get(normalized)
+                        || productByCode.get(normalized)
+                        || productByName.get(normalized)
                         || null;
                 }
 
@@ -261,7 +291,13 @@
 
                 async function fetchProductSuggestions(input) {
                     const query = String(input?.value || '');
+                    const normalizedQuery = normalizeLookup(query);
                     if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                        lastProductLookupQuery = '';
+                        renderProductSuggestions(input);
+                        return;
+                    }
+                    if (normalizedQuery !== '' && normalizedQuery === lastProductLookupQuery) {
                         renderProductSuggestions(input);
                         return;
                     }
@@ -276,6 +312,7 @@
                             return;
                         }
                         const payload = await response.json();
+                        lastProductLookupQuery = normalizedQuery;
                         upsertProducts(payload.data || []);
                         renderProductSuggestions(input);
                     } catch (error) {
@@ -316,7 +353,6 @@
                     const productIdInput = row.querySelector('.admin-return-item-product');
                     const onSearchInput = debounce(async (event) => {
                         await fetchProductSuggestions(event.currentTarget);
-                        renderProductSuggestions(event.currentTarget);
                         const selected = findProductByLabel(event.currentTarget.value);
                         if (!selected) {
                             productIdInput.value = '';
@@ -371,6 +407,7 @@
                     reindexRows();
                 }
 
+                rebuildProductIndexes();
                 Array.from(tbody.querySelectorAll('tr')).forEach(bindRow);
                 renderProductSuggestions(null);
                 reindexRows();
@@ -399,9 +436,3 @@
         </script>
     @endif
 @endsection
-
-
-
-
-
-

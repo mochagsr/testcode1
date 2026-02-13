@@ -17,6 +17,11 @@
                     </select>
                     <select id="receivable-customer-id" name="customer_id" style="max-width: 180px;">
                         <option value="">{{ __('receivable.all_customers') }}</option>
+                        @if($selectedCustomerId > 0 && isset($selectedCustomerOption) && $selectedCustomerOption && !$customers->contains('id', $selectedCustomerId))
+                            <option value="{{ $selectedCustomerOption['id'] }}" selected>
+                                {{ $selectedCustomerOption['name'] }}
+                            </option>
+                        @endif
                         @foreach($customers as $customer)
                             <option value="{{ $customer->id }}" @selected($selectedCustomerId === $customer->id)>
                                 {{ $customer->name }}
@@ -201,22 +206,6 @@
                     @if($ledgerRows->isEmpty())
                         <tr><td colspan="6" class="muted">{{ __('receivable.select_customer') }}</td></tr>
                     @else
-                        @php
-                            $paymentRefsWithAlloc = [];
-                            foreach ($ledgerRows as $scanRow) {
-                                $scanDescription = (string) ($scanRow->description ?? '');
-                                if (preg_match('/\b(?:KWT|PYT)-\d{8}-\d{4}\b/i', $scanDescription, $scanMatch) !== 1) {
-                                    continue;
-                                }
-                                $scanRef = strtoupper((string) $scanMatch[0]);
-                                $isAllocation = $scanRow->invoice_id !== null
-                                    || str_contains(strtolower($scanDescription), ' untuk ')
-                                    || str_contains(strtolower($scanDescription), ' for ');
-                                if ($isAllocation) {
-                                    $paymentRefsWithAlloc[$scanRef] = true;
-                                }
-                            }
-                        @endphp
                         <?php $shownPayInvoices = []; ?>
                         @foreach($ledgerRows as $row)
                             <?php
@@ -541,18 +530,22 @@
                 return;
             }
 
-            let debounceTimer = null;
-            searchInput.addEventListener('input', () => {
-                if (debounceTimer) {
-                    clearTimeout(debounceTimer);
+            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+                ? window.PgposAutoSearch.debounce
+                : (fn, wait = 100) => {
+                    let timeoutId = null;
+                    return (...args) => {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => fn(...args), wait);
+                    };
+                };
+            const onSearchInput = debounce(() => {
+                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
+                    return;
                 }
-                debounceTimer = setTimeout(() => {
-                    if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                        return;
-                    }
-                    form.requestSubmit();
-                }, 100);
-            });
+                form.requestSubmit();
+            }, 100);
+            searchInput.addEventListener('input', onSearchInput);
 
             customerSelect.addEventListener('change', () => {
                 form.requestSubmit();
@@ -603,9 +596,6 @@
         })();
     </script>
 @endsection
-
-
-
 
 
 

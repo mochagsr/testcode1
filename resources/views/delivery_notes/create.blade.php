@@ -102,6 +102,12 @@
     <script>
         let customers = @json($customers->values());
         let products = @json($products);
+        let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
+        let customerByLabel = new Map();
+        let customerByName = new Map();
+        let productByLabel = new Map();
+        let productByCode = new Map();
+        let productByName = new Map();
         const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
         const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
         const LOOKUP_LIMIT = 20;
@@ -111,28 +117,62 @@
         const addBtn = document.getElementById('add-item');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
+        const recipientPhoneField = document.getElementById('recipient_phone');
+        const cityField = document.getElementById('city');
+        const addressField = document.getElementById('address');
         const SEARCH_DEBOUNCE_MS = 100;
         let customerLookupAbort = null;
         let productLookupAbort = null;
+        let lastCustomerLookupQuery = '';
+        let lastProductLookupQuery = '';
 
-        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
-            let timeoutId = null;
-            return (...args) => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => fn(...args), wait);
-            };
+        function normalizeLookup(value) {
+            return String(value || '').trim().toLowerCase();
         }
+
+        const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+            ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
+            : (fn, wait = SEARCH_DEBOUNCE_MS) => {
+                let timeoutId = null;
+                return (...args) => {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => fn(...args), wait);
+                };
+            };
 
         function upsertCustomers(rows) {
             const byId = new Map(customers.map((row) => [String(row.id), row]));
             (rows || []).forEach((row) => byId.set(String(row.id), row));
             customers = Array.from(byId.values());
+            customerById = new Map(customers.map((customer) => [String(customer.id), customer]));
+            rebuildCustomerIndexes();
         }
 
         function upsertProducts(rows) {
             const byId = new Map(products.map((row) => [String(row.id), row]));
             (rows || []).forEach((row) => byId.set(String(row.id), row));
             products = Array.from(byId.values());
+            rebuildProductIndexes();
+        }
+
+        function rebuildCustomerIndexes() {
+            customerByLabel = new Map();
+            customerByName = new Map();
+            customers.forEach((customer) => {
+                customerByLabel.set(normalizeLookup(customerLabel(customer)), customer);
+                customerByName.set(normalizeLookup(customer.name), customer);
+            });
+        }
+
+        function rebuildProductIndexes() {
+            productByLabel = new Map();
+            productByCode = new Map();
+            productByName = new Map();
+            products.forEach((product) => {
+                productByLabel.set(normalizeLookup(productLabel(product)), product);
+                productByCode.set(normalizeLookup(product.code), product);
+                productByName.set(normalizeLookup(product.name), product);
+            });
         }
 
         function customerLabel(customer) {
@@ -158,7 +198,13 @@
         }
 
         async function fetchCustomerSuggestions(query) {
+            const normalizedQuery = normalizeLookup(query);
             if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                lastCustomerLookupQuery = '';
+                renderCustomerSuggestions(query);
+                return;
+            }
+            if (normalizedQuery !== '' && normalizedQuery === lastCustomerLookupQuery) {
                 renderCustomerSuggestions(query);
                 return;
             }
@@ -173,6 +219,7 @@
                     return;
                 }
                 const payload = await response.json();
+                lastCustomerLookupQuery = normalizedQuery;
                 upsertCustomers(payload.data || []);
                 renderCustomerSuggestions(query);
             } catch (error) {
@@ -186,9 +233,9 @@
             if (!label) {
                 return null;
             }
-            const normalized = label.trim().toLowerCase();
-            return customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
-                || customers.find((customer) => customer.name.toLowerCase() === normalized)
+            const normalized = normalizeLookup(label);
+            return customerByLabel.get(normalized)
+                || customerByName.get(normalized)
                 || null;
         }
 
@@ -202,6 +249,20 @@
                 || null;
         }
 
+        function getCustomerById(id) {
+            return customerById.get(String(id)) || null;
+        }
+
+        function applyCustomerFields(customer) {
+            customerIdField.value = customer ? customer.id : '';
+            if (!customer) {
+                return;
+            }
+            if (recipientPhoneField) recipientPhoneField.value = customer.phone || '';
+            if (cityField) cityField.value = customer.city || '';
+            if (addressField) addressField.value = customer.address || '';
+        }
+
         function productLabel(product) {
             const code = (product.code || '').trim();
             if (code !== '') {
@@ -210,13 +271,13 @@
             return `${product.name}`;
         }
 
-        function escapeAttribute(value) {
-            return String(value)
+        const escapeAttribute = (window.PgposAutoSearch && window.PgposAutoSearch.escapeAttribute)
+            ? window.PgposAutoSearch.escapeAttribute
+            : (value) => String(value)
                 .replace(/&/g, '&amp;')
                 .replace(/"/g, '&quot;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
-        }
 
         function renderProductSuggestions(query) {
             if (!productsList) {
@@ -236,7 +297,13 @@
         }
 
         async function fetchProductSuggestions(query) {
+            const normalizedQuery = normalizeLookup(query);
             if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                lastProductLookupQuery = '';
+                renderProductSuggestions(query);
+                return;
+            }
+            if (normalizedQuery !== '' && normalizedQuery === lastProductLookupQuery) {
                 renderProductSuggestions(query);
                 return;
             }
@@ -251,6 +318,7 @@
                     return;
                 }
                 const payload = await response.json();
+                lastProductLookupQuery = normalizedQuery;
                 upsertProducts(payload.data || []);
                 renderProductSuggestions(query);
             } catch (error) {
@@ -264,10 +332,10 @@
             if (!label) {
                 return null;
             }
-            const normalized = label.trim().toLowerCase();
-            return products.find((product) => productLabel(product).toLowerCase() === normalized)
-                || products.find((product) => product.code.toLowerCase() === normalized)
-                || products.find((product) => product.name.toLowerCase() === normalized)
+            const normalized = normalizeLookup(label);
+            return productByLabel.get(normalized)
+                || productByCode.get(normalized)
+                || productByName.get(normalized)
                 || null;
         }
 
@@ -299,7 +367,6 @@
 
             const onProductInput = debounce(async (event) => {
                 await fetchProductSuggestions(event.currentTarget.value);
-                renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
@@ -326,34 +393,26 @@
 
         if (customerSearch) {
             const bootCustomer = customerIdField.value
-                ? customers.find(c => String(c.id) === String(customerIdField.value))
+                ? getCustomerById(customerIdField.value)
                 : findCustomerByLabel(customerSearch.value);
-            if (bootCustomer) {
-                customerIdField.value = bootCustomer.id;
-            }
+            applyCustomerFields(bootCustomer);
             const onCustomerInput = debounce(async (event) => {
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
-                customerIdField.value = customer ? customer.id : '';
-                if (customer) {
-                    document.getElementById('recipient_phone').value = customer.phone || '';
-                    document.getElementById('city').value = customer.city || '';
-                    document.getElementById('address').value = customer.address || '';
-                }
+                applyCustomerFields(customer);
             });
             customerSearch.addEventListener('input', onCustomerInput);
             customerSearch.addEventListener('change', (event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
-                customerIdField.value = customer ? customer.id : '';
+                applyCustomerFields(customer);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
-                    document.getElementById('recipient_phone').value = customer.phone || '';
-                    document.getElementById('city').value = customer.city || '';
-                    document.getElementById('address').value = customer.address || '';
                 }
             });
         }
 
+        rebuildCustomerIndexes();
+        rebuildProductIndexes();
         addBtn.addEventListener('click', addRow);
         renderCustomerSuggestions('');
         renderProductSuggestions('');

@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Supplier;
 use App\Services\AuditLogService;
+use App\Support\AppCache;
 use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class SupplierPageController extends Controller
 {
@@ -24,6 +26,7 @@ class SupplierPageController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $suppliers = Supplier::query()
+            ->select(['id', 'name', 'company_name', 'phone', 'address', 'notes'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")
@@ -51,6 +54,7 @@ class SupplierPageController extends Controller
     public function lookup(Request $request): JsonResponse
     {
         $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
+        $page = max(1, (int) $request->integer('page', 1));
         $search = trim((string) $request->string('search', ''));
 
         $query = Supplier::query()
@@ -74,10 +78,18 @@ class SupplierPageController extends Controller
             });
         }
 
-        $suppliers = $query
-            ->orderBy('name')
-            ->orderBy('id')
-            ->paginate($perPage);
+        $cacheKey = AppCache::lookupCacheKey('lookups.suppliers', [
+            'per_page' => $perPage,
+            'page' => $page,
+            'search' => mb_strtolower($search),
+        ]);
+        $suppliers = Cache::remember($cacheKey, now()->addSeconds(20), function () use ($query, $perPage) {
+            return $query
+                ->orderBy('name')
+                ->orderBy('id')
+                ->paginate($perPage)
+                ->toArray();
+        });
 
         return response()->json($suppliers);
     }
@@ -94,6 +106,8 @@ class SupplierPageController extends Controller
             "Supplier created: {$supplier->name}",
             $request
         );
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('suppliers.index')
@@ -119,6 +133,8 @@ class SupplierPageController extends Controller
             "Supplier updated: {$supplier->name}",
             $request
         );
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('suppliers.index')
@@ -136,6 +152,8 @@ class SupplierPageController extends Controller
             "Supplier deleted: {$name}",
             $request
         );
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('suppliers.index')

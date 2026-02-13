@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\OutgoingTransaction;
@@ -12,6 +11,7 @@ use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Support\AppCache;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -35,12 +35,12 @@ class ReportExportController extends Controller
         $selectedUserRole = $this->selectedUserRole($request);
         $selectedFinanceLock = $this->selectedFinanceLock($request);
         $selectedOutgoingSupplierId = $this->selectedOutgoingSupplierId($request);
-        $receivableCustomers = Cache::remember('reports.receivable_customers.options', now()->addSeconds(60), function () {
+        $receivableCustomers = Cache::remember(AppCache::lookupCacheKey('reports.receivable_customers.options'), now()->addSeconds(60), function () {
             return Customer::query()
                 ->orderBy('name')
                 ->get(['id', 'name']);
         });
-        $outgoingSuppliers = Cache::remember('reports.outgoing_suppliers.options', now()->addSeconds(60), function () {
+        $outgoingSuppliers = Cache::remember(AppCache::lookupCacheKey('reports.outgoing_suppliers.options'), now()->addSeconds(60), function () {
             return Supplier::query()
                 ->orderBy('name')
                 ->get(['id', 'name']);
@@ -76,13 +76,18 @@ class ReportExportController extends Controller
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Report');
-            $rowsOut = [];
-            $rowsOut[] = [$report['title']];
-            $rowsOut[] = [__('report.printed'), $printedAt->format('d-m-Y H:i:s').' WIB'];
+            $rowCursor = 1;
+            $sheet->setCellValue('A'.$rowCursor, (string) ($report['title'] ?? ''));
+            $rowCursor++;
+            $sheet->setCellValue('A'.$rowCursor, __('report.printed'));
+            $sheet->setCellValue('B'.$rowCursor, $printedAt->format('d-m-Y H:i:s').' WIB');
+            $rowCursor++;
 
             if (! empty($report['filters'])) {
                 foreach ($report['filters'] as $filter) {
-                    $rowsOut[] = [$filter['label'], $filter['value']];
+                    $sheet->setCellValue('A'.$rowCursor, (string) ($filter['label'] ?? ''));
+                    $sheet->setCellValue('B'.$rowCursor, (string) ($filter['value'] ?? ''));
+                    $rowCursor++;
                 }
             }
 
@@ -91,17 +96,19 @@ class ReportExportController extends Controller
                     $value = ($item['type'] ?? 'number') === 'currency'
                         ? 'Rp '.number_format((int) round((float) ($item['value'] ?? 0)), 0, ',', '.')
                         : (int) round((float) ($item['value'] ?? 0));
-
-                    $rowsOut[] = [$item['label'], $value];
+                    $sheet->setCellValue('A'.$rowCursor, (string) ($item['label'] ?? ''));
+                    $sheet->setCellValue('B'.$rowCursor, (string) $value);
+                    $rowCursor++;
                 }
             }
 
-            $rowsOut[] = [];
-            $headerRowIndex = count($rowsOut) + 1;
-            $rowsOut[] = $report['headers'];
+            $rowCursor++;
+            $headerRowIndex = $rowCursor;
+            $sheet->fromArray([$report['headers']], null, 'A'.$rowCursor);
+            $rowCursor++;
+            $isReceivableRecap = ($report['layout'] ?? null) === 'receivable_recap';
             foreach ($report['rows'] as $row) {
                 $formatted = [];
-                $isReceivableRecap = ($report['layout'] ?? null) === 'receivable_recap';
                 foreach ($report['headers'] as $index => $header) {
                     $value = $row[$index] ?? null;
                     $text = $value === null ? '' : (string) $value;
@@ -121,13 +128,12 @@ class ReportExportController extends Controller
 
                     $formatted[] = $text;
                 }
-                $rowsOut[] = $formatted;
+                $sheet->fromArray([$formatted], null, 'A'.$rowCursor);
+                $rowCursor++;
             }
 
-            $sheet->fromArray($rowsOut, null, 'A1');
-
             $columnCount = count($report['headers']);
-            $dataRowCount = count($report['rows']);
+            $dataRowCount = max(0, $rowCursor - $headerRowIndex - 1);
             if ($columnCount > 0) {
                 $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
                 $lastDataRow = max($headerRowIndex, $headerRowIndex + $dataRowCount);
@@ -1192,37 +1198,31 @@ class ReportExportController extends Controller
 
     private function semesterOptions(): array
     {
-        return Cache::remember('reports.semester_options', now()->addSeconds(60), function (): array {
-            $current = $this->currentSemesterPeriod();
-            $previous = $this->previousSemesterPeriod($current);
-
-            $options = SalesInvoice::query()
-                ->whereNotNull('semester_period')
-                ->where('semester_period', '!=', '')
-                ->distinct()
-                ->pluck('semester_period')
-                ->merge(
-                    SalesReturn::query()
-                        ->whereNotNull('semester_period')
-                        ->where('semester_period', '!=', '')
-                        ->distinct()
-                        ->pluck('semester_period')
-                )
-                ->merge(
-                    OutgoingTransaction::query()
-                        ->whereNotNull('semester_period')
-                        ->where('semester_period', '!=', '')
-                        ->distinct()
-                        ->pluck('semester_period')
-                )
-                ->merge($this->configuredSemesterOptions())
-                ->push($current)
-                ->push($previous)
-                ->unique()
-                ->sortDesc()
-                ->values();
-
-            return $this->semesterBookService()->filterToActiveSemesters($options->all());
+        return Cache::remember(AppCache::lookupCacheKey('reports.semester_options'), now()->addSeconds(60), function (): array {
+            return $this->semesterBookService()->buildSemesterOptionCollection(
+                SalesInvoice::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge(
+                        SalesReturn::query()
+                            ->whereNotNull('semester_period')
+                            ->where('semester_period', '!=', '')
+                            ->distinct()
+                            ->pluck('semester_period')
+                    )
+                    ->merge(
+                        OutgoingTransaction::query()
+                            ->whereNotNull('semester_period')
+                            ->where('semester_period', '!=', '')
+                            ->distinct()
+                            ->pluck('semester_period')
+                    )
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                true,
+                true
+            )->all();
         });
     }
 
@@ -1267,13 +1267,6 @@ class ReportExportController extends Controller
         return null;
     }
 
-    private function configuredSemesterOptions()
-    {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '');
-    }
-
     private function receivableSemesterColumns(?string $selectedSemester)
     {
         if ($selectedSemester !== null) {
@@ -1285,14 +1278,15 @@ class ReportExportController extends Controller
             ->where('semester_period', '!=', '')
             ->distinct()
             ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->map(fn (string $item): ?string => $this->semesterBookService()->normalizeSemester($item))
-            ->filter(fn (?string $item): bool => $item !== null)
-            ->unique()
-            ->sortBy(fn (string $item): int => $this->semesterSortValue($item))
+            ->merge($this->semesterBookService()->configuredSemesterOptions())
             ->values();
+        $normalized = $this->semesterBookService()->buildSemesterOptionCollection(
+            $columns,
+            true,
+            false
+        );
 
-        return collect($this->semesterBookService()->filterToActiveSemesters($columns->all()))
+        return $normalized
             ->sortBy(fn (string $item): int => $this->semesterSortValue($item))
             ->values();
     }

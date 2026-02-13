@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Services\AuditLogService;
+use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
 use Carbon\Carbon;
@@ -67,6 +68,7 @@ class ProductPageController extends Controller
         $filename = 'products-'.$printedAt->format('Ymd-His').'.xlsx';
 
         $productQuery = Product::query()
+            ->select(['id', 'code', 'name', 'stock'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")
@@ -142,6 +144,8 @@ class ProductPageController extends Controller
         $data['is_active'] = true;
         $product = Product::create($data);
         $this->auditLogService->log('master.product.create', $product, "Product created: {$product->code}", $request);
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('products.index')
@@ -170,6 +174,8 @@ class ProductPageController extends Controller
         $data['is_active'] = true;
         $product->update($data);
         $this->auditLogService->log('master.product.update', $product, "Product updated: {$product->code}", $request);
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('products.index')
@@ -181,6 +187,8 @@ class ProductPageController extends Controller
         $code = $product->code;
         $product->delete();
         $this->auditLogService->log('master.product.delete', null, "Product deleted: {$code}", $request);
+        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('products.index')

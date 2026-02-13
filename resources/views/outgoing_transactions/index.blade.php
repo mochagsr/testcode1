@@ -182,19 +182,22 @@
                 return;
             }
 
-            let debounceTimer = null;
-            searchInput.addEventListener('input', () => {
-                if (debounceTimer) {
-                    clearTimeout(debounceTimer);
+            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+                ? window.PgposAutoSearch.debounce
+                : (fn, wait = 100) => {
+                    let timeoutId = null;
+                    return (...args) => {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => fn(...args), wait);
+                    };
+                };
+            const onSearchInput = debounce(() => {
+                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
+                    return;
                 }
-
-                debounceTimer = setTimeout(() => {
-                    if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                        return;
-                    }
-                    form.requestSubmit();
-                }, 100);
-            });
+                form.requestSubmit();
+            }, 100);
+            searchInput.addEventListener('input', onSearchInput);
             dateInput.addEventListener('change', () => form.requestSubmit());
             semesterInput.addEventListener('change', () => form.requestSubmit());
             supplierInput.addEventListener('change', () => form.requestSubmit());

@@ -82,6 +82,9 @@
 
     <script>
         let customers = @json($customers->values());
+        let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
+        let customerByLabel = new Map();
+        let customerByName = new Map();
         const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
         const LOOKUP_LIMIT = 20;
         const customerSearch = document.getElementById('customer-search');
@@ -94,28 +97,48 @@
         const paymentAmountFeedback = document.getElementById('payment-amount-feedback');
         const amountInWordsField = document.getElementById('amount-in-words');
         const SEARCH_DEBOUNCE_MS = 100;
+        const idNumberFormatter = new Intl.NumberFormat('id-ID');
         let customerLookupAbort = null;
-
-        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
-            let timeoutId = null;
-            return (...args) => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => fn(...args), wait);
-            };
+        let lastCustomerLookupQuery = '';
+        function normalizeLookup(value) {
+            return String(value || '').trim().toLowerCase();
         }
+        const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+            ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
+            : (fn, wait = SEARCH_DEBOUNCE_MS) => {
+                let timeoutId = null;
+                return (...args) => {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => fn(...args), wait);
+                };
+            };
+        const escapeAttribute = (window.PgposAutoSearch && window.PgposAutoSearch.escapeAttribute)
+            ? window.PgposAutoSearch.escapeAttribute
+            : (value) => String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
 
         function upsertCustomers(rows) {
             const byId = new Map(customers.map((row) => [String(row.id), row]));
             (rows || []).forEach((row) => byId.set(String(row.id), row));
             customers = Array.from(byId.values());
+            customerById = new Map(customers.map((customer) => [String(customer.id), customer]));
+            rebuildCustomerIndexes();
         }
 
-        function escapeAttribute(value) {
-            return String(value)
-                .replace(/&/g, '&amp;')
-                .replace(/"/g, '&quot;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+        function rebuildCustomerIndexes() {
+            customerByLabel = new Map();
+            customerByName = new Map();
+            customers.forEach((customer) => {
+                customerByLabel.set(normalizeLookup(customerLabel(customer)), customer);
+                customerByName.set(normalizeLookup(customer.name), customer);
+            });
+        }
+
+        function getCustomerById(id) {
+            return customerById.get(String(id)) || null;
         }
 
         function customerLabel(customer) {
@@ -141,7 +164,13 @@
         }
 
         async function fetchCustomerSuggestions(query) {
+            const normalizedQuery = normalizeLookup(query);
             if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                lastCustomerLookupQuery = '';
+                renderCustomerSuggestions(query);
+                return;
+            }
+            if (normalizedQuery !== '' && normalizedQuery === lastCustomerLookupQuery) {
                 renderCustomerSuggestions(query);
                 return;
             }
@@ -156,6 +185,7 @@
                     return;
                 }
                 const payload = await response.json();
+                lastCustomerLookupQuery = normalizedQuery;
                 upsertCustomers(payload.data || []);
                 renderCustomerSuggestions(query);
             } catch (error) {
@@ -169,9 +199,9 @@
             if (!label) {
                 return null;
             }
-            const normalized = label.trim().toLowerCase();
-            return customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
-                || customers.find((customer) => customer.name.toLowerCase() === normalized)
+            const normalized = normalizeLookup(label);
+            return customerByLabel.get(normalized)
+                || customerByName.get(normalized)
                 || customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
                 || customers.find((customer) => customer.name.toLowerCase().includes(normalized))
                 || null;
@@ -179,7 +209,7 @@
 
         function money(value) {
             const amount = Number(value || 0);
-            return `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(amount))}`;
+            return `Rp ${idNumberFormatter.format(Math.round(amount))}`;
         }
 
         function digitsOnly(value) {
@@ -228,7 +258,7 @@
         }
 
         function validatePaymentAmount() {
-            const selectedCustomer = customers.find((customer) => String(customer.id) === String(customerIdField.value));
+            const selectedCustomer = getCustomerById(customerIdField.value);
             const outstanding = Math.round(Number(selectedCustomer?.outstanding_receivable || 0));
             const amount = Math.round(Number(paymentAmountField.value || 0));
 
@@ -262,6 +292,8 @@
             }
         }
 
+        rebuildCustomerIndexes();
+
         function bindCustomer(customer, preserveAmount = false) {
             if (!customer) {
                 customerIdField.value = '';
@@ -290,7 +322,7 @@
 
         if (customerSearch) {
             const bootCustomer = customerIdField.value
-                ? customers.find(c => String(c.id) === String(customerIdField.value))
+                ? getCustomerById(customerIdField.value)
                 : findCustomerByLabel(customerSearch.value);
             const hasPresetAmount = String(paymentAmountField.value || '').trim() !== '';
             renderCustomerSuggestions('');

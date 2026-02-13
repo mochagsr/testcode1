@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\Product;
@@ -11,6 +10,7 @@ use App\Models\SalesReturnItem;
 use App\Models\StockMutation;
 use App\Services\AuditLogService;
 use App\Services\ReceivableLedgerService;
+use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -55,20 +56,23 @@ class SalesReturnPageController extends Controller
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
 
-        $semesterOptions = SalesReturn::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->push($currentSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
+        $semesterOptions = Cache::remember(
+            AppCache::lookupCacheKey('sales_returns.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
+                SalesReturn::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
         $semesterOptions = $isAdminUser
             ? $semesterOptions->values()
-            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+            : $this->semesterBookService()->buildSemesterOptionCollection($semesterOptions->all(), true, false);
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
         }
@@ -110,14 +114,45 @@ class SalesReturnPageController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $todaySummary = SalesReturn::query()
-            ->selectRaw('COUNT(*) as total_return, COALESCE(SUM(total), 0) as grand_total')
-            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                $query->where('is_canceled', $selectedStatus === 'canceled');
+        $todaySummary = Cache::remember(
+            AppCache::lookupCacheKey('sales_returns.index.today_summary', [
+                'status' => $selectedStatus ?? 'all',
+                'date' => now()->toDateString(),
+            ]),
+            now()->addSeconds(30),
+            function () use ($selectedStatus, $todayRange) {
+                return SalesReturn::query()
+                    ->selectRaw('COUNT(*) as total_return, COALESCE(SUM(total), 0) as grand_total')
+                    ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                        $query->where('is_canceled', $selectedStatus === 'canceled');
+                    })
+                    ->whereBetween('return_date', $todayRange)
+                    ->first();
+            }
+        );
+        $lockPairs = collect($returns->items())
+            ->map(function (SalesReturn $salesReturn): array {
+                return [
+                    'customer_id' => (int) $salesReturn->customer_id,
+                    'semester' => trim((string) $salesReturn->semester_period),
+                ];
             })
-            ->whereBetween('return_date', $todayRange)
-            ->first();
-        $customerSemesterLockMap = $this->customerSemesterLockMap(collect($returns->items()));
+            ->filter(fn (array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
+            ->values();
+        $customerSemesterLockMap = [];
+        if ($lockPairs->isNotEmpty()) {
+            $pairStates = $this->semesterBookService()->customerSemesterLockStatesByPairs(
+                $lockPairs->all()
+            );
+
+            foreach ($pairStates as $key => $state) {
+                $customerSemesterLockMap[$key] = [
+                    'locked' => (bool) ($state['locked'] ?? false),
+                    'manual' => (bool) ($state['manual'] ?? false),
+                    'auto' => (bool) ($state['auto'] ?? false),
+                ];
+            }
+        }
         $returnIds = collect($returns->items())
             ->map(fn (SalesReturn $salesReturn): int => (int) $salesReturn->id)
             ->filter(fn (int $id): bool => $id > 0)
@@ -125,10 +160,11 @@ class SalesReturnPageController extends Controller
         $returnAdminActionMap = [];
         if ($returnIds->isNotEmpty()) {
             $actionRows = AuditLog::query()
-                ->select(['subject_id', 'action'])
+                ->selectRaw("subject_id, MAX(CASE WHEN action = 'sales.return.admin_update' THEN 1 ELSE 0 END) as edited, MAX(CASE WHEN action = 'sales.return.cancel' THEN 1 ELSE 0 END) as canceled")
                 ->where('subject_type', SalesReturn::class)
                 ->whereIn('subject_id', $returnIds->all())
                 ->whereIn('action', ['sales.return.admin_update', 'sales.return.cancel'])
+                ->groupBy('subject_id')
                 ->get();
 
             foreach ($actionRows as $row) {
@@ -136,18 +172,10 @@ class SalesReturnPageController extends Controller
                 if ($returnId <= 0) {
                     continue;
                 }
-                if (! isset($returnAdminActionMap[$returnId])) {
-                    $returnAdminActionMap[$returnId] = [
-                        'edited' => false,
-                        'canceled' => false,
-                    ];
-                }
-                if ((string) $row->action === 'sales.return.admin_update') {
-                    $returnAdminActionMap[$returnId]['edited'] = true;
-                }
-                if ((string) $row->action === 'sales.return.cancel') {
-                    $returnAdminActionMap[$returnId]['canceled'] = true;
-                }
+                $returnAdminActionMap[$returnId] = [
+                    'edited' => (int) ($row->edited ?? 0) === 1,
+                    'canceled' => (int) ($row->canceled ?? 0) === 1,
+                ];
             }
         }
         foreach ($returns->items() as $returnRow) {
@@ -183,29 +211,40 @@ class SalesReturnPageController extends Controller
     {
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
-        $semesterOptions = SalesReturn::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->push($currentSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptionsBase = Cache::remember(
+            AppCache::lookupCacheKey('sales_returns.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
+                SalesReturn::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
+        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
+            $semesterOptionsBase->all(),
+            true,
+            true
+        );
         if (! $semesterOptions->contains($currentSemester)) {
             $currentSemester = (string) ($semesterOptions->first() ?? $currentSemester);
         }
 
         $oldCustomerId = (int) old('customer_id', 0);
-        $initialCustomers = Customer::query()
-            ->select(['id', 'name', 'city', 'customer_level_id'])
-            ->with('level:id,code,name')
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $initialCustomers = Cache::remember(
+            AppCache::lookupCacheKey('forms.sales_returns.customers', ['limit' => 20]),
+            now()->addSeconds(60),
+            fn () => Customer::query()
+                ->select(['id', 'name', 'city', 'customer_level_id'])
+                ->with('level:id,code,name')
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldCustomerId > 0 && ! $initialCustomers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
                 ->select(['id', 'name', 'city', 'customer_level_id'])
@@ -223,12 +262,16 @@ class SalesReturnPageController extends Controller
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->values();
-        $initialProducts = Product::query()
-            ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $initialProducts = Cache::remember(
+            AppCache::lookupCacheKey('forms.sales_returns.products', ['limit' => 20, 'active_only' => 1]),
+            now()->addSeconds(60),
+            fn () => Product::query()
+                ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldProductIds->isNotEmpty()) {
             $oldProducts = Product::query()
                 ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
@@ -353,6 +396,7 @@ class SalesReturnPageController extends Controller
             __('txn.audit_return_created', ['number' => $salesReturn->return_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $salesReturn->return_date]);
 
         return redirect()
             ->route('sales-returns.show', $salesReturn)
@@ -367,26 +411,38 @@ class SalesReturnPageController extends Controller
         ]);
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
-        $semesterOptions = SalesReturn::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->push($currentSemester)
-            ->push($previousSemester)
-            ->push((string) $salesReturn->semester_period)
-            ->unique()
-            ->sortDesc()
-            ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptionsBase = Cache::remember(
+            AppCache::lookupCacheKey('sales_returns.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
+                SalesReturn::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
+        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
+            $semesterOptionsBase->push((string) $salesReturn->semester_period)->all(),
+            true,
+            true
+        );
         if (! $semesterOptions->contains((string) $salesReturn->semester_period)) {
             $semesterOptions = $semesterOptions->push((string) $salesReturn->semester_period)->unique()->values();
         }
-        $customerSemesterLockState = $this->customerSemesterLockState(
-            (int) $salesReturn->customer_id,
-            (string) $salesReturn->semester_period
-        );
+        $customerSemesterLockState = ['locked' => false, 'manual' => false, 'auto' => false];
+        $returnSemester = trim((string) $salesReturn->semester_period);
+        if ((int) $salesReturn->customer_id > 0 && $returnSemester !== '') {
+            $states = $this->semesterBookService()->customerSemesterLockStates([(int) $salesReturn->customer_id], $returnSemester);
+            $customerSemesterLockState = [
+                'locked' => (bool) ($states[(int) $salesReturn->customer_id]['locked'] ?? false),
+                'manual' => (bool) ($states[(int) $salesReturn->customer_id]['manual'] ?? false),
+                'auto' => (bool) ($states[(int) $salesReturn->customer_id]['auto'] ?? false),
+            ];
+        }
         $itemProductIds = $salesReturn->items
             ->pluck('product_id')
             ->map(fn ($id): int => (int) $id)
@@ -617,6 +673,7 @@ class SalesReturnPageController extends Controller
             ]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $salesReturn->return_date]);
 
         return redirect()
             ->route('sales-returns.show', $salesReturn)
@@ -699,6 +756,7 @@ class SalesReturnPageController extends Controller
             __('txn.audit_return_canceled', ['number' => $salesReturn->return_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $salesReturn->return_date]);
 
         return redirect()
             ->route('sales-returns.show', $salesReturn)
@@ -802,13 +860,6 @@ class SalesReturnPageController extends Controller
         return $this->semesterBookService()->previousSemester($period);
     }
 
-    private function configuredSemesterOptions()
-    {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '');
-    }
-
     private function semesterBookService(): SemesterBookService
     {
         return app(SemesterBookService::class);
@@ -831,86 +882,4 @@ class SalesReturnPageController extends Controller
         return (float) round((float) ($product->price_general ?? 0));
     }
 
-    /**
-     * @param  \Illuminate\Support\Collection<int, SalesReturn>  $returns
-     * @return array<string, array{locked:bool,manual:bool,auto:bool}>
-     */
-    private function customerSemesterLockMap(\Illuminate\Support\Collection $returns): array
-    {
-        $pairs = $returns
-            ->map(function (SalesReturn $salesReturn): ?array {
-                $customerId = (int) $salesReturn->customer_id;
-                $semester = trim((string) $salesReturn->semester_period);
-                if ($customerId <= 0 || $semester === '') {
-                    return null;
-                }
-
-                return [
-                    'customer_id' => $customerId,
-                    'semester' => $semester,
-                ];
-            })
-            ->filter()
-            ->values();
-        if ($pairs->isEmpty()) {
-            return [];
-        }
-
-        $customerIds = $pairs->pluck('customer_id')->unique()->values();
-        $semesterCodes = $pairs->pluck('semester')->unique()->values();
-
-        $aggregates = \App\Models\SalesInvoice::query()
-            ->selectRaw('customer_id, semester_period, COUNT(*) as invoice_count, COALESCE(SUM(balance), 0) as outstanding')
-            ->where('is_canceled', false)
-            ->whereIn('customer_id', $customerIds->all())
-            ->whereIn('semester_period', $semesterCodes->all())
-            ->groupBy('customer_id', 'semester_period')
-            ->get();
-
-        $autoMap = [];
-        foreach ($aggregates as $aggregate) {
-            $key = ((int) $aggregate->customer_id).':'.(string) $aggregate->semester_period;
-            $invoiceCount = (int) ($aggregate->invoice_count ?? 0);
-            $outstanding = (float) ($aggregate->outstanding ?? 0);
-            $autoMap[$key] = $invoiceCount > 0 && round($outstanding) <= 0;
-        }
-
-        $manualMap = collect($this->semesterBookService()->closedCustomerSemesters())
-            ->mapWithKeys(fn (string $item): array => [$item => true])
-            ->all();
-
-        $result = [];
-        foreach ($pairs as $pair) {
-            $key = ((int) $pair['customer_id']).':'.(string) $pair['semester'];
-            $manual = (bool) ($manualMap[$key] ?? false);
-            $auto = (bool) ($autoMap[$key] ?? false);
-            $result[$key] = [
-                'locked' => $manual || $auto,
-                'manual' => $manual,
-                'auto' => $auto,
-            ];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return array{locked:bool,manual:bool,auto:bool}
-     */
-    private function customerSemesterLockState(int $customerId, string $semester): array
-    {
-        $normalizedSemester = trim($semester);
-        if ($customerId <= 0 || $normalizedSemester === '') {
-            return ['locked' => false, 'manual' => false, 'auto' => false];
-        }
-
-        $manual = $this->semesterBookService()->isCustomerClosed($customerId, $normalizedSemester);
-        $auto = $this->semesterBookService()->isCustomerAutoClosed($customerId, $normalizedSemester);
-
-        return [
-            'locked' => $manual || $auto,
-            'manual' => $manual,
-            'auto' => $auto,
-        ];
-    }
 }

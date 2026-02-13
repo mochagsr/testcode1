@@ -519,6 +519,22 @@
 </div>
 <script>
     (function () {
+        function debounce(fn, wait) {
+            let timeoutId = null;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn(...args), Number(wait) || 100);
+            };
+        }
+
+        function escapeAttribute(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
         function canSearchInput(input) {
             if (!input) {
                 return false;
@@ -536,8 +552,37 @@
             return words.every((word) => word.length >= 3);
         }
 
+        function deriveSemesterFromDate(dateValue) {
+            if (!dateValue) {
+                return '';
+            }
+
+            const [yearText, monthText] = String(dateValue).split('-');
+            const year = parseInt(yearText, 10);
+            const month = parseInt(monthText, 10);
+            if (!Number.isInteger(year) || !Number.isInteger(month)) {
+                return '';
+            }
+
+            if (month >= 5 && month <= 10) {
+                const nextYear = year + 1;
+                return `S1-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
+            }
+
+            if (month >= 11) {
+                const nextYear = year + 1;
+                return `S2-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
+            }
+
+            const startYear = year - 1;
+            return `S2-${String(startYear).slice(-2)}${String(year).slice(-2)}`;
+        }
+
         window.PgposAutoSearch = Object.assign({}, window.PgposAutoSearch || {}, {
+            debounce,
+            escapeAttribute,
             canSearchInput,
+            deriveSemesterFromDate,
         });
     })();
 </script>

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Support\AppCache;
 use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class CustomerController extends Controller
@@ -14,7 +16,8 @@ class CustomerController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $perPage = min(max((int) $request->integer('per_page', 10), 1), 10);
+        $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
+        $page = max(1, (int) $request->integer('page', 1));
         $search = trim((string) $request->string('search', ''));
         $hasSearch = $search !== '';
 
@@ -44,7 +47,14 @@ class CustomerController extends Controller
             $customersQuery->whereRaw('1 = 0');
         }
 
-        $customers = $customersQuery->paginate($perPage);
+        $cacheKey = AppCache::lookupCacheKey('lookups.customers', [
+            'per_page' => $perPage,
+            'page' => $page,
+            'search' => mb_strtolower($search),
+        ]);
+        $customers = Cache::remember($cacheKey, now()->addSeconds(20), function () use ($customersQuery, $perPage) {
+            return $customersQuery->paginate($perPage)->toArray();
+        });
 
         return response()->json($customers);
     }
@@ -69,6 +79,7 @@ class CustomerController extends Controller
 
         unset($data['id_card_photo']);
         $customer = Customer::create($data);
+        AppCache::bumpLookupVersion();
 
         return response()->json($customer->load('level:id,code,name'), 201);
     }
@@ -107,6 +118,7 @@ class CustomerController extends Controller
 
         unset($data['id_card_photo'], $data['remove_id_card_photo']);
         $customer->update($data);
+        AppCache::bumpLookupVersion();
 
         return response()->json($customer->fresh()->load('level:id,code,name'));
     }
@@ -118,6 +130,7 @@ class CustomerController extends Controller
         }
 
         $customer->delete();
+        AppCache::bumpLookupVersion();
 
         return response()->json(status: 204);
     }

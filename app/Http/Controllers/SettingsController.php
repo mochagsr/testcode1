@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
 use App\Models\Customer;
+use App\Support\AppCache;
 use App\Support\SemesterBookService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -178,6 +179,7 @@ class SettingsController extends Controller
                 ->map(fn (array $item): string => $item['code'].'|'.$item['label'])
                 ->implode(',')
         );
+        AppCache::bumpLookupVersion();
 
         if ($user->role === 'admin') {
             $currentLogoPath = AppSetting::getValue('company_logo_path');
@@ -236,6 +238,7 @@ class SettingsController extends Controller
             AppSetting::setValue('company_invoice_notes', trim((string) ($data['company_invoice_notes'] ?? '')));
             AppSetting::setValue('company_billing_note', trim((string) ($data['company_billing_note'] ?? '')));
             AppSetting::setValue('company_transfer_accounts', trim((string) ($data['company_transfer_accounts'] ?? '')));
+            AppCache::forgetReportOptionCaches();
         }
 
         return redirect()->route('settings.edit')->with('success', __('menu.settings_saved'));

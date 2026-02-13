@@ -115,6 +115,12 @@
         (function () {
             let suppliers = @json($suppliers);
             let products = @json($products);
+            let supplierById = new Map((suppliers || []).map((supplier) => [String(supplier.id), supplier]));
+            let supplierByLabel = new Map();
+            let supplierByName = new Map();
+            let productByLabel = new Map();
+            let productByCode = new Map();
+            let productByName = new Map();
             const outgoingUnits = @json($outgoingUnitOptions);
             const SUPPLIER_LOOKUP_URL = @json(route('suppliers.lookup'));
             const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
@@ -135,37 +141,50 @@
             }
             let supplierLookupAbort = null;
             let productLookupAbort = null;
+            let lastSupplierLookupQuery = '';
+            let lastProductLookupQuery = '';
             const SEARCH_DEBOUNCE_MS = 100;
 
-            function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
-                let timeoutId = null;
-                return (...args) => {
-                    clearTimeout(timeoutId);
-                    timeoutId = setTimeout(() => fn(...args), wait);
+            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+                ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
+                : (fn, wait = SEARCH_DEBOUNCE_MS) => {
+                    let timeoutId = null;
+                    return (...args) => {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => fn(...args), wait);
+                    };
                 };
-            }
 
             function upsertSuppliers(rows) {
                 const byId = new Map(suppliers.map((row) => [String(row.id), row]));
                 (rows || []).forEach((row) => byId.set(String(row.id), row));
                 suppliers = Array.from(byId.values());
+                supplierById = new Map(suppliers.map((supplier) => [String(supplier.id), supplier]));
+                rebuildSupplierIndexes();
             }
 
             function upsertProducts(rows) {
                 const byId = new Map(products.map((row) => [String(row.id), row]));
                 (rows || []).forEach((row) => byId.set(String(row.id), row));
                 products = Array.from(byId.values());
+                rebuildProductIndexes();
             }
 
-            function escapeAttribute(value) {
-                return String(value)
+            function getSupplierById(id) {
+                return supplierById.get(String(id)) || null;
+            }
+
+            const escapeAttribute = (window.PgposAutoSearch && window.PgposAutoSearch.escapeAttribute)
+                ? window.PgposAutoSearch.escapeAttribute
+                : (value) => String(value)
                     .replace(/&/g, '&amp;')
                     .replace(/"/g, '&quot;')
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;');
-            }
 
-            const numberFormat = (value) => new Intl.NumberFormat('id-ID').format(Math.max(0, Math.round(Number(value || 0))));
+            const idNumberFormatter = new Intl.NumberFormat('id-ID');
+            const numberFormat = (value) => idNumberFormatter.format(Math.max(0, Math.round(Number(value || 0))));
+            const normalizeLookup = (value) => String(value || '').trim().toLowerCase();
 
             function productLabel(product) {
                 const code = String(product.code || '').trim();
@@ -174,6 +193,41 @@
 
             function supplierLabel(supplier) {
                 return `${supplier.name} (${supplier.company_name || '-'})`;
+            }
+
+            function rebuildSupplierIndexes() {
+                supplierByLabel = new Map();
+                supplierByName = new Map();
+                suppliers.forEach((supplier) => {
+                    const byLabel = normalizeLookup(supplierLabel(supplier));
+                    const byName = normalizeLookup(supplier.name);
+                    if (byLabel !== '' && !supplierByLabel.has(byLabel)) {
+                        supplierByLabel.set(byLabel, supplier);
+                    }
+                    if (byName !== '' && !supplierByName.has(byName)) {
+                        supplierByName.set(byName, supplier);
+                    }
+                });
+            }
+
+            function rebuildProductIndexes() {
+                productByLabel = new Map();
+                productByCode = new Map();
+                productByName = new Map();
+                products.forEach((product) => {
+                    const byLabel = normalizeLookup(productLabel(product));
+                    const byCode = normalizeLookup(product.code);
+                    const byName = normalizeLookup(product.name);
+                    if (byLabel !== '' && !productByLabel.has(byLabel)) {
+                        productByLabel.set(byLabel, product);
+                    }
+                    if (byCode !== '' && !productByCode.has(byCode)) {
+                        productByCode.set(byCode, product);
+                    }
+                    if (byName !== '' && !productByName.has(byName)) {
+                        productByName.set(byName, product);
+                    }
+                });
             }
 
             function renderSupplierSuggestions(query) {
@@ -194,7 +248,13 @@
             }
 
             async function fetchSupplierSuggestions(query) {
+                const normalizedQuery = normalizeLookup(query);
                 if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                    lastSupplierLookupQuery = '';
+                    renderSupplierSuggestions(query);
+                    return;
+                }
+                if (normalizedQuery !== '' && normalizedQuery === lastSupplierLookupQuery) {
                     renderSupplierSuggestions(query);
                     return;
                 }
@@ -209,6 +269,7 @@
                         return;
                     }
                     const payload = await response.json();
+                    lastSupplierLookupQuery = normalizedQuery;
                     upsertSuppliers(payload.data || []);
                     renderSupplierSuggestions(query);
                 } catch (error) {
@@ -220,9 +281,9 @@
 
             function findSupplierByLabel(label) {
                 if (!label) return null;
-                const normalized = String(label).trim().toLowerCase();
-                return suppliers.find((supplier) => supplierLabel(supplier).toLowerCase() === normalized)
-                    || suppliers.find((supplier) => String(supplier.name || '').toLowerCase() === normalized)
+                const normalized = normalizeLookup(label);
+                return supplierByLabel.get(normalized)
+                    || supplierByName.get(normalized)
                     || null;
             }
 
@@ -243,10 +304,10 @@
 
             function findProductByLabel(label) {
                 if (!label) return null;
-                const normalized = String(label).trim().toLowerCase();
-                return products.find((product) => productLabel(product).toLowerCase() === normalized)
-                    || products.find((product) => String(product.code || '').toLowerCase() === normalized)
-                    || products.find((product) => String(product.name || '').toLowerCase() === normalized)
+                const normalized = normalizeLookup(label);
+                return productByLabel.get(normalized)
+                    || productByCode.get(normalized)
+                    || productByName.get(normalized)
                     || null;
             }
 
@@ -276,7 +337,13 @@
             }
 
             async function fetchProductSuggestions(query) {
+                const normalizedQuery = normalizeLookup(query);
                 if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                    lastProductLookupQuery = '';
+                    renderProductSuggestions(query);
+                    return;
+                }
+                if (normalizedQuery !== '' && normalizedQuery === lastProductLookupQuery) {
                     renderProductSuggestions(query);
                     return;
                 }
@@ -291,6 +358,7 @@
                         return;
                     }
                     const payload = await response.json();
+                    lastProductLookupQuery = normalizedQuery;
                     upsertProducts(payload.data || []);
                     renderProductSuggestions(query);
                 } catch (error) {
@@ -347,36 +415,13 @@
                 return options.join('');
             }
 
-            function deriveSemesterFromDate(dateValue) {
-                if (!dateValue) {
-                    return '';
-                }
-
-                const [yearText, monthText] = String(dateValue).split('-');
-                const year = parseInt(yearText, 10);
-                const month = parseInt(monthText, 10);
-                if (!Number.isInteger(year) || !Number.isInteger(month)) {
-                    return '';
-                }
-
-                if (month >= 5 && month <= 10) {
-                    const nextYear = year + 1;
-                    return `S1-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
-                }
-
-                if (month >= 11) {
-                    const nextYear = year + 1;
-                    return `S2-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
-                }
-
-                const startYear = year - 1;
-                return `S2-${String(startYear).slice(-2)}${String(year).slice(-2)}`;
-            }
-
             function autoSelectSemesterByDate() {
                 if (!transactionDateInput || !semesterPeriodSelect) {
                     return;
                 }
+                const deriveSemesterFromDate = (window.PgposAutoSearch && window.PgposAutoSearch.deriveSemesterFromDate)
+                    ? window.PgposAutoSearch.deriveSemesterFromDate
+                    : () => '';
                 const derived = deriveSemesterFromDate(transactionDateInput.value);
                 if (derived === '') {
                     return;
@@ -521,8 +566,10 @@
             });
 
             const initialSupplier = supplierIdField.value
-                ? suppliers.find((supplier) => String(supplier.id) === String(supplierIdField.value))
+                ? getSupplierById(supplierIdField.value)
                 : null;
+            rebuildSupplierIndexes();
+            rebuildProductIndexes();
             renderSupplierSuggestions('');
             renderProductSuggestions('');
             updateSupplierPreview(initialSupplier);

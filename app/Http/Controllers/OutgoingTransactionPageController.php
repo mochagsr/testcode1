@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Services\AuditLogService;
+use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -15,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -39,20 +41,23 @@ class OutgoingTransactionPageController extends Controller
 
         $defaultSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($defaultSemester);
-        $semesterOptions = OutgoingTransaction::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->push($defaultSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
+        $semesterOptions = Cache::remember(
+            AppCache::lookupCacheKey('outgoing_transactions.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService->buildSemesterOptionCollection(
+                OutgoingTransaction::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
         $semesterOptions = $isAdminUser
             ? $semesterOptions->values()
-            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+            : $this->semesterBookService->buildSemesterOptionCollection($semesterOptions->all(), true, false);
         $selectedSemester = $semester !== '' ? $semester : null;
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
@@ -142,7 +147,11 @@ class OutgoingTransactionPageController extends Controller
             'selectedTransactionDate' => $selectedTransactionDate,
             'isDefaultRecentMode' => $isDefaultRecentMode,
             'selectedSupplierId' => $selectedSupplierId,
-            'supplierOptions' => Supplier::query()->orderBy('name')->get(['id', 'name', 'company_name']),
+            'supplierOptions' => Cache::remember(
+                AppCache::lookupCacheKey('outgoing_transactions.index.supplier_options'),
+                now()->addSeconds(60),
+                fn () => Supplier::query()->orderBy('name')->get(['id', 'name', 'company_name'])
+            ),
             'currentSemester' => $defaultSemester,
             'previousSemester' => $previousSemester,
             'selectedSupplierSemesterClosed' => $selectedSupplierSemesterClosed,
@@ -154,28 +163,39 @@ class OutgoingTransactionPageController extends Controller
     {
         $defaultSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($defaultSemester);
-        $semesterOptions = OutgoingTransaction::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->push($defaultSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptionsBase = Cache::remember(
+            AppCache::lookupCacheKey('outgoing_transactions.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService->buildSemesterOptionCollection(
+                OutgoingTransaction::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
+        $semesterOptions = $this->semesterBookService->buildSemesterOptionCollection(
+            $semesterOptionsBase->all(),
+            true,
+            true
+        );
         if (! $semesterOptions->contains($defaultSemester)) {
             $defaultSemester = (string) ($semesterOptions->first() ?? $defaultSemester);
         }
         $outgoingUnitOptions = $this->configuredOutgoingUnitOptions();
         $oldSupplierId = (int) old('supplier_id', 0);
-        $initialSuppliers = Supplier::query()
-            ->select(['id', 'name', 'company_name', 'phone', 'address'])
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $initialSuppliers = Cache::remember(
+            AppCache::lookupCacheKey('forms.outgoing_transactions.suppliers', ['limit' => 20]),
+            now()->addSeconds(60),
+            fn () => Supplier::query()
+                ->select(['id', 'name', 'company_name', 'phone', 'address'])
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldSupplierId > 0 && ! $initialSuppliers->contains('id', $oldSupplierId)) {
             $oldSupplier = Supplier::query()
                 ->select(['id', 'name', 'company_name', 'phone', 'address'])
@@ -192,12 +212,16 @@ class OutgoingTransactionPageController extends Controller
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->values();
-        $initialProducts = Product::query()
-            ->select(['id', 'code', 'name', 'unit', 'stock', 'price_general'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $initialProducts = Cache::remember(
+            AppCache::lookupCacheKey('forms.outgoing_transactions.products', ['limit' => 20, 'active_only' => 1]),
+            now()->addSeconds(60),
+            fn () => Product::query()
+                ->select(['id', 'code', 'name', 'unit', 'stock', 'price_general'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldProductIds->isNotEmpty()) {
             $oldProducts = Product::query()
                 ->select(['id', 'code', 'name', 'unit', 'stock', 'price_general'])
@@ -330,6 +354,7 @@ class OutgoingTransactionPageController extends Controller
             __('txn.audit_outgoing_created', ['number' => $transaction->transaction_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $transaction->transaction_date]);
 
         return redirect()
             ->route('outgoing-transactions.show', $transaction)
@@ -502,18 +527,6 @@ class OutgoingTransactionPageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function configuredSemesterOptions(): array
-    {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '')
-            ->values()
-            ->all();
     }
 
     private function defaultSemesterPeriod(): string

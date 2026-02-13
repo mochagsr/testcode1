@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ItemCategory;
+use App\Support\AppCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -36,6 +37,7 @@ class ItemCategoryController extends Controller
         $data['name'] = $data['code'];
 
         $category = ItemCategory::create($data);
+        AppCache::bumpLookupVersion();
 
         return response()->json($category, 201);
     }
@@ -59,6 +61,7 @@ class ItemCategoryController extends Controller
         $data['name'] = $data['code'];
 
         $itemCategory->update($data);
+        AppCache::bumpLookupVersion();
 
         return response()->json($itemCategory->fresh());
     }
@@ -66,6 +69,7 @@ class ItemCategoryController extends Controller
     public function destroy(ItemCategory $itemCategory): JsonResponse
     {
         $itemCategory->delete();
+        AppCache::bumpLookupVersion();
 
         return response()->json(status: 204);
     }

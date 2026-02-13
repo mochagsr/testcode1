@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ItemCategory;
+use App\Support\AppCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ class ItemCategoryPageController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $categories = ItemCategory::query()
+            ->select(['id', 'code', 'description'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('code', 'like', "%{$search}%")
@@ -40,6 +42,7 @@ class ItemCategoryPageController extends Controller
     {
         $data = $this->validatePayload($request);
         ItemCategory::create($data);
+        AppCache::bumpLookupVersion();
 
         return redirect()->route('item-categories.index')->with('success', 'Category created successfully.');
     }
@@ -53,6 +56,7 @@ class ItemCategoryPageController extends Controller
     {
         $data = $this->validatePayload($request, $itemCategory->id);
         $itemCategory->update($data);
+        AppCache::bumpLookupVersion();
 
         return redirect()->route('item-categories.index')->with('success', 'Category updated successfully.');
     }
@@ -60,6 +64,7 @@ class ItemCategoryPageController extends Controller
     public function destroy(ItemCategory $itemCategory): RedirectResponse
     {
         $itemCategory->delete();
+        AppCache::bumpLookupVersion();
 
         return redirect()->route('item-categories.index')->with('success', 'Category deleted successfully.');
     }

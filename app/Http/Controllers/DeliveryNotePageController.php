@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\Product;
 use App\Services\AuditLogService;
+use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -51,20 +52,23 @@ class DeliveryNotePageController extends Controller
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
         $semesterRange = $this->semesterDateRange($selectedSemester);
 
-        $semesterOptions = DeliveryNote::query()
-            ->whereNotNull('note_date')
-            ->orderByDesc('note_date')
-            ->pluck('note_date')
-            ->map(fn ($date): string => $this->semesterPeriodFromDate($date))
-            ->merge($this->configuredSemesterOptions())
-            ->push($currentSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
+        $semesterOptions = Cache::remember(
+            AppCache::lookupCacheKey('delivery_notes.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
+                DeliveryNote::query()
+                    ->whereNotNull('note_date')
+                    ->orderByDesc('note_date')
+                    ->pluck('note_date')
+                    ->map(fn ($date): string => $this->semesterPeriodFromDate($date))
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
         $semesterOptions = $isAdminUser
             ? $semesterOptions->values()
-            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+            : $this->semesterBookService()->buildSemesterOptionCollection($semesterOptions->all(), true, false);
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
             $semesterRange = null;
@@ -106,21 +110,30 @@ class DeliveryNotePageController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $todaySummary = (object) [
-            'total_notes' => (int) DeliveryNote::query()
-                ->whereBetween('note_date', $todayRange)
-                ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                    $query->where('is_canceled', $selectedStatus === 'canceled');
-                })
-                ->count(),
-            'total_qty' => (int) DeliveryNoteItem::query()
-                ->join('delivery_notes', 'delivery_note_items.delivery_note_id', '=', 'delivery_notes.id')
-                ->whereBetween('delivery_notes.note_date', $todayRange)
-                ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                    $query->where('delivery_notes.is_canceled', $selectedStatus === 'canceled');
-                })
-                ->sum('delivery_note_items.quantity'),
-        ];
+        $todaySummary = Cache::remember(
+            AppCache::lookupCacheKey('delivery_notes.index.today_summary', [
+                'status' => $selectedStatus ?? 'all',
+                'date' => now()->toDateString(),
+            ]),
+            now()->addSeconds(30),
+            function () use ($todayRange, $selectedStatus) {
+                return (object) [
+                    'total_notes' => (int) DeliveryNote::query()
+                        ->whereBetween('note_date', $todayRange)
+                        ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                            $query->where('is_canceled', $selectedStatus === 'canceled');
+                        })
+                        ->count(),
+                    'total_qty' => (int) DeliveryNoteItem::query()
+                        ->join('delivery_notes', 'delivery_note_items.delivery_note_id', '=', 'delivery_notes.id')
+                        ->whereBetween('delivery_notes.note_date', $todayRange)
+                        ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                            $query->where('delivery_notes.is_canceled', $selectedStatus === 'canceled');
+                        })
+                        ->sum('delivery_note_items.quantity'),
+                ];
+            }
+        );
 
         return view('delivery_notes.index', [
             'notes' => $notes,
@@ -139,11 +152,15 @@ class DeliveryNotePageController extends Controller
     public function create(): View
     {
         $oldCustomerId = (int) old('customer_id', 0);
-        $customers = Customer::query()
-            ->select(['id', 'name', 'city', 'phone', 'address'])
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $customers = Cache::remember(
+            AppCache::lookupCacheKey('forms.delivery_notes.customers', ['limit' => 20]),
+            now()->addSeconds(60),
+            fn () => Customer::query()
+                ->select(['id', 'name', 'city', 'phone', 'address'])
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
                 ->select(['id', 'name', 'city', 'phone', 'address'])
@@ -160,12 +177,16 @@ class DeliveryNotePageController extends Controller
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->values();
-        $products = Product::query()
-            ->select(['id', 'code', 'name', 'unit', 'price_general'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $products = Cache::remember(
+            AppCache::lookupCacheKey('forms.delivery_notes.products', ['limit' => 20, 'active_only' => 1]),
+            now()->addSeconds(60),
+            fn () => Product::query()
+                ->select(['id', 'code', 'name', 'unit', 'price_general'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldProductIds->isNotEmpty()) {
             $oldProducts = Product::query()
                 ->select(['id', 'code', 'name', 'unit', 'price_general'])
@@ -253,6 +274,7 @@ class DeliveryNotePageController extends Controller
             __('txn.audit_delivery_created', ['number' => $note->note_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $note->note_date]);
 
         return redirect()
             ->route('delivery-notes.show', $note)
@@ -267,12 +289,16 @@ class DeliveryNotePageController extends Controller
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->values();
-        $products = Product::query()
-            ->select(['id', 'code', 'name', 'unit', 'price_general'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $products = Cache::remember(
+            AppCache::lookupCacheKey('forms.delivery_notes.products', ['limit' => 20, 'active_only' => 1]),
+            now()->addSeconds(60),
+            fn () => Product::query()
+                ->select(['id', 'code', 'name', 'unit', 'price_general'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($itemProductIds->isNotEmpty()) {
             $itemProducts = Product::query()
                 ->select(['id', 'code', 'name', 'unit', 'price_general'])
@@ -360,6 +386,7 @@ class DeliveryNotePageController extends Controller
             __('txn.audit_delivery_admin_updated', ['number' => $deliveryNote->note_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $deliveryNote->note_date]);
 
         return redirect()
             ->route('delivery-notes.show', $deliveryNote)
@@ -385,6 +412,7 @@ class DeliveryNotePageController extends Controller
             __('txn.audit_delivery_canceled', ['number' => $deliveryNote->note_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $deliveryNote->note_date]);
 
         return redirect()
             ->route('delivery-notes.show', $deliveryNote)
@@ -513,13 +541,6 @@ class DeliveryNotePageController extends Controller
     {
         $rawDate = $date instanceof Carbon ? $date->format('Y-m-d') : (string) $date;
         return $this->semesterBookService()->semesterFromDate($rawDate) ?? $this->currentSemesterPeriod();
-    }
-
-    private function configuredSemesterOptions()
-    {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '');
     }
 
     private function semesterBookService(): SemesterBookService

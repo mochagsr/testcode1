@@ -6,12 +6,12 @@ use App\Models\Customer;
 use App\Models\AuditLog;
 use App\Models\InvoicePayment;
 use App\Models\Product;
-use App\Models\AppSetting;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
 use App\Models\StockMutation;
 use App\Services\ReceivableLedgerService;
 use App\Services\AuditLogService;
+use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -19,6 +19,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -56,20 +57,23 @@ class SalesInvoicePageController extends Controller
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
 
-        $semesterOptions = SalesInvoice::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->push($currentSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
+        $semesterOptions = Cache::remember(
+            AppCache::lookupCacheKey('sales_invoices.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
+                SalesInvoice::query()
+                    ->whereNotNull('semester_period')
+                ->where('semester_period', '!=', '')
+                ->distinct()
+                ->pluck('semester_period')
+                ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
         $semesterOptions = $isAdminUser
             ? $semesterOptions->values()
-            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+            : $this->semesterBookService()->buildSemesterOptionCollection($semesterOptions->all(), true, false);
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
         }
@@ -111,14 +115,45 @@ class SalesInvoicePageController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $todaySummary = SalesInvoice::query()
-            ->selectRaw('COUNT(*) as total_invoice, COALESCE(SUM(total), 0) as grand_total')
-            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                $query->where('is_canceled', $selectedStatus === 'canceled');
+        $todaySummary = Cache::remember(
+            AppCache::lookupCacheKey('sales_invoices.index.today_summary', [
+                'status' => $selectedStatus ?? 'all',
+                'date' => now()->toDateString(),
+            ]),
+            now()->addSeconds(30),
+            function () use ($selectedStatus, $todayRange) {
+                return SalesInvoice::query()
+                    ->selectRaw('COUNT(*) as total_invoice, COALESCE(SUM(total), 0) as grand_total')
+                    ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
+                        $query->where('is_canceled', $selectedStatus === 'canceled');
+                    })
+                    ->whereBetween('invoice_date', $todayRange)
+                    ->first();
+            }
+        );
+        $lockPairs = collect($invoices->items())
+            ->map(function (SalesInvoice $invoice): array {
+                return [
+                    'customer_id' => (int) $invoice->customer_id,
+                    'semester' => trim((string) $invoice->semester_period),
+                ];
             })
-            ->whereBetween('invoice_date', $todayRange)
-            ->first();
-        $customerSemesterLockMap = $this->customerSemesterLockMap(collect($invoices->items()));
+            ->filter(fn (array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
+            ->values();
+        $customerSemesterLockMap = [];
+        if ($lockPairs->isNotEmpty()) {
+            $pairStates = $this->semesterBookService()->customerSemesterLockStatesByPairs(
+                $lockPairs->all()
+            );
+
+            foreach ($pairStates as $key => $state) {
+                $customerSemesterLockMap[$key] = [
+                    'locked' => (bool) ($state['locked'] ?? false),
+                    'manual' => (bool) ($state['manual'] ?? false),
+                    'auto' => (bool) ($state['auto'] ?? false),
+                ];
+            }
+        }
         $invoiceIds = collect($invoices->items())
             ->map(fn (SalesInvoice $invoice): int => (int) $invoice->id)
             ->filter(fn (int $id): bool => $id > 0)
@@ -126,10 +161,11 @@ class SalesInvoicePageController extends Controller
         $invoiceAdminActionMap = [];
         if ($invoiceIds->isNotEmpty()) {
             $actionRows = AuditLog::query()
-                ->select(['subject_id', 'action'])
+                ->selectRaw("subject_id, MAX(CASE WHEN action = 'sales.invoice.admin_update' THEN 1 ELSE 0 END) as edited, MAX(CASE WHEN action = 'sales.invoice.cancel' THEN 1 ELSE 0 END) as canceled")
                 ->where('subject_type', SalesInvoice::class)
                 ->whereIn('subject_id', $invoiceIds->all())
                 ->whereIn('action', ['sales.invoice.admin_update', 'sales.invoice.cancel'])
+                ->groupBy('subject_id')
                 ->get();
 
             foreach ($actionRows as $row) {
@@ -137,18 +173,10 @@ class SalesInvoicePageController extends Controller
                 if ($invoiceId <= 0) {
                     continue;
                 }
-                if (! isset($invoiceAdminActionMap[$invoiceId])) {
-                    $invoiceAdminActionMap[$invoiceId] = [
-                        'edited' => false,
-                        'canceled' => false,
-                    ];
-                }
-                if ((string) $row->action === 'sales.invoice.admin_update') {
-                    $invoiceAdminActionMap[$invoiceId]['edited'] = true;
-                }
-                if ((string) $row->action === 'sales.invoice.cancel') {
-                    $invoiceAdminActionMap[$invoiceId]['canceled'] = true;
-                }
+                $invoiceAdminActionMap[$invoiceId] = [
+                    'edited' => (int) ($row->edited ?? 0) === 1,
+                    'canceled' => (int) ($row->canceled ?? 0) === 1,
+                ];
             }
         }
         foreach ($invoices->items() as $invoiceRow) {
@@ -184,33 +212,40 @@ class SalesInvoicePageController extends Controller
     {
         $defaultSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($defaultSemester);
-        $configured = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '');
-
-        $semesterOptions = SalesInvoice::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($configured)
-            ->push($defaultSemester)
-            ->push($previousSemester)
-            ->unique()
-            ->sortDesc()
-            ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptionsBase = Cache::remember(
+            AppCache::lookupCacheKey('sales_invoices.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
+                SalesInvoice::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
+        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
+            $semesterOptionsBase->all(),
+            true,
+            true
+        );
         if (! $semesterOptions->contains($defaultSemester)) {
             $defaultSemester = (string) ($semesterOptions->first() ?? $defaultSemester);
         }
 
         $oldCustomerId = (int) old('customer_id', 0);
-        $initialCustomers = Customer::query()
-            ->select(['id', 'name', 'city', 'customer_level_id'])
-            ->with('level:id,code,name')
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $initialCustomers = Cache::remember(
+            AppCache::lookupCacheKey('forms.sales_invoices.customers', ['limit' => 20]),
+            now()->addSeconds(60),
+            fn () => Customer::query()
+                ->select(['id', 'name', 'city', 'customer_level_id'])
+                ->with('level:id,code,name')
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldCustomerId > 0 && ! $initialCustomers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
                 ->select(['id', 'name', 'city', 'customer_level_id'])
@@ -228,12 +263,16 @@ class SalesInvoicePageController extends Controller
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->values();
-        $initialProducts = Product::query()
-            ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(20)
-            ->get();
+        $initialProducts = Cache::remember(
+            AppCache::lookupCacheKey('forms.sales_invoices.products', ['limit' => 20, 'active_only' => 1]),
+            now()->addSeconds(60),
+            fn () => Product::query()
+                ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->limit(20)
+                ->get()
+        );
         if ($oldProductIds->isNotEmpty()) {
             $oldProducts = Product::query()
                 ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
@@ -443,6 +482,7 @@ class SalesInvoicePageController extends Controller
             __('txn.audit_invoice_created', ['number' => $invoice->invoice_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $invoice->invoice_date]);
 
         return redirect()
             ->route('sales-invoices.show', $invoice)
@@ -458,26 +498,38 @@ class SalesInvoicePageController extends Controller
         ]);
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
-        $semesterOptions = SalesInvoice::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge($this->configuredSemesterOptions())
-            ->push($currentSemester)
-            ->push($previousSemester)
-            ->push((string) $salesInvoice->semester_period)
-            ->unique()
-            ->sortDesc()
-            ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptionsBase = Cache::remember(
+            AppCache::lookupCacheKey('sales_invoices.index.semester_options.base'),
+            now()->addSeconds(60),
+            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
+                SalesInvoice::query()
+                    ->whereNotNull('semester_period')
+                    ->where('semester_period', '!=', '')
+                    ->distinct()
+                    ->pluck('semester_period')
+                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
+                false,
+                true
+            )
+        );
+        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
+            $semesterOptionsBase->push((string) $salesInvoice->semester_period)->all(),
+            true,
+            true
+        );
         if (! $semesterOptions->contains((string) $salesInvoice->semester_period)) {
             $semesterOptions = $semesterOptions->push((string) $salesInvoice->semester_period)->unique()->values();
         }
-        $customerSemesterLockState = $this->customerSemesterLockState(
-            (int) $salesInvoice->customer_id,
-            (string) $salesInvoice->semester_period
-        );
+        $customerSemesterLockState = ['locked' => false, 'manual' => false, 'auto' => false];
+        $invoiceSemester = trim((string) $salesInvoice->semester_period);
+        if ((int) $salesInvoice->customer_id > 0 && $invoiceSemester !== '') {
+            $states = $this->semesterBookService()->customerSemesterLockStates([(int) $salesInvoice->customer_id], $invoiceSemester);
+            $customerSemesterLockState = [
+                'locked' => (bool) ($states[(int) $salesInvoice->customer_id]['locked'] ?? false),
+                'manual' => (bool) ($states[(int) $salesInvoice->customer_id]['manual'] ?? false),
+                'auto' => (bool) ($states[(int) $salesInvoice->customer_id]['auto'] ?? false),
+            ];
+        }
         $itemProductIds = $salesInvoice->items
             ->pluck('product_id')
             ->map(fn ($id): int => (int) $id)
@@ -721,6 +773,7 @@ class SalesInvoicePageController extends Controller
             ]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $salesInvoice->invoice_date]);
 
         return redirect()
             ->route('sales-invoices.show', $salesInvoice)
@@ -799,6 +852,7 @@ class SalesInvoicePageController extends Controller
             __('txn.audit_invoice_canceled', ['number' => $salesInvoice->invoice_number]),
             $request
         );
+        AppCache::forgetAfterFinancialMutation([(string) $salesInvoice->invoice_date]);
 
         return redirect()
             ->route('sales-invoices.show', $salesInvoice)
@@ -938,13 +992,6 @@ class SalesInvoicePageController extends Controller
         return $this->semesterBookService()->previousSemester($period);
     }
 
-    private function configuredSemesterOptions()
-    {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '');
-    }
-
     private function semesterBookService(): SemesterBookService
     {
         return app(SemesterBookService::class);
@@ -961,86 +1008,4 @@ class SalesInvoicePageController extends Controller
         };
     }
 
-    /**
-     * @param  \Illuminate\Support\Collection<int, SalesInvoice>  $invoices
-     * @return array<string, array{locked:bool,manual:bool,auto:bool}>
-     */
-    private function customerSemesterLockMap(\Illuminate\Support\Collection $invoices): array
-    {
-        $pairs = $invoices
-            ->map(function (SalesInvoice $invoice): ?array {
-                $customerId = (int) $invoice->customer_id;
-                $semester = trim((string) $invoice->semester_period);
-                if ($customerId <= 0 || $semester === '') {
-                    return null;
-                }
-
-                return [
-                    'customer_id' => $customerId,
-                    'semester' => $semester,
-                ];
-            })
-            ->filter()
-            ->values();
-        if ($pairs->isEmpty()) {
-            return [];
-        }
-
-        $customerIds = $pairs->pluck('customer_id')->unique()->values();
-        $semesterCodes = $pairs->pluck('semester')->unique()->values();
-
-        $aggregates = SalesInvoice::query()
-            ->selectRaw('customer_id, semester_period, COUNT(*) as invoice_count, COALESCE(SUM(balance), 0) as outstanding')
-            ->where('is_canceled', false)
-            ->whereIn('customer_id', $customerIds->all())
-            ->whereIn('semester_period', $semesterCodes->all())
-            ->groupBy('customer_id', 'semester_period')
-            ->get();
-
-        $autoMap = [];
-        foreach ($aggregates as $aggregate) {
-            $key = ((int) $aggregate->customer_id).':'.(string) $aggregate->semester_period;
-            $invoiceCount = (int) ($aggregate->invoice_count ?? 0);
-            $outstanding = (float) ($aggregate->outstanding ?? 0);
-            $autoMap[$key] = $invoiceCount > 0 && round($outstanding) <= 0;
-        }
-
-        $manualMap = collect($this->semesterBookService()->closedCustomerSemesters())
-            ->mapWithKeys(fn (string $item): array => [$item => true])
-            ->all();
-
-        $result = [];
-        foreach ($pairs as $pair) {
-            $key = ((int) $pair['customer_id']).':'.(string) $pair['semester'];
-            $manual = (bool) ($manualMap[$key] ?? false);
-            $auto = (bool) ($autoMap[$key] ?? false);
-            $result[$key] = [
-                'locked' => $manual || $auto,
-                'manual' => $manual,
-                'auto' => $auto,
-            ];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return array{locked:bool,manual:bool,auto:bool}
-     */
-    private function customerSemesterLockState(int $customerId, string $semester): array
-    {
-        $normalizedSemester = trim($semester);
-        if ($customerId <= 0 || $normalizedSemester === '') {
-            return ['locked' => false, 'manual' => false, 'auto' => false];
-        }
-
-        $manual = $this->semesterBookService()->isCustomerClosed($customerId, $normalizedSemester);
-        $auto = $this->semesterBookService()->isCustomerAutoClosed($customerId, $normalizedSemester);
-
-        return [
-            'locked' => $manual || $auto,
-            'manual' => $manual,
-            'auto' => $auto,
-        ];
-    }
 }

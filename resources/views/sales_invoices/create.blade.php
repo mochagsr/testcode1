@@ -109,6 +109,13 @@
     <script>
         let products = @json($products);
         let customers = @json($customers);
+        let productById = new Map((products || []).map((product) => [String(product.id), product]));
+        let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
+        let customerByLabel = new Map();
+        let customerByName = new Map();
+        let productByLabel = new Map();
+        let productByCode = new Map();
+        let productByName = new Map();
         const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
         const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
         const LOOKUP_LIMIT = 20;
@@ -127,6 +134,12 @@
         let currentCustomer = null;
         let customerLookupAbort = null;
         let productLookupAbort = null;
+        let lastCustomerLookupQuery = '';
+        let lastProductLookupQuery = '';
+
+        function normalizeLookup(value) {
+            return String(value || '').trim().toLowerCase();
+        }
 
         function upsertCustomers(rows) {
             const byId = new Map(customers.map((row) => [String(row.id), row]));
@@ -134,6 +147,8 @@
                 byId.set(String(row.id), row);
             });
             customers = Array.from(byId.values());
+            customerById = new Map(customers.map((customer) => [String(customer.id), customer]));
+            rebuildCustomerIndexes();
         }
 
         function upsertProducts(rows) {
@@ -142,15 +157,43 @@
                 byId.set(String(row.id), row);
             });
             products = Array.from(byId.values());
+            productById = new Map(products.map((product) => [String(product.id), product]));
+            rebuildProductIndexes();
         }
 
-        function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
-            let timeoutId = null;
-            return (...args) => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => fn(...args), wait);
-            };
+        function getProductById(id) {
+            return productById.get(String(id)) || null;
         }
+
+        function rebuildCustomerIndexes() {
+            customerByLabel = new Map();
+            customerByName = new Map();
+            customers.forEach((customer) => {
+                customerByLabel.set(normalizeLookup(customerLabel(customer)), customer);
+                customerByName.set(normalizeLookup(customer.name), customer);
+            });
+        }
+
+        function rebuildProductIndexes() {
+            productByLabel = new Map();
+            productByCode = new Map();
+            productByName = new Map();
+            products.forEach((product) => {
+                productByLabel.set(normalizeLookup(productLabel(product)), product);
+                productByCode.set(normalizeLookup(product.code), product);
+                productByName.set(normalizeLookup(product.name), product);
+            });
+        }
+
+        const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
+            ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
+            : (fn, wait = SEARCH_DEBOUNCE_MS) => {
+                let timeoutId = null;
+                return (...args) => {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => fn(...args), wait);
+                };
+            };
 
         function normalizeLevelLabel(value) {
             return (value || '').toString().trim().toLowerCase();
@@ -196,7 +239,13 @@
         }
 
         async function fetchCustomerSuggestions(query) {
+            const normalizedQuery = normalizeLookup(query);
             if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                lastCustomerLookupQuery = '';
+                renderCustomerSuggestions(query);
+                return;
+            }
+            if (normalizedQuery !== '' && normalizedQuery === lastCustomerLookupQuery) {
                 renderCustomerSuggestions(query);
                 return;
             }
@@ -211,6 +260,7 @@
                     return;
                 }
                 const payload = await response.json();
+                lastCustomerLookupQuery = normalizedQuery;
                 upsertCustomers(payload.data || []);
                 renderCustomerSuggestions(query);
             } catch (error) {
@@ -224,9 +274,9 @@
             if (!label) {
                 return null;
             }
-            const normalized = label.trim().toLowerCase();
-            return customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
-                || customers.find((customer) => customer.name.toLowerCase() === normalized)
+            const normalized = normalizeLookup(label);
+            return customerByLabel.get(normalized)
+                || customerByName.get(normalized)
                 || null;
         }
 
@@ -257,13 +307,13 @@
             return `${product.name}`;
         }
 
-        function escapeAttribute(value) {
-            return String(value)
+        const escapeAttribute = (window.PgposAutoSearch && window.PgposAutoSearch.escapeAttribute)
+            ? window.PgposAutoSearch.escapeAttribute
+            : (value) => String(value)
                 .replace(/&/g, '&amp;')
                 .replace(/"/g, '&quot;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
-        }
 
         function renderProductSuggestions(query) {
             if (!productsList) {
@@ -283,7 +333,13 @@
         }
 
         async function fetchProductSuggestions(query) {
+            const normalizedQuery = normalizeLookup(query);
             if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                lastProductLookupQuery = '';
+                renderProductSuggestions(query);
+                return;
+            }
+            if (normalizedQuery !== '' && normalizedQuery === lastProductLookupQuery) {
                 renderProductSuggestions(query);
                 return;
             }
@@ -298,6 +354,7 @@
                     return;
                 }
                 const payload = await response.json();
+                lastProductLookupQuery = normalizedQuery;
                 upsertProducts(payload.data || []);
                 renderProductSuggestions(query);
             } catch (error) {
@@ -311,10 +368,10 @@
             if (!label) {
                 return null;
             }
-            const normalized = label.trim().toLowerCase();
-            return products.find((product) => productLabel(product).toLowerCase() === normalized)
-                || products.find((product) => product.code.toLowerCase() === normalized)
-                || products.find((product) => product.name.toLowerCase() === normalized)
+            const normalized = normalizeLookup(label);
+            return productByLabel.get(normalized)
+                || productByCode.get(normalized)
+                || productByName.get(normalized)
                 || null;
         }
 
@@ -349,7 +406,7 @@
                     return;
                 }
                 const productId = row.querySelector('.product-id')?.value;
-                const product = products.find(p => String(p.id) === String(productId));
+                const product = getProductById(productId);
                 priceInput.value = resolveProductPrice(product);
             });
             recalc();
@@ -402,7 +459,6 @@
 
             const onProductInput = debounce(async (event) => {
                 await fetchProductSuggestions(event.currentTarget.value);
-                renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 updateRowMeta(tr, product);
@@ -442,37 +498,14 @@
             });
         }
 
-        function deriveSemesterFromDate(dateValue) {
-            if (!dateValue) {
-                return '';
-            }
-
-            const [yearText, monthText] = String(dateValue).split('-');
-            const year = parseInt(yearText, 10);
-            const month = parseInt(monthText, 10);
-            if (!Number.isInteger(year) || !Number.isInteger(month)) {
-                return '';
-            }
-
-            if (month >= 5 && month <= 10) {
-                const nextYear = year + 1;
-                return `S1-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
-            }
-
-            if (month >= 11) {
-                const nextYear = year + 1;
-                return `S2-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
-            }
-
-            const startYear = year - 1;
-            return `S2-${String(startYear).slice(-2)}${String(year).slice(-2)}`;
-        }
-
         function autoSelectSemesterByDate() {
             if (!invoiceDateInput || !semesterPeriodSelect) {
                 return;
             }
 
+            const deriveSemesterFromDate = (window.PgposAutoSearch && window.PgposAutoSearch.deriveSemesterFromDate)
+                ? window.PgposAutoSearch.deriveSemesterFromDate
+                : () => '';
             const derived = deriveSemesterFromDate(invoiceDateInput.value);
             if (derived === '') {
                 return;
@@ -488,12 +521,14 @@
             semesterPeriodSelect.value = derived;
         }
 
+        rebuildCustomerIndexes();
+        rebuildProductIndexes();
         addBtn.addEventListener('click', addRow);
         renderCustomerSuggestions('');
         renderProductSuggestions('');
         if (customerSearch) {
             const bootCustomer = customerIdField.value
-                ? customers.find(c => String(c.id) === String(customerIdField.value))
+                ? (customerById.get(String(customerIdField.value)) || null)
                 : findCustomerByLabel(customerSearch.value);
             setCurrentCustomer(bootCustomer);
             const onCustomerInput = debounce(async (event) => {

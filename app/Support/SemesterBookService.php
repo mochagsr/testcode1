@@ -9,6 +9,53 @@ use Carbon\Carbon;
 class SemesterBookService
 {
     /**
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    public function configuredSemesterOptions(): \Illuminate\Support\Collection
+    {
+        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
+            ->map(fn (string $item): string => trim($item))
+            ->filter(fn (string $item): bool => $item !== '')
+            ->values();
+    }
+
+    /**
+     * Build normalized semester options from mixed sources.
+     *
+     * @param  iterable<int, string>  $options
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    public function buildSemesterOptionCollection(
+        iterable $options,
+        bool $activeOnly = false,
+        bool $includeCurrentAndPrevious = true
+    ): \Illuminate\Support\Collection {
+        $normalized = collect($options)
+            ->map(fn (string $item): string => trim($item))
+            ->filter(fn (string $item): bool => $item !== '')
+            ->map(fn (string $item): ?string => $this->normalizeSemester($item))
+            ->filter(fn (?string $item): bool => $item !== null);
+
+        if ($includeCurrentAndPrevious) {
+            $current = $this->currentSemester();
+            $normalized = $normalized
+                ->push($current)
+                ->push($this->previousSemester($current));
+        }
+
+        $normalized = $normalized
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        if ($activeOnly) {
+            return collect($this->filterToActiveSemesters($normalized->all()))->values();
+        }
+
+        return $normalized->values();
+    }
+
+    /**
      * @return array<int, string>
      */
     public function closedSupplierSemesters(): array
@@ -85,6 +132,7 @@ class SemesterBookService
             ->implode(',');
 
         AppSetting::setValue('closed_supplier_semester_periods', $items);
+        $this->invalidateSemesterCaches();
     }
 
     public function openSupplierSemester(int $supplierId, string $semester): void
@@ -102,6 +150,7 @@ class SemesterBookService
             ->implode(',');
 
         AppSetting::setValue('closed_supplier_semester_periods', $items);
+        $this->invalidateSemesterCaches();
     }
 
     /**
@@ -215,6 +264,85 @@ class SemesterBookService
         return $states;
     }
 
+    /**
+     * @param  iterable<int, array{customer_id:int|string, semester:string}>  $pairs
+     * @return array<string, array{locked:bool,manual:bool,auto:bool,outstanding:int,invoice_count:int}>
+     */
+    public function customerSemesterLockStatesByPairs(iterable $pairs): array
+    {
+        $normalizedPairs = collect($pairs)
+            ->map(function (array $pair): ?array {
+                $customerId = (int) ($pair['customer_id'] ?? 0);
+                $semester = $this->normalizeSemester((string) ($pair['semester'] ?? ''));
+                if ($customerId <= 0 || $semester === null) {
+                    return null;
+                }
+
+                return [
+                    'customer_id' => $customerId,
+                    'semester' => $semester,
+                    'key' => $customerId.':'.$semester,
+                ];
+            })
+            ->filter()
+            ->unique('key')
+            ->values();
+
+        if ($normalizedPairs->isEmpty()) {
+            return [];
+        }
+
+        $customerIds = $normalizedPairs->pluck('customer_id')->unique()->values();
+        $semesterCodes = $normalizedPairs->pluck('semester')->unique()->values();
+
+        $aggregates = SalesInvoice::query()
+            ->select('customer_id', 'semester_period')
+            ->selectRaw('COUNT(*) as invoice_count, COALESCE(SUM(balance), 0) as outstanding')
+            ->whereIn('customer_id', $customerIds->all())
+            ->whereIn('semester_period', $semesterCodes->all())
+            ->where('is_canceled', false)
+            ->groupBy('customer_id', 'semester_period')
+            ->get();
+
+        $aggregateMap = [];
+        foreach ($aggregates as $aggregate) {
+            $key = ((int) $aggregate->customer_id).':'.(string) $aggregate->semester_period;
+            $aggregateMap[$key] = [
+                'invoice_count' => (int) ($aggregate->invoice_count ?? 0),
+                'outstanding' => (int) round((float) ($aggregate->outstanding ?? 0)),
+            ];
+        }
+
+        $manualMap = collect($this->closedCustomerSemesters())
+            ->filter(function (string $key) use ($customerIds, $semesterCodes): bool {
+                [$customerIdRaw, $semester] = array_pad(explode(':', $key, 2), 2, '');
+                $customerId = (int) $customerIdRaw;
+
+                return $customerIds->contains($customerId) && $semesterCodes->contains($semester);
+            })
+            ->mapWithKeys(fn (string $key): array => [$key => true])
+            ->all();
+
+        $states = [];
+        foreach ($normalizedPairs as $pair) {
+            $key = (string) $pair['key'];
+            $invoiceCount = (int) ($aggregateMap[$key]['invoice_count'] ?? 0);
+            $outstanding = (int) ($aggregateMap[$key]['outstanding'] ?? 0);
+            $manual = (bool) ($manualMap[$key] ?? false);
+            $auto = $invoiceCount > 0 && $outstanding <= 0;
+
+            $states[$key] = [
+                'locked' => $manual || $auto,
+                'manual' => $manual,
+                'auto' => $auto,
+                'outstanding' => $outstanding,
+                'invoice_count' => $invoiceCount,
+            ];
+        }
+
+        return $states;
+    }
+
     public function closeCustomerSemester(int $customerId, string $semester): void
     {
         $normalizedSemester = $this->normalizeSemester($semester);
@@ -230,6 +358,7 @@ class SemesterBookService
             ->implode(',');
 
         AppSetting::setValue('closed_customer_semester_periods', $items);
+        $this->invalidateSemesterCaches();
     }
 
     public function openCustomerSemester(int $customerId, string $semester): void
@@ -247,6 +376,7 @@ class SemesterBookService
             ->implode(',');
 
         AppSetting::setValue('closed_customer_semester_periods', $items);
+        $this->invalidateSemesterCaches();
     }
 
     /**
@@ -337,6 +467,7 @@ class SemesterBookService
             ->implode(',');
 
         AppSetting::setValue('closed_semester_periods', $items);
+        $this->invalidateSemesterCaches();
     }
 
     public function openSemester(string $semester): void
@@ -352,6 +483,7 @@ class SemesterBookService
             ->implode(',');
 
         AppSetting::setValue('closed_semester_periods', $items);
+        $this->invalidateSemesterCaches();
     }
 
     public function normalizeSemester(string $semester): ?string
@@ -470,5 +602,11 @@ class SemesterBookService
     private function supplierSemesterKey(int $supplierId, string $semester): string
     {
         return $supplierId.':'.$semester;
+    }
+
+    private function invalidateSemesterCaches(): void
+    {
+        AppCache::forgetReportOptionCaches();
+        AppCache::bumpLookupVersion();
     }
 }
