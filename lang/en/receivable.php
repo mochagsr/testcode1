@@ -106,7 +106,6 @@ return [
     'bill_total_receivable' => 'Total Receivable',
     'invoice_label' => 'Invoice',
     'note_label' => 'Note',
-    'transfer_via_label' => 'Transfer via',
     'default_billing_note' => "For orders and complaints, please contact the company number directly.\nReturns are limited to 10% of total delivery.",
     'default_transfer_accounts' => "BCA : 0110989806 a/n Marimin\nBRI : 124701000187568 a/n Marimin\nMANDIRI : 144.00.1327809.5 a/n Sumarni",
 ];

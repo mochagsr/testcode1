@@ -371,6 +371,40 @@
         .action-menu-lg {
             max-width: 190px;
         }
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .pagination .page-item {
+            list-style: none;
+        }
+        .pagination .page-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            min-height: 34px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            text-decoration: none;
+            font-size: 13px;
+            line-height: 1;
+        }
+        .pagination .page-item.active .page-link {
+            background: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
+            border-color: var(--btn-primary-bg);
+            font-weight: 700;
+        }
+        .pagination .page-item.disabled .page-link {
+            opacity: 0.55;
+            pointer-events: none;
+        }
         @media (max-width: 900px) {
             .wrap { grid-template-columns: 1fr; }
             .sidebar { position: sticky; top: 0; z-index: 10; }
@@ -412,6 +446,12 @@
                             <a href="{{ route('customers-web.index') }}" class="{{ request()->routeIs('customers-web.*') ? 'active' : '' }}">{{ __('menu.customers') }}</a>
                         </div>
                     </div>
+                    <div class="nav-group">
+                        <span class="nav-group-title {{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</span>
+                        <div class="nav-sub">
+                            <a href="{{ route('suppliers.index') }}" class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</a>
+                        </div>
+                    </div>
                 @endif
             @endauth
             <span class="nav-section-title">{{ __('ui.nav_transactions') }}</span>
@@ -420,6 +460,7 @@
                 <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
                 <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
                 <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
+                <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
             </div>
             <div class="nav-group">
                 <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
@@ -438,6 +479,7 @@
                 @if(auth()->user()->role === 'admin')
                     <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'active' : '' }}">{{ __('menu.users') }}</a>
                     <a href="{{ route('audit-logs.index') }}" class="{{ request()->routeIs('audit-logs.*') ? 'active' : '' }}">{{ __('ui.audit_logs') }}</a>
+                    <a href="{{ route('semester-transactions.index') }}" class="{{ request()->routeIs('semester-transactions.*') ? 'active' : '' }}">{{ __('menu.semester_transactions') }}</a>
                 @endif
                 <a href="{{ route('settings.edit') }}" class="{{ request()->routeIs('settings.*') ? 'active' : '' }}">{{ __('menu.settings') }}</a>
                 </div>
@@ -475,5 +517,29 @@
         @yield('content')
     </main>
 </div>
+<script>
+    (function () {
+        function canSearchInput(input) {
+            if (!input) {
+                return false;
+            }
+            const raw = String(input.value || '').trim();
+            if (raw === '') {
+                return true;
+            }
+
+            const words = raw.split(/\s+/).filter(Boolean);
+            if (words.length === 0) {
+                return true;
+            }
+
+            return words.every((word) => word.length >= 3);
+        }
+
+        window.PgposAutoSearch = Object.assign({}, window.PgposAutoSearch || {}, {
+            canSearchInput,
+        });
+    })();
+</script>
 </body>
 </html>

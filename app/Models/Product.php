@@ -79,5 +79,13 @@ class Product extends Model
     {
         return $this->hasMany(OrderNoteItem::class);
     }
+
+    /**
+     * @return HasMany<OutgoingTransactionItem, $this>
+     */
+    public function outgoingTransactionItems(): HasMany
+    {
+        return $this->hasMany(OutgoingTransactionItem::class);
+    }
 }
 

@@ -17,8 +17,11 @@ return [
     'all_semesters' => 'All Semesters',
     'apply_filter' => 'Apply',
     'customer_filter' => 'Customer Filter',
+    'supplier_filter' => 'Supplier Filter',
     'all_customers' => 'All Customers',
+    'all_suppliers' => 'All Suppliers',
     'customer_filter_note' => 'Customer filter only affects Receivables report.',
+    'supplier_filter_note' => 'Supplier filter only affects Outgoing Transactions report.',
     'user_role_filter' => 'User Role Filter',
     'all_roles' => 'All Roles',
     'finance_lock_filter' => 'Finance Lock Filter',
@@ -29,14 +32,17 @@ return [
     'filters' => [
         'semester' => 'Semester',
         'customer' => 'Customer',
+        'supplier' => 'Supplier',
     ],
     'columns' => [
         'invoice_no' => 'Invoice No',
         'return_no' => 'Return No',
         'note_no' => 'Note No',
+        'transaction_no' => 'Transaction No',
         'date' => 'Date',
         'created_at' => 'Created At',
         'customer' => 'Customer',
+        'supplier' => 'Supplier',
         'recipient' => 'Recipient',
         'name' => 'Name',
         'email' => 'Email',
@@ -73,6 +79,7 @@ return [
         'sales_returns' => 'Sales Returns',
         'delivery_notes' => 'Delivery Notes',
         'order_notes' => 'Order Notes',
+        'outgoing_transactions' => 'Outgoing Transactions',
     ],
     'titles' => [
         'products' => 'Products Report',
@@ -83,6 +90,7 @@ return [
         'sales_returns' => 'Sales Returns Report',
         'delivery_notes' => 'Delivery Notes Report',
         'order_notes' => 'Order Notes Report',
+        'outgoing_transactions' => 'Outgoing Transactions Report',
     ],
     'values' => [
         'role_admin' => 'Admin',
@@ -112,5 +120,9 @@ return [
         'paid_cash' => 'Paid by Cash',
         'paid_customer_balance' => 'Paid from Customer Balance',
         'total_balance' => 'Total Balance',
+    ],
+    'outgoing_summary' => [
+        'total_transactions' => 'Total Outgoing Transactions',
+        'grand_total' => 'Total Expense Amount',
     ],
 ];

@@ -3,20 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class CustomerController extends Controller
 {
+    use ValidatesSearchTokens;
+
     public function index(Request $request): JsonResponse
     {
         $perPage = min(max((int) $request->integer('per_page', 10), 1), 10);
         $search = trim((string) $request->string('search', ''));
+        $hasSearch = $search !== '';
 
-        $customers = Customer::query()
+        $customersQuery = Customer::query()
+            ->select([
+                'id',
+                'customer_level_id',
+                'name',
+                'phone',
+                'city',
+                'address',
+                'outstanding_receivable',
+                'credit_balance',
+            ])
             ->with('level:id,code,name')
-            ->when($search !== '', function ($query) use ($search): void {
+            ->when($hasSearch, function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")
                         ->orWhere('city', 'like', "%{$search}%")
@@ -24,7 +38,13 @@ class CustomerController extends Controller
                 });
             })
             ->orderBy('name')
-            ->paginate($perPage);
+            ->orderBy('id');
+
+        if ($hasSearch && ! $this->hasValidSearchTokens($search)) {
+            $customersQuery->whereRaw('1 = 0');
+        }
+
+        $customers = $customersQuery->paginate($perPage);
 
         return response()->json($customers);
     }
@@ -112,4 +132,5 @@ class CustomerController extends Controller
 
         return $code;
     }
+
 }

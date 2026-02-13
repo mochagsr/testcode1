@@ -2,21 +2,28 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
+use App\Models\OutgoingTransaction;
 use App\Models\OrderNote;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportExportController extends Controller
@@ -27,6 +34,17 @@ class ReportExportController extends Controller
         $selectedCustomerId = $this->selectedCustomerId($request);
         $selectedUserRole = $this->selectedUserRole($request);
         $selectedFinanceLock = $this->selectedFinanceLock($request);
+        $selectedOutgoingSupplierId = $this->selectedOutgoingSupplierId($request);
+        $receivableCustomers = Cache::remember('reports.receivable_customers.options', now()->addSeconds(60), function () {
+            return Customer::query()
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        });
+        $outgoingSuppliers = Cache::remember('reports.outgoing_suppliers.options', now()->addSeconds(60), function () {
+            return Supplier::query()
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        });
 
         return view('reports.index', [
             'datasets' => $this->datasets(),
@@ -34,11 +52,11 @@ class ReportExportController extends Controller
             'selectedCustomerId' => $selectedCustomerId,
             'selectedUserRole' => $selectedUserRole,
             'selectedFinanceLock' => $selectedFinanceLock,
+            'selectedOutgoingSupplierId' => $selectedOutgoingSupplierId,
             'semesterOptions' => $this->semesterOptions(),
-            'semesterEnabledDatasets' => ['sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'receivables'],
-            'receivableCustomers' => Customer::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'semesterEnabledDatasets' => ['sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'receivables', 'outgoing_transactions'],
+            'receivableCustomers' => $receivableCustomers,
+            'outgoingSuppliers' => $outgoingSuppliers,
         ]);
     }
 
@@ -46,26 +64,25 @@ class ReportExportController extends Controller
     {
         $selectedSemester = $this->selectedSemester($request);
         $selectedCustomerId = $this->selectedCustomerId($request);
+        $selectedCustomerIds = $this->selectedCustomerIds($request);
         $selectedUserRole = $this->selectedUserRole($request);
         $selectedFinanceLock = $this->selectedFinanceLock($request);
-        $report = $this->reportData($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock);
-        $filename = $dataset.'-'.now()->format('Ymd-His').'.csv';
+        $selectedOutgoingSupplierId = $this->selectedOutgoingSupplierId($request);
+        $report = $this->reportData($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock, $selectedCustomerIds, $selectedOutgoingSupplierId);
+        $printedAt = $this->nowWib();
+        $filename = $dataset.'-'.$printedAt->format('Ymd-His').'.xlsx';
 
-        return response()->streamDownload(function () use ($report): void {
-            $handle = fopen('php://output', 'w');
-            if ($handle === false) {
-                return;
-            }
-
-            // UTF-8 BOM + separator hint to keep Excel import stable.
-            ExcelCsv::start($handle);
-
-            ExcelCsv::row($handle, [$report['title']]);
-            ExcelCsv::row($handle, [__('report.printed'), now()->format('d-m-Y H:i:s')]);
+        return response()->streamDownload(function () use ($report, $printedAt): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Report');
+            $rowsOut = [];
+            $rowsOut[] = [$report['title']];
+            $rowsOut[] = [__('report.printed'), $printedAt->format('d-m-Y H:i:s').' WIB'];
 
             if (! empty($report['filters'])) {
                 foreach ($report['filters'] as $filter) {
-                    ExcelCsv::row($handle, [$filter['label'], $filter['value']]);
+                    $rowsOut[] = [$filter['label'], $filter['value']];
                 }
             }
 
@@ -75,12 +92,13 @@ class ReportExportController extends Controller
                         ? 'Rp '.number_format((int) round((float) ($item['value'] ?? 0)), 0, ',', '.')
                         : (int) round((float) ($item['value'] ?? 0));
 
-                    ExcelCsv::row($handle, [$item['label'], $value]);
+                    $rowsOut[] = [$item['label'], $value];
                 }
             }
 
-            ExcelCsv::row($handle, []);
-            ExcelCsv::row($handle, $report['headers']);
+            $rowsOut[] = [];
+            $headerRowIndex = count($rowsOut) + 1;
+            $rowsOut[] = $report['headers'];
             foreach ($report['rows'] as $row) {
                 $formatted = [];
                 $isReceivableRecap = ($report['layout'] ?? null) === 'receivable_recap';
@@ -103,22 +121,75 @@ class ReportExportController extends Controller
 
                     $formatted[] = $text;
                 }
-                ExcelCsv::row($handle, $formatted);
+                $rowsOut[] = $formatted;
             }
-            fclose($handle);
+
+            $sheet->fromArray($rowsOut, null, 'A1');
+
+            $columnCount = count($report['headers']);
+            $dataRowCount = count($report['rows']);
+            if ($columnCount > 0) {
+                $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
+                $lastDataRow = max($headerRowIndex, $headerRowIndex + $dataRowCount);
+
+                $headerRange = 'A'.$headerRowIndex.':'.$lastColumn.$headerRowIndex;
+                $tableRange = 'A'.$headerRowIndex.':'.$lastColumn.$lastDataRow;
+
+                $sheet->getStyle($headerRange)->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'color' => ['rgb' => 'FFFFFF'],
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '1F2937'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER,
+                    ],
+                ]);
+
+                $sheet->getStyle($tableRange)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['rgb' => 'BFC3C8'],
+                        ],
+                    ],
+                    'alignment' => [
+                        'vertical' => Alignment::VERTICAL_TOP,
+                    ],
+                ]);
+
+                $sheet->freezePane('A'.($headerRowIndex + 1));
+
+                for ($col = 1; $col <= $columnCount; $col++) {
+                    $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                    $sheet->getColumnDimension($columnLetter)->setAutoSize(true);
+                }
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
         }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
     public function print(Request $request, string $dataset): View
     {
+        $printedAt = $this->nowWib();
         $report = $this->reportData(
             $dataset,
             $this->selectedSemester($request),
             $this->selectedCustomerId($request),
             $this->selectedUserRole($request),
-            $this->selectedFinanceLock($request)
+            $this->selectedFinanceLock($request),
+            $this->selectedCustomerIds($request),
+            $this->selectedOutgoingSupplierId($request)
         );
 
         return view('reports.print', [
@@ -129,20 +200,23 @@ class ReportExportController extends Controller
             'filters' => $report['filters'],
             'layout' => $report['layout'] ?? null,
             'receivableSemesterHeaders' => $report['receivable_semester_headers'] ?? [],
-            'printedAt' => now(),
+            'printedAt' => $printedAt,
         ]);
     }
 
     public function exportPdf(Request $request, string $dataset)
     {
+        $printedAt = $this->nowWib();
         $report = $this->reportData(
             $dataset,
             $this->selectedSemester($request),
             $this->selectedCustomerId($request),
             $this->selectedUserRole($request),
-            $this->selectedFinanceLock($request)
+            $this->selectedFinanceLock($request),
+            $this->selectedCustomerIds($request),
+            $this->selectedOutgoingSupplierId($request)
         );
-        $filename = $dataset.'-'.now()->format('Ymd-His').'.pdf';
+        $filename = $dataset.'-'.$printedAt->format('Ymd-His').'.pdf';
 
         $pdf = Pdf::loadView('reports.pdf', [
             'title' => $report['title'],
@@ -152,7 +226,7 @@ class ReportExportController extends Controller
             'filters' => $report['filters'],
             'layout' => $report['layout'] ?? null,
             'receivableSemesterHeaders' => $report['receivable_semester_headers'] ?? [],
-            'printedAt' => now(),
+            'printedAt' => $printedAt,
         ])->setPaper('a4', 'landscape');
 
         return $pdf->download($filename);
@@ -172,7 +246,13 @@ class ReportExportController extends Controller
             'sales_returns' => __('report.datasets.sales_returns'),
             'delivery_notes' => __('report.datasets.delivery_notes'),
             'order_notes' => __('report.datasets.order_notes'),
+            'outgoing_transactions' => __('report.datasets.outgoing_transactions'),
         ];
+    }
+
+    private function nowWib(): Carbon
+    {
+        return now('Asia/Jakarta');
     }
 
     /**
@@ -215,7 +295,9 @@ class ReportExportController extends Controller
         ?string $selectedSemester = null,
         ?int $selectedCustomerId = null,
         ?string $selectedUserRole = null,
-        ?int $selectedFinanceLock = null
+        ?int $selectedFinanceLock = null,
+        array $selectedCustomerIds = [],
+        ?int $selectedOutgoingSupplierId = null
     ): array
     {
         $semesterRange = $this->semesterDateRange($selectedSemester);
@@ -233,6 +315,15 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function (): array {
                     return Product::query()
+                        ->select([
+                            'id',
+                            'item_category_id',
+                            'name',
+                            'stock',
+                            'price_agent',
+                            'price_sales',
+                            'price_general',
+                        ])
                         ->with('category:id,name')
                         ->orderBy('name')
                         ->get()
@@ -257,9 +348,21 @@ class ReportExportController extends Controller
                     __('report.columns.outstanding_receivable'),
                     __('report.columns.customer_balance'),
                 ],
-                'rows' => function (): array {
+                'rows' => function () use ($selectedCustomerIds): array {
                     return Customer::query()
+                        ->select([
+                            'id',
+                            'customer_level_id',
+                            'name',
+                            'phone',
+                            'city',
+                            'outstanding_receivable',
+                            'credit_balance',
+                        ])
                         ->with('level:id,name')
+                        ->when(count($selectedCustomerIds) > 0, function ($query) use ($selectedCustomerIds): void {
+                            $query->whereIn('id', $selectedCustomerIds);
+                        })
                         ->orderBy('name')
                         ->get()
                         ->map(fn (Customer $row): array => [
@@ -286,6 +389,16 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedUserRole, $selectedFinanceLock): array {
                     return User::query()
+                        ->select([
+                            'id',
+                            'name',
+                            'email',
+                            'role',
+                            'locale',
+                            'theme',
+                            'finance_locked',
+                            'created_at',
+                        ])
                         ->when($selectedUserRole !== null, function ($query) use ($selectedUserRole): void {
                             $query->where('role', $selectedUserRole);
                         })
@@ -331,9 +444,19 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedSemester): array {
                     return SalesInvoice::query()
+                        ->select([
+                            'id',
+                            'invoice_number',
+                            'invoice_date',
+                            'customer_id',
+                            'total',
+                            'total_paid',
+                            'payment_status',
+                            'semester_period',
+                        ])
                         ->with([
                             'customer:id,name,phone,city',
-                            'payments:id,sales_invoice_id,method,amount',
+                            'payments:id,sales_invoice_id,method',
                         ])
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                             $query->where('semester_period', $selectedSemester);
@@ -378,20 +501,11 @@ class ReportExportController extends Controller
                         'TOTAL PIUTANG',
                     ];
 
-                    $invoiceCounts = SalesInvoice::query()
-                        ->selectRaw('customer_id, semester_period, COUNT(*) as invoice_count')
-                        ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                            $query->where('semester_period', $selectedSemester);
-                        })
-                        ->when($selectedCustomerId !== null, function ($query) use ($selectedCustomerId): void {
-                            $query->where('customer_id', $selectedCustomerId);
-                        })
-                        ->groupBy('customer_id', 'semester_period')
-                        ->get();
-
-                    $balances = SalesInvoice::query()
-                        ->selectRaw('customer_id, semester_period, COALESCE(SUM(balance), 0) as total_balance')
-                        ->where('is_canceled', false)
+                    $semesterAggregates = SalesInvoice::query()
+                        ->selectRaw(
+                            'customer_id, semester_period, COUNT(*) as invoice_count, '.
+                            'COALESCE(SUM(CASE WHEN is_canceled = 0 THEN balance ELSE 0 END), 0) as total_balance'
+                        )
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                             $query->where('semester_period', $selectedSemester);
                         })
@@ -402,22 +516,14 @@ class ReportExportController extends Controller
                         ->get();
 
                     $invoiceCountMap = [];
-                    foreach ($invoiceCounts as $row) {
-                        $customerKey = (int) $row->customer_id;
-                        $period = (string) ($row->semester_period ?? '');
-                        if ($period === '') {
-                            continue;
-                        }
-                        $invoiceCountMap[$customerKey][$period] = (int) $row->invoice_count;
-                    }
-
                     $balanceMap = [];
-                    foreach ($balances as $row) {
+                    foreach ($semesterAggregates as $row) {
                         $customerKey = (int) $row->customer_id;
                         $period = (string) ($row->semester_period ?? '');
                         if ($period === '') {
                             continue;
                         }
+                        $invoiceCountMap[$customerKey][$period] = (int) ($row->invoice_count ?? 0);
                         $balanceMap[$customerKey][$period] = (int) round((float) $row->total_balance);
                     }
 
@@ -500,6 +606,14 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedSemester): array {
                     return SalesReturn::query()
+                        ->select([
+                            'id',
+                            'return_number',
+                            'return_date',
+                            'customer_id',
+                            'total',
+                            'semester_period',
+                        ])
                         ->with('customer:id,name,phone,city')
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                             $query->where('semester_period', $selectedSemester);
@@ -530,6 +644,15 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($semesterRange): array {
                     return DeliveryNote::query()
+                        ->select([
+                            'id',
+                            'note_number',
+                            'note_date',
+                            'recipient_name',
+                            'recipient_phone',
+                            'city',
+                            'created_by_name',
+                        ])
                         ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                             $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
                         })
@@ -558,6 +681,15 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($semesterRange): array {
                     return OrderNote::query()
+                        ->select([
+                            'id',
+                            'note_number',
+                            'note_date',
+                            'customer_name',
+                            'customer_phone',
+                            'city',
+                            'created_by_name',
+                        ])
                         ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                             $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
                         })
@@ -574,6 +706,52 @@ class ReportExportController extends Controller
                         ->all();
                 },
             ],
+            'outgoing_transactions' => [
+                'title' => __('report.titles.outgoing_transactions'),
+                'headers' => [
+                    __('report.columns.transaction_no'),
+                    __('report.columns.date'),
+                    __('report.columns.note_no'),
+                    __('report.columns.supplier'),
+                    __('report.columns.phone'),
+                    __('report.columns.total'),
+                    __('report.columns.semester'),
+                    __('report.columns.created_by'),
+                ],
+                'rows' => function () use ($selectedSemester, $selectedOutgoingSupplierId): array {
+                    return OutgoingTransaction::query()
+                        ->select([
+                            'id',
+                            'transaction_number',
+                            'transaction_date',
+                            'note_number',
+                            'supplier_id',
+                            'total',
+                            'semester_period',
+                            'created_by_user_id',
+                        ])
+                        ->with(['supplier:id,name,phone', 'creator:id,name'])
+                        ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
+                            $query->where('semester_period', $selectedSemester);
+                        })
+                        ->when($selectedOutgoingSupplierId !== null, function ($query) use ($selectedOutgoingSupplierId): void {
+                            $query->where('supplier_id', $selectedOutgoingSupplierId);
+                        })
+                        ->latest('transaction_date')
+                        ->get()
+                        ->map(fn (OutgoingTransaction $row): array => [
+                            $row->transaction_number,
+                            $row->transaction_date?->format('d-m-Y'),
+                            $row->note_number,
+                            $row->supplier?->name,
+                            $row->supplier?->phone,
+                            (int) round((float) $row->total),
+                            $row->semester_period,
+                            $row->creator?->name,
+                        ])
+                        ->all();
+                },
+            ],
             default => abort(404),
         };
     }
@@ -586,10 +764,12 @@ class ReportExportController extends Controller
         ?string $selectedSemester = null,
         ?int $selectedCustomerId = null,
         ?string $selectedUserRole = null,
-        ?int $selectedFinanceLock = null
+        ?int $selectedFinanceLock = null,
+        array $selectedCustomerIds = [],
+        ?int $selectedOutgoingSupplierId = null
     ): array
     {
-        $config = $this->datasetConfig($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock);
+        $config = $this->datasetConfig($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock, $selectedCustomerIds, $selectedOutgoingSupplierId);
         $rows = $config['rows']();
         $headers = $config['headers'];
         $layout = $config['layout'] ?? null;
@@ -605,7 +785,8 @@ class ReportExportController extends Controller
         $summary = null;
         $filters = null;
         if ($dataset === 'customers') {
-            $summary = $this->customerSummary();
+            $summary = $this->customerSummary($selectedCustomerIds);
+            $filters = $this->customerFilters($selectedCustomerIds);
         }
         if ($dataset === 'users') {
             $summary = $this->userSummary($selectedUserRole, $selectedFinanceLock);
@@ -614,6 +795,10 @@ class ReportExportController extends Controller
         if ($dataset === 'sales_invoices') {
             $summary = $this->salesInvoiceSummary($selectedSemester);
             $filters = $this->salesInvoiceFilters($selectedSemester);
+        }
+        if ($dataset === 'outgoing_transactions') {
+            $summary = $this->outgoingTransactionSummary($selectedSemester, $selectedOutgoingSupplierId);
+            $filters = $this->outgoingTransactionFilters($selectedSemester, $selectedOutgoingSupplierId);
         }
         if ($dataset === 'receivables') {
             $filters = $this->receivableFilters($selectedSemester, $selectedCustomerId);
@@ -636,12 +821,12 @@ class ReportExportController extends Controller
         if ($semester === '') {
             return null;
         }
-
-        if (preg_match('/^S([12])-(\d{4})$/', $semester) !== 1) {
+        $normalized = $this->semesterBookService()->normalizeSemester($semester);
+        if ($normalized === null) {
             return null;
         }
 
-        return $this->semesterBookService()->isActive($semester) ? $semester : null;
+        return $this->semesterBookService()->isActive($normalized) ? $normalized : null;
     }
 
     private function selectedCustomerId(Request $request): ?int
@@ -649,6 +834,32 @@ class ReportExportController extends Controller
         $customerId = $request->integer('customer_id');
 
         return $customerId > 0 ? $customerId : null;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function selectedCustomerIds(Request $request): array
+    {
+        $input = $request->input('customer_ids', []);
+        $ids = is_array($input) ? $input : [$input];
+
+        return collect($ids)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function selectedOutgoingSupplierId(Request $request): ?int
+    {
+        $supplierId = $request->integer('outgoing_supplier_id');
+        if ($supplierId <= 0) {
+            return null;
+        }
+
+        return Supplier::query()->whereKey($supplierId)->exists() ? $supplierId : null;
     }
 
     private function selectedUserRole(Request $request): ?string
@@ -793,9 +1004,65 @@ class ReportExportController extends Controller
     /**
      * @return array<int, array{label:string,value:int|float,type:string}>
      */
-    private function customerSummary(): array
+    private function outgoingTransactionSummary(?string $selectedSemester, ?int $selectedOutgoingSupplierId = null): array
+    {
+        $aggregate = OutgoingTransaction::query()
+            ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
+                $query->where('semester_period', $selectedSemester);
+            })
+            ->when($selectedOutgoingSupplierId !== null, function ($query) use ($selectedOutgoingSupplierId): void {
+                $query->where('supplier_id', $selectedOutgoingSupplierId);
+            })
+            ->selectRaw('COUNT(*) as transaction_count, COALESCE(SUM(total), 0) as grand_total')
+            ->first();
+
+        return [
+            [
+                'label' => __('report.outgoing_summary.total_transactions'),
+                'value' => (int) ($aggregate?->transaction_count ?? 0),
+                'type' => 'number',
+            ],
+            [
+                'label' => __('report.outgoing_summary.grand_total'),
+                'value' => (float) ($aggregate?->grand_total ?? 0),
+                'type' => 'currency',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, array{label:string,value:string}>
+     */
+    private function outgoingTransactionFilters(?string $selectedSemester, ?int $selectedOutgoingSupplierId = null): array
+    {
+        $supplierName = __('report.all_suppliers');
+        if ($selectedOutgoingSupplierId !== null) {
+            $supplierName = Supplier::query()
+                ->whereKey($selectedOutgoingSupplierId)
+                ->value('name') ?? __('report.all_suppliers');
+        }
+
+        return [
+            [
+                'label' => __('report.filters.semester'),
+                'value' => $selectedSemester ?? __('report.all_semesters'),
+            ],
+            [
+                'label' => __('report.filters.supplier'),
+                'value' => $supplierName,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, array{label:string,value:int|float,type:string}>
+     */
+    private function customerSummary(array $selectedCustomerIds = []): array
     {
         $aggregate = Customer::query()
+            ->when(count($selectedCustomerIds) > 0, function ($query) use ($selectedCustomerIds): void {
+                $query->whereIn('id', $selectedCustomerIds);
+            })
             ->selectRaw('COUNT(*) as customer_count, COALESCE(SUM(outstanding_receivable), 0) as total_outstanding, COALESCE(SUM(credit_balance), 0) as total_customer_balance')
             ->first();
 
@@ -816,6 +1083,38 @@ class ReportExportController extends Controller
                 'type' => 'currency',
             ],
         ];
+    }
+
+    /**
+     * @param array<int, int> $selectedCustomerIds
+     * @return array<int, array{label:string,value:string}>
+     */
+    private function customerFilters(array $selectedCustomerIds = []): array
+    {
+        if (count($selectedCustomerIds) === 0) {
+            return [[
+                'label' => __('report.customer_filter'),
+                'value' => __('report.all_customers'),
+            ]];
+        }
+
+        $selectedCount = count($selectedCustomerIds);
+        $names = Customer::query()
+            ->whereIn('id', $selectedCustomerIds)
+            ->orderBy('name')
+            ->limit(3)
+            ->pluck('name')
+            ->all();
+
+        $display = implode(', ', $names);
+        if ($selectedCount > 3) {
+            $display .= ' +'.($selectedCount - 3);
+        }
+
+        return [[
+            'label' => __('report.customer_filter'),
+            'value' => $display,
+        ]];
     }
 
     /**
@@ -893,57 +1192,48 @@ class ReportExportController extends Controller
 
     private function semesterOptions(): array
     {
-        $current = $this->currentSemesterPeriod();
-        $previous = $this->previousSemesterPeriod($current);
+        return Cache::remember('reports.semester_options', now()->addSeconds(60), function (): array {
+            $current = $this->currentSemesterPeriod();
+            $previous = $this->previousSemesterPeriod($current);
 
-        $options = SalesInvoice::query()
-            ->whereNotNull('semester_period')
-            ->where('semester_period', '!=', '')
-            ->distinct()
-            ->pluck('semester_period')
-            ->merge(
-                SalesReturn::query()
-                    ->whereNotNull('semester_period')
-                    ->where('semester_period', '!=', '')
-                    ->distinct()
-                    ->pluck('semester_period')
-            )
-            ->merge($this->configuredSemesterOptions())
-            ->push($current)
-            ->push($previous)
-            ->unique()
-            ->sortDesc()
-            ->values();
+            $options = SalesInvoice::query()
+                ->whereNotNull('semester_period')
+                ->where('semester_period', '!=', '')
+                ->distinct()
+                ->pluck('semester_period')
+                ->merge(
+                    SalesReturn::query()
+                        ->whereNotNull('semester_period')
+                        ->where('semester_period', '!=', '')
+                        ->distinct()
+                        ->pluck('semester_period')
+                )
+                ->merge(
+                    OutgoingTransaction::query()
+                        ->whereNotNull('semester_period')
+                        ->where('semester_period', '!=', '')
+                        ->distinct()
+                        ->pluck('semester_period')
+                )
+                ->merge($this->configuredSemesterOptions())
+                ->push($current)
+                ->push($previous)
+                ->unique()
+                ->sortDesc()
+                ->values();
 
-        return $this->semesterBookService()->filterToActiveSemesters($options->all());
+            return $this->semesterBookService()->filterToActiveSemesters($options->all());
+        });
     }
 
     private function currentSemesterPeriod(): string
     {
-        $year = now()->year;
-        $month = (int) now()->format('n');
-        $semester = $month <= 6 ? 1 : 2;
-
-        return "S{$semester}-{$year}";
+        return $this->semesterBookService()->currentSemester();
     }
 
     private function previousSemesterPeriod(string $period): string
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $period, $matches) === 1) {
-            $semester = (int) $matches[1];
-            $year = (int) $matches[2];
-
-            if ($semester === 2) {
-                return "S1-{$year}";
-            }
-
-            return 'S2-'.($year - 1);
-        }
-
-        $previous = now()->subMonths(6);
-        $semester = (int) $previous->format('n') <= 6 ? 1 : 2;
-
-        return "S{$semester}-{$previous->year}";
+        return $this->semesterBookService()->previousSemester($period);
     }
 
     /**
@@ -951,19 +1241,30 @@ class ReportExportController extends Controller
      */
     private function semesterDateRange(?string $period): ?array
     {
-        if ($period === null || preg_match('/^S([12])-(\d{4})$/', $period, $matches) !== 1) {
+        if ($period === null) {
             return null;
         }
+        $normalized = $this->semesterBookService()->normalizeSemester($period);
+        if ($normalized === null) {
+            return null;
+        }
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $normalized, $matches) === 1) {
+            $half = (int) $matches[1];
+            $startYear = 2000 + (int) $matches[2];
+            $endYear = 2000 + (int) $matches[3];
+            if ($half === 1) {
+                return [
+                    'start' => Carbon::create($startYear, 5, 1)->startOfDay()->toDateString(),
+                    'end' => Carbon::create($startYear, 10, 31)->endOfDay()->toDateString(),
+                ];
+            }
 
-        $semester = (int) $matches[1];
-        $year = (int) $matches[2];
-        $start = Carbon::create($year, $semester === 1 ? 1 : 7, 1)->startOfDay();
-        $end = (clone $start)->addMonths(6)->subDay()->endOfDay();
-
-        return [
-            'start' => $start->toDateString(),
-            'end' => $end->toDateString(),
-        ];
+            return [
+                'start' => Carbon::create($startYear, 11, 1)->startOfDay()->toDateString(),
+                'end' => Carbon::create($endYear, 4, 30)->endOfDay()->toDateString(),
+            ];
+        }
+        return null;
     }
 
     private function configuredSemesterOptions()
@@ -985,7 +1286,8 @@ class ReportExportController extends Controller
             ->distinct()
             ->pluck('semester_period')
             ->merge($this->configuredSemesterOptions())
-            ->filter(fn (string $item): bool => preg_match('/^S([12])-(\d{4})$/', $item) === 1)
+            ->map(fn (string $item): ?string => $this->semesterBookService()->normalizeSemester($item))
+            ->filter(fn (?string $item): bool => $item !== null)
             ->unique()
             ->sortBy(fn (string $item): int => $this->semesterSortValue($item))
             ->values();
@@ -997,23 +1299,23 @@ class ReportExportController extends Controller
 
     private function semesterSortValue(string $period): int
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $period, $matches) !== 1) {
-            return PHP_INT_MAX;
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $period, $matches) === 1) {
+            $semester = (int) $matches[1];
+            $startYear = 2000 + (int) $matches[2];
+            return ($startYear * 10) + $semester;
         }
-
-        return ((int) $matches[2] * 10) + (int) $matches[1];
+        return PHP_INT_MAX;
     }
 
     private function semesterDisplayLabel(string $period): string
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $period, $matches) !== 1) {
-            return $period;
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $period, $matches) === 1) {
+            $semester = (int) $matches[1];
+            $startYear = 2000 + (int) $matches[2];
+            $endYear = 2000 + (int) $matches[3];
+            return "Smt {$semester} ({$startYear}-{$endYear})";
         }
-
-        $semester = (int) $matches[1];
-        $year = (int) $matches[2];
-
-        return "Smt {$semester} ({$year}-".($year + 1).')';
+        return $period;
     }
 
     private function invoicePaymentMethodLabel(SalesInvoice $invoice): string

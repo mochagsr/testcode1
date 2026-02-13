@@ -4,14 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\CustomerLevel;
+use App\Support\ExcelExportStyler;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -22,6 +22,16 @@ class CustomerPageController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $customers = Customer::query()
+            ->select([
+                'id',
+                'customer_level_id',
+                'name',
+                'phone',
+                'city',
+                'address',
+                'outstanding_receivable',
+                'id_card_photo_path',
+            ])
             ->with('level:id,code,name')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
@@ -43,9 +53,10 @@ class CustomerPageController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $search = trim((string) $request->string('search', ''));
-        $filename = 'customers-'.now()->format('Ymd-His').'.xlsx';
+        $printedAt = $this->nowWib();
+        $filename = 'customers-'.$printedAt->format('Ymd-His').'.xlsx';
 
-        $customers = Customer::query()
+        $customerQuery = Customer::query()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")
@@ -53,16 +64,17 @@ class CustomerPageController extends Controller
                         ->orWhere('phone', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('name')
-            ->get(['name', 'phone', 'city', 'address', 'outstanding_receivable']);
+            ->orderBy('id');
 
-        return response()->streamDownload(function () use ($customers): void {
+        $customerCount = (clone $customerQuery)->count();
+
+        return response()->streamDownload(function () use ($customerQuery, $customerCount, $printedAt): void {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Customer');
 
             $sheet->setCellValue('A1', __('ui.customers_title'));
-            $sheet->setCellValue('A2', __('report.printed').': '.now()->format('d-m-Y H:i:s'));
+            $sheet->setCellValue('A2', __('report.printed').': '.$printedAt->format('d-m-Y H:i:s').' WIB');
             $sheet->setCellValue('A4', 'No');
             $sheet->setCellValue('B4', __('ui.name'));
             $sheet->setCellValue('C4', __('ui.phone'));
@@ -72,35 +84,31 @@ class CustomerPageController extends Controller
 
             $row = 5;
             $number = 1;
-            foreach ($customers as $customer) {
-                $phoneRaw = (string) ($customer->phone ?? '');
-                $phoneNumber = preg_replace('/[^0-9]/', '', $phoneRaw);
+            $customerQuery->chunkById(500, function ($customers) use ($sheet, &$row, &$number): void {
+                foreach ($customers as $customer) {
+                    $phoneRaw = (string) ($customer->phone ?? '');
+                    $phoneNumber = preg_replace('/[^0-9]/', '', $phoneRaw);
 
-                $sheet->setCellValue('A'.$row, $number++);
-                $sheet->setCellValue('B'.$row, (string) $customer->name);
-                $sheet->setCellValueExplicit(
-                    'C'.$row,
-                    $phoneNumber !== '' ? $phoneNumber : '-',
-                    DataType::TYPE_STRING
-                );
-                $sheet->setCellValue('D'.$row, (string) ($customer->city ?: '-'));
-                $sheet->setCellValue('E'.$row, (string) ($customer->address ?: '-'));
-                $sheet->setCellValue('F'.$row, (int) round((float) $customer->outstanding_receivable));
-                $row++;
+                    $sheet->setCellValue('A'.$row, $number++);
+                    $sheet->setCellValue('B'.$row, (string) $customer->name);
+                    $sheet->setCellValueExplicit(
+                        'C'.$row,
+                        $phoneNumber !== '' ? $phoneNumber : '-',
+                        DataType::TYPE_STRING
+                    );
+                    $sheet->setCellValue('D'.$row, (string) ($customer->city ?: '-'));
+                    $sheet->setCellValue('E'.$row, (string) ($customer->address ?: '-'));
+                    $sheet->setCellValue('F'.$row, (int) round((float) $customer->outstanding_receivable));
+                    $row++;
+                }
+            }, 'id', 'id');
+
+            $itemCount = $customerCount;
+            ExcelExportStyler::styleTable($sheet, 4, 6, $itemCount, true);
+            if ($itemCount > 0) {
+                ExcelExportStyler::formatNumberColumns($sheet, 5, 4 + $itemCount, [1, 6], '#,##0');
+                $sheet->getStyle('C5:C'.(4 + $itemCount))->getNumberFormat()->setFormatCode('@');
             }
-
-            $lastRow = max(4, $row - 1);
-            $sheet->getStyle('A4:F4')->getFont()->setBold(true);
-            $sheet->getStyle('A4:F'.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-            $sheet->getStyle('F5:F'.$lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1);
-            $sheet->getStyle('C5:C'.$lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_TEXT);
-
-            $sheet->getColumnDimension('A')->setWidth(8);
-            $sheet->getColumnDimension('B')->setWidth(36);
-            $sheet->getColumnDimension('C')->setWidth(20);
-            $sheet->getColumnDimension('D')->setWidth(22);
-            $sheet->getColumnDimension('E')->setWidth(50);
-            $sheet->getColumnDimension('F')->setWidth(18);
 
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -109,6 +117,11 @@ class CustomerPageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    private function nowWib(): Carbon
+    {
+        return now('Asia/Jakarta');
     }
 
     public function create(): View

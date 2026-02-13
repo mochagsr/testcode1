@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\AppSetting;
 use App\Models\Product;
 use App\Support\ProductCodeGenerator;
+use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
+    use ValidatesSearchTokens;
+
     public function __construct(
         private readonly ProductCodeGenerator $productCodeGenerator
     ) {
@@ -20,10 +23,27 @@ class ProductController extends Controller
     {
         $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
         $search = trim((string) $request->string('search', ''));
+        $hasSearch = $search !== '';
+        $activeOnly = $request->boolean('active_only');
 
-        $products = Product::query()
+        $productsQuery = Product::query()
+            ->select([
+                'id',
+                'item_category_id',
+                'code',
+                'name',
+                'unit',
+                'stock',
+                'price_agent',
+                'price_sales',
+                'price_general',
+                'is_active',
+            ])
             ->with('category:id,code,name')
-            ->when($search !== '', function ($query) use ($search): void {
+            ->when($activeOnly, function ($query): void {
+                $query->where('is_active', true);
+            })
+            ->when($hasSearch, function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('code', 'like', "%{$search}%")
                         ->orWhere('name', 'like', "%{$search}%")
@@ -36,7 +56,13 @@ class ProductController extends Controller
                 $query->where('item_category_id', $request->integer('item_category_id'));
             })
             ->orderBy('name')
-            ->paginate($perPage);
+            ->orderBy('id');
+
+        if ($hasSearch && ! $this->hasValidSearchTokens($search)) {
+            $productsQuery->whereRaw('1 = 0');
+        }
+
+        $products = $productsQuery->paginate($perPage);
 
         return response()->json($products);
     }

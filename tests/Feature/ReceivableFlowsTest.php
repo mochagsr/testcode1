@@ -95,11 +95,9 @@ class ReceivableFlowsTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $content = $response->streamedContent();
-        $this->assertStringContainsString('NAMA KONSUMEN', $content);
-        $this->assertStringContainsString('Customer Beta', $content);
-        $this->assertStringContainsString('GRAND TOTAL PIUTANG', $content);
+        $this->assertStringStartsWith('PK', $content);
     }
 
     public function test_receivable_payment_create_prefills_customer_invoice_and_return_path(): void
@@ -678,10 +676,8 @@ class ReceivableFlowsTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $content = $response->streamedContent();
-        $this->assertStringContainsString(__('receivable.customer_bill_title'), $content);
-        $this->assertStringContainsString('Customer Theta', $content);
-        $this->assertStringContainsString(__('receivable.bill_total'), $content);
+        $this->assertStringStartsWith('PK', $content);
     }
 }

@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\Product;
 use App\Services\AuditLogService;
+use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -16,6 +16,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DeliveryNotePageController extends Controller
@@ -27,6 +29,7 @@ class DeliveryNotePageController extends Controller
 
     public function index(Request $request): View
     {
+        $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $semester = trim((string) $request->string('semester', ''));
         $status = trim((string) $request->string('status', ''));
@@ -34,6 +37,15 @@ class DeliveryNotePageController extends Controller
         $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
         $selectedSemester = $semester !== '' ? $semester : null;
         $selectedNoteDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $noteDate) === 1 ? $noteDate : null;
+        $selectedNoteDateRange = $selectedNoteDate !== null
+            ? [
+                Carbon::parse($selectedNoteDate)->startOfDay(),
+                Carbon::parse($selectedNoteDate)->endOfDay(),
+            ]
+            : null;
+        $isDefaultRecentMode = $selectedNoteDateRange === null && $selectedSemester === null && $search === '';
+        $recentRangeStart = now()->subDays(6)->startOfDay();
+        $todayRange = [now()->startOfDay(), now()->endOfDay()];
 
         $currentSemester = $this->currentSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
@@ -50,13 +62,25 @@ class DeliveryNotePageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptions = $isAdminUser
+            ? $semesterOptions->values()
+            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
             $semesterRange = null;
         }
 
         $notes = DeliveryNote::query()
+            ->select([
+                'id',
+                'note_number',
+                'note_date',
+                'customer_id',
+                'recipient_name',
+                'city',
+                'created_by_name',
+                'is_canceled',
+            ])
             ->with('customer:id,name,city')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
@@ -71,24 +95,27 @@ class DeliveryNotePageController extends Controller
             ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                 $query->where('is_canceled', $selectedStatus === 'canceled');
             })
-            ->when($selectedNoteDate !== null, function ($query) use ($selectedNoteDate): void {
-                $query->whereDate('note_date', $selectedNoteDate);
+            ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
+                $query->whereBetween('note_date', $selectedNoteDateRange);
+            })
+            ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
+                $query->where('note_date', '>=', $recentRangeStart);
             })
             ->latest('note_date')
             ->latest('id')
-            ->paginate(25)
+            ->paginate(20)
             ->withQueryString();
 
         $todaySummary = (object) [
             'total_notes' => (int) DeliveryNote::query()
-                ->whereDate('note_date', now()->toDateString())
+                ->whereBetween('note_date', $todayRange)
                 ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                     $query->where('is_canceled', $selectedStatus === 'canceled');
                 })
                 ->count(),
             'total_qty' => (int) DeliveryNoteItem::query()
                 ->join('delivery_notes', 'delivery_note_items.delivery_note_id', '=', 'delivery_notes.id')
-                ->whereDate('delivery_notes.note_date', now()->toDateString())
+                ->whereBetween('delivery_notes.note_date', $todayRange)
                 ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                     $query->where('delivery_notes.is_canceled', $selectedStatus === 'canceled');
                 })
@@ -102,6 +129,7 @@ class DeliveryNotePageController extends Controller
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedNoteDate' => $selectedNoteDate,
+            'isDefaultRecentMode' => $isDefaultRecentMode,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
@@ -110,12 +138,45 @@ class DeliveryNotePageController extends Controller
 
     public function create(): View
     {
+        $oldCustomerId = (int) old('customer_id', 0);
+        $customers = Customer::query()
+            ->select(['id', 'name', 'city', 'phone', 'address'])
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+        if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
+            $oldCustomer = Customer::query()
+                ->select(['id', 'name', 'city', 'phone', 'address'])
+                ->whereKey($oldCustomerId)
+                ->first();
+            if ($oldCustomer !== null) {
+                $customers->prepend($oldCustomer);
+            }
+        }
+        $customers = $customers->unique('id')->values();
+
+        $oldProductIds = collect(old('items', []))
+            ->pluck('product_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values();
+        $products = Product::query()
+            ->select(['id', 'code', 'name', 'unit', 'price_general'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+        if ($oldProductIds->isNotEmpty()) {
+            $oldProducts = Product::query()
+                ->select(['id', 'code', 'name', 'unit', 'price_general'])
+                ->whereIn('id', $oldProductIds->all())
+                ->get();
+            $products = $oldProducts->concat($products)->unique('id')->values();
+        }
+
         return view('delivery_notes.create', [
-            'customers' => Customer::query()->orderBy('name')->get(['id', 'name', 'city', 'phone', 'address']),
-            'products' => Product::query()
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'code', 'name', 'unit', 'price_general']),
+            'customers' => $customers,
+            'products' => $products,
         ]);
     }
 
@@ -201,12 +262,28 @@ class DeliveryNotePageController extends Controller
     public function show(DeliveryNote $deliveryNote): View
     {
         $deliveryNote->load(['customer:id,name,city,phone,address', 'items']);
+        $itemProductIds = $deliveryNote->items
+            ->pluck('product_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values();
+        $products = Product::query()
+            ->select(['id', 'code', 'name', 'unit', 'price_general'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+        if ($itemProductIds->isNotEmpty()) {
+            $itemProducts = Product::query()
+                ->select(['id', 'code', 'name', 'unit', 'price_general'])
+                ->whereIn('id', $itemProductIds->all())
+                ->get();
+            $products = $itemProducts->concat($products)->unique('id')->values();
+        }
 
         return view('delivery_notes.show', [
             'note' => $deliveryNote,
-            'products' => Product::query()
-                ->orderBy('name')
-                ->get(['id', 'code', 'name', 'unit', 'price_general']),
+            'products' => $products,
         ]);
     }
 
@@ -339,40 +416,47 @@ class DeliveryNotePageController extends Controller
     public function exportExcel(DeliveryNote $deliveryNote): StreamedResponse
     {
         $deliveryNote->load(['customer:id,name,city,phone,address', 'items']);
-        $filename = $deliveryNote->note_number.'.csv';
+        $filename = $deliveryNote->note_number.'.xlsx';
 
         return response()->streamDownload(function () use ($deliveryNote): void {
-            $handle = fopen('php://output', 'w');
-            if ($handle === false) {
-                return;
-            }
-
-            ExcelCsv::start($handle);
-            ExcelCsv::row($handle, [__('txn.delivery_notes_title').' '.__('txn.note_number'), $deliveryNote->note_number]);
-            ExcelCsv::row($handle, [__('txn.date'), $deliveryNote->note_date?->format('d-m-Y')]);
-            ExcelCsv::row($handle, [__('txn.recipient'), $deliveryNote->recipient_name]);
-            ExcelCsv::row($handle, [__('txn.phone'), $deliveryNote->recipient_phone]);
-            ExcelCsv::row($handle, [__('txn.city'), $deliveryNote->city]);
-            ExcelCsv::row($handle, [__('txn.address'), $deliveryNote->address]);
-            ExcelCsv::row($handle, [__('txn.created_by'), $deliveryNote->created_by_name]);
-            ExcelCsv::row($handle, [__('txn.notes'), $deliveryNote->notes]);
-            ExcelCsv::row($handle, []);
-            ExcelCsv::row($handle, [__('txn.items')]);
-            ExcelCsv::row($handle, [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.notes')]);
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Surat Jalan');
+            $rows = [];
+            $rows[] = [__('txn.delivery_notes_title').' '.__('txn.note_number'), $deliveryNote->note_number];
+            $rows[] = [__('txn.date'), $deliveryNote->note_date?->format('d-m-Y')];
+            $rows[] = [__('txn.recipient'), $deliveryNote->recipient_name];
+            $rows[] = [__('txn.phone'), $deliveryNote->recipient_phone];
+            $rows[] = [__('txn.city'), $deliveryNote->city];
+            $rows[] = [__('txn.address'), $deliveryNote->address];
+            $rows[] = [__('txn.created_by'), $deliveryNote->created_by_name];
+            $rows[] = [__('txn.notes'), $deliveryNote->notes];
+            $rows[] = [];
+            $rows[] = [__('txn.items')];
+            $rows[] = [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.notes')];
 
             foreach ($deliveryNote->items as $item) {
-                ExcelCsv::row($handle, [
+                $rows[] = [
                     $item->product_name,
                     $item->unit,
                     $item->quantity,
                     $item->unit_price !== null ? number_format((int) round((float) $item->unit_price), 0, ',', '.') : null,
                     $item->notes,
-                ]);
+                ];
             }
 
-            fclose($handle);
+            $sheet->fromArray($rows, null, 'A1');
+            $itemsCount = $deliveryNote->items->count();
+            $itemsHeaderRow = 11;
+            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 5, $itemsCount, true);
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [3, 4], '#,##0');
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
         }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
@@ -389,55 +473,46 @@ class DeliveryNotePageController extends Controller
 
     private function currentSemesterPeriod(): string
     {
-        $year = now()->year;
-        $month = (int) now()->format('n');
-        $semester = $month <= 6 ? 1 : 2;
-
-        return "S{$semester}-{$year}";
+        return $this->semesterBookService()->currentSemester();
     }
 
     private function previousSemesterPeriod(string $period): string
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $period, $matches) === 1) {
-            $semester = (int) $matches[1];
-            $year = (int) $matches[2];
-
-            if ($semester === 2) {
-                return "S1-{$year}";
-            }
-
-            return 'S2-'.($year - 1);
-        }
-
-        $previous = now()->subMonths(6);
-        $semester = (int) $previous->format('n') <= 6 ? 1 : 2;
-
-        return "S{$semester}-{$previous->year}";
+        return $this->semesterBookService()->previousSemester($period);
     }
 
     private function semesterDateRange(?string $period): ?array
     {
-        if ($period === null || preg_match('/^S([12])-(\d{4})$/', $period, $matches) !== 1) {
+        if ($period === null) {
             return null;
         }
+        $normalized = $this->semesterBookService()->normalizeSemester($period);
+        if ($normalized === null) {
+            return null;
+        }
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $normalized, $matches) === 1) {
+            $half = (int) $matches[1];
+            $startYear = 2000 + (int) $matches[2];
+            $endYear = 2000 + (int) $matches[3];
+            if ($half === 1) {
+                return [
+                    'start' => Carbon::create($startYear, 5, 1)->startOfDay()->toDateString(),
+                    'end' => Carbon::create($startYear, 10, 31)->endOfDay()->toDateString(),
+                ];
+            }
 
-        $semester = (int) $matches[1];
-        $year = (int) $matches[2];
-        $start = Carbon::create($year, $semester === 1 ? 1 : 7, 1)->startOfDay();
-        $end = (clone $start)->addMonths(6)->subDay()->endOfDay();
-
-        return [
-            'start' => $start->toDateString(),
-            'end' => $end->toDateString(),
-        ];
+            return [
+                'start' => Carbon::create($startYear, 11, 1)->startOfDay()->toDateString(),
+                'end' => Carbon::create($endYear, 4, 30)->endOfDay()->toDateString(),
+            ];
+        }
+        return null;
     }
 
     private function semesterPeriodFromDate(Carbon|string|null $date): string
     {
-        $dateValue = $date instanceof Carbon ? $date : Carbon::parse((string) $date);
-        $semester = (int) $dateValue->format('n') <= 6 ? 1 : 2;
-
-        return "S{$semester}-{$dateValue->year}";
+        $rawDate = $date instanceof Carbon ? $date->format('Y-m-d') : (string) $date;
+        return $this->semesterBookService()->semesterFromDate($rawDate) ?? $this->currentSemesterPeriod();
     }
 
     private function configuredSemesterOptions()

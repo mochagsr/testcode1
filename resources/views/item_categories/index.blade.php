@@ -65,6 +65,9 @@
                     clearTimeout(debounceTimer);
                 }
                 debounceTimer = setTimeout(() => {
+                    if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
+                        return;
+                    }
                     form.requestSubmit();
                 }, 100);
             });

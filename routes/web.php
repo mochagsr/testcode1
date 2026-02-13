@@ -11,6 +11,7 @@ use App\Http\Controllers\DeliveryNotePageController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ItemCategoryPageController;
 use App\Http\Controllers\OrderNotePageController;
+use App\Http\Controllers\OutgoingTransactionPageController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPageController;
 use App\Http\Controllers\ReceivablePageController;
@@ -18,7 +19,9 @@ use App\Http\Controllers\ReceivablePaymentPageController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\SalesInvoicePageController;
 use App\Http\Controllers\SalesReturnPageController;
+use App\Http\Controllers\SemesterTransactionPageController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SupplierPageController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -96,6 +99,22 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         ->middleware(['admin', 'semester.open'])
         ->name('order-notes.cancel');
 
+    Route::get('/outgoing-transactions', [OutgoingTransactionPageController::class, 'index'])->name('outgoing-transactions.index');
+    Route::get('/outgoing-transactions/create', [OutgoingTransactionPageController::class, 'create'])->name('outgoing-transactions.create');
+    Route::post('/outgoing-transactions', [OutgoingTransactionPageController::class, 'store'])
+        ->middleware(['finance.unlocked', 'semester.open'])
+        ->name('outgoing-transactions.store');
+    Route::get('/outgoing-transactions/{outgoingTransaction}', [OutgoingTransactionPageController::class, 'show'])->name('outgoing-transactions.show');
+    Route::get('/outgoing-transactions/{outgoingTransaction}/print', [OutgoingTransactionPageController::class, 'print'])->name('outgoing-transactions.print');
+    Route::get('/outgoing-transactions/{outgoingTransaction}/pdf', [OutgoingTransactionPageController::class, 'exportPdf'])->name('outgoing-transactions.export.pdf');
+    Route::get('/outgoing-transactions/{outgoingTransaction}/excel', [OutgoingTransactionPageController::class, 'exportExcel'])->name('outgoing-transactions.export.excel');
+    Route::post('/outgoing-transactions/supplier/{supplier}/semester-close', [OutgoingTransactionPageController::class, 'closeSupplierSemester'])
+        ->middleware('admin')
+        ->name('outgoing-transactions.supplier-semester.close');
+    Route::post('/outgoing-transactions/supplier/{supplier}/semester-open', [OutgoingTransactionPageController::class, 'openSupplierSemester'])
+        ->middleware('admin')
+        ->name('outgoing-transactions.supplier-semester.open');
+
     Route::get('/receivables', [ReceivablePageController::class, 'index'])->name('receivables.index');
     Route::get('/receivables/customer/{customer}/print-bill', [ReceivablePageController::class, 'printCustomerBill'])
         ->name('receivables.print-customer-bill');
@@ -143,6 +162,11 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         ->middleware('admin')
         ->name('settings.semester.open');
 
+    Route::get('/suppliers', [SupplierPageController::class, 'index'])->name('suppliers.index');
+    Route::get('/suppliers/lookup', [SupplierPageController::class, 'lookup'])->name('suppliers.lookup');
+    Route::get('/suppliers/{supplier}/edit', [SupplierPageController::class, 'edit'])->name('suppliers.edit');
+    Route::put('/suppliers/{supplier}', [SupplierPageController::class, 'update'])->name('suppliers.update');
+
     Route::middleware('admin')->group(function (): void {
         Route::get('/item-categories', [ItemCategoryPageController::class, 'index'])->name('item-categories.index');
         Route::get('/item-categories/create', [ItemCategoryPageController::class, 'create'])->name('item-categories.create');
@@ -174,6 +198,10 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::put('/customers-web/{customer}', [CustomerPageController::class, 'update'])->name('customers-web.update');
         Route::delete('/customers-web/{customer}', [CustomerPageController::class, 'destroy'])->name('customers-web.destroy');
 
+        Route::get('/suppliers/create', [SupplierPageController::class, 'create'])->name('suppliers.create');
+        Route::post('/suppliers', [SupplierPageController::class, 'store'])->name('suppliers.store');
+        Route::delete('/suppliers/{supplier}', [SupplierPageController::class, 'destroy'])->name('suppliers.destroy');
+
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
         Route::get('/users/create', [UserManagementController::class, 'create'])->name('users.create');
         Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
@@ -182,5 +210,6 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
         Route::get('/audit-logs', [AuditLogPageController::class, 'index'])->name('audit-logs.index');
         Route::get('/audit-logs/export.csv', [AuditLogPageController::class, 'exportCsv'])->name('audit-logs.export.csv');
+        Route::get('/semester-transactions', [SemesterTransactionPageController::class, 'index'])->name('semester-transactions.index');
     });
 });

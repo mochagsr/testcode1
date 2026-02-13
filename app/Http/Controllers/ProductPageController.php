@@ -6,14 +6,14 @@ use App\Models\AppSetting;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Services\AuditLogService;
+use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -30,6 +30,16 @@ class ProductPageController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $products = Product::query()
+            ->select([
+                'id',
+                'item_category_id',
+                'code',
+                'name',
+                'stock',
+                'price_agent',
+                'price_sales',
+                'price_general',
+            ])
             ->with('category:id,code,name')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
@@ -53,25 +63,27 @@ class ProductPageController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $search = trim((string) $request->string('search', ''));
-        $filename = 'products-'.now()->format('Ymd-His').'.xlsx';
+        $printedAt = $this->nowWib();
+        $filename = 'products-'.$printedAt->format('Ymd-His').'.xlsx';
 
-        $products = Product::query()
+        $productQuery = Product::query()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('name')
-            ->get(['code', 'name', 'stock']);
+            ->orderBy('id');
 
-        return response()->streamDownload(function () use ($products): void {
+        $productCount = (clone $productQuery)->count();
+
+        return response()->streamDownload(function () use ($productQuery, $productCount, $printedAt): void {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Barang');
 
             $sheet->setCellValue('A1', __('ui.products_title'));
-            $sheet->setCellValue('A2', __('report.printed').': '.now()->format('d-m-Y H:i:s'));
+            $sheet->setCellValue('A2', __('report.printed').': '.$printedAt->format('d-m-Y H:i:s').' WIB');
             $sheet->setCellValue('A4', 'No');
             $sheet->setCellValue('B4', __('ui.code'));
             $sheet->setCellValue('C4', __('ui.name'));
@@ -79,23 +91,21 @@ class ProductPageController extends Controller
 
             $row = 5;
             $number = 1;
-            foreach ($products as $product) {
-                $sheet->setCellValue('A'.$row, $number++);
-                $sheet->setCellValue('B'.$row, (string) ($product->code ?: '-'));
-                $sheet->setCellValue('C'.$row, (string) $product->name);
-                $sheet->setCellValue('D'.$row, (int) round((float) $product->stock));
-                $row++;
+            $productQuery->chunkById(500, function ($products) use ($sheet, &$row, &$number): void {
+                foreach ($products as $product) {
+                    $sheet->setCellValue('A'.$row, $number++);
+                    $sheet->setCellValue('B'.$row, (string) ($product->code ?: '-'));
+                    $sheet->setCellValue('C'.$row, (string) $product->name);
+                    $sheet->setCellValue('D'.$row, (int) round((float) $product->stock));
+                    $row++;
+                }
+            }, 'id', 'id');
+
+            $itemCount = $productCount;
+            ExcelExportStyler::styleTable($sheet, 4, 4, $itemCount, true);
+            if ($itemCount > 0) {
+                ExcelExportStyler::formatNumberColumns($sheet, 5, 4 + $itemCount, [1, 4], '#,##0');
             }
-
-            $lastRow = max(4, $row - 1);
-            $sheet->getStyle('A4:D4')->getFont()->setBold(true);
-            $sheet->getStyle('A4:D'.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-            $sheet->getStyle('D5:D'.$lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
-
-            $sheet->getColumnDimension('A')->setWidth(8);
-            $sheet->getColumnDimension('B')->setWidth(26);
-            $sheet->getColumnDimension('C')->setWidth(70);
-            $sheet->getColumnDimension('D')->setWidth(14);
 
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -104,6 +114,11 @@ class ProductPageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    private function nowWib(): Carbon
+    {
+        return now('Asia/Jakarta');
     }
 
     public function create(): View

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\ExcelCsv;
 use App\Models\Customer;
 use App\Models\AuditLog;
 use App\Models\InvoicePayment;
@@ -13,6 +12,7 @@ use App\Models\SalesInvoiceItem;
 use App\Models\StockMutation;
 use App\Services\ReceivableLedgerService;
 use App\Services\AuditLogService;
+use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -21,6 +21,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SalesInvoicePageController extends Controller
@@ -33,6 +35,7 @@ class SalesInvoicePageController extends Controller
 
     public function index(Request $request): View
     {
+        $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $semester = trim((string) $request->string('semester', ''));
         $status = trim((string) $request->string('status', ''));
@@ -40,6 +43,15 @@ class SalesInvoicePageController extends Controller
         $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
         $selectedSemester = $semester !== '' ? $semester : null;
         $selectedInvoiceDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $invoiceDate) === 1 ? $invoiceDate : null;
+        $selectedInvoiceDateRange = $selectedInvoiceDate !== null
+            ? [
+                Carbon::parse($selectedInvoiceDate)->startOfDay(),
+                Carbon::parse($selectedInvoiceDate)->endOfDay(),
+            ]
+            : null;
+        $isDefaultRecentMode = $selectedInvoiceDateRange === null && $selectedSemester === null && $search === '';
+        $recentRangeStart = now()->subDays(6)->startOfDay();
+        $todayRange = [now()->startOfDay(), now()->endOfDay()];
 
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
@@ -55,12 +67,23 @@ class SalesInvoicePageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptions = $isAdminUser
+            ? $semesterOptions->values()
+            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
         }
 
         $invoices = SalesInvoice::query()
+            ->select([
+                'id',
+                'invoice_number',
+                'customer_id',
+                'invoice_date',
+                'semester_period',
+                'total',
+                'is_canceled',
+            ])
             ->with('customer:id,name,city')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
@@ -77,12 +100,15 @@ class SalesInvoicePageController extends Controller
             ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                 $query->where('is_canceled', $selectedStatus === 'canceled');
             })
-            ->when($selectedInvoiceDate !== null, function ($query) use ($selectedInvoiceDate): void {
-                $query->whereDate('invoice_date', $selectedInvoiceDate);
+            ->when($selectedInvoiceDateRange !== null, function ($query) use ($selectedInvoiceDateRange): void {
+                $query->whereBetween('invoice_date', $selectedInvoiceDateRange);
+            })
+            ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
+                $query->where('invoice_date', '>=', $recentRangeStart);
             })
             ->latest('invoice_date')
             ->latest('id')
-            ->paginate(25)
+            ->paginate(20)
             ->withQueryString();
 
         $todaySummary = SalesInvoice::query()
@@ -90,7 +116,7 @@ class SalesInvoicePageController extends Controller
             ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                 $query->where('is_canceled', $selectedStatus === 'canceled');
             })
-            ->whereDate('invoice_date', now()->toDateString())
+            ->whereBetween('invoice_date', $todayRange)
             ->first();
         $customerSemesterLockMap = $this->customerSemesterLockMap(collect($invoices->items()));
         $invoiceIds = collect($invoices->items())
@@ -145,6 +171,7 @@ class SalesInvoicePageController extends Controller
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedInvoiceDate' => $selectedInvoiceDate,
+            'isDefaultRecentMode' => $isDefaultRecentMode,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
@@ -177,15 +204,47 @@ class SalesInvoicePageController extends Controller
             $defaultSemester = (string) ($semesterOptions->first() ?? $defaultSemester);
         }
 
-        return view('sales_invoices.create', [
-            'customers' => Customer::query()
+        $oldCustomerId = (int) old('customer_id', 0);
+        $initialCustomers = Customer::query()
+            ->select(['id', 'name', 'city', 'customer_level_id'])
+            ->with('level:id,code,name')
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+        if ($oldCustomerId > 0 && ! $initialCustomers->contains('id', $oldCustomerId)) {
+            $oldCustomer = Customer::query()
+                ->select(['id', 'name', 'city', 'customer_level_id'])
                 ->with('level:id,code,name')
-                ->orderBy('name')
-                ->get(['id', 'name', 'city', 'customer_level_id']),
-            'products' => Product::query()
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general']),
+                ->whereKey($oldCustomerId)
+                ->first();
+            if ($oldCustomer !== null) {
+                $initialCustomers->prepend($oldCustomer);
+            }
+        }
+        $initialCustomers = $initialCustomers->unique('id')->values();
+
+        $oldProductIds = collect(old('items', []))
+            ->pluck('product_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values();
+        $initialProducts = Product::query()
+            ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+        if ($oldProductIds->isNotEmpty()) {
+            $oldProducts = Product::query()
+                ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+                ->whereIn('id', $oldProductIds->all())
+                ->get();
+            $initialProducts = $oldProducts->concat($initialProducts)->unique('id')->values();
+        }
+
+        return view('sales_invoices.create', [
+            'customers' => $initialCustomers,
+            'products' => $initialProducts,
             'defaultSemesterPeriod' => $defaultSemester,
             'semesterOptions' => $semesterOptions,
         ]);
@@ -206,8 +265,11 @@ class SalesInvoicePageController extends Controller
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
+        $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
+        $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['invoice_date']);
+        $selectedSemester = $normalizedSemester ?? $semesterFromDate ?? $this->defaultSemesterPeriod();
 
-        $invoice = DB::transaction(function () use ($data): SalesInvoice {
+        $invoice = DB::transaction(function () use ($data, $selectedSemester): SalesInvoice {
             $invoiceDate = Carbon::parse($data['invoice_date']);
             $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
             $rows = collect($data['items']);
@@ -257,7 +319,7 @@ class SalesInvoicePageController extends Controller
                 'customer_id' => $data['customer_id'],
                 'invoice_date' => $invoiceDate->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
-                'semester_period' => $data['semester_period'] ?? $this->defaultSemesterPeriod(),
+                'semester_period' => $selectedSemester,
                 'subtotal' => $subtotal,
                 'total' => $subtotal,
                 'total_paid' => 0,
@@ -416,14 +478,30 @@ class SalesInvoicePageController extends Controller
             (int) $salesInvoice->customer_id,
             (string) $salesInvoice->semester_period
         );
+        $itemProductIds = $salesInvoice->items
+            ->pluck('product_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values();
+        $products = Product::query()
+            ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+        if ($itemProductIds->isNotEmpty()) {
+            $itemProducts = Product::query()
+                ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+                ->whereIn('id', $itemProductIds->all())
+                ->get();
+            $products = $itemProducts->concat($products)->unique('id')->values();
+        }
 
         return view('sales_invoices.show', [
             'invoice' => $salesInvoice,
             'customerSemesterLockState' => $customerSemesterLockState,
             'semesterOptions' => $semesterOptions,
-            'products' => Product::query()
-                ->orderBy('name')
-                ->get(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general']),
+            'products' => $products,
         ]);
     }
 
@@ -765,64 +843,77 @@ class SalesInvoicePageController extends Controller
             'payments',
         ]);
 
-        $filename = $salesInvoice->invoice_number.'.csv';
+        $filename = $salesInvoice->invoice_number.'.xlsx';
 
         return response()->streamDownload(function () use ($salesInvoice): void {
-            $handle = fopen('php://output', 'w');
-            if ($handle === false) {
-                return;
-            }
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Invoice');
 
-            ExcelCsv::start($handle);
-            ExcelCsv::row($handle, [__('txn.note_number'), $salesInvoice->invoice_number]);
-            ExcelCsv::row($handle, [__('txn.invoice_date'), $salesInvoice->invoice_date?->format('d-m-Y')]);
-            ExcelCsv::row($handle, [__('txn.customer'), $salesInvoice->customer?->name]);
-            ExcelCsv::row($handle, [__('txn.city'), $salesInvoice->customer?->city]);
+            $rows = [];
+            $rows[] = [__('txn.note_number'), $salesInvoice->invoice_number];
+            $rows[] = [__('txn.invoice_date'), $salesInvoice->invoice_date?->format('d-m-Y')];
+            $rows[] = [__('txn.customer'), $salesInvoice->customer?->name];
+            $rows[] = [__('txn.city'), $salesInvoice->customer?->city];
             $paymentStatusLabel = match ((string) $salesInvoice->payment_status) {
                 'paid' => __('txn.status_paid'),
                 default => __('txn.status_unpaid'),
             };
-            ExcelCsv::row($handle, [__('txn.status'), $paymentStatusLabel]);
+            $rows[] = [__('txn.status'), $paymentStatusLabel];
             $paidFromCustomerBalance = (float) $salesInvoice->payments
                 ->where('method', 'customer_balance')
                 ->sum('amount');
             $paidCash = max(0, (float) $salesInvoice->total_paid - $paidFromCustomerBalance);
-            ExcelCsv::row($handle, [__('txn.total'), number_format((int) round((float) $salesInvoice->total), 0, ',', '.')]);
-            ExcelCsv::row($handle, [__('txn.paid'), number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')]);
-            ExcelCsv::row($handle, [__('txn.paid_cash'), number_format((int) round($paidCash), 0, ',', '.')]);
-            ExcelCsv::row($handle, [__('txn.paid_customer_balance'), number_format((int) round($paidFromCustomerBalance), 0, ',', '.')]);
-            ExcelCsv::row($handle, [__('txn.balance'), number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')]);
-            ExcelCsv::row($handle, []);
-            ExcelCsv::row($handle, [__('txn.items')]);
-            ExcelCsv::row($handle, [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount').' (%)', __('txn.line_total')]);
+            $rows[] = [__('txn.total'), number_format((int) round((float) $salesInvoice->total), 0, ',', '.')];
+            $rows[] = [__('txn.paid'), number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')];
+            $rows[] = [__('txn.paid_cash'), number_format((int) round($paidCash), 0, ',', '.')];
+            $rows[] = [__('txn.paid_customer_balance'), number_format((int) round($paidFromCustomerBalance), 0, ',', '.')];
+            $rows[] = [__('txn.balance'), number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')];
+            $rows[] = [];
+            $rows[] = [__('txn.items')];
+            $rows[] = [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount').' (%)', __('txn.line_total')];
 
             foreach ($salesInvoice->items as $item) {
                 $gross = (float) $item->quantity * (float) $item->unit_price;
                 $discountPercent = $gross > 0 ? (float) $item->discount / $gross * 100 : 0;
-                ExcelCsv::row($handle, [
+                $rows[] = [
                     $item->product_name,
                     $item->quantity,
                     number_format((int) round((float) $item->unit_price), 0, ',', '.'),
                     (int) round($discountPercent),
                     number_format((int) round((float) $item->line_total), 0, ',', '.'),
-                ]);
+                ];
             }
 
-            ExcelCsv::row($handle, []);
-            ExcelCsv::row($handle, [__('txn.record_payment')]);
-            ExcelCsv::row($handle, [__('txn.date'), __('txn.method'), __('txn.amount'), __('txn.notes')]);
+            $rows[] = [];
+            $rows[] = [__('txn.record_payment')];
+            $rows[] = [__('txn.date'), __('txn.method'), __('txn.amount'), __('txn.notes')];
             foreach ($salesInvoice->payments as $payment) {
-                ExcelCsv::row($handle, [
+                $rows[] = [
                     $payment->payment_date?->format('d-m-Y'),
                     $this->paymentMethodLabel((string) $payment->method),
                     number_format((int) round((float) $payment->amount), 0, ',', '.'),
                     $payment->notes,
-                ]);
+                ];
             }
 
-            fclose($handle);
+            $sheet->fromArray($rows, null, 'A1');
+            $itemsCount = $salesInvoice->items->count();
+            $paymentsCount = $salesInvoice->payments->count();
+            $itemsHeaderRow = 13;
+            $paymentHeaderRow = 16 + $itemsCount;
+
+            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 5, $itemsCount, true);
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [2, 3, 4, 5], '#,##0');
+            ExcelExportStyler::styleTable($sheet, $paymentHeaderRow, 4, $paymentsCount, false);
+            ExcelExportStyler::formatNumberColumns($sheet, $paymentHeaderRow + 1, $paymentHeaderRow + $paymentsCount, [3], '#,##0');
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
         }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
@@ -839,31 +930,12 @@ class SalesInvoicePageController extends Controller
 
     private function defaultSemesterPeriod(): string
     {
-        $year = now()->year;
-        $month = (int) now()->format('n');
-        $semester = $month <= 6 ? 1 : 2;
-
-        return "S{$semester}-{$year}";
+        return $this->semesterBookService()->currentSemester();
     }
 
     private function previousSemesterPeriod(string $period): string
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $period, $matches) === 1) {
-            $semester = (int) $matches[1];
-            $year = (int) $matches[2];
-
-            if ($semester === 2) {
-                return "S1-{$year}";
-            }
-
-            return 'S2-'.($year - 1);
-        }
-
-        $previous = now()->subMonths(6);
-        $semester = (int) $previous->format('n') <= 6 ? 1 : 2;
-        $year = $previous->year;
-
-        return "S{$semester}-{$year}";
+        return $this->semesterBookService()->previousSemester($period);
     }
 
     private function configuredSemesterOptions()

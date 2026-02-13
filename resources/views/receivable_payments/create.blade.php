@@ -81,8 +81,11 @@
     </form>
 
     <script>
-        const customers = @json($customers->values());
+        let customers = @json($customers->values());
+        const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
+        const LOOKUP_LIMIT = 20;
         const customerSearch = document.getElementById('customer-search');
+        const customersList = document.getElementById('customers-list');
         const customerIdField = document.getElementById('customer-id');
         const customerAddressField = document.getElementById('customer-address');
         const customerOutstandingField = document.getElementById('customer-outstanding');
@@ -91,6 +94,7 @@
         const paymentAmountFeedback = document.getElementById('payment-amount-feedback');
         const amountInWordsField = document.getElementById('amount-in-words');
         const SEARCH_DEBOUNCE_MS = 100;
+        let customerLookupAbort = null;
 
         function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
             let timeoutId = null;
@@ -100,9 +104,65 @@
             };
         }
 
+        function upsertCustomers(rows) {
+            const byId = new Map(customers.map((row) => [String(row.id), row]));
+            (rows || []).forEach((row) => byId.set(String(row.id), row));
+            customers = Array.from(byId.values());
+        }
+
+        function escapeAttribute(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
         function customerLabel(customer) {
             const city = customer.city || '-';
             return `${customer.name} (${city})`;
+        }
+
+        function renderCustomerSuggestions(query) {
+            if (!customersList) {
+                return;
+            }
+            const normalized = String(query || '').trim().toLowerCase();
+            const matches = customers.filter((customer) => {
+                const label = customerLabel(customer).toLowerCase();
+                const name = String(customer.name || '').toLowerCase();
+                const city = String(customer.city || '').toLowerCase();
+                return normalized === '' || label.includes(normalized) || name.includes(normalized) || city.includes(normalized);
+            }).slice(0, 60);
+
+            customersList.innerHTML = matches
+                .map((customer) => `<option value="${escapeAttribute(customerLabel(customer))}"></option>`)
+                .join('');
+        }
+
+        async function fetchCustomerSuggestions(query) {
+            if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                renderCustomerSuggestions(query);
+                return;
+            }
+            try {
+                if (customerLookupAbort) {
+                    customerLookupAbort.abort();
+                }
+                customerLookupAbort = new AbortController();
+                const url = `${CUSTOMER_LOOKUP_URL}?search=${encodeURIComponent(query)}&per_page=${LOOKUP_LIMIT}`;
+                const response = await fetch(url, { signal: customerLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) {
+                    return;
+                }
+                const payload = await response.json();
+                upsertCustomers(payload.data || []);
+                renderCustomerSuggestions(query);
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+            }
         }
 
         function findCustomerByLabel(label) {
@@ -233,8 +293,10 @@
                 ? customers.find(c => String(c.id) === String(customerIdField.value))
                 : findCustomerByLabel(customerSearch.value);
             const hasPresetAmount = String(paymentAmountField.value || '').trim() !== '';
+            renderCustomerSuggestions('');
             bindCustomer(bootCustomer, hasPresetAmount);
-            const onCustomerInput = debounce((event) => {
+            const onCustomerInput = debounce(async (event) => {
+                await fetchCustomerSuggestions(event.currentTarget.value);
                 bindCustomer(findCustomerByLabel(event.currentTarget.value));
             });
             customerSearch.addEventListener('input', onCustomerInput);
@@ -289,4 +351,3 @@
         validatePaymentAmount();
     </script>
 @endsection
-

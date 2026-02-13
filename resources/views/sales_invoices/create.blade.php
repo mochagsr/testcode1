@@ -39,7 +39,7 @@
                             </div>
                             <div class="col-6">
                                 <label>{{ __('txn.invoice_date') }} <span class="label-required">*</span></label>
-                                <input type="date" name="invoice_date" value="{{ old('invoice_date', now()->format('Y-m-d')) }}" required>
+                                <input type="date" id="invoice-date" name="invoice_date" value="{{ old('invoice_date', now()->format('Y-m-d')) }}" required>
                             </div>
                             <div class="col-6">
                                 <label>{{ __('txn.due_date') }}</label>
@@ -47,7 +47,7 @@
                             </div>
                             <div class="col-6">
                                 <label>{{ __('txn.semester_period') }}</label>
-                                <select name="semester_period">
+                                <select id="semester-period" name="semester_period">
                                     @foreach($semesterOptions as $semester)
                                         <option value="{{ $semester }}" @selected(old('semester_period', $defaultSemesterPeriod) === $semester)>{{ $semester }}</option>
                                     @endforeach
@@ -107,18 +107,42 @@
     </form>
 
     <script>
-        const products = @json($products);
-        const customers = @json($customers);
+        let products = @json($products);
+        let customers = @json($customers);
+        const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
+        const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
+        const LOOKUP_LIMIT = 20;
         const selectProductLabel = @json(__('txn.select_product'));
         const tbody = document.querySelector('#items-table tbody');
         const productsList = document.getElementById('products-list');
+        const customersList = document.getElementById('customers-list');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer-id');
         const grandTotal = document.getElementById('grand-total');
         const addBtn = document.getElementById('add-item');
+        const invoiceDateInput = document.getElementById('invoice-date');
+        const semesterPeriodSelect = document.getElementById('semester-period');
         const form = document.querySelector('form');
         const SEARCH_DEBOUNCE_MS = 100;
         let currentCustomer = null;
+        let customerLookupAbort = null;
+        let productLookupAbort = null;
+
+        function upsertCustomers(rows) {
+            const byId = new Map(customers.map((row) => [String(row.id), row]));
+            (rows || []).forEach((row) => {
+                byId.set(String(row.id), row);
+            });
+            customers = Array.from(byId.values());
+        }
+
+        function upsertProducts(rows) {
+            const byId = new Map(products.map((row) => [String(row.id), row]));
+            (rows || []).forEach((row) => {
+                byId.set(String(row.id), row);
+            });
+            products = Array.from(byId.values());
+        }
 
         function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
             let timeoutId = null;
@@ -152,6 +176,48 @@
         function customerLabel(customer) {
             const city = customer.city || '-';
             return `${customer.name} (${city})`;
+        }
+
+        function renderCustomerSuggestions(query) {
+            if (!customersList) {
+                return;
+            }
+            const normalized = (query || '').trim().toLowerCase();
+            const matches = customers.filter((customer) => {
+                const label = customerLabel(customer).toLowerCase();
+                const name = (customer.name || '').toLowerCase();
+                const city = (customer.city || '').toLowerCase();
+                return normalized === '' || label.includes(normalized) || name.includes(normalized) || city.includes(normalized);
+            }).slice(0, 60);
+
+            customersList.innerHTML = matches
+                .map((customer) => `<option value="${escapeAttribute(customerLabel(customer))}"></option>`)
+                .join('');
+        }
+
+        async function fetchCustomerSuggestions(query) {
+            if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                renderCustomerSuggestions(query);
+                return;
+            }
+            try {
+                if (customerLookupAbort) {
+                    customerLookupAbort.abort();
+                }
+                customerLookupAbort = new AbortController();
+                const url = `${CUSTOMER_LOOKUP_URL}?search=${encodeURIComponent(query)}&per_page=${LOOKUP_LIMIT}`;
+                const response = await fetch(url, { signal: customerLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) {
+                    return;
+                }
+                const payload = await response.json();
+                upsertCustomers(payload.data || []);
+                renderCustomerSuggestions(query);
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+            }
         }
 
         function findCustomerByLabel(label) {
@@ -214,6 +280,31 @@
             productsList.innerHTML = matches
                 .map((product) => `<option value="${escapeAttribute(productLabel(product))}"></option>`)
                 .join('');
+        }
+
+        async function fetchProductSuggestions(query) {
+            if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                renderProductSuggestions(query);
+                return;
+            }
+            try {
+                if (productLookupAbort) {
+                    productLookupAbort.abort();
+                }
+                productLookupAbort = new AbortController();
+                const url = `${PRODUCT_LOOKUP_URL}?search=${encodeURIComponent(query)}&active_only=1&per_page=${LOOKUP_LIMIT}`;
+                const response = await fetch(url, { signal: productLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) {
+                    return;
+                }
+                const payload = await response.json();
+                upsertProducts(payload.data || []);
+                renderProductSuggestions(query);
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+            }
         }
 
         function findProductByLabel(label) {
@@ -309,7 +400,8 @@
             `;
             tbody.appendChild(tr);
 
-            const onProductInput = debounce((event) => {
+            const onProductInput = debounce(async (event) => {
+                await fetchProductSuggestions(event.currentTarget.value);
                 renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
@@ -350,14 +442,62 @@
             });
         }
 
+        function deriveSemesterFromDate(dateValue) {
+            if (!dateValue) {
+                return '';
+            }
+
+            const [yearText, monthText] = String(dateValue).split('-');
+            const year = parseInt(yearText, 10);
+            const month = parseInt(monthText, 10);
+            if (!Number.isInteger(year) || !Number.isInteger(month)) {
+                return '';
+            }
+
+            if (month >= 5 && month <= 10) {
+                const nextYear = year + 1;
+                return `S1-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
+            }
+
+            if (month >= 11) {
+                const nextYear = year + 1;
+                return `S2-${String(year).slice(-2)}${String(nextYear).slice(-2)}`;
+            }
+
+            const startYear = year - 1;
+            return `S2-${String(startYear).slice(-2)}${String(year).slice(-2)}`;
+        }
+
+        function autoSelectSemesterByDate() {
+            if (!invoiceDateInput || !semesterPeriodSelect) {
+                return;
+            }
+
+            const derived = deriveSemesterFromDate(invoiceDateInput.value);
+            if (derived === '') {
+                return;
+            }
+
+            const hasOption = Array.from(semesterPeriodSelect.options).some((option) => option.value === derived);
+            if (!hasOption) {
+                const option = document.createElement('option');
+                option.value = derived;
+                option.textContent = derived;
+                semesterPeriodSelect.appendChild(option);
+            }
+            semesterPeriodSelect.value = derived;
+        }
+
         addBtn.addEventListener('click', addRow);
+        renderCustomerSuggestions('');
         renderProductSuggestions('');
         if (customerSearch) {
             const bootCustomer = customerIdField.value
                 ? customers.find(c => String(c.id) === String(customerIdField.value))
                 : findCustomerByLabel(customerSearch.value);
             setCurrentCustomer(bootCustomer);
-            const onCustomerInput = debounce((event) => {
+            const onCustomerInput = debounce(async (event) => {
+                await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 setCurrentCustomer(customer);
                 applyCustomerPricing();
@@ -383,6 +523,8 @@
             });
         }
         addRow();
+        autoSelectSemesterByDate();
+        invoiceDateInput?.addEventListener('change', autoSelectSemesterByDate);
     </script>
 
     <datalist id="products-list">
@@ -391,4 +533,3 @@
         @endforeach
     </datalist>
 @endsection
-

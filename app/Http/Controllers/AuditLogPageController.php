@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\ExcelCsv;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
@@ -10,9 +9,13 @@ use App\Models\OrderNote;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Support\ExcelExportStyler;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AuditLogPageController extends Controller
@@ -23,7 +26,7 @@ class AuditLogPageController extends Controller
 
         $logs = $this->buildFilteredLogsQuery($filters)
             ->latest('id')
-            ->paginate(30)
+            ->paginate(50)
             ->withQueryString();
         $viewMaps = $this->buildAuditViewMaps($logs->getCollection());
 
@@ -43,47 +46,55 @@ class AuditLogPageController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $filters = $this->resolveFilters($request);
-        $logs = $this->buildFilteredLogsQuery($filters)
+        $logQuery = $this->buildFilteredLogsQuery($filters)
             ->latest('id')
-            ->limit(5000)
-            ->get();
+            ->limit(5000);
+        $logCount = (clone $logQuery)->count();
 
-        $filename = 'audit-logs-'.now()->format('Ymd-His').'.csv';
+        $filename = 'audit-logs-'.$this->nowWib()->format('Ymd-His').'.xlsx';
 
-        return response()->streamDownload(function () use ($logs): void {
-            $handle = fopen('php://output', 'w');
-            if ($handle === false) {
-                return;
-            }
-
-            ExcelCsv::start($handle);
-            ExcelCsv::row($handle, [
+        return response()->streamDownload(function () use ($logQuery, $logCount): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Audit Logs');
+            $rows = [[
                 __('txn.date'),
                 __('ui.user'),
                 __('ui.actions'),
                 __('ui.subject'),
                 __('ui.description'),
                 __('ui.ip'),
-            ]);
+            ]];
+            $sheet->fromArray($rows, null, 'A1');
 
-            foreach ($logs as $log) {
+            $row = 2;
+            foreach ($logQuery->lazy(500) as $log) {
                 $subject = class_basename((string) $log->subject_type);
                 if ($log->subject_id) {
                     $subject .= ' #'.$log->subject_id;
                 }
-                ExcelCsv::row($handle, [
-                    (string) optional($log->created_at)->format('d-m-Y H:i:s'),
-                    (string) ($log->user?->name ?? '-'),
-                    (string) $log->action,
-                    $subject,
-                    (string) ($log->description ?: '-'),
-                    (string) ($log->ip_address ?: '-'),
-                ]);
+
+                $sheet->setCellValue('A'.$row, (string) optional($log->created_at)->timezone('Asia/Jakarta')->format('d-m-Y H:i:s'));
+                $sheet->setCellValue('B'.$row, (string) ($log->user?->name ?? '-'));
+                $sheet->setCellValue('C'.$row, (string) $log->action);
+                $sheet->setCellValue('D'.$row, $subject);
+                $sheet->setCellValue('E'.$row, (string) ($log->description ?: '-'));
+                $sheet->setCellValue('F'.$row, (string) ($log->ip_address ?: '-'));
+                $row++;
             }
 
-            fclose($handle);
+            ExcelExportStyler::styleTable($sheet, 1, 6, $logCount, true);
+            if ($logCount > 0) {
+                $sheet->getStyle('A2:A'.(1 + $logCount))->getNumberFormat()->setFormatCode('@');
+                $sheet->getStyle('F2:F'.(1 + $logCount))->getNumberFormat()->setFormatCode('@');
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
         }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
@@ -126,17 +137,29 @@ class AuditLogPageController extends Controller
         $actionPrefix = $filters['actionPrefix'];
         $dateFrom = $filters['dateFrom'];
         $dateTo = $filters['dateTo'];
+        $dateFromStart = $dateFrom !== '' ? Carbon::parse($dateFrom)->startOfDay()->toDateTimeString() : null;
+        $dateToEnd = $dateTo !== '' ? Carbon::parse($dateTo)->endOfDay()->toDateTimeString() : null;
 
         return AuditLog::query()
+            ->select([
+                'id',
+                'user_id',
+                'action',
+                'subject_type',
+                'subject_id',
+                'description',
+                'ip_address',
+                'created_at',
+            ])
             ->with('user:id,name,email')
             ->when($actionPrefix !== null, function ($query) use ($actionPrefix): void {
                 $query->where('action', 'like', $actionPrefix.'%');
             })
-            ->when($dateFrom !== '', function ($query) use ($dateFrom): void {
-                $query->whereDate('created_at', '>=', $dateFrom);
+            ->when($dateFromStart !== null, function ($query) use ($dateFromStart): void {
+                $query->where('created_at', '>=', $dateFromStart);
             })
-            ->when($dateTo !== '', function ($query) use ($dateTo): void {
-                $query->whereDate('created_at', '<=', $dateTo);
+            ->when($dateToEnd !== null, function ($query) use ($dateToEnd): void {
+                $query->where('created_at', '<=', $dateToEnd);
             })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
@@ -180,7 +203,6 @@ class AuditLogPageController extends Controller
         $invoiceMap = [];
         if (isset($idsByType[SalesInvoice::class])) {
             $invoiceMap = SalesInvoice::query()
-                ->with('customer:id,name')
                 ->whereIn('id', $idsByType[SalesInvoice::class])
                 ->get(['id', 'invoice_number', 'customer_id'])
                 ->keyBy('id');
@@ -194,7 +216,6 @@ class AuditLogPageController extends Controller
         $salesReturnMap = [];
         if (isset($idsByType[SalesReturn::class])) {
             $salesReturnMap = SalesReturn::query()
-                ->with('customer:id,name')
                 ->whereIn('id', $idsByType[SalesReturn::class])
                 ->get(['id', 'return_number', 'customer_id'])
                 ->keyBy('id');
@@ -208,7 +229,6 @@ class AuditLogPageController extends Controller
         $deliveryMap = [];
         if (isset($idsByType[DeliveryNote::class])) {
             $deliveryMap = DeliveryNote::query()
-                ->with('customer:id,name')
                 ->whereIn('id', $idsByType[DeliveryNote::class])
                 ->get(['id', 'note_number', 'customer_id', 'recipient_name'])
                 ->keyBy('id');
@@ -222,7 +242,6 @@ class AuditLogPageController extends Controller
         $orderMap = [];
         if (isset($idsByType[OrderNote::class])) {
             $orderMap = OrderNote::query()
-                ->with('customer:id,name')
                 ->whereIn('id', $idsByType[OrderNote::class])
                 ->get(['id', 'note_number', 'customer_id', 'customer_name'])
                 ->keyBy('id');
@@ -236,7 +255,6 @@ class AuditLogPageController extends Controller
         $receivablePaymentMap = [];
         if (isset($idsByType[ReceivablePayment::class])) {
             $receivablePaymentMap = ReceivablePayment::query()
-                ->with('customer:id,name')
                 ->whereIn('id', $idsByType[ReceivablePayment::class])
                 ->get(['id', 'payment_number', 'customer_id'])
                 ->keyBy('id');
@@ -255,6 +273,24 @@ class AuditLogPageController extends Controller
                 ->keyBy('id');
         }
 
+        $relatedCustomerIds = collect()
+            ->merge(collect($invoiceMap)->pluck('customer_id'))
+            ->merge(collect($salesReturnMap)->pluck('customer_id'))
+            ->merge(collect($deliveryMap)->pluck('customer_id'))
+            ->merge(collect($orderMap)->pluck('customer_id'))
+            ->merge(collect($receivablePaymentMap)->pluck('customer_id'))
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $relatedCustomerNameMap = $relatedCustomerIds->isNotEmpty()
+            ? Customer::query()
+                ->whereIn('id', $relatedCustomerIds->all())
+                ->pluck('name', 'id')
+                ->all()
+            : [];
+
         foreach ($logs as $log) {
             $logId = (int) $log->id;
             $subjectMap[$logId] = class_basename((string) $log->subject_type) ?: '-';
@@ -269,23 +305,23 @@ class AuditLogPageController extends Controller
             $subjectType = (string) ($log->subject_type ?? '');
             if ($subjectType === SalesInvoice::class && isset($invoiceMap[$subjectId])) {
                 $invoice = $invoiceMap[$subjectId];
-                $subjectMap[$logId] = (string) ($invoice->customer?->name ?? '-');
+                $subjectMap[$logId] = (string) ($relatedCustomerNameMap[(int) ($invoice->customer_id ?? 0)] ?? '-');
                 $subjectCodeMap[$logId] = (string) ($invoice->invoice_number ?? '');
             } elseif ($subjectType === SalesReturn::class && isset($salesReturnMap[$subjectId])) {
                 $salesReturn = $salesReturnMap[$subjectId];
-                $subjectMap[$logId] = (string) ($salesReturn->customer?->name ?? '-');
+                $subjectMap[$logId] = (string) ($relatedCustomerNameMap[(int) ($salesReturn->customer_id ?? 0)] ?? '-');
                 $subjectCodeMap[$logId] = (string) ($salesReturn->return_number ?? '');
             } elseif ($subjectType === DeliveryNote::class && isset($deliveryMap[$subjectId])) {
                 $deliveryNote = $deliveryMap[$subjectId];
-                $subjectMap[$logId] = (string) ($deliveryNote->customer?->name ?: $deliveryNote->recipient_name ?: '-');
+                $subjectMap[$logId] = (string) ($relatedCustomerNameMap[(int) ($deliveryNote->customer_id ?? 0)] ?: $deliveryNote->recipient_name ?: '-');
                 $subjectCodeMap[$logId] = (string) ($deliveryNote->note_number ?? '');
             } elseif ($subjectType === OrderNote::class && isset($orderMap[$subjectId])) {
                 $orderNote = $orderMap[$subjectId];
-                $subjectMap[$logId] = (string) ($orderNote->customer?->name ?: $orderNote->customer_name ?: '-');
+                $subjectMap[$logId] = (string) ($relatedCustomerNameMap[(int) ($orderNote->customer_id ?? 0)] ?: $orderNote->customer_name ?: '-');
                 $subjectCodeMap[$logId] = (string) ($orderNote->note_number ?? '');
             } elseif ($subjectType === ReceivablePayment::class && isset($receivablePaymentMap[$subjectId])) {
                 $payment = $receivablePaymentMap[$subjectId];
-                $subjectMap[$logId] = (string) ($payment->customer?->name ?? '-');
+                $subjectMap[$logId] = (string) ($relatedCustomerNameMap[(int) ($payment->customer_id ?? 0)] ?? '-');
                 $subjectCodeMap[$logId] = (string) ($payment->payment_number ?? '');
             } elseif ($subjectType === Customer::class && isset($customerMap[$subjectId])) {
                 $subjectMap[$logId] = (string) ($customerMap[$subjectId]->name ?? '-');
@@ -394,5 +430,10 @@ class AuditLogPageController extends Controller
         }
 
         return $normalized !== '' ? $normalized : '-';
+    }
+
+    private function nowWib(): Carbon
+    {
+        return now('Asia/Jakarta');
     }
 }

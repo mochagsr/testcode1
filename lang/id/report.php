@@ -17,8 +17,11 @@ return [
     'all_semesters' => 'Semua Semester',
     'apply_filter' => 'Terapkan',
     'customer_filter' => 'Filter Customer',
+    'supplier_filter' => 'Filter Supplier',
     'all_customers' => 'Semua Customer',
+    'all_suppliers' => 'Semua Supplier',
     'customer_filter_note' => 'Filter customer hanya mempengaruhi laporan Piutang.',
+    'supplier_filter_note' => 'Filter supplier hanya mempengaruhi laporan Transaksi Keluar.',
     'user_role_filter' => 'Filter Role User',
     'all_roles' => 'Semua Role',
     'finance_lock_filter' => 'Filter Finance Lock',
@@ -29,14 +32,17 @@ return [
     'filters' => [
         'semester' => 'Semester',
         'customer' => 'Customer',
+        'supplier' => 'Supplier',
     ],
     'columns' => [
         'invoice_no' => 'No Faktur',
         'return_no' => 'No Retur',
         'note_no' => 'No Surat',
+        'transaction_no' => 'No Transaksi',
         'date' => 'Tanggal',
         'created_at' => 'Dibuat Pada',
         'customer' => 'Customer',
+        'supplier' => 'Supplier',
         'recipient' => 'Penerima',
         'name' => 'Nama',
         'email' => 'Email',
@@ -73,6 +79,7 @@ return [
         'sales_returns' => 'Retur Penjualan',
         'delivery_notes' => 'Surat Jalan',
         'order_notes' => 'Surat Pesanan',
+        'outgoing_transactions' => 'Transaksi Keluar',
     ],
     'titles' => [
         'products' => 'Laporan Barang',
@@ -83,6 +90,7 @@ return [
         'sales_returns' => 'Laporan Retur Penjualan',
         'delivery_notes' => 'Laporan Surat Jalan',
         'order_notes' => 'Laporan Surat Pesanan',
+        'outgoing_transactions' => 'Laporan Transaksi Keluar',
     ],
     'values' => [
         'role_admin' => 'Admin',
@@ -112,5 +120,9 @@ return [
         'paid_cash' => 'Terbayar Tunai',
         'paid_customer_balance' => 'Terbayar dari Saldo Customer',
         'total_balance' => 'Total Sisa',
+    ],
+    'outgoing_summary' => [
+        'total_transactions' => 'Total Transaksi Keluar',
+        'grand_total' => 'Grand Total Pengeluaran',
     ],
 ];

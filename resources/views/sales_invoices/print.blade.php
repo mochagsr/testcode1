@@ -10,7 +10,7 @@
         .container { max-width: 900px; margin: 0 auto; }
         .company-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
         .company-left { display: flex; gap: 8px; }
-        .company-logo { width: 30px; height: 30px; border: 1px solid #111; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
+        .company-logo { width: 37px; height: 50px; border: 1px solid #111; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 16px; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 1px; line-height: 1.2; text-transform: uppercase; }
         .company-detail { font-size: 11px; line-height: 1.3; white-space: pre-line; }
@@ -142,7 +142,7 @@
                 <td>{{ $item->product_name }}</td>
                 <td>{{ (int) round($item->quantity) }}</td>
                 <td>{{ number_format((int) round($item->unit_price), 0, ',', '.') }}</td>
-                <td>{{ (int) round($discountPercent) }}%</td>
+                <td>{{ (int) round($discountPercent) > 0 ? ((int) round($discountPercent)).'%' : '-' }}</td>
                 <td>{{ number_format((int) round($item->line_total), 0, ',', '.') }}</td>
             </tr>
         @endforeach
@@ -180,5 +180,4 @@
 </div>
 </body>
 </html>
-
 

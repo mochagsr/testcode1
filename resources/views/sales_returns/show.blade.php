@@ -178,13 +178,16 @@
                     return;
                 }
 
-                const products = @json($products->map(fn ($product) => [
+                let products = @json($products->map(fn ($product) => [
                     'id' => (int) $product->id,
                     'code' => (string) ($product->code ?? ''),
                     'name' => (string) $product->name,
                     'price_general' => (int) round((float) ($product->price_general ?? 0)),
                 ])->values()->all());
+                const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
+                const LOOKUP_LIMIT = 20;
                 const SEARCH_DEBOUNCE_MS = 100;
+                let productLookupAbort = null;
 
                 function numberFormat(value) {
                     return new Intl.NumberFormat('id-ID').format(Math.round(Number(value || 0)));
@@ -210,6 +213,12 @@
                     const code = String(product.code || '').trim();
                     const name = String(product.name || '').trim();
                     return code !== '' ? `${code} - ${name}` : name;
+                }
+
+                function upsertProducts(rows) {
+                    const byId = new Map(products.map((row) => [String(row.id), row]));
+                    (rows || []).forEach((row) => byId.set(String(row.id), row));
+                    products = Array.from(byId.values());
                 }
 
                 function findProductByLabel(label) {
@@ -250,6 +259,32 @@
                         .join('');
                 }
 
+                async function fetchProductSuggestions(input) {
+                    const query = String(input?.value || '');
+                    if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                        renderProductSuggestions(input);
+                        return;
+                    }
+                    try {
+                        if (productLookupAbort) {
+                            productLookupAbort.abort();
+                        }
+                        productLookupAbort = new AbortController();
+                        const url = `${PRODUCT_LOOKUP_URL}?search=${encodeURIComponent(query)}&active_only=1&per_page=${LOOKUP_LIMIT}`;
+                        const response = await fetch(url, { signal: productLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                        if (!response.ok) {
+                            return;
+                        }
+                        const payload = await response.json();
+                        upsertProducts(payload.data || []);
+                        renderProductSuggestions(input);
+                    } catch (error) {
+                        if (error && error.name === 'AbortError') {
+                            return;
+                        }
+                    }
+                }
+
                 function reindexRows() {
                     Array.from(tbody.querySelectorAll('tr')).forEach((row, index) => {
                         const productSearch = row.querySelector('.admin-return-item-product-search');
@@ -279,7 +314,8 @@
                     });
                     const searchInput = row.querySelector('.admin-return-item-product-search');
                     const productIdInput = row.querySelector('.admin-return-item-product');
-                    const onSearchInput = debounce((event) => {
+                    const onSearchInput = debounce(async (event) => {
+                        await fetchProductSuggestions(event.currentTarget);
                         renderProductSuggestions(event.currentTarget);
                         const selected = findProductByLabel(event.currentTarget.value);
                         if (!selected) {
@@ -363,7 +399,6 @@
         </script>
     @endif
 @endsection
-
 
 
 

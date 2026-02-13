@@ -11,7 +11,7 @@
         .receipt { border: 1px solid #111; padding: 12px; }
         .top { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
         .company-left { display: flex; gap: 8px; max-width: 66%; }
-        .company-logo { width: 34px; height: 34px; border: 1px solid #111; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
+        .company-logo { width: 37px; height: 50px; border: 1px solid #111; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 14px; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
         .company-detail { white-space: pre-line; }
@@ -142,5 +142,4 @@
 </div>
 </body>
 </html>
-
 

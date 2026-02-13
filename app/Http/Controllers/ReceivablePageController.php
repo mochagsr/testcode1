@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\ExcelCsv;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\InvoicePayment;
@@ -18,6 +17,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivablePageController extends Controller
@@ -30,10 +31,11 @@ class ReceivablePageController extends Controller
 
     public function index(Request $request): View
     {
+        $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $customerId = $request->integer('customer_id');
         $semester = trim((string) $request->string('semester', ''));
-        $selectedSemester = $semester !== '' ? $semester : null;
+        $selectedSemester = $semester !== '' ? $this->semesterBookService->normalizeSemester($semester) : null;
         $currentSemester = $this->currentSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
 
@@ -49,7 +51,9 @@ class ReceivablePageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
-        $semesterOptions = collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
+        $semesterOptions = $isAdminUser
+            ? $semesterOptions->values()
+            : collect($this->semesterBookService()->filterToActiveSemesters($semesterOptions->all()));
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
         }
@@ -152,6 +156,17 @@ class ReceivablePageController extends Controller
                 })
                 ->sum(DB::raw('debit - credit'));
             $ledgerRows = ReceivableLedger::query()
+                ->select([
+                    'id',
+                    'customer_id',
+                    'sales_invoice_id',
+                    'entry_date',
+                    'description',
+                    'debit',
+                    'credit',
+                    'balance_after',
+                    'period_code',
+                ])
                 ->with('invoice:id,invoice_number,balance,semester_period,customer_id,is_canceled')
                 ->where('customer_id', $customerId)
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
@@ -303,7 +318,7 @@ class ReceivablePageController extends Controller
     {
         $data = $this->customerBillViewData($request, $customer);
         $data['isPdf'] = true;
-        $filename = 'tagihan-'.$customer->id.'-'.now()->format('Ymd-His').'.pdf';
+        $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.pdf';
 
         return Pdf::loadView('receivables.print_customer_bill', $data)
             ->setPaper('a4', 'portrait')
@@ -314,63 +329,65 @@ class ReceivablePageController extends Controller
     {
         $data = $this->customerBillViewData($request, $customer);
         $rows = collect($data['rows'] ?? []);
-        $filename = 'tagihan-'.$customer->id.'-'.now()->format('Ymd-His').'.csv';
+        $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.xlsx';
 
         return response()->streamDownload(function () use ($rows, $data): void {
-            $handle = fopen('php://output', 'w');
-            if ($handle === false) {
-                return;
-            }
-
-            ExcelCsv::start($handle);
-
-            ExcelCsv::row($handle, [__('receivable.customer_bill_title')]);
-            ExcelCsv::row($handle, [__('receivable.customer'), $data['customer']->name ?? '']);
-            ExcelCsv::row($handle, [__('txn.address'), $data['customer']->address ?: ($data['customer']->city ?: '-')]);
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Tagihan');
+            $rowsOut = [];
+            $rowsOut[] = [__('receivable.customer_bill_title')];
+            $rowsOut[] = [__('receivable.customer'), $data['customer']->name ?? ''];
+            $rowsOut[] = [__('txn.address'), $data['customer']->address ?: ($data['customer']->city ?: '-')];
             if (!empty($data['selectedSemester'])) {
-                ExcelCsv::row($handle, [__('txn.semester_period'), (string) $data['selectedSemester']]);
+                $rowsOut[] = [__('txn.semester_period'), (string) $data['selectedSemester']];
             }
-            ExcelCsv::row($handle, []);
-            ExcelCsv::row($handle, [
+            $rowsOut[] = [];
+            $rowsOut[] = [
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
                 __('receivable.bill_credit_sales'),
                 __('receivable.bill_installment_payment'),
                 __('receivable.bill_sales_return'),
                 __('receivable.bill_running_balance'),
-            ]);
+            ];
 
             foreach ($rows as $row) {
-                ExcelCsv::row($handle, [
+                $rowsOut[] = [
                     (string) ($row['date_label'] ?? ''),
                     (string) ($row['proof_number'] ?? ''),
                     number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.'),
-                ]);
+                ];
             }
 
             $totals = (array) ($data['totals'] ?? []);
-            ExcelCsv::row($handle, [
+            $rowsOut[] = [
                 '',
                 __('receivable.bill_total'),
                 number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['installment_payment'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
-            ]);
-            ExcelCsv::row($handle, [
+            ];
+            $rowsOut[] = [
                 '',
                 '',
                 '',
                 '',
                 __('receivable.bill_total_receivable'),
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
-            ]);
-            fclose($handle);
+            ];
+
+            $sheet->fromArray($rowsOut, null, 'A1');
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
         }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
@@ -389,6 +406,9 @@ class ReceivablePageController extends Controller
             }
 
             $selectedSemester = trim((string) ($data['semester'] ?? ''));
+            $selectedSemester = $selectedSemester !== ''
+                ? ($this->semesterBookService->normalizeSemester($selectedSemester) ?? '')
+                : '';
             $amount = (float) $data['amount'];
             $paymentDate = isset($data['payment_date']) && $data['payment_date'] !== ''
                 ? Carbon::parse($data['payment_date'])
@@ -474,31 +494,12 @@ class ReceivablePageController extends Controller
 
     private function currentSemesterPeriod(): string
     {
-        $year = now()->year;
-        $month = (int) now()->format('n');
-        $semester = $month <= 6 ? 1 : 2;
-
-        return "S{$semester}-{$year}";
+        return $this->semesterBookService->currentSemester();
     }
 
     private function previousSemesterPeriod(string $period): string
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $period, $matches) === 1) {
-            $semester = (int) $matches[1];
-            $year = (int) $matches[2];
-
-            if ($semester === 2) {
-                return "S1-{$year}";
-            }
-
-            return 'S2-'.($year - 1);
-        }
-
-        $previous = now()->subMonths(6);
-        $semester = (int) $previous->format('n') <= 6 ? 1 : 2;
-        $year = $previous->year;
-
-        return "S{$semester}-{$year}";
+        return $this->semesterBookService->previousSemester($period);
     }
 
     private function configuredSemesterOptions()
@@ -510,24 +511,25 @@ class ReceivablePageController extends Controller
 
     private function semesterDescriptionLabel(string $periodCode): string
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $periodCode, $matches) !== 1) {
-            return $periodCode !== '' ? $periodCode : __('txn.semester_period');
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $periodCode, $matches) === 1) {
+            $semester = (int) $matches[1];
+            $startYear = 2000 + (int) $matches[2];
+            $endYear = 2000 + (int) $matches[3];
+
+            return "SMT {$semester} ({$startYear}-{$endYear})";
         }
-
-        $semester = (int) $matches[1];
-        $year = (int) $matches[2];
-        $nextYear = $year + 1;
-
-        return "SMT {$semester} ({$year}-{$nextYear})";
+        return $periodCode !== '' ? $periodCode : __('txn.semester_period');
     }
 
     private function semesterSortValue(string $periodCode): int
     {
-        if (preg_match('/^S([12])-(\d{4})$/', $periodCode, $matches) !== 1) {
-            return PHP_INT_MAX;
-        }
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $periodCode, $matches) === 1) {
+            $semester = (int) $matches[1];
+            $startYear = 2000 + (int) $matches[2];
 
-        return ((int) $matches[2] * 10) + (int) $matches[1];
+            return ($startYear * 10) + $semester;
+        }
+        return PHP_INT_MAX;
     }
 
     /**
@@ -552,21 +554,23 @@ class ReceivablePageController extends Controller
             'companyAddress' => trim((string) AppSetting::getValue('company_address', '')),
             'companyPhone' => trim((string) AppSetting::getValue('company_phone', '')),
             'companyEmail' => trim((string) AppSetting::getValue('company_email', '')),
-            'companyNotes' => trim((string) AppSetting::getValue('company_notes', '')),
             'companyInvoiceNotes' => trim((string) AppSetting::getValue('company_invoice_notes', '')),
-            'companyBillingNote' => trim((string) AppSetting::getValue('company_billing_note', '')),
-            'companyTransferAccounts' => trim((string) AppSetting::getValue('company_transfer_accounts', '')),
         ];
     }
 
     private function normalizeSemester(string $semester): string
     {
         $value = trim($semester);
-        if ($value !== '' && preg_match('/^S([12])-(\d{4})$/', $value) !== 1) {
+        if ($value === '') {
             return '';
         }
 
-        return $value;
+        $normalized = $this->semesterBookService->normalizeSemester($value);
+        if ($normalized === null) {
+            return '';
+        }
+
+        return $normalized;
     }
 
     private function semesterBookService(): SemesterBookService
@@ -708,14 +712,13 @@ class ReceivablePageController extends Controller
             return '-';
         }
 
-        $date->locale(app()->getLocale() === 'id' ? 'id' : 'en');
-
-        return $date->translatedFormat('d F Y');
+        return $date->format('d-m-Y');
     }
 
     /**
-     * Hide redundant summary rows like "Pembayaran KWT-xxxx" when detailed
-     * allocation rows "Pembayaran KWT-xxxx untuk INV-xxxx" already exist.
+     * Collapse payment mutation rows so each payment ref (KWT/PYT) appears once.
+     * Priority: keep summary row; if only allocation rows exist, keep one row
+     * and normalize its description to a summary label.
      *
      * @param Collection<int, ReceivableLedger> $rows
      * @return Collection<int, ReceivableLedger>
@@ -726,50 +729,66 @@ class ReceivablePageController extends Controller
             return $rows;
         }
 
-        $paymentRefsWithSummary = [];
-        $paymentRefsWithAllocation = [];
-        foreach ($rows as $row) {
+        $firstIndexByPaymentRef = [];
+        $summaryByPaymentRef = [];
+        foreach ($rows as $index => $row) {
             $description = (string) ($row->description ?? '');
             $paymentRef = $this->extractPaymentRef($description);
             if ($paymentRef === null) {
                 continue;
             }
-            $isAllocation = $row->invoice_id !== null
-                || str_contains(strtolower($description), ' untuk ')
-                || str_contains(strtolower($description), ' for ');
-            if ($isAllocation) {
-                $paymentRefsWithAllocation[$paymentRef] = true;
-            } else {
-                $paymentRefsWithSummary[$paymentRef] = true;
+
+            if (!isset($firstIndexByPaymentRef[$paymentRef])) {
+                $firstIndexByPaymentRef[$paymentRef] = $index;
+            }
+
+            if (! $this->isAllocationPaymentRow($row, $description) && !isset($summaryByPaymentRef[$paymentRef])) {
+                $summaryByPaymentRef[$paymentRef] = $row;
             }
         }
 
-        if ($paymentRefsWithSummary === [] || $paymentRefsWithAllocation === []) {
+        if ($firstIndexByPaymentRef === []) {
             return $rows;
         }
 
-        return $rows
-            ->reject(function ($row) use ($paymentRefsWithSummary, $paymentRefsWithAllocation): bool {
-                $description = (string) ($row->description ?? '');
-                $paymentRef = $this->extractPaymentRef($description);
-                if ($paymentRef === null) {
-                    return false;
-                }
+        $result = collect();
+        $pushedPaymentRef = [];
+        foreach ($rows as $index => $row) {
+            $description = (string) ($row->description ?? '');
+            $paymentRef = $this->extractPaymentRef($description);
+            if ($paymentRef === null) {
+                $result->push($row);
+                continue;
+            }
 
-                $hasSummary = isset($paymentRefsWithSummary[$paymentRef]);
-                $hasAllocation = isset($paymentRefsWithAllocation[$paymentRef]);
-                if (!$hasSummary || !$hasAllocation) {
-                    return false;
-                }
+            if (isset($pushedPaymentRef[$paymentRef])) {
+                continue;
+            }
 
-                $isAllocation = $row->invoice_id !== null
-                    || str_contains(strtolower($description), ' untuk ')
-                    || str_contains(strtolower($description), ' for ');
+            $canonicalRow = $summaryByPaymentRef[$paymentRef] ?? null;
+            if ($canonicalRow instanceof ReceivableLedger) {
+                $result->push($canonicalRow);
+                $pushedPaymentRef[$paymentRef] = true;
+                continue;
+            }
 
-                // Keep single summary row, hide allocation rows when both exist.
-                return $isAllocation;
-            })
-            ->values();
+            if (($firstIndexByPaymentRef[$paymentRef] ?? null) === $index) {
+                $row->setAttribute('description', (string) __('receivable.receivable_payment', ['payment' => $paymentRef]));
+                $row->setAttribute('invoice_id', null);
+                $row->setRelation('invoice', null);
+                $result->push($row);
+                $pushedPaymentRef[$paymentRef] = true;
+            }
+        }
+
+        return $result->values();
+    }
+
+    private function isAllocationPaymentRow(ReceivableLedger $row, string $description): bool
+    {
+        return $row->invoice_id !== null
+            || str_contains(strtolower($description), ' untuk ')
+            || str_contains(strtolower($description), ' for ');
     }
 
     private function extractPaymentRef(string $description): ?string
@@ -779,5 +798,10 @@ class ReceivablePageController extends Controller
         }
 
         return strtoupper((string) $matches[0]);
+    }
+
+    private function nowWib(): Carbon
+    {
+        return now('Asia/Jakarta');
     }
 }

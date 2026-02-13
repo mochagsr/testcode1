@@ -41,6 +41,9 @@
                 <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $previousSemester, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
             </div>
         </form>
+        @if(!empty($isDefaultRecentMode))
+            <p class="muted" style="margin: 8px 0 0 0;">Menampilkan data 7 hari terakhir (default). Gunakan filter tanggal/semester untuk data lebih lama.</p>
+        @endif
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
@@ -145,6 +148,9 @@
                 }
 
                 debounceTimer = setTimeout(() => {
+                    if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
+                        return;
+                    }
                     form.requestSubmit();
                 }, 100);
             });
@@ -155,8 +161,6 @@
         })();
     </script>
 @endsection
-
-
 
 
 

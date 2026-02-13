@@ -91,14 +91,20 @@
     </form>
 
     <script>
-        const customers = @json($customers->values());
-        const products = @json($products);
+        let customers = @json($customers->values());
+        let products = @json($products);
+        const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
+        const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
+        const LOOKUP_LIMIT = 20;
         const tbody = document.querySelector('#items-table tbody');
         const productsList = document.getElementById('products-list');
+        const customersList = document.getElementById('customers-list');
         const addBtn = document.getElementById('add-item');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
         const SEARCH_DEBOUNCE_MS = 100;
+        let customerLookupAbort = null;
+        let productLookupAbort = null;
 
         function debounce(fn, wait = SEARCH_DEBOUNCE_MS) {
             let timeoutId = null;
@@ -108,9 +114,63 @@
             };
         }
 
+        function upsertCustomers(rows) {
+            const byId = new Map(customers.map((row) => [String(row.id), row]));
+            (rows || []).forEach((row) => byId.set(String(row.id), row));
+            customers = Array.from(byId.values());
+        }
+
+        function upsertProducts(rows) {
+            const byId = new Map(products.map((row) => [String(row.id), row]));
+            (rows || []).forEach((row) => byId.set(String(row.id), row));
+            products = Array.from(byId.values());
+        }
+
         function customerLabel(customer) {
             const city = customer.city || '-';
             return `${customer.name} (${city})`;
+        }
+
+        function renderCustomerSuggestions(query) {
+            if (!customersList) {
+                return;
+            }
+            const normalized = (query || '').trim().toLowerCase();
+            const matches = customers.filter((customer) => {
+                const label = customerLabel(customer).toLowerCase();
+                const name = (customer.name || '').toLowerCase();
+                const city = (customer.city || '').toLowerCase();
+                return normalized === '' || label.includes(normalized) || name.includes(normalized) || city.includes(normalized);
+            }).slice(0, 60);
+
+            customersList.innerHTML = matches
+                .map((customer) => `<option value="${escapeAttribute(customerLabel(customer))}"></option>`)
+                .join('');
+        }
+
+        async function fetchCustomerSuggestions(query) {
+            if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                renderCustomerSuggestions(query);
+                return;
+            }
+            try {
+                if (customerLookupAbort) {
+                    customerLookupAbort.abort();
+                }
+                customerLookupAbort = new AbortController();
+                const url = `${CUSTOMER_LOOKUP_URL}?search=${encodeURIComponent(query)}&per_page=${LOOKUP_LIMIT}`;
+                const response = await fetch(url, { signal: customerLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) {
+                    return;
+                }
+                const payload = await response.json();
+                upsertCustomers(payload.data || []);
+                renderCustomerSuggestions(query);
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+            }
         }
 
         function findCustomerByLabel(label) {
@@ -166,6 +226,31 @@
                 .join('');
         }
 
+        async function fetchProductSuggestions(query) {
+            if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                renderProductSuggestions(query);
+                return;
+            }
+            try {
+                if (productLookupAbort) {
+                    productLookupAbort.abort();
+                }
+                productLookupAbort = new AbortController();
+                const url = `${PRODUCT_LOOKUP_URL}?search=${encodeURIComponent(query)}&active_only=1&per_page=${LOOKUP_LIMIT}`;
+                const response = await fetch(url, { signal: productLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) {
+                    return;
+                }
+                const payload = await response.json();
+                upsertProducts(payload.data || []);
+                renderProductSuggestions(query);
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+            }
+        }
+
         function findProductByLabel(label) {
             if (!label) {
                 return null;
@@ -201,7 +286,8 @@
             `;
             tbody.appendChild(tr);
 
-            const onProductInput = debounce((event) => {
+            const onProductInput = debounce(async (event) => {
+                await fetchProductSuggestions(event.currentTarget.value);
                 renderProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
@@ -227,7 +313,8 @@
             if (bootCustomer) {
                 customerIdField.value = bootCustomer.id;
             }
-            const onCustomerInput = debounce((event) => {
+            const onCustomerInput = debounce(async (event) => {
+                await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 customerIdField.value = customer ? customer.id : '';
                 if (customer) {
@@ -248,6 +335,7 @@
         }
 
         addBtn.addEventListener('click', addRow);
+        renderCustomerSuggestions('');
         renderProductSuggestions('');
         addRow();
     </script>
