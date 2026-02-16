@@ -66,12 +66,7 @@ class ReceivablePageController extends Controller
 
         $customersQuery = Customer::query()
             ->select(['customers.id', 'customers.name', 'customers.city', 'customers.credit_balance'])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('city', 'like', "%{$search}%");
-                });
-            });
+            ->searchKeyword($search);
 
         if ($selectedSemester !== null) {
             $semesterLedger = ReceivableLedger::query()
@@ -146,25 +141,24 @@ class ReceivablePageController extends Controller
             }
 
             $outstandingInvoiceQuery = SalesInvoice::query()
-                ->where('customer_id', $customerId)
-                ->where('is_canceled', false)
-                ->where('balance', '>', 0)
+                ->forCustomer($customerId)
+                ->active()
+                ->withOpenBalance()
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                    $query->where('semester_period', $selectedSemester);
+                    $query->forSemester($selectedSemester);
                 });
 
             $customerOutstandingTotal = (float) (clone $outstandingInvoiceQuery)->sum('balance');
 
             $outstandingInvoices = (clone $outstandingInvoiceQuery)
                 ->select(['id', 'invoice_number', 'invoice_date', 'semester_period', 'total', 'total_paid', 'balance'])
-                ->orderBy('invoice_date')
-                ->orderBy('id')
+                ->orderByDate('asc')
                 ->get();
 
             $ledgerBaseQuery = ReceivableLedger::query()
-                ->where('customer_id', $customerId)
+                ->forCustomer($customerId)
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                    $query->where('period_code', $selectedSemester);
+                    $query->forSemester($selectedSemester);
                 });
 
             $ledgerOutstandingTotal = (float) (clone $ledgerBaseQuery)->sum(DB::raw('debit - credit'));
@@ -604,12 +598,11 @@ class ReceivablePageController extends Controller
         $semester = $selectedSemester ?? '';
         $ledgerRows = ReceivableLedger::query()
             ->with('invoice:id,invoice_number,invoice_date')
-            ->where('customer_id', $customerId)
+            ->forCustomer($customerId)
             ->when($semester !== '', function ($query) use ($semester): void {
-                $query->where('period_code', $semester);
+                $query->forSemester($semester);
             })
-            ->orderBy('entry_date')
-            ->orderBy('id')
+            ->orderByDate('asc')
             ->get();
 
         if ($ledgerRows->isNotEmpty()) {
@@ -617,11 +610,11 @@ class ReceivablePageController extends Controller
             $openingBalance = (int) round((float) $first->balance_after - (float) $first->debit + (float) $first->credit);
         } else {
             $openingBalance = (int) round((float) SalesInvoice::query()
-                ->where('customer_id', $customerId)
-                ->where('is_canceled', false)
-                ->where('balance', '>', 0)
+                ->forCustomer($customerId)
+                ->active()
+                ->withOpenBalance()
                 ->when($semester !== '', function ($query) use ($semester): void {
-                    $query->where('semester_period', $semester);
+                    $query->forSemester($semester);
                 })
                 ->sum('balance'));
         }

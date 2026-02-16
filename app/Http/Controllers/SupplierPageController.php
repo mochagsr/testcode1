@@ -27,14 +27,8 @@ class SupplierPageController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $suppliers = Supplier::query()
-            ->select(['id', 'name', 'company_name', 'phone', 'address', 'notes'])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('company_name', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                });
-            })
+            ->onlyListColumns()
+            ->searchKeyword($search)
             ->orderBy('name')
             ->paginate(25)
             ->withQueryString();
@@ -54,29 +48,20 @@ class SupplierPageController extends Controller
 
     public function lookup(Request $request): JsonResponse
     {
-        $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
-        $page = max(1, (int) $request->integer('page', 1));
+        $perPage = $this->resolveLookupPerPage($request, 20, 25);
+        $page = $this->resolveLookupPage($request);
         $search = trim((string) $request->string('search', ''));
+        $now = now();
 
         $query = Supplier::query()
-            ->select(['id', 'name', 'company_name', 'phone', 'address']);
+            ->onlyLookupColumns();
 
         if ($search !== '') {
             if (! $this->hasValidSearchTokens($search)) {
-                return response()->json([
-                    'data' => [],
-                    'current_page' => 1,
-                    'last_page' => 1,
-                    'per_page' => $perPage,
-                    'total' => 0,
-                ]);
+                return response()->json($this->emptyLookupPage($page, $perPage));
             }
 
-            $query->where(function ($subQuery) use ($search): void {
-                $subQuery->where('name', 'like', "%{$search}%")
-                    ->orWhere('company_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
+            $query->searchKeyword($search);
         }
 
         $cacheKey = AppCache::lookupCacheKey('lookups.suppliers', [
@@ -84,7 +69,7 @@ class SupplierPageController extends Controller
             'page' => $page,
             'search' => mb_strtolower($search),
         ]);
-        $suppliers = Cache::remember($cacheKey, now()->addSeconds(20), function () use ($query, $perPage) {
+        $suppliers = Cache::remember($cacheKey, $now->copy()->addSeconds(20), function () use ($query, $perPage) {
             return $query
                 ->orderBy('name')
                 ->orderBy('id')
@@ -108,7 +93,6 @@ class SupplierPageController extends Controller
             $request
         );
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('suppliers.index')
@@ -135,7 +119,6 @@ class SupplierPageController extends Controller
             $request
         );
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('suppliers.index')
@@ -154,7 +137,6 @@ class SupplierPageController extends Controller
             $request
         );
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('suppliers.index')

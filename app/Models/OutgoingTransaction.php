@@ -79,6 +79,7 @@ class OutgoingTransaction extends Model
             'semester_period',
             'note_number',
             'total',
+            'created_by_user_id',
         ]);
     }
 
@@ -90,7 +91,7 @@ class OutgoingTransaction extends Model
      */
     public function scopeWithSupplierInfo(Builder $query): Builder
     {
-        return $query->with('supplier:id,code,name,company_name');
+        return $query->with('supplier:id,code,name,company_name,phone');
     }
 
     /**
@@ -114,5 +115,39 @@ class OutgoingTransaction extends Model
     public function scopeForSemester(Builder $query, string $semester): Builder
     {
         return $query->where('semester_period', $semester);
+    }
+
+    /**
+     * Scope: Filter by supplier.
+     *
+     * @param  Builder<OutgoingTransaction>  $query
+     * @return Builder<OutgoingTransaction>
+     */
+    public function scopeForSupplier(Builder $query, int $supplierId): Builder
+    {
+        return $query->where('supplier_id', $supplierId);
+    }
+
+    /**
+     * Scope: Apply keyword search by transaction/note/supplier.
+     *
+     * @param  Builder<OutgoingTransaction>  $query
+     * @return Builder<OutgoingTransaction>
+     */
+    public function scopeSearchKeyword(Builder $query, string $keyword): Builder
+    {
+        $search = trim($keyword);
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $subQuery) use ($search): void {
+            $subQuery->where('transaction_number', 'like', "%{$search}%")
+                ->orWhere('note_number', 'like', "%{$search}%")
+                ->orWhereHas('supplier', function (Builder $supplierQuery) use ($search): void {
+                    $supplierQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('company_name', 'like', "%{$search}%");
+                });
+        });
     }
 }

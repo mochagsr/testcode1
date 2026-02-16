@@ -17,13 +17,8 @@ class CustomerLevelPageController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $levels = CustomerLevel::query()
-            ->select(['id', 'code', 'description'])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%");
-                });
-            })
+            ->onlyListColumns()
+            ->searchKeyword($search)
             ->orderBy('code')
             ->paginate(25)
             ->withQueryString();

@@ -37,11 +37,13 @@ class SalesInvoicePageController extends Controller
 
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService,
-        private readonly AuditLogService $auditLogService
+        private readonly AuditLogService $auditLogService,
+        private readonly SemesterBookService $semesterBookService
     ) {}
 
     public function index(Request $request): View
     {
+        $now = now();
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $semester = (string) $request->string('semester', '');
@@ -52,8 +54,8 @@ class SalesInvoicePageController extends Controller
         $selectedInvoiceDate = $this->selectedDateFilter($invoiceDate);
         $selectedInvoiceDateRange = $this->selectedDateRange($selectedInvoiceDate);
         $isDefaultRecentMode = $selectedInvoiceDateRange === null && $selectedSemester === null && $search === '';
-        $recentRangeStart = now()->subDays(6)->startOfDay();
-        $todayRange = [now()->startOfDay(), now()->endOfDay()];
+        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
+        $todayRange = [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
 
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
@@ -68,15 +70,7 @@ class SalesInvoicePageController extends Controller
         $invoices = SalesInvoice::query()
             ->onlyListColumns()
             ->withCustomerInfo()
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('invoice_number', 'like', "%{$search}%")
-                        ->orWhereHas('customer', function ($customerQuery) use ($search): void {
-                            $customerQuery->where('name', 'like', "%{$search}%")
-                                ->orWhere('city', 'like', "%{$search}%");
-                        });
-                });
-            })
+            ->searchKeyword($search)
             ->when($selectedStatus === 'active', fn($q) => $q->active())
             ->when($selectedStatus === 'canceled', fn($q) => $q->canceled())
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
@@ -88,17 +82,16 @@ class SalesInvoicePageController extends Controller
             ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
                 $query->where('invoice_date', '>=', $recentRangeStart);
             })
-            ->orderBy('invoice_date', 'desc')
-            ->orderBy('id', 'desc')
+            ->orderByDate()
             ->paginate(20)
             ->withQueryString();
 
         $todaySummary = Cache::remember(
             AppCache::lookupCacheKey('sales_invoices.index.today_summary', [
                 'status' => $selectedStatus ?? 'all',
-                'date' => now()->toDateString(),
+                'date' => $now->toDateString(),
             ]),
-            now()->addSeconds(30),
+            $now->copy()->addSeconds(30),
             function () use ($selectedStatus, $todayRange) {
                 return SalesInvoice::query()
                     ->selectRaw('COUNT(*) as total_invoice, COALESCE(SUM(total), 0) as grand_total')
@@ -204,7 +197,7 @@ class SalesInvoicePageController extends Controller
             AppCache::lookupCacheKey('forms.sales_invoices.customers', ['limit' => 20]),
             now()->addSeconds(60),
             fn() => Customer::query()
-                ->select(['id', 'name', 'city', 'customer_level_id'])
+                ->onlySalesFormColumns()
                 ->with('level:id,code,name')
                 ->orderBy('name')
                 ->limit(20)
@@ -212,7 +205,7 @@ class SalesInvoicePageController extends Controller
         );
         if ($oldCustomerId > 0 && ! $initialCustomers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
-                ->select(['id', 'name', 'city', 'customer_level_id'])
+                ->onlySalesFormColumns()
                 ->with('level:id,code,name')
                 ->whereKey($oldCustomerId)
                 ->first();
@@ -231,15 +224,15 @@ class SalesInvoicePageController extends Controller
             AppCache::lookupCacheKey('forms.sales_invoices.products', ['limit' => 20, 'active_only' => 1]),
             now()->addSeconds(60),
             fn() => Product::query()
-                ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
-                ->where('is_active', true)
+                ->onlySalesFormColumns()
+                ->active()
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
         );
         if ($oldProductIds->isNotEmpty()) {
             $oldProducts = Product::query()
-                ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+                ->onlySalesFormColumns()
                 ->whereIn('id', $oldProductIds->all())
                 ->get();
             $initialProducts = $oldProducts->concat($initialProducts)->unique('id')->values();
@@ -488,14 +481,14 @@ class SalesInvoicePageController extends Controller
             ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $products = Product::query()
-            ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
-            ->where('is_active', true)
+            ->onlySalesFormColumns()
+            ->active()
             ->orderBy('name')
             ->limit(20)
             ->get();
         if ($itemProductIds->isNotEmpty()) {
             $itemProducts = Product::query()
-                ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+                ->onlySalesFormColumns()
                 ->whereIn('id', $itemProductIds->all())
                 ->get();
             $products = $itemProducts->concat($products)->unique('id')->values();
@@ -946,7 +939,7 @@ class SalesInvoicePageController extends Controller
 
     private function semesterBookService(): SemesterBookService
     {
-        return app(SemesterBookService::class);
+        return $this->semesterBookService;
     }
 
     private function paymentMethodLabel(string $method): string

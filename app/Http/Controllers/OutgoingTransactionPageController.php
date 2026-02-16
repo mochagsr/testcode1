@@ -39,6 +39,7 @@ class OutgoingTransactionPageController extends Controller
 
     public function index(Request $request): View
     {
+        $now = now();
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $semester = (string) $request->string('semester', '');
@@ -57,25 +58,16 @@ class OutgoingTransactionPageController extends Controller
         $selectedTransactionDate = $this->selectedDateFilter($transactionDate);
         $selectedTransactionDateRange = $this->selectedDateRange($selectedTransactionDate);
         $isDefaultRecentMode = $selectedTransactionDateRange === null && $selectedSemester === null && $search === '';
-        $recentRangeStart = now()->subDays(6)->startOfDay();
+        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
 
         $baseQuery = OutgoingTransaction::query()
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('transaction_number', 'like', "%{$search}%")
-                        ->orWhere('note_number', 'like', "%{$search}%")
-                        ->orWhereHas('supplier', function ($supplierQuery) use ($search): void {
-                            $supplierQuery->where('name', 'like', "%{$search}%")
-                                ->orWhere('company_name', 'like', "%{$search}%");
-                        });
-                });
-            })
+            ->searchKeyword($search)
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
+                $query->forSemester($selectedSemester);
             })
             ->when($selectedSupplierId !== null, function ($query) use ($selectedSupplierId): void {
-                $query->where('supplier_id', $selectedSupplierId);
+                $query->forSupplier($selectedSupplierId);
             })
             ->when($selectedTransactionDateRange !== null, function ($query) use ($selectedTransactionDateRange): void {
                 $query->whereBetween('transaction_date', $selectedTransactionDateRange);
@@ -128,8 +120,8 @@ class OutgoingTransactionPageController extends Controller
             'selectedSupplierId' => $selectedSupplierId,
             'supplierOptions' => Cache::remember(
                 AppCache::lookupCacheKey('outgoing_transactions.index.supplier_options'),
-                now()->addSeconds(60),
-                fn() => Supplier::query()->orderBy('name')->get(['id', 'name', 'company_name'])
+                $now->copy()->addSeconds(60),
+                fn() => Supplier::query()->onlyLookupColumns()->orderBy('name')->get()
             ),
             'currentSemester' => $defaultSemester,
             'previousSemester' => $previousSemester,
@@ -140,6 +132,7 @@ class OutgoingTransactionPageController extends Controller
 
     public function create(): View
     {
+        $now = now();
         $defaultSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($defaultSemester);
         $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
@@ -154,16 +147,16 @@ class OutgoingTransactionPageController extends Controller
         $oldSupplierId = (int) old('supplier_id', 0);
         $initialSuppliers = Cache::remember(
             AppCache::lookupCacheKey('forms.outgoing_transactions.suppliers', ['limit' => 20]),
-            now()->addSeconds(60),
+            $now->copy()->addSeconds(60),
             fn() => Supplier::query()
-                ->select(['id', 'name', 'company_name', 'phone', 'address'])
+                ->onlyLookupColumns()
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
         );
         if ($oldSupplierId > 0 && ! $initialSuppliers->contains('id', $oldSupplierId)) {
             $oldSupplier = Supplier::query()
-                ->select(['id', 'name', 'company_name', 'phone', 'address'])
+                ->onlyLookupColumns()
                 ->whereKey($oldSupplierId)
                 ->first();
             if ($oldSupplier !== null) {
@@ -179,17 +172,17 @@ class OutgoingTransactionPageController extends Controller
             ->values();
         $initialProducts = Cache::remember(
             AppCache::lookupCacheKey('forms.outgoing_transactions.products', ['limit' => 20, 'active_only' => 1]),
-            now()->addSeconds(60),
+            $now->copy()->addSeconds(60),
             fn() => Product::query()
-                ->select(['id', 'code', 'name', 'unit', 'stock', 'price_general'])
-                ->where('is_active', true)
+                ->onlyOutgoingFormColumns()
+                ->active()
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
         );
         if ($oldProductIds->isNotEmpty()) {
             $oldProducts = Product::query()
-                ->select(['id', 'code', 'name', 'unit', 'stock', 'price_general'])
+                ->onlyOutgoingFormColumns()
                 ->whereIn('id', $oldProductIds->all())
                 ->get();
             $initialProducts = $oldProducts->concat($initialProducts)->unique('id')->values();

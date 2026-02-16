@@ -114,6 +114,58 @@ class Product extends Model
     }
 
     /**
+     * Scope: Columns for sales/return product picker.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeOnlySalesFormColumns(Builder $query): Builder
+    {
+        return $query->select([
+            'id',
+            'code',
+            'name',
+            'stock',
+            'price_agent',
+            'price_sales',
+            'price_general',
+        ]);
+    }
+
+    /**
+     * Scope: Columns for delivery note product picker.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeOnlyDeliveryFormColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'code', 'name', 'unit', 'price_general']);
+    }
+
+    /**
+     * Scope: Columns for order note product picker.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeOnlyOrderFormColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'code', 'name']);
+    }
+
+    /**
+     * Scope: Columns for outgoing transaction product picker.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeOnlyOutgoingFormColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'code', 'name', 'unit', 'stock', 'price_general']);
+    }
+
+    /**
      * Scope: Eager load category with minimal columns.
      *
      * @param  Builder<Product>  $query
@@ -145,6 +197,28 @@ class Product extends Model
     public function scopeInCategory(Builder $query, int $categoryId): Builder
     {
         return $query->where('item_category_id', $categoryId);
+    }
+
+    /**
+     * Scope: Apply keyword search for code/name/category name.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeSearchKeyword(Builder $query, string $keyword): Builder
+    {
+        $search = trim($keyword);
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $subQuery) use ($search): void {
+            $subQuery->where('code', 'like', "%{$search}%")
+                ->orWhere('name', 'like', "%{$search}%")
+                ->orWhereHas('category', function (Builder $categoryQuery) use ($search): void {
+                    $categoryQuery->where('name', 'like', "%{$search}%");
+                });
+        });
     }
 
     /**

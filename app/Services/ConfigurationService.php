@@ -15,12 +15,8 @@ final class ConfigurationService
 {
     /**
      * Get a setting value with caching.
-     *
-     * @param  string  $key The setting key
-     * @param  mixed  $default Default value if not found
-     * @return mixed The setting value
      */
-    public static function get(string $key, mixed $default = null): mixed
+    public static function get(string $key, ?string $default = null): ?string
     {
         return AppSetting::getValue($key, $default);
     }
@@ -28,8 +24,8 @@ final class ConfigurationService
     /**
      * Get multiple setting values with caching.
      *
-     * @param  array<string, mixed>  $defaults
-     * @return array<string, mixed>
+     * @param  array<string, string|null>  $defaults
+     * @return array<string, string|null>
      */
     public static function getMany(array $defaults): array
     {

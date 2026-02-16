@@ -103,6 +103,26 @@ class OrderNote extends Model
     }
 
     /**
+     * Scope to apply keyword search.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeSearchKeyword(Builder $query, string $keyword): Builder
+    {
+        $search = trim($keyword);
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $subQuery) use ($search): void {
+            $subQuery->where('note_number', 'like', "%{$search}%")
+                ->orWhere('customer_name', 'like', "%{$search}%")
+                ->orWhere('city', 'like', "%{$search}%");
+        });
+    }
+
+    /**
      * Scope to filter canceled order notes only.
      *
      * @param Builder $query

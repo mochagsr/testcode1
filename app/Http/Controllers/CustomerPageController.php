@@ -36,13 +36,7 @@ class CustomerPageController extends Controller
                 'id_card_photo_path',
             ])
             ->withLevel()
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('city', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                });
-            })
+            ->searchKeyword($search)
             ->orderBy('name')
             ->paginate(25)
             ->withQueryString();
@@ -61,13 +55,7 @@ class CustomerPageController extends Controller
 
         $customerQuery = Customer::query()
             ->select(['id', 'name', 'phone', 'city', 'address', 'outstanding_receivable'])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('city', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                });
-            })
+            ->searchKeyword($search)
             ->orderBy('id');
 
         $customerCount = (clone $customerQuery)->count();
@@ -147,7 +135,6 @@ class CustomerPageController extends Controller
         unset($data['id_card_photo']);
         Customer::create($data);
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()->route('customers-web.index')->with('success', 'Customer created successfully.');
     }
@@ -179,7 +166,6 @@ class CustomerPageController extends Controller
         unset($data['id_card_photo'], $data['remove_id_card_photo']);
         $customer->update($data);
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()->route('customers-web.index')->with('success', 'Customer updated successfully.');
     }
@@ -191,7 +177,6 @@ class CustomerPageController extends Controller
         }
         $customer->delete();
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()->route('customers-web.index')->with('success', 'Customer deleted successfully.');
     }

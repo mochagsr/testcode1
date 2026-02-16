@@ -110,6 +110,61 @@ class Customer extends Model
     }
 
     /**
+     * Scope: Columns for sales/return form customer picker.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeOnlySalesFormColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'name', 'city', 'customer_level_id']);
+    }
+
+    /**
+     * Scope: Columns for receivable payment customer picker.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeOnlyReceivableFormColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance']);
+    }
+
+    /**
+     * Scope: Columns for delivery note customer picker.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeOnlyDeliveryFormColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'name', 'city', 'phone', 'address']);
+    }
+
+    /**
+     * Scope: Columns for order note customer picker.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeOnlyOrderFormColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'name', 'city', 'phone']);
+    }
+
+    /**
+     * Scope: Minimal columns for option/dropdown lists.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeOnlyOptionColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'name']);
+    }
+
+    /**
      * Scope: Eager load customer level.
      *
      * @param  Builder<Customer>  $query
@@ -129,6 +184,26 @@ class Customer extends Model
     public function scopeWithOutstanding(Builder $query): Builder
     {
         return $query->where('outstanding_receivable', '>', 0);
+    }
+
+    /**
+     * Scope: Apply keyword search for name/city/phone.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeSearchKeyword(Builder $query, string $keyword): Builder
+    {
+        $search = trim($keyword);
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $subQuery) use ($search): void {
+            $subQuery->where('name', 'like', "%{$search}%")
+                ->orWhere('city', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%");
+        });
     }
 
     /**

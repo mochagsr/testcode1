@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
 use App\Support\ValidatesSearchTokens;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -31,21 +32,16 @@ class ProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
-        $page = max(1, (int) $request->integer('page', 1));
+        $perPage = $this->resolveLookupPerPage($request, 20, 25);
+        $page = $this->resolveLookupPage($request);
         $search = trim((string) $request->string('search', ''));
         $hasSearch = $search !== '';
         $activeOnly = $request->boolean('active_only');
         $itemCategoryId = $request->filled('item_category_id') ? (int) $request->integer('item_category_id') : null;
+        $now = now();
 
         if ($hasSearch && ! $this->hasValidSearchTokens($search)) {
-            return response()->json([
-                'data' => [],
-                'current_page' => $page,
-                'last_page' => 1,
-                'per_page' => $perPage,
-                'total' => 0,
-            ]);
+            return response()->json($this->emptyLookupPage($page, $perPage));
         }
 
         $productsQuery = Product::query()
@@ -62,21 +58,9 @@ class ProductController extends Controller
                 'is_active',
             ])
             ->with('category:id,code,name')
-            ->when($activeOnly, function ($query): void {
-                $query->where('is_active', true);
-            })
-            ->when($hasSearch, function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhereHas('category', function ($categoryQuery) use ($search): void {
-                            $categoryQuery->where('name', 'like', "%{$search}%");
-                        });
-                });
-            })
-            ->when($itemCategoryId !== null, function ($query) use ($itemCategoryId): void {
-                $query->where('item_category_id', $itemCategoryId);
-            })
+            ->when($activeOnly, fn(Builder $query) => $query->active())
+            ->when($hasSearch, fn(Builder $query) => $query->searchKeyword($search))
+            ->when($itemCategoryId !== null, fn(Builder $query) => $query->inCategory((int) $itemCategoryId))
             ->orderBy('name')
             ->orderBy('id');
 
@@ -87,7 +71,7 @@ class ProductController extends Controller
             'active_only' => $activeOnly ? 1 : 0,
             'item_category_id' => $itemCategoryId ?? 0,
         ]);
-        $products = Cache::remember($cacheKey, now()->addSeconds(20), function () use ($productsQuery, $perPage) {
+        $products = Cache::remember($cacheKey, $now->copy()->addSeconds(20), function () use ($productsQuery, $perPage) {
             return $productsQuery->paginate($perPage)->toArray();
         });
 

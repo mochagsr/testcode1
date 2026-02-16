@@ -6,24 +6,23 @@ namespace App\Http\Controllers;
 
 use App\Models\ItemCategory;
 use App\Support\AppCache;
+use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ItemCategoryController extends Controller
 {
+    use ValidatesSearchTokens;
+
     public function index(Request $request): JsonResponse
     {
-        $perPage = min(max((int) $request->integer('per_page', 25), 1), 25);
+        $perPage = $this->resolveLookupPerPage($request, 25, 25);
         $search = trim((string) $request->string('search', ''));
 
         $categories = ItemCategory::query()
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%");
-                });
-            })
+            ->onlyListColumns()
+            ->searchKeyword($search)
             ->orderBy('code')
             ->paginate($perPage);
 

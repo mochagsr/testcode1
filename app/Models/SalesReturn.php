@@ -122,6 +122,28 @@ class SalesReturn extends Model
     }
 
     /**
+     * Scope to apply keyword search.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeSearchKeyword(Builder $query, string $keyword): Builder
+    {
+        $search = trim($keyword);
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $subQuery) use ($search): void {
+            $subQuery->where('return_number', 'like', "%{$search}%")
+                ->orWhereHas('customer', function (Builder $customerQuery) use ($search): void {
+                    $customerQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%");
+                });
+        });
+    }
+
+    /**
      * Scope to filter canceled sales returns only.
      *
      * @param Builder $query

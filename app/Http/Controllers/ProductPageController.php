@@ -34,28 +34,10 @@ class ProductPageController extends Controller
         $search = trim((string) $request->string('search', ''));
 
         $products = Product::query()
-            ->select([
-                'id',
-                'item_category_id',
-                'code',
-                'name',
-                'stock',
-                'price_agent',
-                'price_sales',
-                'price_general',
-                'is_active',
-            ])
+            ->onlyListColumns()
             ->active()
             ->withCategoryInfo()
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhereHas('category', function ($categoryQuery) use ($search): void {
-                            $categoryQuery->where('name', 'like', "%{$search}%");
-                        });
-                });
-            })
+            ->searchKeyword($search)
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
@@ -73,13 +55,9 @@ class ProductPageController extends Controller
         $filename = 'products-' . $printedAt->format('Ymd-His') . '.xlsx';
 
         $productQuery = Product::query()
+            ->active()
             ->select(['id', 'code', 'name', 'stock'])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
-                });
-            })
+            ->searchKeyword($search)
             ->orderBy('id');
 
         $productCount = (clone $productQuery)->count();
@@ -150,7 +128,6 @@ class ProductPageController extends Controller
         $product = Product::create($data);
         $this->auditLogService->log('master.product.create', $product, "Product created: {$product->code}", $request);
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('products.index')
@@ -180,7 +157,6 @@ class ProductPageController extends Controller
         $product->update($data);
         $this->auditLogService->log('master.product.update', $product, "Product updated: {$product->code}", $request);
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('products.index')
@@ -193,7 +169,6 @@ class ProductPageController extends Controller
         $product->delete();
         $this->auditLogService->log('master.product.delete', null, "Product deleted: {$code}", $request);
         AppCache::forgetAfterFinancialMutation();
-        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('products.index')

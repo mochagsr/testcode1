@@ -26,6 +26,7 @@ class ReceivablePaymentPageController extends Controller
 
     public function index(Request $request): View
     {
+        $now = now();
         $search = trim((string) $request->string('search', ''));
         $status = trim((string) $request->string('status', ''));
         $paymentDate = trim((string) $request->string('payment_date', ''));
@@ -38,38 +39,22 @@ class ReceivablePaymentPageController extends Controller
             ]
             : null;
         $isDefaultRecentMode = $selectedPaymentDateRange === null && $search === '';
-        $recentRangeStart = now()->subDays(6)->startOfDay();
+        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
 
         $payments = ReceivablePayment::query()
-            ->select([
-                'id',
-                'payment_number',
-                'customer_id',
-                'payment_date',
-                'amount',
-                'is_canceled',
-            ])
-            ->with('customer:id,name,city')
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('payment_number', 'like', "%{$search}%")
-                        ->orWhereHas('customer', function ($customerQuery) use ($search): void {
-                            $customerQuery->where('name', 'like', "%{$search}%")
-                                ->orWhere('city', 'like', "%{$search}%");
-                        });
-                });
-            })
-            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                $query->where('is_canceled', $selectedStatus === 'canceled');
-            })
-            ->when($selectedPaymentDateRange !== null, function ($query) use ($selectedPaymentDateRange): void {
-                $query->whereBetween('payment_date', $selectedPaymentDateRange);
-            })
+            ->onlyListColumns()
+            ->withCustomerInfo()
+            ->searchKeyword($search)
+            ->when($selectedStatus === 'active', fn($query) => $query->active())
+            ->when($selectedStatus === 'canceled', fn($query) => $query->canceled())
+            ->when($selectedPaymentDateRange !== null, fn($query) => $query->betweenDates(
+                $selectedPaymentDateRange[0],
+                $selectedPaymentDateRange[1]
+            ))
             ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
                 $query->where('payment_date', '>=', $recentRangeStart);
             })
-            ->latest('payment_date')
-            ->latest('id')
+            ->orderByDate()
             ->paginate(20)
             ->withQueryString();
 
@@ -84,10 +69,11 @@ class ReceivablePaymentPageController extends Controller
 
     public function create(Request $request): View
     {
+        $now = now();
         $prefillCustomerId = $request->integer('customer_id');
         $rawPrefillAmount = $request->integer('amount', 0);
         $prefillAmount = $rawPrefillAmount > 0 ? $rawPrefillAmount : null;
-        $prefillDate = trim((string) $request->string('payment_date', now()->format('Y-m-d')));
+        $prefillDate = trim((string) $request->string('payment_date', $now->format('Y-m-d')));
         $preferredInvoiceId = $request->integer('preferred_invoice_id');
         $returnTo = $this->sanitizeReturnPath((string) $request->string('return_to', ''));
 
@@ -96,23 +82,23 @@ class ReceivablePaymentPageController extends Controller
             $preferredInvoice = SalesInvoice::query()
                 ->whereKey($preferredInvoiceId)
                 ->where('customer_id', $prefillCustomerId)
-                ->where('is_canceled', false)
-                ->where('balance', '>', 0)
+                ->active()
+                ->withOpenBalance()
                 ->first(['id', 'invoice_number', 'balance']);
         }
         $oldCustomerId = (int) old('customer_id', $prefillCustomerId > 0 ? $prefillCustomerId : 0);
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.receivable_payments.customers', ['limit' => 20]),
-            now()->addSeconds(60),
+            $now->copy()->addSeconds(60),
             fn() => Customer::query()
-                ->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance'])
+                ->onlyReceivableFormColumns()
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
         );
         if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
-                ->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance'])
+                ->onlyReceivableFormColumns()
                 ->whereKey($oldCustomerId)
                 ->first();
             if ($oldCustomer !== null) {
@@ -125,7 +111,7 @@ class ReceivablePaymentPageController extends Controller
             'customers' => $customers,
             'prefillCustomerId' => $prefillCustomerId > 0 ? $prefillCustomerId : null,
             'prefillAmount' => $prefillAmount,
-            'prefillDate' => $prefillDate !== '' ? $prefillDate : now()->format('Y-m-d'),
+            'prefillDate' => $prefillDate !== '' ? $prefillDate : $now->format('Y-m-d'),
             'preferredInvoice' => $preferredInvoice,
             'returnTo' => $returnTo,
         ]);
@@ -169,10 +155,9 @@ class ReceivablePaymentPageController extends Controller
             $remaining = $amount;
             $invoices = SalesInvoice::query()
                 ->where('customer_id', $customer->id)
-                ->where('is_canceled', false)
-                ->where('balance', '>', 0)
-                ->orderBy('invoice_date')
-                ->orderBy('id')
+                ->active()
+                ->withOpenBalance()
+                ->orderByDate('asc')
                 ->lockForUpdate()
                 ->get();
 

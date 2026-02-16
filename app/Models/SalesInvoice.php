@@ -91,6 +91,7 @@ class SalesInvoice extends Model
             'invoice_date',
             'semester_period',
             'total',
+            'total_paid',
             'balance',
             'payment_status',
             'is_canceled',
@@ -105,7 +106,7 @@ class SalesInvoice extends Model
      */
     public function scopeWithCustomerInfo(Builder $query): Builder
     {
-        return $query->with('customer:id,code,name,city');
+        return $query->with('customer:id,code,name,phone,city');
     }
 
     /**
@@ -140,5 +141,62 @@ class SalesInvoice extends Model
     public function scopeForSemester(Builder $query, string $semester): Builder
     {
         return $query->where('semester_period', $semester);
+    }
+
+    /**
+     * Scope: Filter by customer.
+     *
+     * @param  Builder<SalesInvoice>  $query
+     * @return Builder<SalesInvoice>
+     */
+    public function scopeForCustomer(Builder $query, int $customerId): Builder
+    {
+        return $query->where('customer_id', $customerId);
+    }
+
+    /**
+     * Scope: Filter invoices with open balance.
+     *
+     * @param  Builder<SalesInvoice>  $query
+     * @return Builder<SalesInvoice>
+     */
+    public function scopeWithOpenBalance(Builder $query): Builder
+    {
+        return $query->where('balance', '>', 0);
+    }
+
+    /**
+     * Scope: Apply keyword search by invoice number or customer.
+     *
+     * @param  Builder<SalesInvoice>  $query
+     * @return Builder<SalesInvoice>
+     */
+    public function scopeSearchKeyword(Builder $query, string $keyword): Builder
+    {
+        $search = trim($keyword);
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $subQuery) use ($search): void {
+            $subQuery->where('invoice_number', 'like', "%{$search}%")
+                ->orWhereHas('customer', function (Builder $customerQuery) use ($search): void {
+                    $customerQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%");
+                });
+        });
+    }
+
+    /**
+     * Scope: Order by invoice date then id.
+     *
+     * @param  Builder<SalesInvoice>  $query
+     * @param  string  $direction
+     * @return Builder<SalesInvoice>
+     */
+    public function scopeOrderByDate(Builder $query, string $direction = 'desc'): Builder
+    {
+        return $query->orderBy('invoice_date', $direction)
+            ->orderBy('id', $direction);
     }
 }

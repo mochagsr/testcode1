@@ -80,18 +80,20 @@ class AppSetting extends Model
             }
 
             $timestamp = now();
-            $rows = collect($values)
-                ->map(function ($value, $key) use ($timestamp): array {
-                    return [
-                        'key' => (string) $key,
-                        'value' => $value,
-                        'created_at' => $timestamp,
-                        'updated_at' => $timestamp,
-                    ];
-                })
-                ->filter(fn(array $row): bool => $row['key'] !== '')
-                ->values()
-                ->all();
+            $rows = [];
+            foreach ($values as $key => $value) {
+                $normalizedKey = (string) $key;
+                if ($normalizedKey === '') {
+                    continue;
+                }
+
+                $rows[] = [
+                    'key' => $normalizedKey,
+                    'value' => $value,
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
+                ];
+            }
 
             if ($rows === []) {
                 return;

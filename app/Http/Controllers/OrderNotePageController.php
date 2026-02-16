@@ -31,11 +31,13 @@ class OrderNotePageController extends Controller
     use ResolvesSemesterOptions;
 
     public function __construct(
-        private readonly AuditLogService $auditLogService
+        private readonly AuditLogService $auditLogService,
+        private readonly SemesterBookService $semesterBookService
     ) {}
 
     public function index(Request $request): View
     {
+        $now = now();
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $semester = (string) $request->string('semester', '');
@@ -46,8 +48,8 @@ class OrderNotePageController extends Controller
         $selectedNoteDate = $this->selectedDateFilter($noteDate);
         $selectedNoteDateRange = $this->selectedDateRange($selectedNoteDate);
         $isDefaultRecentMode = $selectedNoteDateRange === null && $selectedSemester === null && $search === '';
-        $recentRangeStart = now()->subDays(6)->startOfDay();
-        $todayRange = [now()->startOfDay(), now()->endOfDay()];
+        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
+        $todayRange = [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
 
         $currentSemester = $this->currentSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
@@ -67,13 +69,7 @@ class OrderNotePageController extends Controller
         $notes = OrderNote::query()
             ->onlyListColumns()
             ->withCustomerInfo()
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('note_number', 'like', "%{$search}%")
-                        ->orWhere('customer_name', 'like', "%{$search}%")
-                        ->orWhere('city', 'like', "%{$search}%");
-                });
-            })
+            ->searchKeyword($search)
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
             })
@@ -93,9 +89,9 @@ class OrderNotePageController extends Controller
         $todaySummary = Cache::remember(
             AppCache::lookupCacheKey('order_notes.index.today_summary', [
                 'status' => $selectedStatus ?? 'all',
-                'date' => now()->toDateString(),
+                'date' => $now->toDateString(),
             ]),
-            now()->addSeconds(30),
+            $now->copy()->addSeconds(30),
             function () use ($todayRange, $selectedStatus) {
                 return (object) [
                     'total_notes' => (int) OrderNote::query()
@@ -131,19 +127,20 @@ class OrderNotePageController extends Controller
 
     public function create(): View
     {
+        $now = now();
         $oldCustomerId = (int) old('customer_id', 0);
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.customers', ['limit' => 20]),
-            now()->addSeconds(60),
+            $now->copy()->addSeconds(60),
             fn() => Customer::query()
-                ->select(['id', 'name', 'city', 'phone'])
+                ->onlyOrderFormColumns()
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
         );
         if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
-                ->select(['id', 'name', 'city', 'phone'])
+                ->onlyOrderFormColumns()
                 ->whereKey($oldCustomerId)
                 ->first();
             if ($oldCustomer !== null) {
@@ -159,17 +156,17 @@ class OrderNotePageController extends Controller
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 20, 'active_only' => 1]),
-            now()->addSeconds(60),
+            $now->copy()->addSeconds(60),
             fn() => Product::query()
-                ->select(['id', 'code', 'name'])
-                ->where('is_active', true)
+                ->onlyOrderFormColumns()
+                ->active()
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
         );
         if ($oldProductIds->isNotEmpty()) {
             $oldProducts = Product::query()
-                ->select(['id', 'code', 'name'])
+                ->onlyOrderFormColumns()
                 ->whereIn('id', $oldProductIds->all())
                 ->get();
             $products = $oldProducts->concat($products)->unique('id')->values();
@@ -254,6 +251,7 @@ class OrderNotePageController extends Controller
 
     public function show(OrderNote $orderNote): View
     {
+        $now = now();
         $orderNote->load(['customer:id,name,city,phone', 'items']);
         $itemProductIds = $orderNote->items
             ->pluck('product_id')
@@ -262,17 +260,17 @@ class OrderNotePageController extends Controller
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 20, 'active_only' => 1]),
-            now()->addSeconds(60),
+            $now->copy()->addSeconds(60),
             fn() => Product::query()
-                ->select(['id', 'code', 'name'])
-                ->where('is_active', true)
+                ->onlyOrderFormColumns()
+                ->active()
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
         );
         if ($itemProductIds->isNotEmpty()) {
             $itemProducts = Product::query()
-                ->select(['id', 'code', 'name'])
+                ->onlyOrderFormColumns()
                 ->whereIn('id', $itemProductIds->all())
                 ->get();
             $products = $itemProducts->concat($products)->unique('id')->values();
@@ -458,27 +456,22 @@ class OrderNotePageController extends Controller
 
     private function currentSemesterPeriod(): string
     {
-        return $this->semesterBookService()->currentSemester();
+        return $this->semesterBookService->currentSemester();
     }
 
     private function previousSemesterPeriod(string $period): string
     {
-        return $this->semesterBookService()->previousSemester($period);
+        return $this->semesterBookService->previousSemester($period);
     }
 
     private function semesterDateRange(?string $period): ?array
     {
-        return $this->semesterBookService()->semesterDateRange($period);
+        return $this->semesterBookService->semesterDateRange($period);
     }
 
     private function semesterPeriodFromDate(Carbon|string|null $date): string
     {
         $rawDate = $date instanceof Carbon ? $date->format('Y-m-d') : (string) $date;
-        return $this->semesterBookService()->semesterFromDate($rawDate) ?? $this->currentSemesterPeriod();
-    }
-
-    private function semesterBookService(): SemesterBookService
-    {
-        return app(SemesterBookService::class);
+        return $this->semesterBookService->semesterFromDate($rawDate) ?? $this->currentSemesterPeriod();
     }
 }

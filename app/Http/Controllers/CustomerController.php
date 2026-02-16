@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Support\AppCache;
 use App\Support\ValidatesSearchTokens;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -18,19 +19,14 @@ class CustomerController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $perPage = min(max((int) $request->integer('per_page', 20), 1), 25);
-        $page = max(1, (int) $request->integer('page', 1));
+        $perPage = $this->resolveLookupPerPage($request, 20, 25);
+        $page = $this->resolveLookupPage($request);
         $search = trim((string) $request->string('search', ''));
         $hasSearch = $search !== '';
+        $now = now();
 
         if ($hasSearch && ! $this->hasValidSearchTokens($search)) {
-            return response()->json([
-                'data' => [],
-                'current_page' => $page,
-                'last_page' => 1,
-                'per_page' => $perPage,
-                'total' => 0,
-            ]);
+            return response()->json($this->emptyLookupPage($page, $perPage));
         }
 
         $customersQuery = Customer::query()
@@ -45,13 +41,7 @@ class CustomerController extends Controller
                 'credit_balance',
             ])
             ->with('level:id,code,name')
-            ->when($hasSearch, function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('city', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                });
-            })
+            ->when($hasSearch, fn(Builder $query) => $query->searchKeyword($search))
             ->orderBy('name')
             ->orderBy('id');
 
@@ -60,7 +50,7 @@ class CustomerController extends Controller
             'page' => $page,
             'search' => mb_strtolower($search),
         ]);
-        $customers = Cache::remember($cacheKey, now()->addSeconds(20), function () use ($customersQuery, $perPage) {
+        $customers = Cache::remember($cacheKey, $now->copy()->addSeconds(20), function () use ($customersQuery, $perPage) {
             return $customersQuery->paginate($perPage)->toArray();
         });
 
@@ -153,4 +143,5 @@ class CustomerController extends Controller
 
         return $code;
     }
+
 }

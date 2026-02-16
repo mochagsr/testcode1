@@ -30,22 +30,29 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportExportController extends Controller
 {
+    public function __construct(
+        private readonly SemesterBookService $semesterBookService
+    ) {}
+
     public function index(Request $request): View
     {
+        $now = now();
         $selectedSemester = $this->selectedSemester($request);
         $selectedCustomerId = $this->selectedCustomerId($request);
         $selectedUserRole = $this->selectedUserRole($request);
         $selectedFinanceLock = $this->selectedFinanceLock($request);
         $selectedOutgoingSupplierId = $this->selectedOutgoingSupplierId($request);
-        $receivableCustomers = Cache::remember(AppCache::lookupCacheKey('reports.receivable_customers.options'), now()->addSeconds(60), function () {
+        $receivableCustomers = Cache::remember(AppCache::lookupCacheKey('reports.receivable_customers.options'), $now->copy()->addSeconds(60), function () {
             return Customer::query()
+                ->onlyOptionColumns()
                 ->orderBy('name')
-                ->get(['id', 'name']);
+                ->get();
         });
-        $outgoingSuppliers = Cache::remember(AppCache::lookupCacheKey('reports.outgoing_suppliers.options'), now()->addSeconds(60), function () {
+        $outgoingSuppliers = Cache::remember(AppCache::lookupCacheKey('reports.outgoing_suppliers.options'), $now->copy()->addSeconds(60), function () {
             return Supplier::query()
+                ->onlyOptionColumns()
                 ->orderBy('name')
-                ->get(['id', 'name']);
+                ->get();
         });
 
         return view('reports.index', [
@@ -339,16 +346,8 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function (): array {
                     return Product::query()
-                        ->select([
-                            'id',
-                            'item_category_id',
-                            'name',
-                            'stock',
-                            'price_agent',
-                            'price_sales',
-                            'price_general',
-                        ])
-                        ->with('category:id,name')
+                        ->onlyListColumns()
+                        ->withCategoryInfo()
                         ->orderBy('name')
                         ->get()
                         ->map(fn(Product $row): array => [
@@ -374,16 +373,8 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedCustomerIds): array {
                     return Customer::query()
-                        ->select([
-                            'id',
-                            'customer_level_id',
-                            'name',
-                            'phone',
-                            'city',
-                            'outstanding_receivable',
-                            'credit_balance',
-                        ])
-                        ->with('level:id,name')
+                        ->onlyListColumns()
+                        ->withLevel()
                         ->when(count($selectedCustomerIds) > 0, function ($query) use ($selectedCustomerIds): void {
                             $query->whereIn('id', $selectedCustomerIds);
                         })
@@ -413,21 +404,12 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedUserRole, $selectedFinanceLock): array {
                     return User::query()
-                        ->select([
-                            'id',
-                            'name',
-                            'email',
-                            'role',
-                            'locale',
-                            'theme',
-                            'finance_locked',
-                            'created_at',
-                        ])
+                        ->onlyListColumns()
                         ->when($selectedUserRole !== null, function ($query) use ($selectedUserRole): void {
-                            $query->where('role', $selectedUserRole);
+                            $query->inRole($selectedUserRole);
                         })
                         ->when($selectedFinanceLock !== null, function ($query) use ($selectedFinanceLock): void {
-                            $query->where('finance_locked', $selectedFinanceLock);
+                            $query->financeLock((int) $selectedFinanceLock === 1);
                         })
                         ->orderBy('name')
                         ->get()
@@ -468,21 +450,12 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedSemester): array {
                     $invoices = SalesInvoice::query()
-                        ->select([
-                            'id',
-                            'invoice_number',
-                            'invoice_date',
-                            'customer_id',
-                            'total',
-                            'total_paid',
-                            'payment_status',
-                            'semester_period',
-                        ])
-                        ->with('customer:id,name,phone,city')
+                        ->onlyListColumns()
+                        ->withCustomerInfo()
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                            $query->where('semester_period', $selectedSemester);
+                            $query->forSemester($selectedSemester);
                         })
-                        ->latest('invoice_date')
+                        ->orderByDate()
                         ->get();
 
                     $invoiceIds = $invoices
@@ -771,22 +744,14 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedSemester, $selectedOutgoingSupplierId): array {
                     return OutgoingTransaction::query()
-                        ->select([
-                            'id',
-                            'transaction_number',
-                            'transaction_date',
-                            'note_number',
-                            'supplier_id',
-                            'total',
-                            'semester_period',
-                            'created_by_user_id',
-                        ])
-                        ->with(['supplier:id,name,phone', 'creator:id,name'])
+                        ->onlyListColumns()
+                        ->withSupplierInfo()
+                        ->withCreator()
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                            $query->where('semester_period', $selectedSemester);
+                            $query->forSemester($selectedSemester);
                         })
                         ->when($selectedOutgoingSupplierId !== null, function ($query) use ($selectedOutgoingSupplierId): void {
-                            $query->where('supplier_id', $selectedOutgoingSupplierId);
+                            $query->forSupplier($selectedOutgoingSupplierId);
                         })
                         ->latest('transaction_date')
                         ->get()
@@ -1174,10 +1139,10 @@ class ReportExportController extends Controller
     {
         $aggregate = User::query()
             ->when($selectedUserRole !== null, function ($query) use ($selectedUserRole): void {
-                $query->where('role', $selectedUserRole);
+                $query->inRole($selectedUserRole);
             })
             ->when($selectedFinanceLock !== null, function ($query) use ($selectedFinanceLock): void {
-                $query->where('finance_locked', $selectedFinanceLock);
+                $query->financeLock((int) $selectedFinanceLock === 1);
             })
             ->selectRaw(
                 "COUNT(*) as total_users,
@@ -1242,7 +1207,8 @@ class ReportExportController extends Controller
 
     private function semesterOptions(): array
     {
-        return Cache::remember(AppCache::lookupCacheKey('reports.semester_options'), now()->addSeconds(60), function (): array {
+        $now = now();
+        return Cache::remember(AppCache::lookupCacheKey('reports.semester_options'), $now->copy()->addSeconds(60), function (): array {
             return $this->semesterBookService()->buildSemesterOptionCollection(
                 SalesInvoice::query()
                     ->whereNotNull('semester_period')
@@ -1340,6 +1306,6 @@ class ReportExportController extends Controller
 
     private function semesterBookService(): SemesterBookService
     {
-        return app(SemesterBookService::class);
+        return $this->semesterBookService;
     }
 }

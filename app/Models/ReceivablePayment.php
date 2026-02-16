@@ -63,6 +63,24 @@ class ReceivablePayment extends Model
     }
 
     /**
+     * Scope: Only columns used by list page.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    public function scopeOnlyListColumns(Builder $query): Builder
+    {
+        return $query->select([
+            'id',
+            'payment_number',
+            'customer_id',
+            'payment_date',
+            'amount',
+            'is_canceled',
+        ]);
+    }
+
+    /**
      * Scope: Only active (not canceled) payments.
      *
      * @param  Builder  $query
@@ -71,6 +89,17 @@ class ReceivablePayment extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_canceled', false);
+    }
+
+    /**
+     * Scope: Only canceled payments.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    public function scopeCanceled(Builder $query): Builder
+    {
+        return $query->where('is_canceled', true);
     }
 
     /**
@@ -105,6 +134,28 @@ class ReceivablePayment extends Model
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
         return $query->where('customer_id', $customerId);
+    }
+
+    /**
+     * Scope: Apply keyword search for payment/customer.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    public function scopeSearchKeyword(Builder $query, string $keyword): Builder
+    {
+        $search = trim($keyword);
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $subQuery) use ($search): void {
+            $subQuery->where('payment_number', 'like', "%{$search}%")
+                ->orWhereHas('customer', function (Builder $customerQuery) use ($search): void {
+                    $customerQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%");
+                });
+        });
     }
 
     /**
