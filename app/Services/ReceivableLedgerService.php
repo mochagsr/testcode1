@@ -1,13 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\ReceivableLedger;
 use Carbon\CarbonInterface;
 
-class ReceivableLedgerService
+final class ReceivableLedgerService
 {
+    /**
+     * Add a debit entry to the receivable ledger and update customer outstanding balance.
+     *
+     * @param  int  $customerId The customer ID
+     * @param  int|null  $invoiceId The invoice ID (if applicable)
+     * @param  CarbonInterface  $entryDate The date of the ledger entry
+     * @param  float  $amount The debit amount
+     * @param  string|null  $periodCode The period code
+     * @param  string|null  $description Additional description
+     * @return ReceivableLedger The created ledger entry
+     */
     public function addDebit(
         int $customerId,
         ?int $invoiceId,
@@ -34,6 +47,17 @@ class ReceivableLedgerService
         ]);
     }
 
+    /**
+     * Add a credit entry to the receivable ledger and update customer outstanding balance.
+     *
+     * @param  int  $customerId The customer ID
+     * @param  int|null  $invoiceId The invoice ID (if applicable)
+     * @param  CarbonInterface  $entryDate The date of the ledger entry
+     * @param  float  $amount The credit amount
+     * @param  string|null  $periodCode The period code
+     * @param  string|null  $description Additional description
+     * @return ReceivableLedger The created ledger entry
+     */
     public function addCredit(
         int $customerId,
         ?int $invoiceId,

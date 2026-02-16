@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
@@ -20,8 +22,7 @@ class ReceivablePaymentPageController extends Controller
 {
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -55,7 +56,7 @@ class ReceivablePaymentPageController extends Controller
                         ->orWhereHas('customer', function ($customerQuery) use ($search): void {
                             $customerQuery->where('name', 'like', "%{$search}%")
                                 ->orWhere('city', 'like', "%{$search}%");
-                    });
+                        });
                 });
             })
             ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
@@ -103,7 +104,7 @@ class ReceivablePaymentPageController extends Controller
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.receivable_payments.customers', ['limit' => 20]),
             now()->addSeconds(60),
-            fn () => Customer::query()
+            fn() => Customer::query()
                 ->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance'])
                 ->orderBy('name')
                 ->limit(20)
@@ -180,7 +181,7 @@ class ReceivablePaymentPageController extends Controller
                 $preferred = $invoices->firstWhere('id', $preferredInvoiceId);
                 if ($preferred) {
                     $invoices = collect([$preferred])->concat(
-                        $invoices->reject(fn (SalesInvoice $invoice): bool => (int) $invoice->id === $preferredInvoiceId)
+                        $invoices->reject(fn(SalesInvoice $invoice): bool => (int) $invoice->id === $preferredInvoiceId)
                     )->values();
                 }
             }
@@ -406,7 +407,7 @@ class ReceivablePaymentPageController extends Controller
     {
         $receivablePayment->load('customer:id,name,city,address,phone');
 
-        $filename = $receivablePayment->payment_number.'.pdf';
+        $filename = $receivablePayment->payment_number . '.pdf';
         $pdf = Pdf::loadView('receivable_payments.print', [
             'payment' => $receivablePayment,
             'isPdf' => true,
@@ -417,7 +418,7 @@ class ReceivablePaymentPageController extends Controller
 
     private function generatePaymentNumber(string $date): string
     {
-        $prefix = 'KWT-'.date('Ymd', strtotime($date));
+        $prefix = 'KWT-' . date('Ymd', strtotime($date));
         $count = ReceivablePayment::query()
             ->whereDate('payment_date', $date)
             ->lockForUpdate()
@@ -429,7 +430,7 @@ class ReceivablePaymentPageController extends Controller
     private function toIndonesianWords(float $amount): string
     {
         $integerPart = (int) round($amount);
-        $result = trim($this->spellNumber($integerPart)).' rupiah';
+        $result = trim($this->spellNumber($integerPart)) . ' rupiah';
 
         return ucfirst(trim($result));
     }
@@ -456,31 +457,31 @@ class ReceivablePaymentPageController extends Controller
             return $words[$number];
         }
         if ($number < 20) {
-            return $this->spellNumber($number - 10).' belas';
+            return $this->spellNumber($number - 10) . ' belas';
         }
         if ($number < 100) {
-            return $this->spellNumber((int) floor($number / 10)).' puluh '.$this->spellNumber($number % 10);
+            return $this->spellNumber((int) floor($number / 10)) . ' puluh ' . $this->spellNumber($number % 10);
         }
         if ($number < 200) {
-            return 'seratus '.$this->spellNumber($number - 100);
+            return 'seratus ' . $this->spellNumber($number - 100);
         }
         if ($number < 1000) {
-            return $this->spellNumber((int) floor($number / 100)).' ratus '.$this->spellNumber($number % 100);
+            return $this->spellNumber((int) floor($number / 100)) . ' ratus ' . $this->spellNumber($number % 100);
         }
         if ($number < 2000) {
-            return 'seribu '.$this->spellNumber($number - 1000);
+            return 'seribu ' . $this->spellNumber($number - 1000);
         }
         if ($number < 1000000) {
-            return $this->spellNumber((int) floor($number / 1000)).' ribu '.$this->spellNumber($number % 1000);
+            return $this->spellNumber((int) floor($number / 1000)) . ' ribu ' . $this->spellNumber($number % 1000);
         }
         if ($number < 1000000000) {
-            return $this->spellNumber((int) floor($number / 1000000)).' juta '.$this->spellNumber($number % 1000000);
+            return $this->spellNumber((int) floor($number / 1000000)) . ' juta ' . $this->spellNumber($number % 1000000);
         }
         if ($number < 1000000000000) {
-            return $this->spellNumber((int) floor($number / 1000000000)).' miliar '.$this->spellNumber($number % 1000000000);
+            return $this->spellNumber((int) floor($number / 1000000000)) . ' miliar ' . $this->spellNumber($number % 1000000000);
         }
 
-        return $this->spellNumber((int) floor($number / 1000000000000)).' triliun '.$this->spellNumber($number % 1000000000000);
+        return $this->spellNumber((int) floor($number / 1000000000000)) . ' triliun ' . $this->spellNumber($number % 1000000000000);
     }
 
     private function sanitizeReturnPath(string $path): ?string
@@ -497,5 +498,4 @@ class ReceivablePaymentPageController extends Controller
 
         return null;
     }
-
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
@@ -15,6 +17,8 @@ class DashboardController extends Controller
 {
     public function index(): View
     {
+        $now = now();
+
         if (! Schema::hasTable('products') || ! Schema::hasTable('customers') || ! Schema::hasTable('sales_invoices')) {
             return view('dashboard', [
                 'summary' => [
@@ -43,29 +47,29 @@ class DashboardController extends Controller
 
         $hasOutgoingTable = Schema::hasTable('outgoing_transactions') && Schema::hasTable('suppliers');
 
-        $monthKey = now()->format('Y-m');
-        $summaryCacheKey = 'dashboard.summary.'.$monthKey.'.'.($hasOutgoingTable ? 'with_outgoing' : 'without_outgoing');
-        $summary = Cache::remember($summaryCacheKey, now()->addSeconds(60), function () use ($hasOutgoingTable): array {
+        $monthKey = $now->format('Y-m');
+        $summaryCacheKey = 'dashboard.summary.' . $monthKey . '.' . ($hasOutgoingTable ? 'with_outgoing' : 'without_outgoing');
+        $summary = Cache::remember($summaryCacheKey, $now->copy()->addSeconds(60), function () use ($hasOutgoingTable, $now): array {
             return [
                 'total_products' => Product::count(),
                 'total_customers' => Customer::count(),
                 'total_receivable' => Customer::sum('outstanding_receivable'),
                 'invoice_this_month' => SalesInvoice::query()
-                    ->whereYear('invoice_date', now()->year)
-                    ->whereMonth('invoice_date', now()->month)
+                    ->whereYear('invoice_date', $now->year)
+                    ->whereMonth('invoice_date', $now->month)
                     ->sum('total'),
                 'outgoing_this_month' => $hasOutgoingTable
                     ? OutgoingTransaction::query()
-                        ->whereYear('transaction_date', now()->year)
-                        ->whereMonth('transaction_date', now()->month)
-                        ->sum('total')
+                    ->whereYear('transaction_date', $now->year)
+                    ->whereMonth('transaction_date', $now->month)
+                    ->sum('total')
                     : 0,
             ];
         });
 
         $uncollectedCustomers = Customer::query()
             ->select(['id', 'name', 'city', 'outstanding_receivable'])
-            ->where('outstanding_receivable', '>', 0)
+            ->withOutstanding()
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();

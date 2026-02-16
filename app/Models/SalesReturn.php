@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -64,5 +67,79 @@ class SalesReturn extends Model
     {
         return $this->hasMany(SalesReturnItem::class);
     }
-}
 
+    /**
+     * Scope: Only select essential columns for list views.
+     *
+     * @param  Builder<SalesReturn>  $query
+     * @return Builder<SalesReturn>
+     */
+    public function scopeOnlyListColumns(Builder $query): Builder
+    {
+        return $query->select([
+            'id',
+            'return_number',
+            'customer_id',
+            'sales_invoice_id',
+            'return_date',
+            'semester_period',
+            'total',
+            'is_canceled',
+        ]);
+    }
+
+    /**
+     * Scope to filter active sales returns (not canceled).
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_canceled', false);
+    }
+
+    /**
+     * Scope to eager load the associated customer.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeWithCustomerInfo(Builder $query): Builder
+    {
+        return $query->with('customer:id,code,name,city');
+    }
+
+    /**
+     * Scope to eager load the associated sales invoice.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeWithInvoiceInfo(Builder $query): Builder
+    {
+        return $query->with('invoice:id,invoice_number,customer_id,total,balance');
+    }
+
+    /**
+     * Scope to filter canceled sales returns only.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeCanceled(Builder $query): Builder
+    {
+        return $query->where('is_canceled', true);
+    }
+
+    /**
+     * Scope to order sales returns by return date descending.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeOrderByDate(Builder $query): Builder
+    {
+        return $query->orderBy('return_date', 'desc');
+    }
+}

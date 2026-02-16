@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
@@ -33,7 +35,7 @@ class CustomerPageController extends Controller
                 'outstanding_receivable',
                 'id_card_photo_path',
             ])
-            ->with('level:id,code,name')
+            ->withLevel()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('name', 'like', "%{$search}%")
@@ -55,7 +57,7 @@ class CustomerPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $printedAt = $this->nowWib();
-        $filename = 'customers-'.$printedAt->format('Ymd-His').'.xlsx';
+        $filename = 'customers-' . $printedAt->format('Ymd-His') . '.xlsx';
 
         $customerQuery = Customer::query()
             ->select(['id', 'name', 'phone', 'city', 'address', 'outstanding_receivable'])
@@ -76,7 +78,7 @@ class CustomerPageController extends Controller
             $sheet->setTitle('Customer');
 
             $sheet->setCellValue('A1', __('ui.customers_title'));
-            $sheet->setCellValue('A2', __('report.printed').': '.$printedAt->format('d-m-Y H:i:s').' WIB');
+            $sheet->setCellValue('A2', __('report.printed') . ': ' . $printedAt->format('d-m-Y H:i:s') . ' WIB');
             $sheet->setCellValue('A4', 'No');
             $sheet->setCellValue('B4', __('ui.name'));
             $sheet->setCellValue('C4', __('ui.phone'));
@@ -91,16 +93,16 @@ class CustomerPageController extends Controller
                     $phoneRaw = (string) ($customer->phone ?? '');
                     $phoneNumber = preg_replace('/[^0-9]/', '', $phoneRaw);
 
-                    $sheet->setCellValue('A'.$row, $number++);
-                    $sheet->setCellValue('B'.$row, (string) $customer->name);
+                    $sheet->setCellValue('A' . $row, $number++);
+                    $sheet->setCellValue('B' . $row, (string) $customer->name);
                     $sheet->setCellValueExplicit(
-                        'C'.$row,
+                        'C' . $row,
                         $phoneNumber !== '' ? $phoneNumber : '-',
                         DataType::TYPE_STRING
                     );
-                    $sheet->setCellValue('D'.$row, (string) ($customer->city ?: '-'));
-                    $sheet->setCellValue('E'.$row, (string) ($customer->address ?: '-'));
-                    $sheet->setCellValue('F'.$row, (int) round((float) $customer->outstanding_receivable));
+                    $sheet->setCellValue('D' . $row, (string) ($customer->city ?: '-'));
+                    $sheet->setCellValue('E' . $row, (string) ($customer->address ?: '-'));
+                    $sheet->setCellValue('F' . $row, (int) round((float) $customer->outstanding_receivable));
                     $row++;
                 }
             }, 'id', 'id');
@@ -109,7 +111,7 @@ class CustomerPageController extends Controller
             ExcelExportStyler::styleTable($sheet, 4, 6, $itemCount, true);
             if ($itemCount > 0) {
                 ExcelExportStyler::formatNumberColumns($sheet, 5, 4 + $itemCount, [1, 6], '#,##0');
-                $sheet->getStyle('C5:C'.(4 + $itemCount))->getNumberFormat()->setFormatCode('@');
+                $sheet->getStyle('C5:C' . (4 + $itemCount))->getNumberFormat()->setFormatCode('@');
             }
 
             $writer = new Xlsx($spreadsheet);
@@ -214,10 +216,10 @@ class CustomerPageController extends Controller
 
     private function generateCustomerCode(): string
     {
-        $prefix = 'CUS-'.now()->format('Ymd');
+        $prefix = 'CUS-' . now()->format('Ymd');
 
         do {
-            $code = $prefix.'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            $code = $prefix . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
         } while (Customer::query()->where('code', $code)->exists());
 
         return $code;

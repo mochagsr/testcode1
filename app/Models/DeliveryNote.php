@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -56,5 +59,69 @@ class DeliveryNote extends Model
     public function items(): HasMany
     {
         return $this->hasMany(DeliveryNoteItem::class);
+    }
+
+    /**
+     * Scope: Only select essential columns for list views.
+     *
+     * @param  Builder<DeliveryNote>  $query
+     * @return Builder<DeliveryNote>
+     */
+    public function scopeOnlyListColumns(Builder $query): Builder
+    {
+        return $query->select([
+            'id',
+            'note_number',
+            'note_date',
+            'customer_id',
+            'recipient_name',
+            'city',
+            'created_by_name',
+            'is_canceled',
+        ]);
+    }
+
+    /**
+     * Scope to filter active delivery notes (not canceled).
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_canceled', false);
+    }
+
+    /**
+     * Scope to eager load the associated customer.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeWithCustomerInfo(Builder $query): Builder
+    {
+        return $query->with('customer:id,name,city');
+    }
+
+    /**
+     * Scope to filter canceled delivery notes only.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeCanceled(Builder $query): Builder
+    {
+        return $query->where('is_canceled', true);
+    }
+
+    /**
+     * Scope to order delivery notes by delivery date descending.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeOrderByDate(Builder $query): Builder
+    {
+        return $query->orderBy('note_date', 'desc');
     }
 }

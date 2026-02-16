@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
@@ -28,8 +30,7 @@ class ReceivablePageController extends Controller
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService,
         private readonly SemesterBookService $semesterBookService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -44,7 +45,7 @@ class ReceivablePageController extends Controller
         $semesterOptions = Cache::remember(
             AppCache::lookupCacheKey('receivables.index.semester_options.base'),
             now()->addSeconds(60),
-            fn () => $this->semesterBookService->buildSemesterOptionCollection(
+            fn() => $this->semesterBookService->buildSemesterOptionCollection(
                 ReceivableLedger::query()
                     ->whereNotNull('period_code')
                     ->where('period_code', '!=', '')
@@ -144,34 +145,30 @@ class ReceivablePageController extends Controller
                 $selectedCustomerSemesterClosed = $this->semesterBookService->isCustomerLocked($customerId, $selectedSemester);
             }
 
-            $customerOutstandingTotal = (float) SalesInvoice::query()
+            $outstandingInvoiceQuery = SalesInvoice::query()
                 ->where('customer_id', $customerId)
                 ->where('is_canceled', false)
                 ->where('balance', '>', 0)
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                     $query->where('semester_period', $selectedSemester);
-                })
-                ->sum('balance');
+                });
 
-            $outstandingInvoices = SalesInvoice::query()
+            $customerOutstandingTotal = (float) (clone $outstandingInvoiceQuery)->sum('balance');
+
+            $outstandingInvoices = (clone $outstandingInvoiceQuery)
                 ->select(['id', 'invoice_number', 'invoice_date', 'semester_period', 'total', 'total_paid', 'balance'])
-                ->where('customer_id', $customerId)
-                ->where('is_canceled', false)
-                ->where('balance', '>', 0)
-                ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                    $query->where('semester_period', $selectedSemester);
-                })
                 ->orderBy('invoice_date')
                 ->orderBy('id')
                 ->get();
 
-            $ledgerOutstandingTotal = (float) ReceivableLedger::query()
+            $ledgerBaseQuery = ReceivableLedger::query()
                 ->where('customer_id', $customerId)
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                     $query->where('period_code', $selectedSemester);
-                })
-                ->sum(DB::raw('debit - credit'));
-            $ledgerRows = ReceivableLedger::query()
+                });
+
+            $ledgerOutstandingTotal = (float) (clone $ledgerBaseQuery)->sum(DB::raw('debit - credit'));
+            $ledgerRows = (clone $ledgerBaseQuery)
                 ->select([
                     'id',
                     'customer_id',
@@ -183,13 +180,9 @@ class ReceivablePageController extends Controller
                     'balance_after',
                     'period_code',
                 ])
-                ->with('invoice:id,invoice_number,balance,semester_period,customer_id,is_canceled')
-                ->where('customer_id', $customerId)
-                ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                    $query->where('period_code', $selectedSemester);
-                })
-                ->latest('entry_date')
-                ->latest('id')
+                ->withCustomerInfo()
+                ->withInvoiceInfo()
+                ->orderByDate()
                 ->limit(50)
                 ->get();
             $ledgerRows = $this->filterRedundantPaymentSummaryRows($ledgerRows);
@@ -339,7 +332,7 @@ class ReceivablePageController extends Controller
     {
         $data = $this->customerBillViewData($request, $customer);
         $data['isPdf'] = true;
-        $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.pdf';
+        $filename = 'tagihan-' . $customer->id . '-' . $this->nowWib()->format('Ymd-His') . '.pdf';
 
         return Pdf::loadView('receivables.print_customer_bill', $data)
             ->setPaper('a4', 'portrait')
@@ -350,7 +343,7 @@ class ReceivablePageController extends Controller
     {
         $data = $this->customerBillViewData($request, $customer);
         $rows = collect($data['rows'] ?? []);
-        $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.xlsx';
+        $filename = 'tagihan-' . $customer->id . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx';
 
         return response()->streamDownload(function () use ($rows, $data): void {
             $spreadsheet = new Spreadsheet();
@@ -544,6 +537,14 @@ class ReceivablePageController extends Controller
         $statementData = $this->cachedCustomerBillStatement((int) $customer->id, $selectedSemester !== '' ? $selectedSemester : null);
         $statementRows = $statementData['rows'];
         $totals = $statementData['totals'];
+        $settings = AppSetting::getValues([
+            'company_logo_path' => null,
+            'company_name' => 'CV. PUSTAKA GRAFIKA',
+            'company_address' => '',
+            'company_phone' => '',
+            'company_email' => '',
+            'company_invoice_notes' => '',
+        ]);
 
         return [
             'customer' => $customer,
@@ -552,12 +553,12 @@ class ReceivablePageController extends Controller
             'rows' => $statementRows,
             'totalOutstanding' => (int) round((float) $totals['running_balance']),
             'totals' => $totals,
-            'companyLogoPath' => AppSetting::getValue('company_logo_path'),
-            'companyName' => trim((string) AppSetting::getValue('company_name', 'CV. PUSTAKA GRAFIKA')),
-            'companyAddress' => trim((string) AppSetting::getValue('company_address', '')),
-            'companyPhone' => trim((string) AppSetting::getValue('company_phone', '')),
-            'companyEmail' => trim((string) AppSetting::getValue('company_email', '')),
-            'companyInvoiceNotes' => trim((string) AppSetting::getValue('company_invoice_notes', '')),
+            'companyLogoPath' => $settings['company_logo_path'] ?? null,
+            'companyName' => trim((string) ($settings['company_name'] ?? 'CV. PUSTAKA GRAFIKA')),
+            'companyAddress' => trim((string) ($settings['company_address'] ?? '')),
+            'companyPhone' => trim((string) ($settings['company_phone'] ?? '')),
+            'companyEmail' => trim((string) ($settings['company_email'] ?? '')),
+            'companyInvoiceNotes' => trim((string) ($settings['company_invoice_notes'] ?? '')),
         ];
     }
 
@@ -591,7 +592,7 @@ class ReceivablePageController extends Controller
                 'semester' => (string) ($normalizedSemester ?? ''),
             ]),
             now()->addSeconds(45),
-            fn () => $this->buildCustomerBillStatement($customerId, $normalizedSemester)
+            fn() => $this->buildCustomerBillStatement($customerId, $normalizedSemester)
         );
     }
 
@@ -655,8 +656,8 @@ class ReceivablePageController extends Controller
             $proofNumber = $ledgerRow->invoice?->invoice_number ?: (trim((string) ($ledgerRow->description ?? '')) ?: '-');
             $invoiceId = $ledgerRow->invoice?->id;
             $groupKey = $invoiceId !== null
-                ? 'invoice:'.$invoiceId
-                : 'text:'.$proofNumber;
+                ? 'invoice:' . $invoiceId
+                : 'text:' . $proofNumber;
             $dateValue = $ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date;
 
             if (!isset($groupedRows[$groupKey])) {

@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
+use App\Http\Controllers\Concerns\ResolvesProductUnits;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Services\AuditLogService;
@@ -20,11 +22,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductPageController extends Controller
 {
+    use ResolvesProductUnits;
+
     public function __construct(
         private readonly AuditLogService $auditLogService,
         private readonly ProductCodeGenerator $productCodeGenerator
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -40,8 +43,10 @@ class ProductPageController extends Controller
                 'price_agent',
                 'price_sales',
                 'price_general',
+                'is_active',
             ])
-            ->with('category:id,code,name')
+            ->active()
+            ->withCategoryInfo()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('code', 'like', "%{$search}%")
@@ -65,7 +70,7 @@ class ProductPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $printedAt = $this->nowWib();
-        $filename = 'products-'.$printedAt->format('Ymd-His').'.xlsx';
+        $filename = 'products-' . $printedAt->format('Ymd-His') . '.xlsx';
 
         $productQuery = Product::query()
             ->select(['id', 'code', 'name', 'stock'])
@@ -85,7 +90,7 @@ class ProductPageController extends Controller
             $sheet->setTitle('Barang');
 
             $sheet->setCellValue('A1', __('ui.products_title'));
-            $sheet->setCellValue('A2', __('report.printed').': '.$printedAt->format('d-m-Y H:i:s').' WIB');
+            $sheet->setCellValue('A2', __('report.printed') . ': ' . $printedAt->format('d-m-Y H:i:s') . ' WIB');
             $sheet->setCellValue('A4', 'No');
             $sheet->setCellValue('B4', __('ui.code'));
             $sheet->setCellValue('C4', __('ui.name'));
@@ -95,10 +100,10 @@ class ProductPageController extends Controller
             $number = 1;
             $productQuery->chunkById(500, function ($products) use ($sheet, &$row, &$number): void {
                 foreach ($products as $product) {
-                    $sheet->setCellValue('A'.$row, $number++);
-                    $sheet->setCellValue('B'.$row, (string) ($product->code ?: '-'));
-                    $sheet->setCellValue('C'.$row, (string) $product->name);
-                    $sheet->setCellValue('D'.$row, (int) round((float) $product->stock));
+                    $sheet->setCellValue('A' . $row, $number++);
+                    $sheet->setCellValue('B' . $row, (string) ($product->code ?: '-'));
+                    $sheet->setCellValue('C' . $row, (string) $product->name);
+                    $sheet->setCellValue('D' . $row, (int) round((float) $product->stock));
                     $row++;
                 }
             }, 'id', 'id');
@@ -127,8 +132,8 @@ class ProductPageController extends Controller
     {
         return view('products.create', [
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
-            'unitOptions' => $this->configuredUnitOptions(),
-            'defaultUnit' => $this->defaultUnitCode(),
+            'unitOptions' => $this->configuredProductUnitOptions(),
+            'defaultUnit' => $this->defaultProductUnitCode(),
         ]);
     }
 
@@ -136,7 +141,7 @@ class ProductPageController extends Controller
     {
         $request->merge([
             'code' => $this->productCodeGenerator->normalizeInput($request->input('code')),
-            'unit' => $this->normalizeUnitInput($request->input('unit')),
+            'unit' => $this->normalizeProductUnitInput($request->input('unit')),
         ]);
 
         $data = $this->validatePayload($request);
@@ -157,8 +162,8 @@ class ProductPageController extends Controller
         return view('products.edit', [
             'product' => $product,
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
-            'unitOptions' => $this->configuredUnitOptions(),
-            'defaultUnit' => $this->defaultUnitCode(),
+            'unitOptions' => $this->configuredProductUnitOptions(),
+            'defaultUnit' => $this->defaultProductUnitCode(),
         ]);
     }
 
@@ -166,7 +171,7 @@ class ProductPageController extends Controller
     {
         $request->merge([
             'code' => $this->productCodeGenerator->normalizeInput($request->input('code')),
-            'unit' => $this->normalizeUnitInput($request->input('unit')),
+            'unit' => $this->normalizeProductUnitInput($request->input('unit')),
         ]);
 
         $data = $this->validatePayload($request, $product->id);
@@ -209,7 +214,7 @@ class ProductPageController extends Controller
                 Rule::unique('products', 'code')->ignore($ignoreId),
             ],
             'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30', Rule::in($this->configuredUnitCodes())],
+            'unit' => ['required', 'string', 'max:30', Rule::in($this->configuredProductUnitCodes())],
             'stock' => ['required', 'integer', 'min:0'],
             'price_agent' => ['required', 'numeric', 'min:0'],
             'price_sales' => ['required', 'numeric', 'min:0'],
@@ -217,59 +222,6 @@ class ProductPageController extends Controller
         ], [
             'code.unique' => __('ui.product_code_unique_error'),
         ]);
-    }
-
-    private function configuredUnitOptions(): array
-    {
-        $raw = (string) AppSetting::getValue('product_unit_options', 'exp|Exemplar');
-        $options = collect(preg_split('/[\r\n,]+/', $raw) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '')
-            ->map(function (string $item): array {
-                [$code, $label] = array_pad(array_map('trim', explode('|', $item, 2)), 2, '');
-                $normalizedCode = strtolower((string) preg_replace('/[^a-z0-9\-]/', '', $code));
-                $normalizedLabel = $label !== '' ? $label : ucfirst($normalizedCode);
-
-                return [
-                    'code' => $normalizedCode,
-                    'label' => $normalizedLabel,
-                ];
-            })
-            ->filter(fn (array $item): bool => $item['code'] !== '')
-            ->unique('code')
-            ->values();
-
-        $withoutExp = $options->filter(fn (array $item): bool => $item['code'] !== 'exp')->values();
-
-        $withDefault = collect([[
-            'code' => 'exp',
-            'label' => 'Exemplar',
-        ]])->merge($withoutExp);
-
-        return $withDefault->values()->all();
-    }
-
-    private function defaultUnitCode(): string
-    {
-        $default = strtolower((string) AppSetting::getValue('product_default_unit', 'exp'));
-
-        return $default !== '' ? $default : 'exp';
-    }
-
-    private function configuredUnitCodes(): array
-    {
-        return collect($this->configuredUnitOptions())
-            ->pluck('code')
-            ->filter(fn (string $code): bool => $code !== '')
-            ->values()
-            ->all();
-    }
-
-    private function normalizeUnitInput(mixed $unit): string
-    {
-        $normalized = strtolower((string) preg_replace('/[^a-z0-9\-]/', '', (string) $unit));
-
-        return $normalized !== '' ? $normalized : $this->defaultUnitCode();
     }
 
 }

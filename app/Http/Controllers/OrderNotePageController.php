@@ -1,7 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesDateFilters;
+use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\Customer;
 use App\Models\OrderNote;
 use App\Models\OrderNoteItem;
@@ -23,27 +27,24 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderNotePageController extends Controller
 {
+    use ResolvesDateFilters;
+    use ResolvesSemesterOptions;
+
     public function __construct(
         private readonly AuditLogService $auditLogService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
-        $semester = trim((string) $request->string('semester', ''));
+        $semester = (string) $request->string('semester', '');
         $status = trim((string) $request->string('status', ''));
         $noteDate = trim((string) $request->string('note_date', ''));
         $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
-        $selectedSemester = $semester !== '' ? $semester : null;
-        $selectedNoteDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $noteDate) === 1 ? $noteDate : null;
-        $selectedNoteDateRange = $selectedNoteDate !== null
-            ? [
-                Carbon::parse($selectedNoteDate)->startOfDay(),
-                Carbon::parse($selectedNoteDate)->endOfDay(),
-            ]
-            : null;
+        $selectedSemester = $this->normalizedSemesterInput($semester);
+        $selectedNoteDate = $this->selectedDateFilter($noteDate);
+        $selectedNoteDateRange = $this->selectedDateRange($selectedNoteDate);
         $isDefaultRecentMode = $selectedNoteDateRange === null && $selectedSemester === null && $search === '';
         $recentRangeStart = now()->subDays(6)->startOfDay();
         $todayRange = [now()->startOfDay(), now()->endOfDay()];
@@ -52,40 +53,20 @@ class OrderNotePageController extends Controller
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
         $semesterRange = $this->semesterDateRange($selectedSemester);
 
-        $semesterOptions = Cache::remember(
-            AppCache::lookupCacheKey('order_notes.index.semester_options.base'),
-            now()->addSeconds(60),
-            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
-                OrderNote::query()
-                    ->whereNotNull('note_date')
-                    ->orderByDesc('note_date')
-                    ->pluck('note_date')
-                    ->map(fn ($date): string => $this->semesterPeriodFromDate($date))
-                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                false,
-                true
-            )
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromDateColumn(
+            'order_notes.index.semester_options.base',
+            OrderNote::class,
+            'note_date'
         );
-        $semesterOptions = $isAdminUser
-            ? $semesterOptions->values()
-            : $this->semesterBookService()->buildSemesterOptionCollection($semesterOptions->all(), true, false);
-        if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
-            $selectedSemester = null;
+        $semesterOptions = $this->semesterOptionsForIndex($semesterOptionsBase, $isAdminUser);
+        $selectedSemester = $this->selectedSemesterIfAvailable($selectedSemester, $semesterOptions);
+        if ($selectedSemester === null) {
             $semesterRange = null;
         }
 
         $notes = OrderNote::query()
-            ->select([
-                'id',
-                'note_number',
-                'note_date',
-                'customer_id',
-                'customer_name',
-                'city',
-                'created_by_name',
-                'is_canceled',
-            ])
-            ->with('customer:id,name,city')
+            ->onlyListColumns()
+            ->withCustomerInfo()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('note_number', 'like', "%{$search}%")
@@ -96,9 +77,8 @@ class OrderNotePageController extends Controller
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
             })
-            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                $query->where('is_canceled', $selectedStatus === 'canceled');
-            })
+            ->when($selectedStatus === 'active', fn($query) => $query->active())
+            ->when($selectedStatus === 'canceled', fn($query) => $query->canceled())
             ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
                 $query->whereBetween('note_date', $selectedNoteDateRange);
             })
@@ -155,7 +135,7 @@ class OrderNotePageController extends Controller
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.customers', ['limit' => 20]),
             now()->addSeconds(60),
-            fn () => Customer::query()
+            fn() => Customer::query()
                 ->select(['id', 'name', 'city', 'phone'])
                 ->orderBy('name')
                 ->limit(20)
@@ -174,13 +154,13 @@ class OrderNotePageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 20, 'active_only' => 1]),
             now()->addSeconds(60),
-            fn () => Product::query()
+            fn() => Product::query()
                 ->select(['id', 'code', 'name'])
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -277,13 +257,13 @@ class OrderNotePageController extends Controller
         $orderNote->load(['customer:id,name,city,phone', 'items']);
         $itemProductIds = $orderNote->items
             ->pluck('product_id')
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 20, 'active_only' => 1]),
             now()->addSeconds(60),
-            fn () => Product::query()
+            fn() => Product::query()
                 ->select(['id', 'code', 'name'])
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -412,7 +392,7 @@ class OrderNotePageController extends Controller
     {
         $orderNote->load(['customer:id,name,city,phone', 'items']);
 
-        $filename = $orderNote->note_number.'.pdf';
+        $filename = $orderNote->note_number . '.pdf';
         $pdf = Pdf::loadView('order_notes.print', [
             'note' => $orderNote,
             'isPdf' => true,
@@ -424,14 +404,14 @@ class OrderNotePageController extends Controller
     public function exportExcel(OrderNote $orderNote): StreamedResponse
     {
         $orderNote->load(['customer:id,name,city,phone', 'items']);
-        $filename = $orderNote->note_number.'.xlsx';
+        $filename = $orderNote->note_number . '.xlsx';
 
         return response()->streamDownload(function () use ($orderNote): void {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Surat Pesanan');
             $rows = [];
-            $rows[] = [__('txn.order_notes_title').' '.__('txn.note_number'), $orderNote->note_number];
+            $rows[] = [__('txn.order_notes_title') . ' ' . __('txn.note_number'), $orderNote->note_number];
             $rows[] = [__('txn.date'), $orderNote->note_date?->format('d-m-Y')];
             $rows[] = [__('txn.customer'), $orderNote->customer_name];
             $rows[] = [__('txn.phone'), $orderNote->customer_phone];
@@ -467,7 +447,7 @@ class OrderNotePageController extends Controller
 
     private function generateNoteNumber(string $date): string
     {
-        $prefix = 'PO-'.date('Ymd', strtotime($date));
+        $prefix = 'PO-' . date('Ymd', strtotime($date));
         $count = OrderNote::query()
             ->whereDate('note_date', $date)
             ->lockForUpdate()
@@ -488,30 +468,7 @@ class OrderNotePageController extends Controller
 
     private function semesterDateRange(?string $period): ?array
     {
-        if ($period === null) {
-            return null;
-        }
-        $normalized = $this->semesterBookService()->normalizeSemester($period);
-        if ($normalized === null) {
-            return null;
-        }
-        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $normalized, $matches) === 1) {
-            $half = (int) $matches[1];
-            $startYear = 2000 + (int) $matches[2];
-            $endYear = 2000 + (int) $matches[3];
-            if ($half === 1) {
-                return [
-                    'start' => Carbon::create($startYear, 5, 1)->startOfDay()->toDateString(),
-                    'end' => Carbon::create($startYear, 10, 31)->endOfDay()->toDateString(),
-                ];
-            }
-
-            return [
-                'start' => Carbon::create($startYear, 11, 1)->startOfDay()->toDateString(),
-                'end' => Carbon::create($endYear, 4, 30)->endOfDay()->toDateString(),
-            ];
-        }
-        return null;
+        return $this->semesterBookService()->semesterDateRange($period);
     }
 
     private function semesterPeriodFromDate(Carbon|string|null $date): string

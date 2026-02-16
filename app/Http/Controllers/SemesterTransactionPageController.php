@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
@@ -13,8 +15,7 @@ class SemesterTransactionPageController extends Controller
 {
     public function __construct(
         private readonly SemesterBookService $semesterBookService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -170,34 +171,34 @@ class SemesterTransactionPageController extends Controller
     private function semesterOptions(): \Illuminate\Support\Collection
     {
         $configured = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '')
-            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn (?string $item): bool => $item !== null);
+            ->map(fn(string $item): string => trim($item))
+            ->filter(fn(string $item): bool => $item !== '')
+            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn(?string $item): bool => $item !== null);
 
         $invoiceSemesters = DB::table('sales_invoices')
             ->whereNotNull('semester_period')
             ->where('semester_period', '!=', '')
             ->distinct()
             ->pluck('semester_period')
-            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn (?string $item): bool => $item !== null);
+            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn(?string $item): bool => $item !== null);
 
         $returnSemesters = DB::table('sales_returns')
             ->whereNotNull('semester_period')
             ->where('semester_period', '!=', '')
             ->distinct()
             ->pluck('semester_period')
-            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn (?string $item): bool => $item !== null);
+            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn(?string $item): bool => $item !== null);
 
         $outgoingSemesters = DB::table('outgoing_transactions')
             ->whereNotNull('semester_period')
             ->where('semester_period', '!=', '')
             ->distinct()
             ->pluck('semester_period')
-            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn (?string $item): bool => $item !== null);
+            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn(?string $item): bool => $item !== null);
 
         return $configured
             ->merge($invoiceSemesters)

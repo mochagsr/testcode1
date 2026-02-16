@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -85,5 +88,58 @@ class Customer extends Model
     {
         return $this->hasMany(OrderNote::class);
     }
-}
 
+    /**
+     * Scope: Only select essential columns for list views.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeOnlyListColumns(Builder $query): Builder
+    {
+        return $query->select([
+            'id',
+            'customer_level_id',
+            'code',
+            'name',
+            'phone',
+            'city',
+            'outstanding_receivable',
+            'credit_balance',
+        ]);
+    }
+
+    /**
+     * Scope: Eager load customer level.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeWithLevel(Builder $query): Builder
+    {
+        return $query->with('level:id,name,discount_percentage');
+    }
+
+    /**
+     * Scope: Filter customers with outstanding receivables.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeWithOutstanding(Builder $query): Builder
+    {
+        return $query->where('outstanding_receivable', '>', 0);
+    }
+
+    /**
+     * Scope: Filter customers by city.
+     *
+     * @param  Builder<Customer>  $query
+     * @param  string  $city
+     * @return Builder<Customer>
+     */
+    public function scopeInCity(Builder $query, string $city): Builder
+    {
+        return $query->where('city', $city);
+    }
+}

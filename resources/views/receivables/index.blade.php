@@ -191,15 +191,33 @@
         <div class="col-8">
             <div class="card">
                 <h3>{{ __('receivable.ledger_entries') }} @if($selectedCustomerId > 0) ({{ __('receivable.customer_id') }}: {{ $selectedCustomerId }}) @endif</h3>
-                <table>
+                
+                @if($selectedCustomerId > 0 && $ledgerRows->isNotEmpty())
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 16px;">
+                        <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
+                            <div style="font-size: 10px; opacity: 0.9; margin-bottom: 6px;">{{ __('receivable.total_debit') }}</div>
+                            <div style="font-size: 16px; font-weight: 700;">Rp {{ number_format($ledgerRows->sum('debit'), 0, ',', '.') }}</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #51cf66 0%, #40c057 100%); color: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
+                            <div style="font-size: 10px; opacity: 0.9; margin-bottom: 6px;">{{ __('receivable.total_credit') }}</div>
+                            <div style="font-size: 16px; font-weight: 700;">Rp {{ number_format($ledgerRows->sum('credit'), 0, ',', '.') }}</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #4c6ef5 0%, #5577ff 100%); color: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
+                            <div style="font-size: 10px; opacity: 0.9; margin-bottom: 6px;">{{ __('receivable.outstanding') }}</div>
+                            <div style="font-size: 16px; font-weight: 700;">Rp {{ number_format($ledgerOutstandingTotal ?? 0, 0, ',', '.') }}</div>
+                        </div>
+                    </div>
+                @endif
+
+                <table style="width: 100%;">
                     <thead>
                     <tr>
-                        <th>{{ __('receivable.date') }}</th>
-                        <th>{{ __('receivable.description') }}</th>
-                        <th>{{ __('receivable.debit') }}</th>
-                        <th>{{ __('receivable.credit') }}</th>
-                        <th>{{ __('receivable.balance') }}</th>
-                        <th>{{ __('receivable.action') }}</th>
+                        <th style="width: 10%;">{{ __('receivable.date') }}</th>
+                        <th style="width: 34%;">{{ __('receivable.description') }}</th>
+                        <th style="width: 12%;">{{ __('receivable.debit') }}</th>
+                        <th style="width: 12%;">{{ __('receivable.credit') }}</th>
+                        <th style="width: 12%;">{{ __('receivable.balance') }}</th>
+                        <th style="width: 12%;">{{ __('receivable.action') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -265,29 +283,41 @@
                                         || str_contains($descriptionUpper, 'INVOICE CANCELLATION');
                                 @endphp
                             </td>
-                            <td>Rp {{ number_format((int) round($row->debit), 0, ',', '.') }}</td>
-                            <td>Rp {{ number_format((int) round($row->credit), 0, ',', '.') }}</td>
-                            <td>Rp {{ number_format((int) round($row->balance_after), 0, ',', '.') }}</td>
-                            <td>
+                            <td style="text-align: right;">
+                                @if($row->debit > 0)
+                                    Rp {{ number_format((int) round($row->debit), 0, ',', '.') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td style="text-align: right;">
+                                @if($row->credit > 0)
+                                    Rp {{ number_format((int) round($row->credit), 0, ',', '.') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td style="text-align: right;">
+                                Rp {{ number_format((int) round($row->balance_after), 0, ',', '.') }}
+                            </td>
+                            <td style="text-align: center;">
                                 @if($isAdminCancelInvoice)
-                                    <span class="badge danger">{{ __('txn.admin_badge_cancel') }}</span>
-                                @elseif($isAdminEditIncrease)
-                                    <span class="badge warning">{{ __('txn.admin_badge_edit_plus') }}</span>
-                                @elseif($isAdminEditDecrease)
-                                    <span class="badge warning">{{ __('txn.admin_badge_edit_minus') }}</span>
+                                    <span style="display: inline-block; background: #ffcdd2; color: #c62828; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500;">{{ __('txn.admin_badge_cancel') }}</span>
                                 @elseif($canPay)
                                     <a
                                         class="btn secondary"
                                         href="{{ route('receivable-payments.create', ['customer_id' => $selectedCustomerId ?: $row->invoice->customer_id, 'amount' => (int) round((float) $row->invoice->balance), 'payment_date' => now()->format('Y-m-d'), 'preferred_invoice_id' => $row->invoice->id, 'return_to' => request()->getRequestUri()]) }}"
+                                        style=""
                                     >
                                         {{ __('receivable.pay') }}
                                     </a>
                                 @elseif(($selectedCustomerSemesterClosed ?? false) === true)
-                                    <span class="badge danger">{{ __('receivable.customer_semester_closed') }}</span>
+                                    <span style="display: inline-block; background: #ffcdd2; color: #c62828; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500;">{{ __('receivable.customer_semester_closed') }}</span>
                                 @else
                                     <span class="muted">-</span>
                                 @endif
                             </td>
+                        </tr>
                         </tr>
                         @endforeach
                     @endif

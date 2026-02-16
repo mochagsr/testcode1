@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -87,5 +90,72 @@ class Product extends Model
     {
         return $this->hasMany(OutgoingTransactionItem::class);
     }
-}
 
+    /**
+     * Scope: Only select columns necessary for list views.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeOnlyListColumns(Builder $query): Builder
+    {
+        return $query->select([
+            'id',
+            'item_category_id',
+            'code',
+            'name',
+            'unit',
+            'stock',
+            'price_agent',
+            'price_sales',
+            'price_general',
+            'is_active',
+        ]);
+    }
+
+    /**
+     * Scope: Eager load category with minimal columns.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeWithCategoryInfo(Builder $query): Builder
+    {
+        return $query->with('category:id,code,name');
+    }
+
+    /**
+     * Scope: Filter active products only.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope: Filter by category ID.
+     *
+     * @param  Builder<Product>  $query
+     * @param  int  $categoryId
+     * @return Builder<Product>
+     */
+    public function scopeInCategory(Builder $query, int $categoryId): Builder
+    {
+        return $query->where('item_category_id', $categoryId);
+    }
+
+    /**
+     * Scope: Filter by low stock (useful for inventory alerts).
+     *
+     * @param  Builder<Product>  $query
+     * @param  int  $threshold
+     * @return Builder<Product>
+     */
+    public function scopeLowStock(Builder $query, int $threshold = 10): Builder
+    {
+        return $query->where('stock', '<', $threshold);
+    }
+}

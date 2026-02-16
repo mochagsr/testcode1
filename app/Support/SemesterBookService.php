@@ -9,14 +9,56 @@ use Carbon\Carbon;
 class SemesterBookService
 {
     /**
+     * @var array<string, string|null>
+     */
+    private array $normalizeSemesterCache = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private array $semesterFromDateCache = [];
+
+    /**
+     * @var array<int, string>|null
+     */
+    private ?array $configuredSemesterOptionsCache = null;
+
+    /**
+     * @var array<int, string>|null
+     */
+    private ?array $closedSupplierSemestersCache = null;
+
+    /**
+     * @var array<int, string>|null
+     */
+    private ?array $closedCustomerSemestersCache = null;
+
+    /**
+     * @var array<int, string>|null
+     */
+    private ?array $activeSemestersCache = null;
+
+    /**
+     * @var array<int, string>|null
+     */
+    private ?array $closedSemestersCache = null;
+
+    /**
      * @return \Illuminate\Support\Collection<int, string>
      */
     public function configuredSemesterOptions(): \Illuminate\Support\Collection
     {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
+        if (is_array($this->configuredSemesterOptionsCache)) {
+            return collect($this->configuredSemesterOptionsCache);
+        }
+
+        $this->configuredSemesterOptionsCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->filter(fn (string $item): bool => $item !== '')
-            ->values();
+            ->values()
+            ->all();
+
+        return collect($this->configuredSemesterOptionsCache);
     }
 
     /**
@@ -60,12 +102,18 @@ class SemesterBookService
      */
     public function closedSupplierSemesters(): array
     {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_supplier_semester_periods', '')) ?: [])
+        if (is_array($this->closedSupplierSemestersCache)) {
+            return $this->closedSupplierSemestersCache;
+        }
+
+        $this->closedSupplierSemestersCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_supplier_semester_periods', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->map(fn (string $item): ?string => $this->normalizeSupplierSemesterKey($item))
             ->filter(fn (?string $item): bool => $item !== null)
             ->values()
             ->all();
+
+        return $this->closedSupplierSemestersCache;
     }
 
     public function isSupplierClosed(?int $supplierId, ?string $semester): bool
@@ -158,12 +206,18 @@ class SemesterBookService
      */
     public function closedCustomerSemesters(): array
     {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_customer_semester_periods', '')) ?: [])
+        if (is_array($this->closedCustomerSemestersCache)) {
+            return $this->closedCustomerSemestersCache;
+        }
+
+        $this->closedCustomerSemestersCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_customer_semester_periods', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->map(fn (string $item): ?string => $this->normalizeCustomerSemesterKey($item))
             ->filter(fn (?string $item): bool => $item !== null)
             ->values()
             ->all();
+
+        return $this->closedCustomerSemestersCache;
     }
 
     public function isCustomerClosed(?int $customerId, ?string $semester): bool
@@ -384,12 +438,18 @@ class SemesterBookService
      */
     public function activeSemesters(): array
     {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_active_periods', '')) ?: [])
+        if (is_array($this->activeSemestersCache)) {
+            return $this->activeSemestersCache;
+        }
+
+        $this->activeSemestersCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_active_periods', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->map(fn (string $item): ?string => $this->normalizeSemester($item))
             ->filter(fn (?string $item): bool => $item !== null)
             ->values()
             ->all();
+
+        return $this->activeSemestersCache;
     }
 
     public function isActive(?string $semester): bool
@@ -434,12 +494,18 @@ class SemesterBookService
      */
     public function closedSemesters(): array
     {
-        return collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_semester_periods', '')) ?: [])
+        if (is_array($this->closedSemestersCache)) {
+            return $this->closedSemestersCache;
+        }
+
+        $this->closedSemestersCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_semester_periods', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->map(fn (string $item): ?string => $this->normalizeSemester($item))
             ->filter(fn (?string $item): bool => $item !== null)
             ->values()
             ->all();
+
+        return $this->closedSemestersCache;
     }
 
     public function isClosed(?string $semester): bool
@@ -489,19 +555,30 @@ class SemesterBookService
     public function normalizeSemester(string $semester): ?string
     {
         $value = strtoupper(trim($semester));
+        if ($value === '') {
+            return null;
+        }
+
+        if (array_key_exists($value, $this->normalizeSemesterCache)) {
+            return $this->normalizeSemesterCache[$value];
+        }
+
         if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $value, $matches) === 1) {
             $semesterNo = (int) $matches[1];
             $startYear2D = (int) $matches[2];
             $endYear2D = (int) $matches[3];
             $expectedEndYear = ($startYear2D + 1) % 100;
             if ($endYear2D !== $expectedEndYear) {
-                return null;
+                $this->normalizeSemesterCache[$value] = null;
+                return $this->normalizeSemesterCache[$value];
             }
 
-            return sprintf('S%d-%02d%02d', $semesterNo, $startYear2D, $endYear2D);
+            $this->normalizeSemesterCache[$value] = sprintf('S%d-%02d%02d', $semesterNo, $startYear2D, $endYear2D);
+            return $this->normalizeSemesterCache[$value];
         }
 
-        return null;
+        $this->normalizeSemesterCache[$value] = null;
+        return $this->normalizeSemesterCache[$value];
     }
 
     public function semesterFromDate(?string $date): ?string
@@ -511,10 +588,15 @@ class SemesterBookService
             return null;
         }
 
+        if (array_key_exists($value, $this->semesterFromDateCache)) {
+            return $this->semesterFromDateCache[$value];
+        }
+
         try {
             $parsed = Carbon::parse($value);
         } catch (\Throwable) {
-            return null;
+            $this->semesterFromDateCache[$value] = null;
+            return $this->semesterFromDateCache[$value];
         }
 
         $month = (int) $parsed->format('n');
@@ -525,19 +607,22 @@ class SemesterBookService
         if ($month >= 5 && $month <= 10) {
             $startYear = $year;
             $endYear = $year + 1;
-            return sprintf('S1-%02d%02d', $startYear % 100, $endYear % 100);
+            $this->semesterFromDateCache[$value] = sprintf('S1-%02d%02d', $startYear % 100, $endYear % 100);
+            return $this->semesterFromDateCache[$value];
         }
 
         if ($month >= 11) {
             $startYear = $year;
             $endYear = $year + 1;
-            return sprintf('S2-%02d%02d', $startYear % 100, $endYear % 100);
+            $this->semesterFromDateCache[$value] = sprintf('S2-%02d%02d', $startYear % 100, $endYear % 100);
+            return $this->semesterFromDateCache[$value];
         }
 
         // Jan-Apr belongs to previous academic year's S2.
         $startYear = $year - 1;
         $endYear = $year;
-        return sprintf('S2-%02d%02d', $startYear % 100, $endYear % 100);
+        $this->semesterFromDateCache[$value] = sprintf('S2-%02d%02d', $startYear % 100, $endYear % 100);
+        return $this->semesterFromDateCache[$value];
     }
 
     public function currentSemester(): string
@@ -562,6 +647,41 @@ class SemesterBookService
         }
 
         return $this->semesterFromDate(now()->subMonths(6)->format('Y-m-d')) ?? $this->currentSemester();
+    }
+
+    /**
+     * @return array{start:string,end:string}|null
+     */
+    public function semesterDateRange(?string $period): ?array
+    {
+        if ($period === null) {
+            return null;
+        }
+
+        $normalized = $this->normalizeSemester($period);
+        if ($normalized === null) {
+            return null;
+        }
+
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $normalized, $matches) !== 1) {
+            return null;
+        }
+
+        $half = (int) $matches[1];
+        $startYear = 2000 + (int) $matches[2];
+        $endYear = 2000 + (int) $matches[3];
+
+        if ($half === 1) {
+            return [
+                'start' => Carbon::create($startYear, 5, 1)->startOfDay()->toDateString(),
+                'end' => Carbon::create($startYear, 10, 31)->endOfDay()->toDateString(),
+            ];
+        }
+
+        return [
+            'start' => Carbon::create($startYear, 11, 1)->startOfDay()->toDateString(),
+            'end' => Carbon::create($endYear, 4, 30)->endOfDay()->toDateString(),
+        ];
     }
 
     private function normalizeCustomerSemesterKey(string $value): ?string
@@ -606,7 +726,19 @@ class SemesterBookService
 
     private function invalidateSemesterCaches(): void
     {
+        $this->resetLocalCaches();
         AppCache::forgetReportOptionCaches();
         AppCache::bumpLookupVersion();
+    }
+
+    private function resetLocalCaches(): void
+    {
+        $this->configuredSemesterOptionsCache = null;
+        $this->closedSupplierSemestersCache = null;
+        $this->closedCustomerSemestersCache = null;
+        $this->activeSemestersCache = null;
+        $this->closedSemestersCache = null;
+        $this->normalizeSemesterCache = [];
+        $this->semesterFromDateCache = [];
     }
 }

@@ -19,6 +19,8 @@ return [
     'description' => 'Keterangan',
     'debit' => 'Debit',
     'credit' => 'Kredit',
+    'total_debit' => 'Total Debit',
+    'total_credit' => 'Total Kredit',
     'balance' => 'Saldo',
     'customer_balance' => 'Saldo Customer',
     'pay' => 'Bayar',

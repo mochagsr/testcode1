@@ -1,7 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesDateFilters;
+use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\Product;
@@ -27,28 +31,25 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SalesReturnPageController extends Controller
 {
+    use ResolvesDateFilters;
+    use ResolvesSemesterOptions;
+
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService,
         private readonly AuditLogService $auditLogService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
-        $semester = trim((string) $request->string('semester', ''));
+        $semester = (string) $request->string('semester', '');
         $status = trim((string) $request->string('status', ''));
         $returnDate = trim((string) $request->string('return_date', ''));
         $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
-        $selectedSemester = $semester !== '' ? $semester : null;
-        $selectedReturnDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $returnDate) === 1 ? $returnDate : null;
-        $selectedReturnDateRange = $selectedReturnDate !== null
-            ? [
-                Carbon::parse($selectedReturnDate)->startOfDay(),
-                Carbon::parse($selectedReturnDate)->endOfDay(),
-            ]
-            : null;
+        $selectedSemester = $this->normalizedSemesterInput($semester);
+        $selectedReturnDate = $this->selectedDateFilter($returnDate);
+        $selectedReturnDateRange = $this->selectedDateRange($selectedReturnDate);
         $isDefaultRecentMode = $selectedReturnDateRange === null && $selectedSemester === null && $search === '';
         $recentRangeStart = now()->subDays(6)->startOfDay();
         $todayRange = [now()->startOfDay(), now()->endOfDay()];
@@ -56,38 +57,17 @@ class SalesReturnPageController extends Controller
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
 
-        $semesterOptions = Cache::remember(
-            AppCache::lookupCacheKey('sales_returns.index.semester_options.base'),
-            now()->addSeconds(60),
-            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
-                SalesReturn::query()
-                    ->whereNotNull('semester_period')
-                    ->where('semester_period', '!=', '')
-                    ->distinct()
-                    ->pluck('semester_period')
-                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                false,
-                true
-            )
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
+            'sales_returns.index.semester_options.base',
+            SalesReturn::class
         );
-        $semesterOptions = $isAdminUser
-            ? $semesterOptions->values()
-            : $this->semesterBookService()->buildSemesterOptionCollection($semesterOptions->all(), true, false);
-        if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
-            $selectedSemester = null;
-        }
+        $semesterOptions = $this->semesterOptionsForIndex($semesterOptionsBase, $isAdminUser);
+        $selectedSemester = $this->selectedSemesterIfAvailable($selectedSemester, $semesterOptions);
 
         $returns = SalesReturn::query()
-            ->select([
-                'id',
-                'return_number',
-                'customer_id',
-                'return_date',
-                'semester_period',
-                'total',
-                'is_canceled',
-            ])
-            ->with('customer:id,name,city')
+            ->onlyListColumns()
+            ->withCustomerInfo()
+            ->withInvoiceInfo()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('return_number', 'like', "%{$search}%")
@@ -97,11 +77,10 @@ class SalesReturnPageController extends Controller
                         });
                 });
             })
+            ->when($selectedStatus === 'active', fn($q) => $q->active())
+            ->when($selectedStatus === 'canceled', fn($q) => $q->canceled())
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                 $query->where('semester_period', $selectedSemester);
-            })
-            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                $query->where('is_canceled', $selectedStatus === 'canceled');
             })
             ->when($selectedReturnDateRange !== null, function ($query) use ($selectedReturnDateRange): void {
                 $query->whereBetween('return_date', $selectedReturnDateRange);
@@ -109,8 +88,7 @@ class SalesReturnPageController extends Controller
             ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
                 $query->where('return_date', '>=', $recentRangeStart);
             })
-            ->latest('return_date')
-            ->latest('id')
+            ->orderByDate()
             ->paginate(20)
             ->withQueryString();
 
@@ -137,7 +115,7 @@ class SalesReturnPageController extends Controller
                     'semester' => trim((string) $salesReturn->semester_period),
                 ];
             })
-            ->filter(fn (array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
+            ->filter(fn(array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
             ->values();
         $customerSemesterLockMap = [];
         if ($lockPairs->isNotEmpty()) {
@@ -154,8 +132,8 @@ class SalesReturnPageController extends Controller
             }
         }
         $returnIds = collect($returns->items())
-            ->map(fn (SalesReturn $salesReturn): int => (int) $salesReturn->id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn(SalesReturn $salesReturn): int => (int) $salesReturn->id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $returnAdminActionMap = [];
         if ($returnIds->isNotEmpty()) {
@@ -211,25 +189,11 @@ class SalesReturnPageController extends Controller
     {
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
-        $semesterOptionsBase = Cache::remember(
-            AppCache::lookupCacheKey('sales_returns.index.semester_options.base'),
-            now()->addSeconds(60),
-            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
-                SalesReturn::query()
-                    ->whereNotNull('semester_period')
-                    ->where('semester_period', '!=', '')
-                    ->distinct()
-                    ->pluck('semester_period')
-                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                false,
-                true
-            )
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
+            'sales_returns.index.semester_options.base',
+            SalesReturn::class
         );
-        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
-            $semesterOptionsBase->all(),
-            true,
-            true
-        );
+        $semesterOptions = $this->semesterOptionsForForm($semesterOptionsBase);
         if (! $semesterOptions->contains($currentSemester)) {
             $currentSemester = (string) ($semesterOptions->first() ?? $currentSemester);
         }
@@ -238,7 +202,7 @@ class SalesReturnPageController extends Controller
         $initialCustomers = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_returns.customers', ['limit' => 20]),
             now()->addSeconds(60),
-            fn () => Customer::query()
+            fn() => Customer::query()
                 ->select(['id', 'name', 'city', 'customer_level_id'])
                 ->with('level:id,code,name')
                 ->orderBy('name')
@@ -259,13 +223,13 @@ class SalesReturnPageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $initialProducts = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_returns.products', ['limit' => 20, 'active_only' => 1]),
             now()->addSeconds(60),
-            fn () => Product::query()
+            fn() => Product::query()
                 ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -373,7 +337,7 @@ class SalesReturnPageController extends Controller
                     'reference_id' => $salesReturn->id,
                     'mutation_type' => 'in',
                     'quantity' => $row['quantity'],
-                    'notes' => __('txn.return').' '.$salesReturn->return_number,
+                    'notes' => __('txn.return') . ' ' . $salesReturn->return_number,
                     'created_by_user_id' => null,
                 ]);
             }
@@ -384,7 +348,7 @@ class SalesReturnPageController extends Controller
                 entryDate: $returnDate,
                 amount: $total,
                 periodCode: $salesReturn->semester_period,
-                description: __('txn.return').' '.$salesReturn->return_number
+                description: __('txn.return') . ' ' . $salesReturn->return_number
             );
 
             return $salesReturn;
@@ -411,24 +375,12 @@ class SalesReturnPageController extends Controller
         ]);
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
-        $semesterOptionsBase = Cache::remember(
-            AppCache::lookupCacheKey('sales_returns.index.semester_options.base'),
-            now()->addSeconds(60),
-            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
-                SalesReturn::query()
-                    ->whereNotNull('semester_period')
-                    ->where('semester_period', '!=', '')
-                    ->distinct()
-                    ->pluck('semester_period')
-                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                false,
-                true
-            )
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
+            'sales_returns.index.semester_options.base',
+            SalesReturn::class
         );
-        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
-            $semesterOptionsBase->push((string) $salesReturn->semester_period)->all(),
-            true,
-            true
+        $semesterOptions = $this->semesterOptionsForForm(
+            $semesterOptionsBase->push((string) $salesReturn->semester_period)
         );
         if (! $semesterOptions->contains((string) $salesReturn->semester_period)) {
             $semesterOptions = $semesterOptions->push((string) $salesReturn->semester_period)->unique()->values();
@@ -445,8 +397,8 @@ class SalesReturnPageController extends Controller
         }
         $itemProductIds = $salesReturn->items
             ->pluck('product_id')
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $products = Product::query()
             ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
@@ -501,7 +453,7 @@ class SalesReturnPageController extends Controller
             $rows = collect($data['items'] ?? []);
             $oldTotal = (float) $return->total;
             $auditBefore = $return->items
-                ->map(fn (SalesReturnItem $item): string => "{$item->product_name}:qty{$item->quantity}:price".(int) round((float) $item->unit_price))
+                ->map(fn(SalesReturnItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
                 ->implode(' | ');
 
             $oldQtyByProduct = [];
@@ -573,8 +525,8 @@ class SalesReturnPageController extends Controller
                         'reference_id' => $return->id,
                         'mutation_type' => 'out',
                         'quantity' => $delta,
-                        'notes' => '[ADMIN EDIT '.strtoupper(__('txn.return')).'] '
-                            .__('txn.return').' '.$return->return_number,
+                        'notes' => '[ADMIN EDIT ' . strtoupper(__('txn.return')) . '] '
+                            . __('txn.return') . ' ' . $return->return_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 } else {
@@ -586,8 +538,8 @@ class SalesReturnPageController extends Controller
                         'reference_id' => $return->id,
                         'mutation_type' => 'in',
                         'quantity' => $inQty,
-                        'notes' => '[ADMIN EDIT '.strtoupper(__('txn.return')).'] '
-                            .__('txn.return').' '.$return->return_number,
+                        'notes' => '[ADMIN EDIT ' . strtoupper(__('txn.return')) . '] '
+                            . __('txn.return') . ' ' . $return->return_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 }
@@ -646,8 +598,8 @@ class SalesReturnPageController extends Controller
                     entryDate: Carbon::parse((string) $data['return_date']),
                     amount: $difference,
                     periodCode: $return->semester_period,
-                    description: '[ADMIN EDIT '.strtoupper(__('txn.return'))." +] "
-                        .__('txn.return').' '.$return->return_number,
+                    description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " +] "
+                        . __('txn.return') . ' ' . $return->return_number,
                 );
             } elseif ($difference < 0) {
                 $this->receivableLedgerService->addDebit(
@@ -656,8 +608,8 @@ class SalesReturnPageController extends Controller
                     entryDate: Carbon::parse((string) $data['return_date']),
                     amount: abs($difference),
                     periodCode: $return->semester_period,
-                    description: '[ADMIN EDIT '.strtoupper(__('txn.return'))." -] "
-                        .__('txn.return').' '.$return->return_number,
+                    description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " -] "
+                        . __('txn.return') . ' ' . $return->return_number,
                 );
             }
         });
@@ -725,7 +677,7 @@ class SalesReturnPageController extends Controller
                     'reference_id' => $return->id,
                     'mutation_type' => 'out',
                     'quantity' => (int) $item->quantity,
-                    'notes' => __('txn.cancel').' '.__('txn.return').' '.$return->return_number,
+                    'notes' => __('txn.cancel') . ' ' . __('txn.return') . ' ' . $return->return_number,
                     'created_by_user_id' => auth()->id(),
                 ]);
             }
@@ -782,7 +734,7 @@ class SalesReturnPageController extends Controller
             'items',
         ]);
 
-        $filename = $salesReturn->return_number.'.pdf';
+        $filename = $salesReturn->return_number . '.pdf';
         $pdf = Pdf::loadView('sales_returns.print', [
             'salesReturn' => $salesReturn,
             'isPdf' => true,
@@ -798,14 +750,14 @@ class SalesReturnPageController extends Controller
             'items',
         ]);
 
-        $filename = $salesReturn->return_number.'.xlsx';
+        $filename = $salesReturn->return_number . '.xlsx';
 
         return response()->streamDownload(function () use ($salesReturn): void {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Retur');
             $rows = [];
-            $rows[] = [__('txn.return').' '.__('txn.note_number'), $salesReturn->return_number];
+            $rows[] = [__('txn.return') . ' ' . __('txn.note_number'), $salesReturn->return_number];
             $rows[] = [__('txn.return_date'), $salesReturn->return_date?->format('d-m-Y')];
             $rows[] = [__('txn.customer'), $salesReturn->customer?->name];
             $rows[] = [__('txn.city'), $salesReturn->customer?->city];
@@ -841,7 +793,7 @@ class SalesReturnPageController extends Controller
 
     private function generateReturnNumber(string $date): string
     {
-        $prefix = 'RTR-'.date('Ymd', strtotime($date));
+        $prefix = 'RTR-' . date('Ymd', strtotime($date));
         $count = SalesReturn::query()
             ->whereDate('return_date', $date)
             ->lockForUpdate()
@@ -869,7 +821,7 @@ class SalesReturnPageController extends Controller
     {
         $levelCode = strtolower(trim((string) ($customer->level?->code ?? '')));
         $levelName = strtolower(trim((string) ($customer->level?->name ?? '')));
-        $combined = trim($levelCode.' '.$levelName);
+        $combined = trim($levelCode . ' ' . $levelName);
 
         if (str_contains($combined, 'agent') || str_contains($combined, 'agen')) {
             return (float) round((float) ($product->price_agent ?? $product->price_general ?? 0));
@@ -881,5 +833,4 @@ class SalesReturnPageController extends Controller
 
         return (float) round((float) ($product->price_general ?? 0));
     }
-
 }

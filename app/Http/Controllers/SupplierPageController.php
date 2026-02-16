@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Supplier;
@@ -18,8 +20,7 @@ class SupplierPageController extends Controller
 
     public function __construct(
         private readonly AuditLogService $auditLogService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -173,5 +174,4 @@ class SupplierPageController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
     }
-
 }

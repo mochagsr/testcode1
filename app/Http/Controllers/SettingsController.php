@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
@@ -17,15 +19,29 @@ class SettingsController extends Controller
 {
     public function __construct(
         private readonly SemesterBookService $semesterBookService
-    ) {
-    }
+    ) {}
 
     public function edit(Request $request): View
     {
-        $rawSemesterOptions = (string) AppSetting::getValue('semester_period_options', '');
+        $settings = AppSetting::getValues([
+            'semester_period_options' => '',
+            'product_unit_options' => 'exp|Exemplar',
+            'outgoing_unit_options' => 'exp|Exemplar',
+            'company_logo_path' => null,
+            'company_name' => 'CV. PUSTAKA GRAFIKA',
+            'company_address' => '',
+            'company_phone' => '',
+            'company_email' => '',
+            'company_notes' => '',
+            'company_invoice_notes' => '',
+            'company_billing_note' => '',
+            'company_transfer_accounts' => '',
+        ]);
+
+        $rawSemesterOptions = (string) ($settings['semester_period_options'] ?? '');
         $semesterPeriodCollection = collect(preg_split('/[\r\n,]+/', $rawSemesterOptions) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '')
+            ->map(fn(string $item): string => trim($item))
+            ->filter(fn(string $item): bool => $item !== '')
             ->unique();
         $currentSemester = $this->semesterBookService->currentSemester();
         $previousSemester = $this->semesterBookService->previousSemester($currentSemester);
@@ -55,36 +71,36 @@ class SettingsController extends Controller
         if ($selectedActiveSemesters->isEmpty()) {
             $selectedActiveSemesters = $semesterBookOptions->values();
         }
-        $rawUnitOptions = (string) AppSetting::getValue('product_unit_options', 'exp|Exemplar');
+        $rawUnitOptions = (string) ($settings['product_unit_options'] ?? 'exp|Exemplar');
         $unitOptionRows = $this->normalizeUnitOptions($rawUnitOptions)->values();
         $unitCodeSuggestions = $unitOptionRows
             ->pluck('code')
             ->merge(['exp', 'pcs', 'pack', 'rim', 'box', 'set', 'lusin'])
-            ->map(fn (string $item): string => strtolower(trim($item)))
-            ->filter(fn (string $item): bool => $item !== '')
+            ->map(fn(string $item): string => strtolower(trim($item)))
+            ->filter(fn(string $item): bool => $item !== '')
             ->unique()
             ->values();
-        $rawOutgoingUnitOptions = (string) AppSetting::getValue('outgoing_unit_options', 'exp|Exemplar');
+        $rawOutgoingUnitOptions = (string) ($settings['outgoing_unit_options'] ?? 'exp|Exemplar');
         $outgoingUnitOptionRows = $this->normalizeUnitOptions($rawOutgoingUnitOptions)->values();
         $outgoingUnitCodeSuggestions = $outgoingUnitOptionRows
             ->pluck('code')
             ->merge(['exp', 'pcs', 'pack', 'rim', 'box', 'set', 'lusin'])
-            ->map(fn (string $item): string => strtolower(trim($item)))
-            ->filter(fn (string $item): bool => $item !== '')
+            ->map(fn(string $item): string => strtolower(trim($item)))
+            ->filter(fn(string $item): bool => $item !== '')
             ->unique()
             ->values();
 
         return view('settings.edit', [
             'user' => auth()->user(),
-            'companyLogoPath' => AppSetting::getValue('company_logo_path'),
-            'companyName' => AppSetting::getValue('company_name', 'CV. PUSTAKA GRAFIKA'),
-            'companyAddress' => AppSetting::getValue('company_address', ''),
-            'companyPhone' => AppSetting::getValue('company_phone', ''),
-            'companyEmail' => AppSetting::getValue('company_email', ''),
-            'companyNotes' => AppSetting::getValue('company_notes', ''),
-            'companyInvoiceNotes' => AppSetting::getValue('company_invoice_notes', ''),
-            'companyBillingNote' => AppSetting::getValue('company_billing_note', ''),
-            'companyTransferAccounts' => AppSetting::getValue('company_transfer_accounts', ''),
+            'companyLogoPath' => $settings['company_logo_path'] ?? null,
+            'companyName' => $settings['company_name'] ?? 'CV. PUSTAKA GRAFIKA',
+            'companyAddress' => $settings['company_address'] ?? '',
+            'companyPhone' => $settings['company_phone'] ?? '',
+            'companyEmail' => $settings['company_email'] ?? '',
+            'companyNotes' => $settings['company_notes'] ?? '',
+            'companyInvoiceNotes' => $settings['company_invoice_notes'] ?? '',
+            'companyBillingNote' => $settings['company_billing_note'] ?? '',
+            'companyTransferAccounts' => $settings['company_transfer_accounts'] ?? '',
             'semesterPeriodOptions' => $rawSemesterOptions,
             'unitOptions' => $rawUnitOptions,
             'unitOptionRows' => $unitOptionRows,
@@ -166,19 +182,15 @@ class SettingsController extends Controller
         if ($normalizedOutgoingUnitOptions->isEmpty()) {
             $normalizedOutgoingUnitOptions = $this->normalizeUnitOptions((string) ($data['outgoing_unit_options'] ?? 'exp|Exemplar'));
         }
-        AppSetting::setValue(
-            'product_unit_options',
-            $normalizedUnitOptions
-                ->map(fn (array $item): string => $item['code'].'|'.$item['label'])
-                ->implode(',')
-        );
-        AppSetting::setValue('product_default_unit', 'exp');
-        AppSetting::setValue(
-            'outgoing_unit_options',
-            $normalizedOutgoingUnitOptions
-                ->map(fn (array $item): string => $item['code'].'|'.$item['label'])
-                ->implode(',')
-        );
+        AppSetting::setValues([
+            'product_unit_options' => $normalizedUnitOptions
+                ->map(fn(array $item): string => $item['code'] . '|' . $item['label'])
+                ->implode(','),
+            'product_default_unit' => 'exp',
+            'outgoing_unit_options' => $normalizedOutgoingUnitOptions
+                ->map(fn(array $item): string => $item['code'] . '|' . $item['label'])
+                ->implode(','),
+        ]);
         AppCache::bumpLookupVersion();
 
         if ($user->role === 'admin') {
@@ -198,46 +210,48 @@ class SettingsController extends Controller
             }
 
             $semesterCodeInputs = collect($request->input('semester_period_codes', []))
-                ->map(fn ($item): string => trim((string) $item))
-                ->filter(fn (string $item): bool => $item !== '');
+                ->map(fn($item): string => trim((string) $item))
+                ->filter(fn(string $item): bool => $item !== '');
             if ($semesterCodeInputs->isEmpty()) {
                 $semesterCodeInputs = collect(preg_split('/[\r\n,]+/', (string) ($data['semester_period_options'] ?? '')) ?: [])
-                    ->map(fn ($item): string => trim((string) $item))
-                    ->filter(fn (string $item): bool => $item !== '');
+                    ->map(fn($item): string => trim((string) $item))
+                    ->filter(fn(string $item): bool => $item !== '');
             }
 
             $normalizedSemesterOptions = $semesterCodeInputs
-                ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-                ->filter(fn (?string $item): bool => $item !== null)
+                ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+                ->filter(fn(?string $item): bool => $item !== null)
                 ->unique()
                 ->sortDesc()
                 ->values();
             $activeSemesterInputs = collect($request->input('semester_active_period_codes', []))
-                ->map(fn ($item): string => trim((string) $item))
-                ->filter(fn (string $item): bool => $item !== '');
+                ->map(fn($item): string => trim((string) $item))
+                ->filter(fn(string $item): bool => $item !== '');
             if ($activeSemesterInputs->isEmpty()) {
                 $activeSemesterInputs = collect($request->input('semester_active_periods', []))
-                    ->map(fn ($item): string => trim((string) $item))
-                    ->filter(fn (string $item): bool => $item !== '');
+                    ->map(fn($item): string => trim((string) $item))
+                    ->filter(fn(string $item): bool => $item !== '');
             }
 
             $normalizedActiveSemesters = $activeSemesterInputs
-                ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-                ->filter(fn (?string $item): bool => $item !== null)
-                ->filter(fn (string $item): bool => $normalizedSemesterOptions->contains($item))
+                ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+                ->filter(fn(?string $item): bool => $item !== null)
+                ->filter(fn(string $item): bool => $normalizedSemesterOptions->contains($item))
                 ->unique()
                 ->sortDesc()
                 ->implode(',');
-            AppSetting::setValue('semester_period_options', $normalizedSemesterOptions->implode(','));
-            AppSetting::setValue('semester_active_periods', $normalizedActiveSemesters);
-            AppSetting::setValue('company_name', trim((string) ($data['company_name'] ?? '')));
-            AppSetting::setValue('company_address', trim((string) ($data['company_address'] ?? '')));
-            AppSetting::setValue('company_phone', trim((string) ($data['company_phone'] ?? '')));
-            AppSetting::setValue('company_email', trim((string) ($data['company_email'] ?? '')));
-            AppSetting::setValue('company_notes', trim((string) ($data['company_notes'] ?? '')));
-            AppSetting::setValue('company_invoice_notes', trim((string) ($data['company_invoice_notes'] ?? '')));
-            AppSetting::setValue('company_billing_note', trim((string) ($data['company_billing_note'] ?? '')));
-            AppSetting::setValue('company_transfer_accounts', trim((string) ($data['company_transfer_accounts'] ?? '')));
+            AppSetting::setValues([
+                'semester_period_options' => $normalizedSemesterOptions->implode(','),
+                'semester_active_periods' => $normalizedActiveSemesters,
+                'company_name' => trim((string) ($data['company_name'] ?? '')),
+                'company_address' => trim((string) ($data['company_address'] ?? '')),
+                'company_phone' => trim((string) ($data['company_phone'] ?? '')),
+                'company_email' => trim((string) ($data['company_email'] ?? '')),
+                'company_notes' => trim((string) ($data['company_notes'] ?? '')),
+                'company_invoice_notes' => trim((string) ($data['company_invoice_notes'] ?? '')),
+                'company_billing_note' => trim((string) ($data['company_billing_note'] ?? '')),
+                'company_transfer_accounts' => trim((string) ($data['company_transfer_accounts'] ?? '')),
+            ]);
             AppCache::forgetReportOptionCaches();
         }
 
@@ -299,8 +313,8 @@ class SettingsController extends Controller
     private function normalizeUnitOptions(string $raw): \Illuminate\Support\Collection
     {
         $options = collect(preg_split('/[\r\n,]+/', $raw) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->filter(fn (string $item): bool => $item !== '')
+            ->map(fn(string $item): string => trim($item))
+            ->filter(fn(string $item): bool => $item !== '')
             ->map(function (string $item): array {
                 $rawCode = '';
                 $rawLabel = $item;
@@ -321,11 +335,11 @@ class SettingsController extends Controller
                     'label' => $normalizedLabel,
                 ];
             })
-            ->filter(fn (array $item): bool => $item['code'] !== '' && $item['label'] !== '')
+            ->filter(fn(array $item): bool => $item['code'] !== '' && $item['label'] !== '')
             ->unique('code')
             ->values();
 
-        $withoutExp = $options->filter(fn (array $item): bool => $item['code'] !== 'exp')->values();
+        $withoutExp = $options->filter(fn(array $item): bool => $item['code'] !== 'exp')->values();
 
         $withDefault = collect([[
             'code' => 'exp',
@@ -362,11 +376,11 @@ class SettingsController extends Controller
                     'label' => $normalizedLabel,
                 ];
             })
-            ->filter(fn (array $item): bool => $item['code'] !== '' && $item['label'] !== '')
+            ->filter(fn(array $item): bool => $item['code'] !== '' && $item['label'] !== '')
             ->unique('code')
             ->values();
 
-        $withoutExp = $rows->filter(fn (array $item): bool => $item['code'] !== 'exp')->values();
+        $withoutExp = $rows->filter(fn(array $item): bool => $item['code'] !== 'exp')->values();
 
         return collect([[
             'code' => 'exp',

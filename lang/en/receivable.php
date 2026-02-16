@@ -19,6 +19,8 @@ return [
     'description' => 'Description',
     'debit' => 'Debit',
     'credit' => 'Credit',
+    'total_debit' => 'Total Debit',
+    'total_credit' => 'Total Credit',
     'balance' => 'Balance',
     'customer_balance' => 'Customer Balance',
     'pay' => 'Pay',

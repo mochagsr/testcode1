@@ -19,6 +19,9 @@
 /storage/*.key
 /storage/pail
 /vendor
+/bootstrap/cache/*.php
+/bootstrap/cache/*.tmp
+!/bootstrap/cache/.gitignore
 Homestead.json
 Homestead.yaml
 Thumbs.db

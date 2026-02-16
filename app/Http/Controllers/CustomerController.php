@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
@@ -20,6 +22,16 @@ class CustomerController extends Controller
         $page = max(1, (int) $request->integer('page', 1));
         $search = trim((string) $request->string('search', ''));
         $hasSearch = $search !== '';
+
+        if ($hasSearch && ! $this->hasValidSearchTokens($search)) {
+            return response()->json([
+                'data' => [],
+                'current_page' => $page,
+                'last_page' => 1,
+                'per_page' => $perPage,
+                'total' => 0,
+            ]);
+        }
 
         $customersQuery = Customer::query()
             ->select([
@@ -42,10 +54,6 @@ class CustomerController extends Controller
             })
             ->orderBy('name')
             ->orderBy('id');
-
-        if ($hasSearch && ! $this->hasValidSearchTokens($search)) {
-            $customersQuery->whereRaw('1 = 0');
-        }
 
         $cacheKey = AppCache::lookupCacheKey('lookups.customers', [
             'per_page' => $perPage,
@@ -137,13 +145,12 @@ class CustomerController extends Controller
 
     private function generateCustomerCode(): string
     {
-        $prefix = 'CUS-'.now()->format('Ymd');
+        $prefix = 'CUS-' . now()->format('Ymd');
 
         do {
-            $code = $prefix.'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            $code = $prefix . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
         } while (Customer::query()->where('code', $code)->exists());
 
         return $code;
     }
-
 }

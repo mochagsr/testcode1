@@ -1,7 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesDateFilters;
+use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\Customer;
 use App\Models\AuditLog;
 use App\Models\InvoicePayment;
@@ -28,28 +32,25 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SalesInvoicePageController extends Controller
 {
+    use ResolvesDateFilters;
+    use ResolvesSemesterOptions;
+
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService,
         private readonly AuditLogService $auditLogService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
-        $semester = trim((string) $request->string('semester', ''));
+        $semester = (string) $request->string('semester', '');
         $status = trim((string) $request->string('status', ''));
         $invoiceDate = trim((string) $request->string('invoice_date', ''));
         $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
-        $selectedSemester = $semester !== '' ? $semester : null;
-        $selectedInvoiceDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $invoiceDate) === 1 ? $invoiceDate : null;
-        $selectedInvoiceDateRange = $selectedInvoiceDate !== null
-            ? [
-                Carbon::parse($selectedInvoiceDate)->startOfDay(),
-                Carbon::parse($selectedInvoiceDate)->endOfDay(),
-            ]
-            : null;
+        $selectedSemester = $this->normalizedSemesterInput($semester);
+        $selectedInvoiceDate = $this->selectedDateFilter($invoiceDate);
+        $selectedInvoiceDateRange = $this->selectedDateRange($selectedInvoiceDate);
         $isDefaultRecentMode = $selectedInvoiceDateRange === null && $selectedSemester === null && $search === '';
         $recentRangeStart = now()->subDays(6)->startOfDay();
         $todayRange = [now()->startOfDay(), now()->endOfDay()];
@@ -57,38 +58,16 @@ class SalesInvoicePageController extends Controller
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
 
-        $semesterOptions = Cache::remember(
-            AppCache::lookupCacheKey('sales_invoices.index.semester_options.base'),
-            now()->addSeconds(60),
-            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
-                SalesInvoice::query()
-                    ->whereNotNull('semester_period')
-                ->where('semester_period', '!=', '')
-                ->distinct()
-                ->pluck('semester_period')
-                ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                false,
-                true
-            )
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
+            'sales_invoices.index.semester_options.base',
+            SalesInvoice::class
         );
-        $semesterOptions = $isAdminUser
-            ? $semesterOptions->values()
-            : $this->semesterBookService()->buildSemesterOptionCollection($semesterOptions->all(), true, false);
-        if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
-            $selectedSemester = null;
-        }
+        $semesterOptions = $this->semesterOptionsForIndex($semesterOptionsBase, $isAdminUser);
+        $selectedSemester = $this->selectedSemesterIfAvailable($selectedSemester, $semesterOptions);
 
         $invoices = SalesInvoice::query()
-            ->select([
-                'id',
-                'invoice_number',
-                'customer_id',
-                'invoice_date',
-                'semester_period',
-                'total',
-                'is_canceled',
-            ])
-            ->with('customer:id,name,city')
+            ->onlyListColumns()
+            ->withCustomerInfo()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('invoice_number', 'like', "%{$search}%")
@@ -98,11 +77,10 @@ class SalesInvoicePageController extends Controller
                         });
                 });
             })
+            ->when($selectedStatus === 'active', fn($q) => $q->active())
+            ->when($selectedStatus === 'canceled', fn($q) => $q->canceled())
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
-            })
-            ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
-                $query->where('is_canceled', $selectedStatus === 'canceled');
+                $query->forSemester($selectedSemester);
             })
             ->when($selectedInvoiceDateRange !== null, function ($query) use ($selectedInvoiceDateRange): void {
                 $query->whereBetween('invoice_date', $selectedInvoiceDateRange);
@@ -110,8 +88,8 @@ class SalesInvoicePageController extends Controller
             ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
                 $query->where('invoice_date', '>=', $recentRangeStart);
             })
-            ->latest('invoice_date')
-            ->latest('id')
+            ->orderBy('invoice_date', 'desc')
+            ->orderBy('id', 'desc')
             ->paginate(20)
             ->withQueryString();
 
@@ -138,7 +116,7 @@ class SalesInvoicePageController extends Controller
                     'semester' => trim((string) $invoice->semester_period),
                 ];
             })
-            ->filter(fn (array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
+            ->filter(fn(array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
             ->values();
         $customerSemesterLockMap = [];
         if ($lockPairs->isNotEmpty()) {
@@ -155,8 +133,8 @@ class SalesInvoicePageController extends Controller
             }
         }
         $invoiceIds = collect($invoices->items())
-            ->map(fn (SalesInvoice $invoice): int => (int) $invoice->id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn(SalesInvoice $invoice): int => (int) $invoice->id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $invoiceAdminActionMap = [];
         if ($invoiceIds->isNotEmpty()) {
@@ -212,25 +190,11 @@ class SalesInvoicePageController extends Controller
     {
         $defaultSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($defaultSemester);
-        $semesterOptionsBase = Cache::remember(
-            AppCache::lookupCacheKey('sales_invoices.index.semester_options.base'),
-            now()->addSeconds(60),
-            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
-                SalesInvoice::query()
-                    ->whereNotNull('semester_period')
-                    ->where('semester_period', '!=', '')
-                    ->distinct()
-                    ->pluck('semester_period')
-                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                false,
-                true
-            )
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
+            'sales_invoices.index.semester_options.base',
+            SalesInvoice::class
         );
-        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
-            $semesterOptionsBase->all(),
-            true,
-            true
-        );
+        $semesterOptions = $this->semesterOptionsForForm($semesterOptionsBase);
         if (! $semesterOptions->contains($defaultSemester)) {
             $defaultSemester = (string) ($semesterOptions->first() ?? $defaultSemester);
         }
@@ -239,7 +203,7 @@ class SalesInvoicePageController extends Controller
         $initialCustomers = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_invoices.customers', ['limit' => 20]),
             now()->addSeconds(60),
-            fn () => Customer::query()
+            fn() => Customer::query()
                 ->select(['id', 'name', 'city', 'customer_level_id'])
                 ->with('level:id,code,name')
                 ->orderBy('name')
@@ -260,13 +224,13 @@ class SalesInvoicePageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $initialProducts = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_invoices.products', ['limit' => 20, 'active_only' => 1]),
             now()->addSeconds(60),
-            fn () => Product::query()
+            fn() => Product::query()
                 ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -401,7 +365,7 @@ class SalesInvoicePageController extends Controller
                 entryDate: $invoiceDate,
                 amount: $subtotal,
                 periodCode: $invoice->semester_period,
-                description: __('receivable.invoice_label').' '.$invoice->invoice_number
+                description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number
             );
 
             $initialPayment = $data['payment_method'] === 'tunai' ? (float) $invoice->total : 0.0;
@@ -498,24 +462,12 @@ class SalesInvoicePageController extends Controller
         ]);
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
-        $semesterOptionsBase = Cache::remember(
-            AppCache::lookupCacheKey('sales_invoices.index.semester_options.base'),
-            now()->addSeconds(60),
-            fn () => $this->semesterBookService()->buildSemesterOptionCollection(
-                SalesInvoice::query()
-                    ->whereNotNull('semester_period')
-                    ->where('semester_period', '!=', '')
-                    ->distinct()
-                    ->pluck('semester_period')
-                    ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                false,
-                true
-            )
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
+            'sales_invoices.index.semester_options.base',
+            SalesInvoice::class
         );
-        $semesterOptions = $this->semesterBookService()->buildSemesterOptionCollection(
-            $semesterOptionsBase->push((string) $salesInvoice->semester_period)->all(),
-            true,
-            true
+        $semesterOptions = $this->semesterOptionsForForm(
+            $semesterOptionsBase->push((string) $salesInvoice->semester_period)
         );
         if (! $semesterOptions->contains((string) $salesInvoice->semester_period)) {
             $semesterOptions = $semesterOptions->push((string) $salesInvoice->semester_period)->unique()->values();
@@ -532,8 +484,8 @@ class SalesInvoicePageController extends Controller
         }
         $itemProductIds = $salesInvoice->items
             ->pluck('product_id')
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $products = Product::query()
             ->select(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
@@ -590,7 +542,7 @@ class SalesInvoicePageController extends Controller
             $rows = collect($data['items'] ?? []);
             $oldTotal = (float) $invoice->total;
             $auditBefore = $invoice->items
-                ->map(fn (SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price".(int) round((float) $item->unit_price))
+                ->map(fn(SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
                 ->implode(' | ');
 
             $oldQtyByProduct = [];
@@ -880,7 +832,7 @@ class SalesInvoicePageController extends Controller
             'payments',
         ]);
 
-        $filename = $salesInvoice->invoice_number.'.pdf';
+        $filename = $salesInvoice->invoice_number . '.pdf';
         $pdf = Pdf::loadView('sales_invoices.print', [
             'invoice' => $salesInvoice,
             'isPdf' => true,
@@ -897,7 +849,7 @@ class SalesInvoicePageController extends Controller
             'payments',
         ]);
 
-        $filename = $salesInvoice->invoice_number.'.xlsx';
+        $filename = $salesInvoice->invoice_number . '.xlsx';
 
         return response()->streamDownload(function () use ($salesInvoice): void {
             $spreadsheet = new Spreadsheet();
@@ -925,7 +877,7 @@ class SalesInvoicePageController extends Controller
             $rows[] = [__('txn.balance'), number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')];
             $rows[] = [];
             $rows[] = [__('txn.items')];
-            $rows[] = [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount').' (%)', __('txn.line_total')];
+            $rows[] = [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount') . ' (%)', __('txn.line_total')];
 
             foreach ($salesInvoice->items as $item) {
                 $gross = (float) $item->quantity * (float) $item->unit_price;
@@ -973,7 +925,7 @@ class SalesInvoicePageController extends Controller
 
     private function generateInvoiceNumber(string $date): string
     {
-        $prefix = 'INV-'.date('Ymd', strtotime($date));
+        $prefix = 'INV-' . date('Ymd', strtotime($date));
         $count = SalesInvoice::query()
             ->whereDate('invoice_date', $date)
             ->lockForUpdate()
@@ -1007,5 +959,4 @@ class SalesInvoicePageController extends Controller
             default => __('txn.credit'),
         };
     }
-
 }
