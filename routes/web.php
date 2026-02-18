@@ -22,6 +22,7 @@ use App\Http\Controllers\SalesReturnPageController;
 use App\Http\Controllers\SemesterTransactionPageController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupplierPageController;
+use App\Http\Controllers\SupplierPayablePageController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,7 +46,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
 
     Route::get('/sales-invoices', [SalesInvoicePageController::class, 'index'])->name('sales-invoices.index');
     Route::get('/sales-invoices/create', [SalesInvoicePageController::class, 'create'])->name('sales-invoices.create');
-    Route::post('/sales-invoices', [SalesInvoicePageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open'])->name('sales-invoices.store');
+    Route::post('/sales-invoices', [SalesInvoicePageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open', 'idempotent'])->name('sales-invoices.store');
     Route::get('/sales-invoices/{salesInvoice}', [SalesInvoicePageController::class, 'show'])->name('sales-invoices.show');
     Route::get('/sales-invoices/{salesInvoice}/print', [SalesInvoicePageController::class, 'print'])->name('sales-invoices.print');
     Route::get('/sales-invoices/{salesInvoice}/pdf', [SalesInvoicePageController::class, 'exportPdf'])->name('sales-invoices.export.pdf');
@@ -59,7 +60,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
 
     Route::get('/sales-returns', [SalesReturnPageController::class, 'index'])->name('sales-returns.index');
     Route::get('/sales-returns/create', [SalesReturnPageController::class, 'create'])->name('sales-returns.create');
-    Route::post('/sales-returns', [SalesReturnPageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open'])->name('sales-returns.store');
+    Route::post('/sales-returns', [SalesReturnPageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open', 'idempotent'])->name('sales-returns.store');
     Route::get('/sales-returns/{salesReturn}', [SalesReturnPageController::class, 'show'])->name('sales-returns.show');
     Route::get('/sales-returns/{salesReturn}/print', [SalesReturnPageController::class, 'print'])->name('sales-returns.print');
     Route::get('/sales-returns/{salesReturn}/pdf', [SalesReturnPageController::class, 'exportPdf'])->name('sales-returns.export.pdf');
@@ -73,7 +74,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
 
     Route::get('/delivery-notes', [DeliveryNotePageController::class, 'index'])->name('delivery-notes.index');
     Route::get('/delivery-notes/create', [DeliveryNotePageController::class, 'create'])->name('delivery-notes.create');
-    Route::post('/delivery-notes', [DeliveryNotePageController::class, 'store'])->middleware('semester.open')->name('delivery-notes.store');
+    Route::post('/delivery-notes', [DeliveryNotePageController::class, 'store'])->middleware(['semester.open', 'idempotent'])->name('delivery-notes.store');
     Route::get('/delivery-notes/{deliveryNote}', [DeliveryNotePageController::class, 'show'])->name('delivery-notes.show');
     Route::get('/delivery-notes/{deliveryNote}/print', [DeliveryNotePageController::class, 'print'])->name('delivery-notes.print');
     Route::get('/delivery-notes/{deliveryNote}/pdf', [DeliveryNotePageController::class, 'exportPdf'])->name('delivery-notes.export.pdf');
@@ -87,7 +88,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
 
     Route::get('/order-notes', [OrderNotePageController::class, 'index'])->name('order-notes.index');
     Route::get('/order-notes/create', [OrderNotePageController::class, 'create'])->name('order-notes.create');
-    Route::post('/order-notes', [OrderNotePageController::class, 'store'])->middleware('semester.open')->name('order-notes.store');
+    Route::post('/order-notes', [OrderNotePageController::class, 'store'])->middleware(['semester.open', 'idempotent'])->name('order-notes.store');
     Route::get('/order-notes/{orderNote}', [OrderNotePageController::class, 'show'])->name('order-notes.show');
     Route::get('/order-notes/{orderNote}/print', [OrderNotePageController::class, 'print'])->name('order-notes.print');
     Route::get('/order-notes/{orderNote}/pdf', [OrderNotePageController::class, 'exportPdf'])->name('order-notes.export.pdf');
@@ -102,7 +103,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/outgoing-transactions', [OutgoingTransactionPageController::class, 'index'])->name('outgoing-transactions.index');
     Route::get('/outgoing-transactions/create', [OutgoingTransactionPageController::class, 'create'])->name('outgoing-transactions.create');
     Route::post('/outgoing-transactions', [OutgoingTransactionPageController::class, 'store'])
-        ->middleware(['finance.unlocked', 'semester.open'])
+        ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
         ->name('outgoing-transactions.store');
     Route::get('/outgoing-transactions/{outgoingTransaction}', [OutgoingTransactionPageController::class, 'show'])->name('outgoing-transactions.show');
     Route::get('/outgoing-transactions/{outgoingTransaction}/print', [OutgoingTransactionPageController::class, 'print'])->name('outgoing-transactions.print');
@@ -137,7 +138,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/receivable-payments', [ReceivablePaymentPageController::class, 'index'])->name('receivable-payments.index');
     Route::get('/receivable-payments/create', [ReceivablePaymentPageController::class, 'create'])->name('receivable-payments.create');
     Route::post('/receivable-payments', [ReceivablePaymentPageController::class, 'store'])
-        ->middleware(['finance.unlocked', 'semester.open'])
+        ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
         ->name('receivable-payments.store');
     Route::get('/receivable-payments/{receivablePayment}', [ReceivablePaymentPageController::class, 'show'])->name('receivable-payments.show');
     Route::get('/receivable-payments/{receivablePayment}/print', [ReceivablePaymentPageController::class, 'print'])->name('receivable-payments.print');
@@ -166,6 +167,14 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/suppliers/lookup', [SupplierPageController::class, 'lookup'])->name('suppliers.lookup');
     Route::get('/suppliers/{supplier}/edit', [SupplierPageController::class, 'edit'])->name('suppliers.edit');
     Route::put('/suppliers/{supplier}', [SupplierPageController::class, 'update'])->name('suppliers.update');
+    Route::get('/supplier-payables', [SupplierPayablePageController::class, 'index'])->name('supplier-payables.index');
+    Route::get('/supplier-payables/create', [SupplierPayablePageController::class, 'create'])->name('supplier-payables.create');
+    Route::post('/supplier-payables', [SupplierPayablePageController::class, 'store'])
+        ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
+        ->name('supplier-payables.store');
+    Route::get('/supplier-payables/payment/{supplierPayment}', [SupplierPayablePageController::class, 'showPayment'])->name('supplier-payables.show-payment');
+    Route::get('/supplier-payables/payment/{supplierPayment}/print', [SupplierPayablePageController::class, 'printPayment'])->name('supplier-payables.print-payment');
+    Route::get('/supplier-payables/payment/{supplierPayment}/pdf', [SupplierPayablePageController::class, 'exportPaymentPdf'])->name('supplier-payables.export-payment-pdf');
 
     Route::middleware('admin')->group(function (): void {
         Route::get('/item-categories', [ItemCategoryPageController::class, 'index'])->name('item-categories.index');

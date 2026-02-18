@@ -21,9 +21,24 @@ class AuditLog extends Model
         'subject_type',
         'subject_id',
         'description',
+        'before_data',
+        'after_data',
+        'meta_data',
         'ip_address',
         'user_agent',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'before_data' => 'array',
+            'after_data' => 'array',
+            'meta_data' => 'array',
+        ];
+    }
 
     /**
      * @return BelongsTo<User, $this>

@@ -463,10 +463,11 @@
                 <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
             </div>
             <div class="nav-group">
-                <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
+                <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') || request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
                 <div class="nav-sub">
                     <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
                     <a href="{{ route('receivable-payments.index') }}" class="{{ request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivable_payments') }}</a>
+                    <a href="{{ route('supplier-payables.index') }}" class="{{ request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.supplier_payables') }}</a>
                 </div>
             </div>
             <span class="nav-section-title">{{ __('ui.nav_reports') }}</span>

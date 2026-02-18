@@ -7,6 +7,7 @@ return [
     'customer_levels' => 'Level Customer',
     'customers' => 'Customer',
     'suppliers' => 'Supplier',
+    'supplier_payables' => 'Hutang Supplier',
     'sales_invoices' => 'Faktur Penjualan',
     'sales_returns' => 'Retur Penjualan',
     'delivery_notes' => 'Surat Jalan',

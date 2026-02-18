@@ -8,6 +8,9 @@ use App\Models\OrderNote;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Models\OutgoingTransaction;
+use App\Models\Supplier;
+use App\Models\SupplierPayment;
 use App\Support\SemesterBookService;
 use Closure;
 use Illuminate\Http\Request;
@@ -32,10 +35,16 @@ class EnsureSemesterOpen
             ])->withInput();
         }
         $customerId = $this->resolveCustomerId($request);
+        $supplierId = $this->resolveSupplierId($request);
         $isAdmin = (($request->user()?->role ?? '') === 'admin');
         if (! $isAdmin && $semester !== null && $this->semesterBookService->isCustomerLocked($customerId, $semester)) {
             return back()->withErrors([
                 'semester' => __('ui.customer_semester_closed_error', ['semester' => $semester]),
+            ])->withInput()->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
+        }
+        if (! $isAdmin && $semester !== null && $this->semesterBookService->isSupplierClosed($supplierId, $semester)) {
+            return back()->withErrors([
+                'semester_period' => __('txn.supplier_semester_closed_error', ['semester' => $semester]),
             ])->withInput()->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
         if ($semester !== null && ! $this->semesterBookService->isActive($semester)) {
@@ -67,6 +76,7 @@ class EnsureSemesterOpen
                 ?? $this->semesterBookService->semesterFromDate((string) $request->input('payment_date')),
             default => $this->semesterBookService->normalizeSemester((string) $request->input('semester_period'))
                 ?? $this->semesterBookService->normalizeSemester((string) $request->input('semester'))
+                ?? $this->semesterBookService->semesterFromDate((string) $request->input('transaction_date'))
                 ?? $this->semesterBookService->semesterFromDate((string) $request->input('invoice_date'))
                 ?? $this->semesterBookService->semesterFromDate((string) $request->input('return_date'))
                 ?? $this->semesterBookService->semesterFromDate((string) $request->input('note_date'))
@@ -116,5 +126,34 @@ class EnsureSemesterOpen
         $customerId = (int) $value;
 
         return $customerId > 0 ? $customerId : null;
+    }
+
+    private function resolveSupplierId(Request $request): ?int
+    {
+        $routeName = (string) optional($request->route())->getName();
+
+        return match ($routeName) {
+            'outgoing-transactions.store', 'supplier-payables.store' => $this->normalizeSupplierId($request->input('supplier_id')),
+            'outgoing-transactions.show', 'outgoing-transactions.print', 'outgoing-transactions.export.pdf', 'outgoing-transactions.export.excel' => $this->normalizeSupplierId(optional($request->route('outgoingTransaction'))->supplier_id),
+            'supplier-payables.show-payment', 'supplier-payables.print-payment', 'supplier-payables.export-payment-pdf' => $this->normalizeSupplierId(optional($request->route('supplierPayment'))->supplier_id),
+            default => $this->normalizeSupplierId($request->input('supplier_id') ?? $request->route('supplier')),
+        };
+    }
+
+    private function normalizeSupplierId(mixed $value): ?int
+    {
+        if ($value instanceof Supplier) {
+            return $this->normalizeSupplierId($value->id);
+        }
+        if ($value instanceof OutgoingTransaction) {
+            return $this->normalizeSupplierId($value->supplier_id);
+        }
+        if ($value instanceof SupplierPayment) {
+            return $this->normalizeSupplierId($value->supplier_id);
+        }
+
+        $supplierId = (int) $value;
+
+        return $supplierId > 0 ? $supplierId : null;
     }
 }

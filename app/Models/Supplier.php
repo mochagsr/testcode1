@@ -23,7 +23,18 @@ class Supplier extends Model
         'address',
         'bank_account_notes',
         'notes',
+        'outstanding_payable',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'outstanding_payable' => 'integer',
+        ];
+    }
 
     /**
      * @return HasMany<OutgoingTransaction, $this>
@@ -34,6 +45,22 @@ class Supplier extends Model
     }
 
     /**
+     * @return HasMany<SupplierLedger, $this>
+     */
+    public function ledgers(): HasMany
+    {
+        return $this->hasMany(SupplierLedger::class);
+    }
+
+    /**
+     * @return HasMany<SupplierPayment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(SupplierPayment::class);
+    }
+
+    /**
      * Scope: Columns for supplier list screens.
      *
      * @param  Builder<Supplier>  $query
@@ -41,7 +68,7 @@ class Supplier extends Model
      */
     public function scopeOnlyListColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'name', 'company_name', 'phone', 'address', 'notes']);
+        return $query->select(['id', 'name', 'company_name', 'phone', 'address', 'notes', 'outstanding_payable']);
     }
 
     /**

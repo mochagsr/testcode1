@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Services\AuditLogService;
+use App\Services\SupplierLedgerService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
@@ -34,7 +35,8 @@ class OutgoingTransactionPageController extends Controller
 
     public function __construct(
         private readonly AuditLogService $auditLogService,
-        private readonly SemesterBookService $semesterBookService
+        private readonly SemesterBookService $semesterBookService,
+        private readonly SupplierLedgerService $supplierLedgerService
     ) {}
 
     public function index(Request $request): View
@@ -273,6 +275,9 @@ class OutgoingTransactionPageController extends Controller
                 'created_by_user_id' => $request->user()?->id,
             ]);
 
+            $supplierId = (int) $data['supplier_id'];
+            $beforeOutstanding = (int) (Supplier::query()->whereKey($supplierId)->value('outstanding_payable') ?? 0);
+
             foreach ($computedRows as $row) {
                 $product = $row['product'];
                 $quantity = $row['quantity'];
@@ -303,15 +308,28 @@ class OutgoingTransactionPageController extends Controller
                 }
             }
 
+            $ledger = $this->supplierLedgerService->addDebit(
+                supplierId: $supplierId,
+                outgoingTransactionId: (int) $transaction->id,
+                entryDate: $transactionDate,
+                amount: (float) $grandTotal,
+                periodCode: $selectedSemester,
+                description: __('supplier_payable.outgoing_debit_ledger_note', ['number' => $transaction->transaction_number])
+            );
+
+            $this->auditLogService->log(
+                'supplier.payable.debit.create',
+                $transaction,
+                __('txn.audit_outgoing_created', ['number' => $transaction->transaction_number]),
+                $request,
+                ['outstanding_payable' => $beforeOutstanding],
+                ['outstanding_payable' => (int) $ledger->balance_after],
+                ['supplier_id' => $supplierId]
+            );
+
             return $transaction;
         });
-
-        $this->auditLogService->log(
-            'outgoing.transaction.create',
-            $transaction,
-            __('txn.audit_outgoing_created', ['number' => $transaction->transaction_number]),
-            $request
-        );
+        
         AppCache::forgetAfterFinancialMutation([(string) $transaction->transaction_date]);
 
         return redirect()

@@ -227,4 +227,5 @@ return [
     'supplier_created_success' => 'Supplier created successfully.',
     'supplier_updated_success' => 'Supplier updated successfully.',
     'supplier_deleted_success' => 'Supplier deleted successfully.',
+    'duplicate_submit_blocked' => 'Duplicate submission detected. Please wait a few seconds and try again.',
 ];

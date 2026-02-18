@@ -7,6 +7,7 @@ return [
     'customer_levels' => 'Customer Levels',
     'customers' => 'Customers',
     'suppliers' => 'Suppliers',
+    'supplier_payables' => 'Supplier Payables',
     'sales_invoices' => 'Sales Invoices',
     'sales_returns' => 'Sales Returns',
     'delivery_notes' => 'Delivery Notes',

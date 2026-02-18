@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'title' => 'Supplier Payables',
+    'search_placeholder' => 'Search supplier...',
+    'all_suppliers' => 'All Suppliers',
+    'all_semesters' => 'All Semesters',
+    'outstanding' => 'Outstanding Payable',
+    'mutation' => 'Payable Mutation',
+    'pay' => 'Pay',
+    'add_payment' => 'Pay Supplier Debt',
+    'save_payment' => 'Save Payment',
+    'proof_number' => 'Proof Number',
+    'payment_saved' => 'Supplier debt payment has been saved.',
+    'amount_exceeds_outstanding' => 'Payment amount exceeds outstanding supplier payable.',
+    'payment_ledger_note' => 'Supplier debt payment :payment',
+    'outgoing_debit_ledger_note' => 'Outgoing transaction :number',
+    'no_data' => 'No suppliers found.',
+    'no_mutation' => 'No supplier payable mutation data.',
+    'amount_in_words' => 'Amount in Words',
+    'supplier_signature' => 'Supplier Signature',
+    'user_signature' => 'User Signature',
+    'receipt_title' => 'Supplier Debt Payment Receipt',
+    'receipt_number' => 'Receipt No.',
+];

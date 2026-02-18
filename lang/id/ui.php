@@ -227,4 +227,5 @@ return [
     'supplier_created_success' => 'Supplier berhasil ditambahkan.',
     'supplier_updated_success' => 'Supplier berhasil diperbarui.',
     'supplier_deleted_success' => 'Supplier berhasil dihapus.',
+    'duplicate_submit_blocked' => 'Submit ganda terdeteksi. Silakan tunggu beberapa detik sebelum mencoba lagi.',
 ];

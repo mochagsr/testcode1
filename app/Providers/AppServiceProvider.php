@@ -5,9 +5,17 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Models\Customer;
+use App\Models\InvoicePayment;
+use App\Models\OutgoingTransaction;
 use App\Models\Product;
+use App\Models\ReceivableLedger;
+use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
+use App\Models\SupplierLedger;
+use App\Models\SupplierPayment;
 use App\Observers\CustomerAuditObserver;
+use App\Observers\FinancialModelAuditObserver;
 use App\Observers\ProductAuditObserver;
 use App\Observers\SalesInvoiceAuditObserver;
 use App\Services\AuditLogService;
@@ -57,6 +65,13 @@ class AppServiceProvider extends ServiceProvider
             Product::class => ProductAuditObserver::class,
             Customer::class => CustomerAuditObserver::class,
             SalesInvoice::class => SalesInvoiceAuditObserver::class,
+            SalesReturn::class => FinancialModelAuditObserver::class,
+            InvoicePayment::class => FinancialModelAuditObserver::class,
+            ReceivablePayment::class => FinancialModelAuditObserver::class,
+            ReceivableLedger::class => FinancialModelAuditObserver::class,
+            OutgoingTransaction::class => FinancialModelAuditObserver::class,
+            SupplierPayment::class => FinancialModelAuditObserver::class,
+            SupplierLedger::class => FinancialModelAuditObserver::class,
         ];
 
         foreach ($observers as $model => $observer) {

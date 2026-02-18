@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'title' => 'Hutang Supplier',
+    'search_placeholder' => 'Cari supplier...',
+    'all_suppliers' => 'Semua Supplier',
+    'all_semesters' => 'Semua Semester',
+    'outstanding' => 'Sisa Hutang',
+    'mutation' => 'Mutasi Hutang',
+    'pay' => 'Bayar',
+    'add_payment' => 'Bayar Hutang Supplier',
+    'save_payment' => 'Simpan Pembayaran',
+    'proof_number' => 'Nomor Bukti',
+    'payment_saved' => 'Pembayaran hutang supplier berhasil disimpan.',
+    'amount_exceeds_outstanding' => 'Nominal pembayaran melebihi sisa hutang supplier.',
+    'payment_ledger_note' => 'Pembayaran hutang supplier :payment',
+    'outgoing_debit_ledger_note' => 'Transaksi keluar :number',
+    'no_data' => 'Belum ada supplier.',
+    'no_mutation' => 'Belum ada mutasi hutang supplier.',
+    'amount_in_words' => 'Terbilang',
+    'supplier_signature' => 'Tanda Tangan Supplier',
+    'user_signature' => 'Tanda Tangan User',
+    'receipt_title' => 'Kwitansi Pembayaran Hutang Supplier',
+    'receipt_number' => 'No. Kwitansi',
+];

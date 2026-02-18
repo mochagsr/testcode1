@@ -9,6 +9,7 @@ use App\Models\OrderNote;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Models\SupplierPayment;
 use App\Support\ExcelExportStyler;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -148,6 +149,8 @@ class AuditLogPageController extends Controller
                 'subject_type',
                 'subject_id',
                 'description',
+                'before_data',
+                'after_data',
                 'ip_address',
                 'created_at',
             ])
@@ -265,6 +268,19 @@ class AuditLogPageController extends Controller
             }
         }
 
+        $supplierPaymentMap = [];
+        if (isset($idsByType[SupplierPayment::class])) {
+            $supplierPaymentMap = SupplierPayment::query()
+                ->whereIn('id', $idsByType[SupplierPayment::class])
+                ->get(['id', 'payment_number', 'supplier_id'])
+                ->keyBy('id');
+            foreach ($supplierPaymentMap as $payment) {
+                if ($payment->payment_number) {
+                    $codeLinkMap[strtoupper((string) $payment->payment_number)] = route('supplier-payables.show-payment', $payment);
+                }
+            }
+        }
+
         $customerMap = [];
         if (isset($idsByType[Customer::class])) {
             $customerMap = Customer::query()
@@ -325,6 +341,9 @@ class AuditLogPageController extends Controller
                 $subjectCodeMap[$logId] = (string) ($payment->payment_number ?? '');
             } elseif ($subjectType === Customer::class && isset($customerMap[$subjectId])) {
                 $subjectMap[$logId] = (string) ($customerMap[$subjectId]->name ?? '-');
+            } elseif ($subjectType === SupplierPayment::class && isset($supplierPaymentMap[$subjectId])) {
+                $subjectMap[$logId] = 'Supplier Payment';
+                $subjectCodeMap[$logId] = (string) ($supplierPaymentMap[$subjectId]->payment_number ?? '');
             }
 
             $shortDesc = $this->shortAuditDescription(
@@ -332,6 +351,18 @@ class AuditLogPageController extends Controller
                 $descriptionMap[$logId],
                 $subjectCodeMap[$logId]
             );
+            $beforeText = is_array($log->before_data) ? json_encode($log->before_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '';
+            $afterText = is_array($log->after_data) ? json_encode($log->after_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '';
+            if ($beforeText !== '' || $afterText !== '') {
+                $parts = [$shortDesc];
+                if ($beforeText !== '') {
+                    $parts[] = 'Before: ' . $beforeText;
+                }
+                if ($afterText !== '') {
+                    $parts[] = 'After: ' . $afterText;
+                }
+                $shortDesc = implode(' | ', $parts);
+            }
             $descriptionMap[$logId] = $shortDesc;
         }
 

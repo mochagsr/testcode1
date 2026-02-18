@@ -58,6 +58,15 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        'alerts' => [
+            'driver' => 'stack',
+            'channels' => array_filter([
+                'daily',
+                env('LOG_ALERT_SLACK_WEBHOOK_URL') ? 'alert_slack' : null,
+            ]),
+            'ignore_exceptions' => false,
+        ],
+
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
@@ -79,6 +88,15 @@ return [
             'username' => env('LOG_SLACK_USERNAME', 'Laravel Log'),
             'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
             'level' => env('LOG_LEVEL', 'critical'),
+            'replace_placeholders' => true,
+        ],
+
+        'alert_slack' => [
+            'driver' => 'slack',
+            'url' => env('LOG_ALERT_SLACK_WEBHOOK_URL'),
+            'username' => env('LOG_ALERT_SLACK_USERNAME', 'PgPOS Alert'),
+            'emoji' => env('LOG_ALERT_SLACK_EMOJI', ':warning:'),
+            'level' => env('LOG_ALERT_LEVEL', 'error'),
             'replace_placeholders' => true,
         ],
 
