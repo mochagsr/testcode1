@@ -74,7 +74,7 @@ class SalesReturnPageController extends Controller
             ->when($selectedStatus === 'active', fn($q) => $q->active())
             ->when($selectedStatus === 'canceled', fn($q) => $q->canceled())
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
+                $query->forSemester($selectedSemester);
             })
             ->when($selectedReturnDateRange !== null, function ($query) use ($selectedReturnDateRange): void {
                 $query->whereBetween('return_date', $selectedReturnDateRange);

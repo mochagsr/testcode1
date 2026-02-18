@@ -71,12 +71,12 @@ class OrderNotePageController extends Controller
             ->withCustomerInfo()
             ->searchKeyword($search)
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
-                $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
+                $query->betweenDates($semesterRange['start'], $semesterRange['end']);
             })
             ->when($selectedStatus === 'active', fn($query) => $query->active())
             ->when($selectedStatus === 'canceled', fn($query) => $query->canceled())
             ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
-                $query->whereBetween('note_date', $selectedNoteDateRange);
+                $query->betweenDates($selectedNoteDateRange[0], $selectedNoteDateRange[1]);
             })
             ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
                 $query->where('note_date', '>=', $recentRangeStart);
@@ -95,7 +95,7 @@ class OrderNotePageController extends Controller
             function () use ($todayRange, $selectedStatus) {
                 return (object) [
                     'total_notes' => (int) OrderNote::query()
-                        ->whereBetween('note_date', $todayRange)
+                        ->betweenDates($todayRange[0], $todayRange[1])
                         ->when($selectedStatus !== null, function ($query) use ($selectedStatus): void {
                             $query->where('is_canceled', $selectedStatus === 'canceled');
                         })

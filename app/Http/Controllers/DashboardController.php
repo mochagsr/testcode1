@@ -63,7 +63,7 @@ class DashboardController extends Controller
         });
 
         $uncollectedCustomers = Customer::query()
-            ->select(['id', 'name', 'city', 'outstanding_receivable'])
+            ->onlyOutstandingColumns()
             ->withOutstanding()
             ->orderBy('name')
             ->paginate(20)

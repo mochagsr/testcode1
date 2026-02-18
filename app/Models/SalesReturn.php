@@ -107,7 +107,7 @@ class SalesReturn extends Model
      */
     public function scopeWithCustomerInfo(Builder $query): Builder
     {
-        return $query->with('customer:id,code,name,city');
+        return $query->with('customer:id,code,name,phone,city');
     }
 
     /**
@@ -141,6 +141,17 @@ class SalesReturn extends Model
                         ->orWhere('city', 'like', "%{$search}%");
                 });
         });
+    }
+
+    /**
+     * Scope: Filter by semester period.
+     *
+     * @param  Builder<SalesReturn>  $query
+     * @return Builder<SalesReturn>
+     */
+    public function scopeForSemester(Builder $query, string $semester): Builder
+    {
+        return $query->where('semester_period', $semester);
     }
 
     /**

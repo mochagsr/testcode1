@@ -531,10 +531,10 @@ class ReportExportController extends Controller
                                 'COALESCE(SUM(CASE WHEN is_canceled = 0 THEN balance ELSE 0 END), 0) as total_balance'
                         )
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                            $query->where('semester_period', $selectedSemester);
+                            $query->forSemester($selectedSemester);
                         })
                         ->when($selectedCustomerId !== null, function ($query) use ($selectedCustomerId): void {
-                            $query->where('customer_id', $selectedCustomerId);
+                            $query->forCustomer($selectedCustomerId);
                         })
                         ->groupBy('customer_id', 'semester_period')
                         ->get();
@@ -630,19 +630,12 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($selectedSemester): array {
                     return SalesReturn::query()
-                        ->select([
-                            'id',
-                            'return_number',
-                            'return_date',
-                            'customer_id',
-                            'total',
-                            'semester_period',
-                        ])
-                        ->with('customer:id,name,phone,city')
+                        ->onlyListColumns()
+                        ->withCustomerInfo()
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                            $query->where('semester_period', $selectedSemester);
+                            $query->forSemester($selectedSemester);
                         })
-                        ->latest('return_date')
+                        ->orderByDate()
                         ->get()
                         ->map(fn(SalesReturn $row): array => [
                             $row->return_number,
@@ -668,19 +661,11 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($semesterRange): array {
                     return DeliveryNote::query()
-                        ->select([
-                            'id',
-                            'note_number',
-                            'note_date',
-                            'recipient_name',
-                            'recipient_phone',
-                            'city',
-                            'created_by_name',
-                        ])
+                        ->onlyListColumns()
                         ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
-                            $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
+                            $query->betweenDates($semesterRange['start'], $semesterRange['end']);
                         })
-                        ->latest('note_date')
+                        ->orderByDate()
                         ->get()
                         ->map(fn(DeliveryNote $row): array => [
                             $row->note_number,
@@ -705,19 +690,11 @@ class ReportExportController extends Controller
                 ],
                 'rows' => function () use ($semesterRange): array {
                     return OrderNote::query()
-                        ->select([
-                            'id',
-                            'note_number',
-                            'note_date',
-                            'customer_name',
-                            'customer_phone',
-                            'city',
-                            'created_by_name',
-                        ])
+                        ->onlyListColumns()
                         ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
-                            $query->whereBetween('note_date', [$semesterRange['start'], $semesterRange['end']]);
+                            $query->betweenDates($semesterRange['start'], $semesterRange['end']);
                         })
-                        ->latest('note_date')
+                        ->orderByDate()
                         ->get()
                         ->map(fn(OrderNote $row): array => [
                             $row->note_number,
@@ -902,10 +879,10 @@ class ReportExportController extends Controller
         $aggregate = SalesInvoice::query()
             ->where('balance', '>', 0)
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
+                $query->forSemester($selectedSemester);
             })
             ->when($selectedCustomerId !== null, function ($query) use ($selectedCustomerId): void {
-                $query->where('customer_id', $selectedCustomerId);
+                $query->forCustomer($selectedCustomerId);
             })
             ->selectRaw('COUNT(*) as invoice_count, COALESCE(SUM(balance), 0) as total_balance')
             ->first();
@@ -978,7 +955,7 @@ class ReportExportController extends Controller
     {
         $invoiceAggregate = SalesInvoice::query()
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
+                $query->forSemester($selectedSemester);
             })
             ->selectRaw('COUNT(*) as invoice_count, COALESCE(SUM(total), 0) as grand_total, COALESCE(SUM(total_paid), 0) as paid_total')
             ->first();
@@ -1023,10 +1000,10 @@ class ReportExportController extends Controller
     {
         $aggregate = OutgoingTransaction::query()
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
-                $query->where('semester_period', $selectedSemester);
+                $query->forSemester($selectedSemester);
             })
             ->when($selectedOutgoingSupplierId !== null, function ($query) use ($selectedOutgoingSupplierId): void {
-                $query->where('supplier_id', $selectedOutgoingSupplierId);
+                $query->forSupplier($selectedOutgoingSupplierId);
             })
             ->selectRaw('COUNT(*) as transaction_count, COALESCE(SUM(total), 0) as grand_total')
             ->first();

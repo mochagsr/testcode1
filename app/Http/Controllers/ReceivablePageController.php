@@ -423,11 +423,11 @@ class ReceivablePageController extends Controller
                 : now();
 
             $invoices = SalesInvoice::query()
-                ->where('customer_id', $customerId)
-                ->where('is_canceled', false)
-                ->where('balance', '>', 0)
+                ->forCustomer($customerId)
+                ->active()
+                ->withOpenBalance()
                 ->when($selectedSemester !== '', function ($query) use ($selectedSemester): void {
-                    $query->where('semester_period', $selectedSemester);
+                    $query->forSemester($selectedSemester);
                 })
                 ->orderBy('invoice_date')
                 ->orderBy('id')

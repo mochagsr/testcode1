@@ -75,6 +75,7 @@ class DeliveryNote extends Model
             'note_date',
             'customer_id',
             'recipient_name',
+            'recipient_phone',
             'city',
             'created_by_name',
             'is_canceled',
@@ -143,5 +144,18 @@ class DeliveryNote extends Model
     public function scopeOrderByDate(Builder $query): Builder
     {
         return $query->orderBy('note_date', 'desc');
+    }
+
+    /**
+     * Scope: filter note date by range.
+     *
+     * @param  Builder<DeliveryNote>  $query
+     * @param  mixed  $startDate
+     * @param  mixed  $endDate
+     * @return Builder<DeliveryNote>
+     */
+    public function scopeBetweenDates(Builder $query, mixed $startDate, mixed $endDate): Builder
+    {
+        return $query->whereBetween('note_date', [$startDate, $endDate]);
     }
 }

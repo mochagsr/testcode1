@@ -165,6 +165,17 @@ class Customer extends Model
     }
 
     /**
+     * Scope: Minimal columns for outstanding customer list.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeOnlyOutstandingColumns(Builder $query): Builder
+    {
+        return $query->select(['id', 'name', 'city', 'outstanding_receivable']);
+    }
+
+    /**
      * Scope: Eager load customer level.
      *
      * @param  Builder<Customer>  $query

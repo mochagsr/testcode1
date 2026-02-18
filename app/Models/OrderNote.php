@@ -74,6 +74,7 @@ class OrderNote extends Model
             'note_date',
             'customer_id',
             'customer_name',
+            'customer_phone',
             'city',
             'created_by_name',
             'is_canceled',
@@ -142,5 +143,18 @@ class OrderNote extends Model
     public function scopeOrderByDate(Builder $query): Builder
     {
         return $query->orderBy('note_date', 'desc');
+    }
+
+    /**
+     * Scope: filter note date by range.
+     *
+     * @param  Builder<OrderNote>  $query
+     * @param  mixed  $startDate
+     * @param  mixed  $endDate
+     * @return Builder<OrderNote>
+     */
+    public function scopeBetweenDates(Builder $query, mixed $startDate, mixed $endDate): Builder
+    {
+        return $query->whereBetween('note_date', [$startDate, $endDate]);
     }
 }
