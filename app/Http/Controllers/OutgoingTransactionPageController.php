@@ -206,6 +206,7 @@ class OutgoingTransactionPageController extends Controller
             'transaction_date' => ['required', 'date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
             'note_number' => ['nullable', 'string', 'max:80'],
+            'supplier_invoice_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -225,7 +226,11 @@ class OutgoingTransactionPageController extends Controller
             ]);
         }
 
-        $transaction = DB::transaction(function () use ($data, $request, $selectedSemester): OutgoingTransaction {
+        $supplierInvoicePhotoPath = $request->hasFile('supplier_invoice_photo')
+            ? $request->file('supplier_invoice_photo')->store('supplier_invoices', 'public')
+            : null;
+
+        $transaction = DB::transaction(function () use ($data, $request, $selectedSemester, $supplierInvoicePhotoPath): OutgoingTransaction {
             $transactionDate = Carbon::parse($data['transaction_date']);
             $transactionNumber = $this->generateTransactionNumber($transactionDate->toDateString());
             $rows = collect($data['items']);
@@ -270,6 +275,7 @@ class OutgoingTransactionPageController extends Controller
                 'supplier_id' => (int) $data['supplier_id'],
                 'semester_period' => $selectedSemester,
                 'note_number' => $data['note_number'] ?? null,
+                'supplier_invoice_photo_path' => $supplierInvoicePhotoPath,
                 'total' => $grandTotal,
                 'notes' => $data['notes'] ?? null,
                 'created_by_user_id' => $request->user()?->id,

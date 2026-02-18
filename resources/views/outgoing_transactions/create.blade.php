@@ -5,7 +5,7 @@
 @section('content')
     <h1 class="page-title">{{ __('txn.create_outgoing_transaction_title') }}</h1>
 
-    <form method="post" action="{{ route('outgoing-transactions.store') }}">
+    <form method="post" action="{{ route('outgoing-transactions.store') }}" enctype="multipart/form-data">
         @csrf
 
         <div class="card">
@@ -47,6 +47,10 @@
                             <div class="col-6">
                                 <label>{{ __('txn.note_number') }}</label>
                                 <input type="text" name="note_number" value="{{ old('note_number') }}">
+                            </div>
+                            <div class="col-6">
+                                <label>{{ __('supplier_payable.supplier_invoice_photo') }}</label>
+                                <input type="file" name="supplier_invoice_photo" accept="image/*">
                             </div>
                             <div class="col-12">
                                 <label>{{ __('txn.notes') }}</label>

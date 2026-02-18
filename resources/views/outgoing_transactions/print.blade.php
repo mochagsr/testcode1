@@ -61,6 +61,7 @@
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
         $companyLogoSrc = null;
+        $supplierInvoicePhotoSrc = null;
 
         if ($companyLogoPath) {
             $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
@@ -68,6 +69,14 @@
             if (is_file($absoluteLogoPath)) {
                 $mimeType = mime_content_type($absoluteLogoPath) ?: 'image/png';
                 $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
+            }
+        }
+
+        if (!empty($transaction->supplier_invoice_photo_path)) {
+            $absoluteInvoicePhotoPath = public_path('storage/' . $transaction->supplier_invoice_photo_path);
+            if (is_file($absoluteInvoicePhotoPath)) {
+                $mimeType = mime_content_type($absoluteInvoicePhotoPath) ?: 'image/jpeg';
+                $supplierInvoicePhotoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteInvoicePhotoPath));
             }
         }
     @endphp
@@ -139,6 +148,12 @@
     </table>
 
     <div style="margin-top: 10px;"><strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}</div>
+    @if($supplierInvoicePhotoSrc)
+        <div style="margin-top: 10px;">
+            <strong>{{ __('supplier_payable.supplier_invoice_photo') }}:</strong><br>
+            <img src="{{ $supplierInvoicePhotoSrc }}" alt="Supplier Invoice Photo" style="max-width: 260px; max-height: 260px; border: 1px solid #111; margin-top: 4px;">
+        </div>
+    @endif
 
     <table class="signature-table">
         <tr>

@@ -21,6 +21,7 @@ class SupplierPayment extends Model
         'supplier_id',
         'payment_date',
         'proof_number',
+        'payment_proof_photo_path',
         'amount',
         'amount_in_words',
         'supplier_signature',

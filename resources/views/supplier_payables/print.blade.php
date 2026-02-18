@@ -17,6 +17,16 @@
 </head>
 <body>
 <div class="wrap">
+    @php
+        $paymentProofPhotoSrc = null;
+        if (!empty($payment->payment_proof_photo_path)) {
+            $absoluteProofPath = public_path('storage/' . $payment->payment_proof_photo_path);
+            if (is_file($absoluteProofPath)) {
+                $mimeType = mime_content_type($absoluteProofPath) ?: 'image/jpeg';
+                $paymentProofPhotoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteProofPath));
+            }
+        }
+    @endphp
     <div class="title">{{ __('supplier_payable.receipt_title') }}</div>
     <table>
         <tr><th>{{ __('supplier_payable.receipt_number') }}</th><td>{{ $payment->payment_number }}</td></tr>
@@ -27,6 +37,12 @@
         <tr><th>{{ __('supplier_payable.amount_in_words') }}</th><td>{{ $payment->amount_in_words ?: '-' }}</td></tr>
         <tr><th>{{ __('txn.notes') }}</th><td>{{ $payment->notes ?: '-' }}</td></tr>
     </table>
+    @if($paymentProofPhotoSrc)
+        <div style="margin-top: 8px;">
+            <strong>{{ __('supplier_payable.payment_proof_photo') }}:</strong><br>
+            <img src="{{ $paymentProofPhotoSrc }}" alt="Payment Proof Photo" style="max-width: 240px; max-height: 240px; border: 1px solid #000; margin-top: 4px;">
+        </div>
+    @endif
     <div class="sign">
         <div class="sign-box">
             {{ __('supplier_payable.supplier_signature') }}

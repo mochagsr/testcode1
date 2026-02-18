@@ -83,6 +83,7 @@ class SupplierPayablePageController extends Controller
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'payment_date' => ['required', 'date'],
             'proof_number' => ['nullable', 'string', 'max:80'],
+            'payment_proof_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'amount' => ['required', 'integer', 'min:1'],
             'supplier_signature' => ['nullable', 'string', 'max:120'],
             'user_signature' => ['nullable', 'string', 'max:120'],
@@ -98,7 +99,11 @@ class SupplierPayablePageController extends Controller
                 ->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
 
-        $payment = DB::transaction(function () use ($data, $semester, $request): SupplierPayment {
+        $paymentProofPhotoPath = $request->hasFile('payment_proof_photo')
+            ? $request->file('payment_proof_photo')->store('supplier_payment_proofs', 'public')
+            : null;
+
+        $payment = DB::transaction(function () use ($data, $semester, $request, $paymentProofPhotoPath): SupplierPayment {
             $supplier = Supplier::query()->lockForUpdate()->findOrFail((int) $data['supplier_id']);
             $amount = (int) $data['amount'];
             $beforeOutstanding = (int) $supplier->outstanding_payable;
@@ -114,6 +119,7 @@ class SupplierPayablePageController extends Controller
                 'supplier_id' => (int) $supplier->id,
                 'payment_date' => $paymentDate->toDateString(),
                 'proof_number' => $data['proof_number'] ?? null,
+                'payment_proof_photo_path' => $paymentProofPhotoPath,
                 'amount' => $amount,
                 'amount_in_words' => $this->toIndonesianWords($amount),
                 'supplier_signature' => $data['supplier_signature'] ?? null,

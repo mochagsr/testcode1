@@ -6,7 +6,7 @@
     <h1 class="page-title">{{ __('supplier_payable.add_payment') }}</h1>
 
     <div class="card">
-        <form method="post" action="{{ route('supplier-payables.store') }}">
+        <form method="post" action="{{ route('supplier-payables.store') }}" enctype="multipart/form-data">
             @csrf
             <div class="row inline">
                 <div class="col-4">
@@ -27,6 +27,10 @@
                 <div class="col-4">
                     <label>{{ __('supplier_payable.proof_number') }}</label>
                     <input type="text" name="proof_number" value="{{ old('proof_number') }}" maxlength="80">
+                </div>
+                <div class="col-4">
+                    <label>{{ __('supplier_payable.payment_proof_photo') }}</label>
+                    <input type="file" name="payment_proof_photo" accept="image/*">
                 </div>
                 <div class="col-4">
                     <label>{{ __('txn.amount') }}</label>

@@ -23,6 +23,7 @@ class OutgoingTransaction extends Model
         'supplier_id',
         'semester_period',
         'note_number',
+        'supplier_invoice_photo_path',
         'total',
         'notes',
         'created_by_user_id',

@@ -24,6 +24,16 @@
                 <div class="col-4"><strong>{{ __('txn.date') }}</strong><div>{{ optional($transaction->transaction_date)->format('d-m-Y') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.semester_period') }}</strong><div>{{ $transaction->semester_period ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.note_number') }}</strong><div>{{ $transaction->note_number ?: '-' }}</div></div>
+                <div class="col-4">
+                    <strong>{{ __('supplier_payable.supplier_invoice_photo') }}</strong>
+                    <div>
+                        @if($transaction->supplier_invoice_photo_path)
+                            <a class="btn secondary id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$transaction->supplier_invoice_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                        @else
+                            -
+                        @endif
+                    </div>
+                </div>
                 <div class="col-4"><strong>{{ __('txn.supplier') }}</strong><div>{{ $transaction->supplier?->name ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('ui.supplier_company_name') }}</strong><div>{{ $transaction->supplier?->company_name ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $transaction->supplier?->phone ?: '-' }}</div></div>
@@ -75,4 +85,37 @@
             </table>
         </div>
     </div>
+
+    <div id="id-card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; align-items:center; justify-content:center;">
+        <img id="id-card-modal-image" src="" alt="Supplier Invoice" style="max-width:25vw; max-height:25vh; width:auto; height:auto; border:2px solid #fff; border-radius:8px; background:#fff;">
+    </div>
+
+    <script>
+        (function () {
+            const modal = document.getElementById('id-card-modal');
+            const modalImage = document.getElementById('id-card-modal-image');
+            const trigger = document.querySelector('.id-card-preview-trigger');
+            if (!modal || !modalImage || !trigger) {
+                return;
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+                modalImage.setAttribute('src', '');
+            }
+
+            trigger.addEventListener('click', (event) => {
+                event.preventDefault();
+                const image = trigger.getAttribute('data-image');
+                if (!image) {
+                    return;
+                }
+                modalImage.setAttribute('src', image);
+                modal.style.display = 'flex';
+            });
+
+            modal.addEventListener('click', closeModal);
+            modalImage.addEventListener('click', closeModal);
+        })();
+    </script>
 @endsection
