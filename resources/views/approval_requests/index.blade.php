@@ -41,6 +41,9 @@
                             <span class="badge {{ ($execution['status'] ?? '') === 'success' ? 'success' : (($execution['status'] ?? '') === 'failed' ? 'danger' : 'warning') }}">
                                 {{ strtoupper((string) ($execution['status'] ?? '-')) }}
                             </span>
+                            @if(!empty($execution['message']))
+                                <div class="muted" style="margin-top:4px;max-width:260px;">{{ (string) $execution['message'] }}</div>
+                            @endif
                         @else
                             -
                         @endif

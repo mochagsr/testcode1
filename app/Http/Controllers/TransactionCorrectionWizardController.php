@@ -15,6 +15,7 @@ use App\Models\SalesReturn;
 use App\Models\SupplierPayment;
 use App\Services\ApprovalWorkflowService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -76,6 +77,15 @@ class TransactionCorrectionWizardController extends Controller
         $subject = $this->resolveSubject((string) $data['type'], (int) $data['subject_id']);
         abort_if($subject === null, 404);
 
+        $supportsAutoExecution = in_array((string) $data['type'], ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment'], true);
+        if ($supportsAutoExecution && trim((string) ($data['requested_patch_json'] ?? '')) !== '') {
+            $decoded = json_decode((string) $data['requested_patch_json'], true);
+            if (! is_array($decoded)) {
+                throw ValidationException::withMessages([
+                    'requested_patch_json' => 'Format JSON patch tidak valid.',
+                ]);
+            }
+        }
         $patch = $this->parsePatchJson((string) ($data['requested_patch_json'] ?? ''));
 
         $approval = $this->approvalWorkflowService->create(
