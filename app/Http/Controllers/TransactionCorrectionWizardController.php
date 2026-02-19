@@ -58,6 +58,7 @@ class TransactionCorrectionWizardController extends Controller
             'subject' => $subject,
             'subjectLabel' => $subjectLabel,
             'initialPatchJson' => $initialPatchJson,
+            'supportsAutoExecution' => in_array($type, ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment'], true),
         ]);
     }
 
@@ -173,6 +174,8 @@ class TransactionCorrectionWizardController extends Controller
         $query = $modelClass::query();
         if ($type === 'sales_invoice') {
             $query->with(['customer:id,name', 'items']);
+        } elseif (in_array($type, ['sales_return', 'delivery_note', 'order_note'], true)) {
+            $query->with('items');
         }
 
         return $query->find($id);
@@ -197,24 +200,72 @@ class TransactionCorrectionWizardController extends Controller
 
     private function initialPatchJson(string $type, ?Model $subject): string
     {
-        if ($type !== 'sales_invoice' || ! $subject instanceof SalesInvoice) {
+        $patch = match ($type) {
+            'sales_invoice' => $subject instanceof SalesInvoice ? [
+                'invoice_date' => optional($subject->invoice_date)->format('Y-m-d'),
+                'due_date' => optional($subject->due_date)->format('Y-m-d'),
+                'semester_period' => (string) ($subject->semester_period ?? ''),
+                'notes' => (string) ($subject->notes ?? ''),
+                'items' => $subject->items->map(fn ($item): array => [
+                    'product_id' => (int) $item->product_id,
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (int) round((float) $item->unit_price),
+                    'discount' => (int) round(((float) $item->discount > 0 && (float) $item->quantity > 0 && (float) $item->unit_price > 0)
+                        ? ((float) $item->discount / ((float) $item->quantity * (float) $item->unit_price) * 100)
+                        : 0),
+                ])->values()->all(),
+            ] : [],
+            'sales_return' => $subject instanceof SalesReturn ? [
+                'return_date' => optional($subject->return_date)->format('Y-m-d'),
+                'semester_period' => (string) ($subject->semester_period ?? ''),
+                'reason' => (string) ($subject->reason ?? ''),
+                'items' => $subject->items->map(fn ($item): array => [
+                    'product_id' => (int) $item->product_id,
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (int) round((float) $item->unit_price),
+                ])->values()->all(),
+            ] : [],
+            'delivery_note' => $subject instanceof DeliveryNote ? [
+                'note_date' => optional($subject->note_date)->format('Y-m-d'),
+                'recipient_name' => (string) ($subject->recipient_name ?? ''),
+                'recipient_phone' => (string) ($subject->recipient_phone ?? ''),
+                'city' => (string) ($subject->city ?? ''),
+                'address' => (string) ($subject->address ?? ''),
+                'notes' => (string) ($subject->notes ?? ''),
+                'items' => $subject->items->map(fn ($item): array => [
+                    'product_id' => (int) ($item->product_id ?? 0),
+                    'product_name' => (string) ($item->product_name ?? ''),
+                    'unit' => (string) ($item->unit ?? ''),
+                    'quantity' => (int) ($item->quantity ?? 0),
+                    'unit_price' => (int) round((float) ($item->unit_price ?? 0)),
+                    'notes' => (string) ($item->notes ?? ''),
+                ])->values()->all(),
+            ] : [],
+            'order_note' => $subject instanceof OrderNote ? [
+                'note_date' => optional($subject->note_date)->format('Y-m-d'),
+                'customer_name' => (string) ($subject->customer_name ?? ''),
+                'customer_phone' => (string) ($subject->customer_phone ?? ''),
+                'city' => (string) ($subject->city ?? ''),
+                'notes' => (string) ($subject->notes ?? ''),
+                'items' => $subject->items->map(fn ($item): array => [
+                    'product_id' => (int) ($item->product_id ?? 0),
+                    'product_name' => (string) ($item->product_name ?? ''),
+                    'quantity' => (int) ($item->quantity ?? 0),
+                    'notes' => (string) ($item->notes ?? ''),
+                ])->values()->all(),
+            ] : [],
+            'receivable_payment' => $subject instanceof ReceivablePayment ? [
+                'payment_date' => optional($subject->payment_date)->format('Y-m-d'),
+                'customer_address' => (string) ($subject->customer_address ?? ''),
+                'customer_signature' => (string) ($subject->customer_signature ?? ''),
+                'user_signature' => (string) ($subject->user_signature ?? ''),
+                'notes' => (string) ($subject->notes ?? ''),
+            ] : [],
+            default => [],
+        };
+        if ($patch === []) {
             return '';
         }
-
-        $patch = [
-            'invoice_date' => optional($subject->invoice_date)->format('Y-m-d'),
-            'due_date' => optional($subject->due_date)->format('Y-m-d'),
-            'semester_period' => (string) ($subject->semester_period ?? ''),
-            'notes' => (string) ($subject->notes ?? ''),
-            'items' => $subject->items->map(fn ($item): array => [
-                'product_id' => (int) $item->product_id,
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (int) round((float) $item->unit_price),
-                'discount' => (int) round(((float) $item->discount > 0 && (float) $item->quantity > 0 && (float) $item->unit_price > 0)
-                    ? ((float) $item->discount / ((float) $item->quantity * (float) $item->unit_price) * 100)
-                    : 0),
-            ])->values()->all(),
-        ];
 
         $encoded = json_encode($patch, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
@@ -236,30 +287,6 @@ class TransactionCorrectionWizardController extends Controller
             return [];
         }
 
-        $items = [];
-        foreach ((array) ($decoded['items'] ?? []) as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $productId = (int) ($row['product_id'] ?? 0);
-            $quantity = max(0, (int) ($row['quantity'] ?? 0));
-            if ($productId <= 0 || $quantity <= 0) {
-                continue;
-            }
-            $items[] = [
-                'product_id' => $productId,
-                'quantity' => $quantity,
-                'unit_price' => max(0, (int) round((float) ($row['unit_price'] ?? 0))),
-                'discount' => max(0, min(100, (float) ($row['discount'] ?? 0))),
-            ];
-        }
-
-        return [
-            'invoice_date' => isset($decoded['invoice_date']) ? (string) $decoded['invoice_date'] : null,
-            'due_date' => isset($decoded['due_date']) ? (string) $decoded['due_date'] : null,
-            'semester_period' => isset($decoded['semester_period']) ? (string) $decoded['semester_period'] : null,
-            'notes' => isset($decoded['notes']) ? (string) $decoded['notes'] : null,
-            'items' => $items,
-        ];
+        return $decoded;
     }
 }

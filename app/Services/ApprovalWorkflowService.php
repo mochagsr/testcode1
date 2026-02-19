@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\ApprovalRequest;
+use App\Models\DeliveryNote;
+use App\Models\OrderNote;
+use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Throwable;
@@ -94,7 +98,8 @@ final class ApprovalWorkflowService
         }
 
         $type = (string) ($payload['type'] ?? '');
-        if ($type !== 'sales_invoice') {
+        $supportedTypes = ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment'];
+        if (! in_array($type, $supportedTypes, true)) {
             $payload['execution'] = [
                 'status' => 'skipped',
                 'message' => 'Auto execute belum tersedia untuk tipe ini.',
@@ -106,10 +111,18 @@ final class ApprovalWorkflowService
         }
 
         $subjectId = (int) ($approvalRequest->subject_id ?? 0);
-        if ($subjectId <= 0 || (string) $approvalRequest->subject_type !== SalesInvoice::class) {
+        $expectedSubjectType = match ($type) {
+            'sales_invoice' => SalesInvoice::class,
+            'sales_return' => SalesReturn::class,
+            'delivery_note' => DeliveryNote::class,
+            'order_note' => OrderNote::class,
+            'receivable_payment' => ReceivablePayment::class,
+            default => '',
+        };
+        if ($subjectId <= 0 || (string) $approvalRequest->subject_type !== $expectedSubjectType) {
             $payload['execution'] = [
                 'status' => 'failed',
-                'message' => 'Subject invoice tidak valid.',
+                'message' => 'Subject dokumen tidak valid.',
                 'executed_at' => now()->toDateTimeString(),
             ];
             $approvalRequest->update(['payload' => $payload]);
@@ -130,10 +143,18 @@ final class ApprovalWorkflowService
         }
 
         try {
-            app(InvoiceCorrectionExecutor::class)->applySalesInvoiceCorrection($subjectId, $patch, $request);
+            $executor = app(InvoiceCorrectionExecutor::class);
+            match ($type) {
+                'sales_invoice' => $executor->applySalesInvoiceCorrection($subjectId, $patch, $request),
+                'sales_return' => $executor->applySalesReturnCorrection($subjectId, $patch, $request),
+                'delivery_note' => $executor->applyDeliveryNoteCorrection($subjectId, $patch, $request),
+                'order_note' => $executor->applyOrderNoteCorrection($subjectId, $patch, $request),
+                'receivable_payment' => $executor->applyReceivablePaymentCorrection($subjectId, $patch, $request),
+                default => null,
+            };
             $payload['execution'] = [
                 'status' => 'success',
-                'message' => 'Koreksi invoice dieksekusi otomatis.',
+                'message' => 'Koreksi dokumen dieksekusi otomatis.',
                 'executed_at' => now()->toDateTimeString(),
             ];
             $approvalRequest->update(['payload' => $payload]);

@@ -41,12 +41,14 @@
                     <label>Detail Perubahan Diminta <span class="label-required">*</span></label>
                     <textarea name="requested_changes" rows="8" required placeholder="Contoh: Ubah qty item A dari 10 menjadi 12, tambah item B qty 2">{{ old('requested_changes') }}</textarea>
                 </div>
-                @if($type === 'sales_invoice')
+                @if(!empty($supportsAutoExecution))
                     <div class="col-12">
-                        <label>Patch Koreksi Invoice (JSON untuk auto-eksekusi)</label>
+                        <label>Patch Koreksi (JSON untuk auto-eksekusi)</label>
                         <textarea id="requested_patch_json" name="requested_patch_json" rows="14" placeholder='{"invoice_date":"2026-02-20","items":[{"product_id":1,"quantity":5,"unit_price":12000,"discount":0}]}'>{{ old('requested_patch_json', $initialPatchJson) }}</textarea>
                         <p class="muted" style="margin: 6px 0 0 0;">Gunakan format JSON ini untuk auto-eksekusi setelah approval.</p>
                     </div>
+                @endif
+                @if($type === 'sales_invoice')
                     <div class="col-12 flex">
                         <button type="button" id="preview-stock-impact" class="btn secondary">Preview Dampak Stok</button>
                         <span id="stock-impact-status" class="muted"></span>
