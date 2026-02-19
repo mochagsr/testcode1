@@ -93,7 +93,7 @@
                     <th>File</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="report-export-task-table-body">
                 @forelse($exportTasks as $task)
                     <tr>
                         <td>{{ $datasets[$task->dataset] ?? $task->dataset }}</td>
@@ -105,6 +105,10 @@
                                 <a class="btn secondary" href="{{ route('reports.queue.download', $task) }}">Download</a>
                             @elseif($task->status === 'failed')
                                 <span class="muted">{{ $task->error_message ?: '-' }}</span>
+                                <form method="post" action="{{ route('reports.queue.retry', $task) }}" style="display:inline;">
+                                    @csrf
+                                    <button type="submit" class="btn secondary">Retry</button>
+                                </form>
                             @else
                                 <span class="muted">Menunggu...</span>
                             @endif
@@ -116,8 +120,56 @@
             </tbody>
         </table>
     </div>
-@endsection
 
+    <script>
+        (function () {
+            const tableBody = document.getElementById('report-export-task-table-body');
+            if (!tableBody) return;
+            const statusUrl = @json(route('reports.queue.status'));
+            const retryUrlTemplate = @json(route('reports.queue.retry', ['task' => '__TASK__']));
+            const csrf = @json(csrf_token());
+
+            const renderRows = (rows) => {
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="muted">{{ __('report.no_data') }}</td></tr>';
+                    return;
+                }
+                tableBody.innerHTML = rows.map((row) => {
+                    const status = String(row.status || '').toUpperCase();
+                    let actionHtml = '<span class="muted">Menunggu...</span>';
+                    if (status === 'READY') {
+                        actionHtml = `<a class="btn secondary" href="${row.download_url}">Download</a>`;
+                    } else if (status === 'FAILED') {
+                        const retryUrl = retryUrlTemplate.replace('__TASK__', String(row.id));
+                        actionHtml = `<span class="muted">${row.error_message || '-'}</span>
+                            <form method="post" action="${retryUrl}" style="display:inline;">
+                                <input type="hidden" name="_token" value="${csrf}">
+                                <button type="submit" class="btn secondary">Retry</button>
+                            </form>`;
+                    }
+                    return `<tr>
+                        <td>${row.dataset}</td>
+                        <td>${row.format}</td>
+                        <td>${status}</td>
+                        <td>${row.created_at || '-'}</td>
+                        <td>${actionHtml}</td>
+                    </tr>`;
+                }).join('');
+            };
+
+            const refresh = async () => {
+                try {
+                    const response = await fetch(statusUrl, { headers: { 'Accept': 'application/json' } });
+                    if (!response.ok) return;
+                    const payload = await response.json();
+                    renderRows(payload.data || []);
+                } catch (_e) {}
+            };
+
+            setInterval(refresh, 5000);
+        })();
+    </script>
+@endsection
 
 
 

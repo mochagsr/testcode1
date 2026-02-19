@@ -20,6 +20,7 @@ use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -108,16 +109,53 @@ class ReportExportController extends Controller
 
     public function downloadQueuedExport(Request $request, ReportExportTask $task)
     {
-        $isOwner = (int) $task->user_id === (int) $request->user()->id;
-        $isAdmin = strtolower((string) ($request->user()->role ?? '')) === 'admin';
-        if (! $isOwner && ! $isAdmin) {
-            abort(403);
-        }
+        $this->authorizeTaskAccess($request, $task);
         if ((string) $task->status !== 'ready' || ! $task->file_path || ! Storage::disk('local')->exists((string) $task->file_path)) {
             abort(404);
         }
 
         return Storage::disk('local')->download((string) $task->file_path, (string) ($task->file_name ?: basename((string) $task->file_path)));
+    }
+
+    public function queuedExportsStatus(Request $request): JsonResponse
+    {
+        $tasks = ReportExportTask::query()
+            ->where('user_id', (int) $request->user()->id)
+            ->latest('id')
+            ->limit(20)
+            ->get(['id', 'dataset', 'format', 'status', 'file_name', 'error_message', 'created_at'])
+            ->map(function (ReportExportTask $task): array {
+                return [
+                    'id' => (int) $task->id,
+                    'dataset' => (string) $task->dataset,
+                    'format' => strtoupper((string) $task->format),
+                    'status' => strtoupper((string) $task->status),
+                    'created_at' => $task->created_at?->format('d-m-Y H:i'),
+                    'download_url' => (string) route('reports.queue.download', $task),
+                    'error_message' => (string) ($task->error_message ?: ''),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'data' => $tasks,
+        ]);
+    }
+
+    public function retryQueuedExport(Request $request, ReportExportTask $task)
+    {
+        $this->authorizeTaskAccess($request, $task);
+        if ((string) $task->status !== 'failed') {
+            return back()->with('error', 'Task belum berstatus failed.');
+        }
+
+        $task->update([
+            'status' => 'queued',
+            'error_message' => null,
+        ]);
+        GenerateReportExportTaskJob::dispatch((int) $task->id)->onQueue('exports');
+
+        return back()->with('success', 'Retry export dimasukkan ke antrian.');
     }
 
     public function exportCsv(Request $request, string $dataset): StreamedResponse
@@ -1336,5 +1374,14 @@ class ReportExportController extends Controller
     private function semesterBookService(): SemesterBookService
     {
         return $this->semesterBookService;
+    }
+
+    private function authorizeTaskAccess(Request $request, ReportExportTask $task): void
+    {
+        $isOwner = (int) $task->user_id === (int) $request->user()->id;
+        $isAdmin = strtolower((string) ($request->user()->role ?? '')) === 'admin';
+        if (! $isOwner && ! $isAdmin) {
+            abort(403);
+        }
     }
 }

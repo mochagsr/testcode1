@@ -10,6 +10,7 @@ use App\Models\OutgoingTransaction;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\AppSetting;
+use App\Models\ReportExportTask;
 use App\Support\SemesterBookService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
@@ -530,6 +531,28 @@ Artisan::command('app:restore-document {type} {id}', function () {
     return 0;
 })->purpose('Restore soft-deleted financial document by type and id');
 
+Artisan::command('app:report-exports-prune {--days=14}', function () {
+    $days = max(1, (int) $this->option('days'));
+    $cutoff = now()->subDays($days);
+    $query = ReportExportTask::query()->where('created_at', '<', $cutoff);
+    $count = 0;
+
+    $query->orderBy('id')->chunkById(200, function ($tasks) use (&$count): void {
+        foreach ($tasks as $task) {
+            $path = (string) ($task->file_path ?? '');
+            if ($path !== '' && File::exists(storage_path('app/'.$path))) {
+                File::delete(storage_path('app/'.$path));
+            }
+            $task->delete();
+            $count++;
+        }
+    });
+
+    $this->info("Prune report export selesai. deleted={$count}");
+    return 0;
+})->purpose('Prune old queued export files/tasks from storage and database');
+
 Schedule::command('app:db-backup --gzip')->dailyAt('01:00');
 Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
 Schedule::command('app:integrity-check')->dailyAt('03:00');
+Schedule::command('app:report-exports-prune --days=14')->dailyAt('04:00');

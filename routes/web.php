@@ -160,6 +160,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/reports/{dataset}/print', [ReportExportController::class, 'print'])->middleware('perm:reports.export')->name('reports.print');
     Route::get('/reports/{dataset}/queue/{format}', [ReportExportController::class, 'queueExport'])->middleware('perm:reports.export')->name('reports.queue');
     Route::get('/reports/queued/{task}/download', [ReportExportController::class, 'downloadQueuedExport'])->middleware('perm:reports.export')->name('reports.queue.download');
+    Route::get('/reports/queued/status', [ReportExportController::class, 'queuedExportsStatus'])->middleware('perm:reports.export')->name('reports.queue.status');
+    Route::post('/reports/queued/{task}/retry', [ReportExportController::class, 'retryQueuedExport'])->middleware('perm:reports.export')->name('reports.queue.retry');
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('perm:settings.profile')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('perm:settings.profile')->name('settings.update');
     Route::post('/settings/semester-close', [SettingsController::class, 'closeSemester'])
