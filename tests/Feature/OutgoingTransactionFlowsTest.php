@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\OutgoingTransactionItem;
@@ -303,5 +304,102 @@ class OutgoingTransactionFlowsTest extends TestCase
         $this->assertSame('PRF-02', (string) $payment->proof_number);
         $this->assertSame('Edit admin', (string) $payment->notes);
         $this->assertSame(70000.0, (float) $supplier->outstanding_payable);
+    }
+
+    public function test_outgoing_index_shows_admin_edit_badge_for_edited_transaction(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Badge',
+            'company_name' => 'PT Badge',
+        ]);
+        $transaction = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-BADGE-0001',
+            'transaction_date' => '2026-02-20',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'total' => 10000,
+            'created_by_user_id' => $user->id,
+        ]);
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => 'outgoing.transaction.admin_update',
+            'subject_type' => OutgoingTransaction::class,
+            'subject_id' => $transaction->id,
+            'description' => 'Admin edited outgoing',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('outgoing-transactions.index'));
+
+        $response->assertOk();
+        $response->assertSee(__('txn.admin_badge_edit'));
+    }
+
+    public function test_supplier_payable_mutation_shows_admin_edit_badges(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Ledger Badge',
+            'company_name' => 'PT Ledger Badge',
+        ]);
+        $transaction = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-BADGE-0002',
+            'transaction_date' => '2026-02-20',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'total' => 12000,
+            'created_by_user_id' => $user->id,
+        ]);
+        $payment = SupplierPayment::query()->create([
+            'payment_number' => 'KWTS-BADGE-0001',
+            'supplier_id' => $supplier->id,
+            'payment_date' => '2026-02-20',
+            'amount' => 5000,
+            'amount_in_words' => 'lima ribu rupiah',
+            'created_by_user_id' => $user->id,
+        ]);
+        SupplierLedger::query()->create([
+            'supplier_id' => $supplier->id,
+            'outgoing_transaction_id' => $transaction->id,
+            'supplier_payment_id' => null,
+            'entry_date' => '2026-02-20',
+            'period_code' => 'S2-2526',
+            'description' => 'Outgoing',
+            'debit' => 12000,
+            'credit' => 0,
+            'balance_after' => 12000,
+        ]);
+        SupplierLedger::query()->create([
+            'supplier_id' => $supplier->id,
+            'outgoing_transaction_id' => null,
+            'supplier_payment_id' => $payment->id,
+            'entry_date' => '2026-02-20',
+            'period_code' => 'S2-2526',
+            'description' => 'Payment',
+            'debit' => 0,
+            'credit' => 5000,
+            'balance_after' => 7000,
+        ]);
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => 'outgoing.transaction.admin_update',
+            'subject_type' => OutgoingTransaction::class,
+            'subject_id' => $transaction->id,
+            'description' => 'Admin edited outgoing',
+        ]);
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => 'supplier.payment.admin_update',
+            'subject_type' => SupplierPayment::class,
+            'subject_id' => $payment->id,
+            'description' => 'Admin edited supplier payment',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('supplier-payables.index', [
+            'supplier_id' => $supplier->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('txn.admin_badge_edit'));
     }
 }

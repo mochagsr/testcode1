@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use App\Models\SupplierPayment;
+use App\Models\OutgoingTransaction;
 use App\Services\AuditLogService;
 use App\Services\AccountingService;
 use App\Services\SupplierLedgerService;
@@ -48,6 +50,8 @@ class SupplierPayablePageController extends Controller
             : null;
 
         $ledgerRows = collect();
+        $supplierPaymentAdminEditedMap = [];
+        $outgoingTransactionAdminEditedMap = [];
         if ($selectedSupplier !== null) {
             $ledgerRows = SupplierLedger::query()
                 ->forSupplier((int) $selectedSupplier->id)
@@ -56,6 +60,52 @@ class SupplierPayablePageController extends Controller
                 ->orderByDate()
                 ->limit(500)
                 ->get();
+
+            $supplierPaymentIds = $ledgerRows
+                ->pluck('supplier_payment_id')
+                ->map(fn($id): int => (int) $id)
+                ->filter(fn(int $id): bool => $id > 0)
+                ->unique()
+                ->values();
+            if ($supplierPaymentIds->isNotEmpty()) {
+                $paymentRows = AuditLog::query()
+                    ->selectRaw("subject_id, MAX(CASE WHEN action = 'supplier.payment.admin_update' THEN 1 ELSE 0 END) as edited")
+                    ->where('subject_type', SupplierPayment::class)
+                    ->whereIn('subject_id', $supplierPaymentIds->all())
+                    ->where('action', 'supplier.payment.admin_update')
+                    ->groupBy('subject_id')
+                    ->get();
+                foreach ($paymentRows as $row) {
+                    $paymentId = (int) ($row->subject_id ?? 0);
+                    if ($paymentId <= 0) {
+                        continue;
+                    }
+                    $supplierPaymentAdminEditedMap[$paymentId] = (int) ($row->edited ?? 0) === 1;
+                }
+            }
+
+            $outgoingTransactionIds = $ledgerRows
+                ->pluck('outgoing_transaction_id')
+                ->map(fn($id): int => (int) $id)
+                ->filter(fn(int $id): bool => $id > 0)
+                ->unique()
+                ->values();
+            if ($outgoingTransactionIds->isNotEmpty()) {
+                $outgoingRows = AuditLog::query()
+                    ->selectRaw("subject_id, MAX(CASE WHEN action = 'outgoing.transaction.admin_update' THEN 1 ELSE 0 END) as edited")
+                    ->where('subject_type', OutgoingTransaction::class)
+                    ->whereIn('subject_id', $outgoingTransactionIds->all())
+                    ->where('action', 'outgoing.transaction.admin_update')
+                    ->groupBy('subject_id')
+                    ->get();
+                foreach ($outgoingRows as $row) {
+                    $outgoingId = (int) ($row->subject_id ?? 0);
+                    if ($outgoingId <= 0) {
+                        continue;
+                    }
+                    $outgoingTransactionAdminEditedMap[$outgoingId] = (int) ($row->edited ?? 0) === 1;
+                }
+            }
         }
 
         return view('supplier_payables.index', [
@@ -66,6 +116,8 @@ class SupplierPayablePageController extends Controller
             'selectedSemester' => $semester,
             'search' => $search,
             'semesterOptions' => $this->semesterBookService->configuredSemesterOptions(),
+            'supplierPaymentAdminEditedMap' => $supplierPaymentAdminEditedMap,
+            'outgoingTransactionAdminEditedMap' => $outgoingTransactionAdminEditedMap,
         ]);
     }
 

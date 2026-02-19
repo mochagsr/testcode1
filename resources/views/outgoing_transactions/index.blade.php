@@ -66,8 +66,16 @@
                     </thead>
                     <tbody>
                     @forelse($transactions as $transaction)
+                        @php
+                            $adminAction = $transactionAdminActionMap[(int) $transaction->id] ?? ['edited' => false];
+                        @endphp
                         <tr>
-                            <td><a href="{{ route('outgoing-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a></td>
+                            <td>
+                                <a href="{{ route('outgoing-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a>
+                                @if((bool) ($adminAction['edited'] ?? false))
+                                    <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
+                                @endif
+                            </td>
                             <td>{{ optional($transaction->transaction_date)->format('d-m-Y') }}</td>
                             <td>{{ $transaction->supplier?->name ?: '-' }}</td>
                             <td>{{ $transaction->note_number ?: '-' }}</td>

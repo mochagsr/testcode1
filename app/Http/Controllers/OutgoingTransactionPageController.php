@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
 use App\Models\StockMutation;
@@ -100,6 +101,37 @@ class OutgoingTransactionPageController extends Controller
         $supplierRecapSummary = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_transactions, COALESCE(SUM(total), 0) as total_amount')
             ->first();
+        $transactionAdminActionMap = [];
+        $transactionIds = collect($transactions->items())
+            ->map(fn(OutgoingTransaction $transaction): int => (int) $transaction->id)
+            ->filter(fn(int $id): bool => $id > 0)
+            ->values();
+        if ($transactionIds->isNotEmpty()) {
+            $actionRows = AuditLog::query()
+                ->selectRaw("subject_id, MAX(CASE WHEN action = 'outgoing.transaction.admin_update' THEN 1 ELSE 0 END) as edited")
+                ->where('subject_type', OutgoingTransaction::class)
+                ->whereIn('subject_id', $transactionIds->all())
+                ->where('action', 'outgoing.transaction.admin_update')
+                ->groupBy('subject_id')
+                ->get();
+            foreach ($actionRows as $row) {
+                $transactionId = (int) ($row->subject_id ?? 0);
+                if ($transactionId <= 0) {
+                    continue;
+                }
+                $transactionAdminActionMap[$transactionId] = [
+                    'edited' => (int) ($row->edited ?? 0) === 1,
+                ];
+            }
+        }
+        foreach ($transactions->items() as $transactionRow) {
+            $transactionId = (int) $transactionRow->id;
+            if (! isset($transactionAdminActionMap[$transactionId])) {
+                $transactionAdminActionMap[$transactionId] = [
+                    'edited' => false,
+                ];
+            }
+        }
         $supplierSemesterClosedMap = [];
         $selectedSupplierSemesterClosed = false;
         if ($selectedSemester !== null) {
@@ -131,6 +163,7 @@ class OutgoingTransactionPageController extends Controller
             'previousSemester' => $previousSemester,
             'selectedSupplierSemesterClosed' => $selectedSupplierSemesterClosed,
             'supplierSemesterClosedMap' => $supplierSemesterClosedMap,
+            'transactionAdminActionMap' => $transactionAdminActionMap,
         ]);
     }
 

@@ -87,10 +87,22 @@
                             <td>
                                 {{ $row->description ?: '-' }}
                                 @if($row->outgoingTransaction)
-                                    <div><a href="{{ route('outgoing-transactions.show', $row->outgoingTransaction) }}" target="_blank">{{ $row->outgoingTransaction->transaction_number }}</a></div>
+                                    @php($isOutgoingEdited = (bool) ($outgoingTransactionAdminEditedMap[(int) $row->outgoing_transaction_id] ?? false))
+                                    <div>
+                                        <a href="{{ route('outgoing-transactions.show', $row->outgoingTransaction) }}" target="_blank">{{ $row->outgoingTransaction->transaction_number }}</a>
+                                        @if($isOutgoingEdited)
+                                            <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
+                                        @endif
+                                    </div>
                                 @endif
                                 @if($row->supplierPayment)
-                                    <div><a href="{{ route('supplier-payables.show-payment', $row->supplierPayment) }}" target="_blank">{{ $row->supplierPayment->payment_number }}</a></div>
+                                    @php($isPaymentEdited = (bool) ($supplierPaymentAdminEditedMap[(int) $row->supplier_payment_id] ?? false))
+                                    <div>
+                                        <a href="{{ route('supplier-payables.show-payment', $row->supplierPayment) }}" target="_blank">{{ $row->supplierPayment->payment_number }}</a>
+                                        @if($isPaymentEdited)
+                                            <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
+                                        @endif
+                                    </div>
                                 @endif
                             </td>
                             <td>Rp {{ number_format((int) $row->debit, 0, ',', '.') }}</td>
