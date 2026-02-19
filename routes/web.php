@@ -113,6 +113,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/outgoing-transactions/{outgoingTransaction}/print', [OutgoingTransactionPageController::class, 'print'])->middleware('perm:transactions.export')->name('outgoing-transactions.print');
     Route::get('/outgoing-transactions/{outgoingTransaction}/pdf', [OutgoingTransactionPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.pdf');
     Route::get('/outgoing-transactions/{outgoingTransaction}/excel', [OutgoingTransactionPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.excel');
+    Route::put('/outgoing-transactions/{outgoingTransaction}/admin-update', [OutgoingTransactionPageController::class, 'adminUpdate'])
+        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->name('outgoing-transactions.admin-update');
     Route::post('/outgoing-transactions/supplier/{supplier}/semester-close', [OutgoingTransactionPageController::class, 'closeSupplierSemester'])
         ->middleware('admin')
         ->name('outgoing-transactions.supplier-semester.close');
@@ -196,6 +199,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/supplier-payables/payment/{supplierPayment}', [SupplierPayablePageController::class, 'showPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.show-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/print', [SupplierPayablePageController::class, 'printPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/pdf', [SupplierPayablePageController::class, 'exportPaymentPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-pdf');
+    Route::put('/supplier-payables/payment/{supplierPayment}/admin-update', [SupplierPayablePageController::class, 'adminUpdate'])
+        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->name('supplier-payables.admin-update');
 
     Route::middleware('admin')->group(function (): void {
         Route::get('/item-categories', [ItemCategoryPageController::class, 'index'])->middleware('perm:masters.products.manage')->name('item-categories.index');

@@ -7,9 +7,11 @@ namespace App\Services;
 use App\Models\ApprovalRequest;
 use App\Models\DeliveryNote;
 use App\Models\OrderNote;
+use App\Models\OutgoingTransaction;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Models\SupplierPayment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Throwable;
@@ -98,7 +100,7 @@ final class ApprovalWorkflowService
         }
 
         $type = (string) ($payload['type'] ?? '');
-        $supportedTypes = ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment'];
+        $supportedTypes = ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment', 'outgoing_transaction', 'supplier_payment'];
         if (! in_array($type, $supportedTypes, true)) {
             $payload['execution'] = [
                 'status' => 'skipped',
@@ -117,6 +119,8 @@ final class ApprovalWorkflowService
             'delivery_note' => DeliveryNote::class,
             'order_note' => OrderNote::class,
             'receivable_payment' => ReceivablePayment::class,
+            'outgoing_transaction' => OutgoingTransaction::class,
+            'supplier_payment' => SupplierPayment::class,
             default => '',
         };
         if ($subjectId <= 0 || (string) $approvalRequest->subject_type !== $expectedSubjectType) {
@@ -150,6 +154,8 @@ final class ApprovalWorkflowService
                 'delivery_note' => $executor->applyDeliveryNoteCorrection($subjectId, $patch, $request),
                 'order_note' => $executor->applyOrderNoteCorrection($subjectId, $patch, $request),
                 'receivable_payment' => $executor->applyReceivablePaymentCorrection($subjectId, $patch, $request),
+                'outgoing_transaction' => $executor->applyOutgoingTransactionCorrection($subjectId, $patch, $request),
+                'supplier_payment' => $executor->applySupplierPaymentCorrection($subjectId, $patch, $request),
                 default => null,
             };
             $payload['execution'] = [

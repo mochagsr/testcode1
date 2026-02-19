@@ -59,7 +59,7 @@ class TransactionCorrectionWizardController extends Controller
             'subject' => $subject,
             'subjectLabel' => $subjectLabel,
             'initialPatchJson' => $initialPatchJson,
-            'supportsAutoExecution' => in_array($type, ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment'], true),
+            'supportsAutoExecution' => in_array($type, ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment', 'outgoing_transaction', 'supplier_payment'], true),
         ]);
     }
 
@@ -77,7 +77,7 @@ class TransactionCorrectionWizardController extends Controller
         $subject = $this->resolveSubject((string) $data['type'], (int) $data['subject_id']);
         abort_if($subject === null, 404);
 
-        $supportsAutoExecution = in_array((string) $data['type'], ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment'], true);
+        $supportsAutoExecution = in_array((string) $data['type'], ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'receivable_payment', 'outgoing_transaction', 'supplier_payment'], true);
         if ($supportsAutoExecution && trim((string) ($data['requested_patch_json'] ?? '')) !== '') {
             $decoded = json_decode((string) $data['requested_patch_json'], true);
             if (! is_array($decoded)) {
@@ -184,7 +184,7 @@ class TransactionCorrectionWizardController extends Controller
         $query = $modelClass::query();
         if ($type === 'sales_invoice') {
             $query->with(['customer:id,name', 'items']);
-        } elseif (in_array($type, ['sales_return', 'delivery_note', 'order_note'], true)) {
+        } elseif (in_array($type, ['sales_return', 'delivery_note', 'order_note', 'outgoing_transaction'], true)) {
             $query->with('items');
         }
 
@@ -268,6 +268,29 @@ class TransactionCorrectionWizardController extends Controller
                 'payment_date' => optional($subject->payment_date)->format('Y-m-d'),
                 'customer_address' => (string) ($subject->customer_address ?? ''),
                 'customer_signature' => (string) ($subject->customer_signature ?? ''),
+                'user_signature' => (string) ($subject->user_signature ?? ''),
+                'notes' => (string) ($subject->notes ?? ''),
+            ] : [],
+            'outgoing_transaction' => $subject instanceof OutgoingTransaction ? [
+                'transaction_date' => optional($subject->transaction_date)->format('Y-m-d'),
+                'semester_period' => (string) ($subject->semester_period ?? ''),
+                'supplier_id' => (int) ($subject->supplier_id ?? 0),
+                'note_number' => (string) ($subject->note_number ?? ''),
+                'notes' => (string) ($subject->notes ?? ''),
+                'items' => $subject->items->map(fn ($item): array => [
+                    'product_id' => (int) ($item->product_id ?? 0),
+                    'product_name' => (string) ($item->product_name ?? ''),
+                    'unit' => (string) ($item->unit ?? ''),
+                    'quantity' => (int) ($item->quantity ?? 0),
+                    'unit_cost' => (int) round((float) ($item->unit_cost ?? 0)),
+                    'notes' => (string) ($item->notes ?? ''),
+                ])->values()->all(),
+            ] : [],
+            'supplier_payment' => $subject instanceof SupplierPayment ? [
+                'payment_date' => optional($subject->payment_date)->format('Y-m-d'),
+                'proof_number' => (string) ($subject->proof_number ?? ''),
+                'amount' => (int) round((float) ($subject->amount ?? 0)),
+                'supplier_signature' => (string) ($subject->supplier_signature ?? ''),
                 'user_signature' => (string) ($subject->user_signature ?? ''),
                 'notes' => (string) ($subject->notes ?? ''),
             ] : [],

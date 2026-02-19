@@ -351,6 +351,216 @@ class OutgoingTransactionPageController extends Controller
             ->with('success', __('txn.outgoing_created_success', ['number' => $transaction->transaction_number]));
     }
 
+    public function adminUpdate(Request $request, OutgoingTransaction $outgoingTransaction): RedirectResponse
+    {
+        $data = $request->validate([
+            'transaction_date' => ['required', 'date'],
+            'semester_period' => ['nullable', 'string', 'max:30'],
+            'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'note_number' => ['nullable', 'string', 'max:80'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_name' => ['required', 'string', 'max:200'],
+            'items.*.unit' => ['nullable', 'string', 'max:30'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'items.*.notes' => ['nullable', 'string'],
+        ]);
+
+        $auditBefore = '';
+        $auditAfter = '';
+
+        DB::transaction(function () use ($outgoingTransaction, $data, &$auditBefore, &$auditAfter): void {
+            $transaction = OutgoingTransaction::query()
+                ->with('items')
+                ->whereKey($outgoingTransaction->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $requestedSupplierId = (int) ($data['supplier_id'] ?? (int) $transaction->supplier_id);
+            if ($requestedSupplierId !== (int) $transaction->supplier_id) {
+                throw ValidationException::withMessages([
+                    'supplier_id' => 'Supplier transaksi keluar tidak bisa diubah saat edit admin.',
+                ]);
+            }
+
+            $rows = collect($data['items'] ?? []);
+            $oldTotal = (float) $transaction->total;
+            $transactionDate = Carbon::parse((string) $data['transaction_date']);
+            $selectedSemester = $this->normalizeSemesterPeriod(
+                (string) ($data['semester_period'] ?? ''),
+                (string) $data['transaction_date']
+            );
+
+            $auditBefore = $transaction->items
+                ->map(fn($item): string => "{$item->product_name}:qty{$item->quantity}:cost" . (int) round((float) $item->unit_cost))
+                ->implode(' | ');
+
+            $oldQtyByProduct = [];
+            foreach ($transaction->items as $existingItem) {
+                $productId = (int) ($existingItem->product_id ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                $oldQtyByProduct[$productId] = ($oldQtyByProduct[$productId] ?? 0) + (int) $existingItem->quantity;
+            }
+
+            $newQtyByProduct = [];
+            foreach ($rows as $row) {
+                $productId = (int) ($row['product_id'] ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                $newQtyByProduct[$productId] = ($newQtyByProduct[$productId] ?? 0) + (int) ($row['quantity'] ?? 0);
+            }
+
+            $productIds = collect(array_merge(array_keys($oldQtyByProduct), array_keys($newQtyByProduct)))
+                ->unique()
+                ->values()
+                ->all();
+            $products = Product::query()
+                ->whereIn('id', $productIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($productIds as $productId) {
+                $product = $products->get((int) $productId);
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'items' => __('txn.product_not_found'),
+                    ]);
+                }
+
+                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
+                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
+                $delta = $newQty - $oldQty;
+
+                if ($delta < 0 && (int) $product->stock < abs($delta)) {
+                    throw ValidationException::withMessages([
+                        'items' => __('txn.insufficient_stock_for', ['product' => $product->name]),
+                    ]);
+                }
+            }
+
+            foreach ($productIds as $productId) {
+                $product = $products->get((int) $productId);
+                if (! $product) {
+                    continue;
+                }
+                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
+                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
+                $delta = $newQty - $oldQty;
+                if ($delta === 0) {
+                    continue;
+                }
+
+                if ($delta > 0) {
+                    $product->increment('stock', $delta);
+                    StockMutation::create([
+                        'product_id' => $product->id,
+                        'reference_type' => OutgoingTransaction::class,
+                        'reference_id' => $transaction->id,
+                        'mutation_type' => 'in',
+                        'quantity' => $delta,
+                        'notes' => "Admin edit outgoing {$transaction->transaction_number}",
+                        'created_by_user_id' => auth()->id(),
+                    ]);
+                } else {
+                    $outQty = abs($delta);
+                    $product->decrement('stock', $outQty);
+                    StockMutation::create([
+                        'product_id' => $product->id,
+                        'reference_type' => OutgoingTransaction::class,
+                        'reference_id' => $transaction->id,
+                        'mutation_type' => 'out',
+                        'quantity' => $outQty,
+                        'notes' => "Admin edit outgoing {$transaction->transaction_number}",
+                        'created_by_user_id' => auth()->id(),
+                    ]);
+                }
+            }
+
+            $transaction->items()->delete();
+            $newTotal = 0.0;
+
+            foreach ($rows as $row) {
+                $quantity = (int) ($row['quantity'] ?? 0);
+                $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
+                $lineTotal = $quantity * $unitCost;
+                $newTotal += $lineTotal;
+
+                $productId = (int) ($row['product_id'] ?? 0);
+                $product = $productId > 0 ? $products->get($productId) : null;
+
+                $transaction->items()->create([
+                    'product_id' => $product?->id,
+                    'product_code' => $product?->code,
+                    'product_name' => $product?->name ?: (string) ($row['product_name'] ?? ''),
+                    'unit' => $product?->unit ?: (string) ($row['unit'] ?? ''),
+                    'quantity' => $quantity,
+                    'unit_cost' => $unitCost,
+                    'line_total' => $lineTotal,
+                    'notes' => (string) ($row['notes'] ?? ''),
+                ]);
+            }
+
+            $transaction->update([
+                'transaction_date' => $transactionDate->toDateString(),
+                'semester_period' => $selectedSemester,
+                'note_number' => $data['note_number'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'total' => (int) round($newTotal),
+            ]);
+
+            $difference = (float) round($newTotal - $oldTotal);
+            if ($difference > 0) {
+                $this->supplierLedgerService->addDebit(
+                    supplierId: (int) $transaction->supplier_id,
+                    outgoingTransactionId: (int) $transaction->id,
+                    entryDate: $transactionDate,
+                    amount: $difference,
+                    periodCode: $selectedSemester,
+                    description: "[ADMIN EDIT +] {$transaction->transaction_number}"
+                );
+            } elseif ($difference < 0) {
+                $this->supplierLedgerService->addCredit(
+                    supplierId: (int) $transaction->supplier_id,
+                    supplierPaymentId: null,
+                    entryDate: $transactionDate,
+                    amount: abs($difference),
+                    periodCode: $selectedSemester,
+                    description: "[ADMIN EDIT -] {$transaction->transaction_number}"
+                );
+            }
+
+            $auditAfter = $rows
+                ->map(function (array $row) use ($products): string {
+                    $product = $products->get((int) ($row['product_id'] ?? 0));
+                    $name = $product?->name ?: (string) ($row['product_name'] ?? '-');
+                    $qty = (int) ($row['quantity'] ?? 0);
+                    $cost = (int) round((float) ($row['unit_cost'] ?? 0));
+
+                    return "{$name}:qty{$qty}:cost{$cost}";
+                })
+                ->implode(' | ');
+        });
+
+        $outgoingTransaction->refresh();
+        $this->auditLogService->log(
+            'outgoing.transaction.admin_update',
+            $outgoingTransaction,
+            "Admin update outgoing {$outgoingTransaction->transaction_number} | before={$auditBefore} | after={$auditAfter}",
+            $request
+        );
+        AppCache::forgetAfterFinancialMutation([(string) $outgoingTransaction->transaction_date]);
+
+        return redirect()
+            ->route('outgoing-transactions.show', $outgoingTransaction)
+            ->with('success', __('txn.admin_update_saved'));
+    }
+
     public function closeSupplierSemester(Request $request, Supplier $supplier): RedirectResponse
     {
         $data = $request->validate([

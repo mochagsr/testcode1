@@ -8,6 +8,9 @@ use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
+use App\Models\Supplier;
+use App\Models\SupplierLedger;
+use App\Models\SupplierPayment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -127,5 +130,87 @@ class ApprovalWorkflowTest extends TestCase
             ->get(route('transaction-corrections.create'))
             ->assertOk();
     }
-}
 
+    public function test_admin_approval_executes_supplier_payment_correction_patch(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Approval',
+            'company_name' => 'PT Supplier Approval',
+            'phone' => '0812345678',
+            'address' => 'Malang',
+            'outstanding_payable' => 80000,
+        ]);
+        $payment = SupplierPayment::query()->create([
+            'payment_number' => 'KWTS-20260220-0001',
+            'supplier_id' => $supplier->id,
+            'payment_date' => '2026-02-20',
+            'proof_number' => 'NOTA-001',
+            'amount' => 20000,
+            'amount_in_words' => 'dua puluh ribu rupiah',
+            'supplier_signature' => 'Supplier',
+            'user_signature' => 'Admin',
+            'notes' => 'Awal',
+            'created_by_user_id' => $admin->id,
+        ]);
+        SupplierLedger::query()->create([
+            'supplier_id' => $supplier->id,
+            'outgoing_transaction_id' => null,
+            'supplier_payment_id' => null,
+            'entry_date' => '2026-02-10',
+            'period_code' => 'S2-2526',
+            'description' => 'Initial payable',
+            'debit' => 100000,
+            'credit' => 0,
+            'balance_after' => 100000,
+        ]);
+        SupplierLedger::query()->create([
+            'supplier_id' => $supplier->id,
+            'outgoing_transaction_id' => null,
+            'supplier_payment_id' => $payment->id,
+            'entry_date' => '2026-02-20',
+            'period_code' => 'S2-2526',
+            'description' => 'Initial payment',
+            'debit' => 0,
+            'credit' => 20000,
+            'balance_after' => 80000,
+        ]);
+
+        $approval = ApprovalRequest::query()->create([
+            'module' => 'transaction',
+            'action' => 'correction',
+            'status' => 'pending',
+            'subject_id' => $payment->id,
+            'subject_type' => SupplierPayment::class,
+            'payload' => [
+                'type' => 'supplier_payment',
+                'requested_changes' => 'Ubah nominal pembayaran',
+                'patch' => [
+                    'payment_date' => '2026-02-20',
+                    'proof_number' => 'NOTA-001-REV',
+                    'amount' => 30000,
+                    'supplier_signature' => 'Supplier',
+                    'user_signature' => 'Admin',
+                    'notes' => 'Revisi approval',
+                ],
+            ],
+            'reason' => 'Nominal salah input',
+            'requested_by_user_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)->post(route('approvals.approve', $approval), [
+            'approval_note' => 'OK',
+        ])->assertRedirect();
+
+        $approval->refresh();
+        $payment->refresh();
+        $supplier->refresh();
+
+        $this->assertSame('approved', (string) $approval->status);
+        $this->assertSame('success', data_get($approval->payload, 'execution.status'));
+        $this->assertSame(30000.0, (float) $payment->amount);
+        $this->assertSame('NOTA-001-REV', (string) $payment->proof_number);
+        $this->assertSame('Revisi approval', (string) $payment->notes);
+        $this->assertSame(70000.0, (float) $supplier->outstanding_payable);
+    }
+}

@@ -10,6 +10,7 @@ use App\Models\SupplierPayment;
 use App\Services\AuditLogService;
 use App\Services\AccountingService;
 use App\Services\SupplierLedgerService;
+use App\Support\AppCache;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -171,6 +172,93 @@ class SupplierPayablePageController extends Controller
         return view('supplier_payables.show', [
             'payment' => $supplierPayment,
         ]);
+    }
+
+    public function adminUpdate(Request $request, SupplierPayment $supplierPayment): RedirectResponse
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'proof_number' => ['nullable', 'string', 'max:80'],
+            'amount' => ['required', 'integer', 'min:1'],
+            'supplier_signature' => ['nullable', 'string', 'max:120'],
+            'user_signature' => ['nullable', 'string', 'max:120'],
+            'notes' => ['nullable', 'string'],
+            'payment_proof_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ]);
+
+        DB::transaction(function () use ($supplierPayment, $data, $request): void {
+            $payment = SupplierPayment::query()
+                ->whereKey($supplierPayment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $supplier = Supplier::query()
+                ->whereKey((int) $payment->supplier_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $oldAmount = (int) $payment->amount;
+            $newAmount = (int) $data['amount'];
+            $maxPayable = max(0, (int) $supplier->outstanding_payable + $oldAmount);
+            if ($newAmount > $maxPayable && $maxPayable > 0) {
+                throw ValidationException::withMessages([
+                    'amount' => __('supplier_payable.amount_exceeds_outstanding'),
+                ]);
+            }
+
+            $paymentDate = Carbon::parse((string) $data['payment_date']);
+            $semester = $this->semesterBookService->semesterFromDate((string) $data['payment_date']);
+            $difference = $newAmount - $oldAmount;
+
+            $proofPhotoPath = $payment->payment_proof_photo_path;
+            if ($request->hasFile('payment_proof_photo')) {
+                $proofPhotoPath = $request->file('payment_proof_photo')->store('supplier_payment_proofs', 'public');
+            }
+
+            $payment->update([
+                'payment_date' => $paymentDate->toDateString(),
+                'proof_number' => $data['proof_number'] ?? null,
+                'payment_proof_photo_path' => $proofPhotoPath,
+                'amount' => $newAmount,
+                'amount_in_words' => $this->toIndonesianWords($newAmount),
+                'supplier_signature' => $data['supplier_signature'] ?? null,
+                'user_signature' => $data['user_signature'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            if ($difference > 0) {
+                $this->supplierLedgerService->addCredit(
+                    supplierId: (int) $supplier->id,
+                    supplierPaymentId: (int) $payment->id,
+                    entryDate: $paymentDate,
+                    amount: (float) $difference,
+                    periodCode: $semester,
+                    description: "[ADMIN EDIT +] {$payment->payment_number}"
+                );
+            } elseif ($difference < 0) {
+                $this->supplierLedgerService->addDebit(
+                    supplierId: (int) $supplier->id,
+                    outgoingTransactionId: null,
+                    entryDate: $paymentDate,
+                    amount: (float) abs($difference),
+                    periodCode: $semester,
+                    description: "[ADMIN EDIT -] {$payment->payment_number}"
+                );
+            }
+        });
+
+        $supplierPayment->refresh();
+        $this->auditLogService->log(
+            'supplier.payment.admin_update',
+            $supplierPayment,
+            "Admin update supplier payment {$supplierPayment->payment_number}",
+            $request
+        );
+        AppCache::forgetAfterFinancialMutation([(string) $supplierPayment->payment_date]);
+
+        return redirect()
+            ->route('supplier-payables.show-payment', $supplierPayment)
+            ->with('success', __('txn.admin_update_saved'));
     }
 
     public function printPayment(SupplierPayment $supplierPayment): View

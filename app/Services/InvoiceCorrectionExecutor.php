@@ -6,14 +6,18 @@ namespace App\Services;
 
 use App\Http\Controllers\DeliveryNotePageController;
 use App\Http\Controllers\OrderNotePageController;
+use App\Http\Controllers\OutgoingTransactionPageController;
 use App\Http\Controllers\ReceivablePaymentPageController;
 use App\Http\Controllers\SalesInvoicePageController;
 use App\Http\Controllers\SalesReturnPageController;
+use App\Http\Controllers\SupplierPayablePageController;
 use App\Models\DeliveryNote;
 use App\Models\OrderNote;
+use App\Models\OutgoingTransaction;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Models\SupplierPayment;
 use Illuminate\Http\Request;
 
 final class InvoiceCorrectionExecutor
@@ -132,6 +136,52 @@ final class InvoiceCorrectionExecutor
         $this->hydrateRequestFromBase($correctionRequest, $baseRequest);
 
         app(ReceivablePaymentPageController::class)->adminUpdate($correctionRequest, $payment);
+    }
+
+    /**
+     * @param array<string, mixed> $patch
+     */
+    public function applyOutgoingTransactionCorrection(int $transactionId, array $patch, ?Request $request = null): void
+    {
+        $transaction = OutgoingTransaction::query()->findOrFail($transactionId);
+        $baseRequest = $request ?? request();
+
+        $payload = [
+            'transaction_date' => (string) ($patch['transaction_date'] ?? optional($transaction->transaction_date)->format('Y-m-d')),
+            'semester_period' => (string) ($patch['semester_period'] ?? ($transaction->semester_period ?? '')),
+            'supplier_id' => (int) ($patch['supplier_id'] ?? (int) $transaction->supplier_id),
+            'note_number' => (string) ($patch['note_number'] ?? ($transaction->note_number ?? '')),
+            'notes' => (string) ($patch['notes'] ?? ($transaction->notes ?? '')),
+            'items' => $patch['items'] ?? [],
+        ];
+
+        $correctionRequest = Request::create('/outgoing-transactions/'.$transactionId.'/admin-update', 'PUT', $payload);
+        $this->hydrateRequestFromBase($correctionRequest, $baseRequest);
+
+        app(OutgoingTransactionPageController::class)->adminUpdate($correctionRequest, $transaction);
+    }
+
+    /**
+     * @param array<string, mixed> $patch
+     */
+    public function applySupplierPaymentCorrection(int $paymentId, array $patch, ?Request $request = null): void
+    {
+        $payment = SupplierPayment::query()->findOrFail($paymentId);
+        $baseRequest = $request ?? request();
+
+        $payload = [
+            'payment_date' => (string) ($patch['payment_date'] ?? optional($payment->payment_date)->format('Y-m-d')),
+            'proof_number' => (string) ($patch['proof_number'] ?? ($payment->proof_number ?? '')),
+            'amount' => (int) ($patch['amount'] ?? (int) $payment->amount),
+            'supplier_signature' => (string) ($patch['supplier_signature'] ?? ($payment->supplier_signature ?? '')),
+            'user_signature' => (string) ($patch['user_signature'] ?? ($payment->user_signature ?? '')),
+            'notes' => (string) ($patch['notes'] ?? ($payment->notes ?? '')),
+        ];
+
+        $correctionRequest = Request::create('/supplier-payables/payment/'.$paymentId.'/admin-update', 'PUT', $payload);
+        $this->hydrateRequestFromBase($correctionRequest, $baseRequest);
+
+        app(SupplierPayablePageController::class)->adminUpdate($correctionRequest, $payment);
     }
 
     private function hydrateRequestFromBase(Request $targetRequest, Request $baseRequest): void
