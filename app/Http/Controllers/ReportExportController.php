@@ -9,10 +9,12 @@ use App\Models\DeliveryNote;
 use App\Models\OutgoingTransaction;
 use App\Models\OrderNote;
 use App\Models\Product;
+use App\Models\ReportExportTask;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Jobs\GenerateReportExportTaskJob;
 use App\Support\AppCache;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -21,6 +23,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -66,7 +69,55 @@ class ReportExportController extends Controller
             'semesterEnabledDatasets' => ['sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'receivables', 'outgoing_transactions'],
             'receivableCustomers' => $receivableCustomers,
             'outgoingSuppliers' => $outgoingSuppliers,
+            'exportTasks' => ReportExportTask::query()
+                ->where('user_id', (int) $request->user()->id)
+                ->latest('id')
+                ->limit(20)
+                ->get(['id', 'dataset', 'format', 'status', 'file_name', 'error_message', 'created_at', 'generated_at']),
         ]);
+    }
+
+    public function queueExport(Request $request, string $dataset, string $format)
+    {
+        $normalizedFormat = strtolower(trim($format));
+        if (! in_array($normalizedFormat, ['pdf', 'excel'], true)) {
+            abort(404);
+        }
+
+        $task = ReportExportTask::create([
+            'user_id' => (int) $request->user()->id,
+            'dataset' => $dataset,
+            'format' => $normalizedFormat,
+            'status' => 'queued',
+            'filters' => [
+                'semester' => $this->selectedSemester($request),
+                'customer_id' => $this->selectedCustomerId($request),
+                'customer_ids' => $this->selectedCustomerIds($request),
+                'user_role' => $this->selectedUserRole($request),
+                'finance_lock' => $this->selectedFinanceLock($request),
+                'outgoing_supplier_id' => $this->selectedOutgoingSupplierId($request),
+            ],
+        ]);
+
+        GenerateReportExportTaskJob::dispatch((int) $task->id)->onQueue('exports');
+
+        return redirect()
+            ->route('reports.index', $request->query())
+            ->with('success', __('report.export_queued_success'));
+    }
+
+    public function downloadQueuedExport(Request $request, ReportExportTask $task)
+    {
+        $isOwner = (int) $task->user_id === (int) $request->user()->id;
+        $isAdmin = strtolower((string) ($request->user()->role ?? '')) === 'admin';
+        if (! $isOwner && ! $isAdmin) {
+            abort(403);
+        }
+        if ((string) $task->status !== 'ready' || ! $task->file_path || ! Storage::disk('local')->exists((string) $task->file_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->download((string) $task->file_path, (string) ($task->file_name ?: basename((string) $task->file_path)));
     }
 
     public function exportCsv(Request $request, string $dataset): StreamedResponse
@@ -233,7 +284,7 @@ class ReportExportController extends Controller
         );
         $filename = $dataset . '-' . $printedAt->format('Ymd-His') . '.pdf';
 
-        $pdf = Pdf::loadView('reports.pdf', [
+        $pdf = Pdf::loadView('reports.print', [
             'title' => $report['title'],
             'headers' => $report['headers'],
             'rows' => $report['rows'],
@@ -242,6 +293,7 @@ class ReportExportController extends Controller
             'layout' => $report['layout'] ?? null,
             'receivableSemesterHeaders' => $report['receivable_semester_headers'] ?? [],
             'printedAt' => $printedAt,
+            'isPdf' => true,
         ])->setPaper('a4', 'landscape');
 
         return $pdf->download($filename);
@@ -752,7 +804,7 @@ class ReportExportController extends Controller
     /**
      * @return array{title:string,headers:array<int,string>,rows:array<int,array<int,string|int|float|null>>,summary:array<int,array{label:string,value:int|float,type:string}>|null,filters:array<int,array{label:string,value:string}>|null}
      */
-    private function reportData(
+    public function reportData(
         string $dataset,
         ?string $selectedSemester = null,
         ?int $selectedCustomerId = null,

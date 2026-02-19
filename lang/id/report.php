@@ -10,6 +10,7 @@ return [
     'download_csv' => 'Unduh CSV',
     'download_pdf' => 'Unduh PDF',
     'open_print' => 'Buka Tampilan Cetak',
+    'export_queued_success' => 'Export sudah masuk antrian. Cek tabel queue export di bawah.',
     'print_save_pdf' => 'Cetak / Simpan PDF',
     'printed' => 'Dicetak',
     'no_data' => 'Tidak ada data.',

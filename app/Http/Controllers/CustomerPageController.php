@@ -38,7 +38,7 @@ class CustomerPageController extends Controller
             ->withLevel()
             ->searchKeyword($search)
             ->orderBy('name')
-            ->paginate(25)
+            ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
         return view('customers.index', [

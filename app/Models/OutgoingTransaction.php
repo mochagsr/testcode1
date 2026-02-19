@@ -9,10 +9,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class OutgoingTransaction extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     /**
      * @var list<string>
@@ -37,6 +39,7 @@ class OutgoingTransaction extends Model
         return [
             'transaction_date' => 'date',
             'total' => 'integer',
+            'deleted_at' => 'datetime',
         ];
     }
 

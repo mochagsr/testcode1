@@ -27,19 +27,21 @@ class AuditLogPageController extends Controller
 
         $logs = $this->buildFilteredLogsQuery($filters)
             ->latest('id')
-            ->paginate(50)
+            ->paginate((int) config('pagination.audit_per_page', 50))
             ->withQueryString();
         $viewMaps = $this->buildAuditViewMaps($logs->getCollection());
 
         return view('audit_logs.index', [
             'logs' => $logs,
             'search' => $filters['search'],
+            'selectedDocumentCode' => $filters['documentCode'],
             'selectedModule' => $filters['selectedModule'],
             'selectedDateFrom' => $filters['dateFrom'],
             'selectedDateTo' => $filters['dateTo'],
             'subjectMap' => $viewMaps['subjectMap'],
             'subjectCodeMap' => $viewMaps['subjectCodeMap'],
             'descriptionMap' => $viewMaps['descriptionMap'],
+            'beforeAfterMap' => $viewMaps['beforeAfterMap'],
             'codeLinkMap' => $viewMaps['codeLinkMap'],
         ]);
     }
@@ -100,11 +102,12 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @return array{search:string,selectedModule:string,actionPrefix:?string,dateFrom:string,dateTo:string}
+     * @return array{search:string,documentCode:string,selectedModule:string,actionPrefix:?string,dateFrom:string,dateTo:string}
      */
     private function resolveFilters(Request $request): array
     {
         $search = trim((string) $request->string('search', ''));
+        $documentCode = strtoupper(trim((string) $request->string('doc_code', '')));
         $module = trim((string) $request->string('module', ''));
         $dateFromInput = trim((string) $request->string('date_from', ''));
         $dateToInput = trim((string) $request->string('date_to', ''));
@@ -122,6 +125,7 @@ class AuditLogPageController extends Controller
 
         return [
             'search' => $search,
+            'documentCode' => $documentCode,
             'selectedModule' => $selectedModule,
             'actionPrefix' => $actionPrefix,
             'dateFrom' => $dateFrom,
@@ -130,11 +134,12 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @param array{search:string,selectedModule:string,actionPrefix:?string,dateFrom:string,dateTo:string} $filters
+     * @param array{search:string,documentCode:string,selectedModule:string,actionPrefix:?string,dateFrom:string,dateTo:string} $filters
      */
     private function buildFilteredLogsQuery(array $filters)
     {
         $search = $filters['search'];
+        $documentCode = $filters['documentCode'];
         $actionPrefix = $filters['actionPrefix'];
         $dateFrom = $filters['dateFrom'];
         $dateTo = $filters['dateTo'];
@@ -173,6 +178,54 @@ class AuditLogPageController extends Controller
                                 ->orWhere('email', 'like', "%{$search}%");
                         });
                 });
+            })
+            ->when($documentCode !== '', function ($query) use ($documentCode): void {
+                $query->where(function ($subQuery) use ($documentCode): void {
+                    $subQuery->where('description', 'like', "%{$documentCode}%")
+                        ->orWhere(function ($documentQuery) use ($documentCode): void {
+                            if (str_starts_with($documentCode, 'INV-')) {
+                                $documentQuery->where('subject_type', SalesInvoice::class)
+                                    ->whereIn('subject_id', SalesInvoice::query()
+                                        ->where('invoice_number', $documentCode)
+                                        ->select('id'));
+                                return;
+                            }
+                            if (str_starts_with($documentCode, 'RTR-') || str_starts_with($documentCode, 'RET-') || str_starts_with($documentCode, 'RTN-')) {
+                                $documentQuery->where('subject_type', SalesReturn::class)
+                                    ->whereIn('subject_id', SalesReturn::query()
+                                        ->where('return_number', $documentCode)
+                                        ->select('id'));
+                                return;
+                            }
+                            if (str_starts_with($documentCode, 'SJ-')) {
+                                $documentQuery->where('subject_type', DeliveryNote::class)
+                                    ->whereIn('subject_id', DeliveryNote::query()
+                                        ->where('note_number', $documentCode)
+                                        ->select('id'));
+                                return;
+                            }
+                            if (str_starts_with($documentCode, 'PO-')) {
+                                $documentQuery->where('subject_type', OrderNote::class)
+                                    ->whereIn('subject_id', OrderNote::query()
+                                        ->where('note_number', $documentCode)
+                                        ->select('id'));
+                                return;
+                            }
+                            if (str_starts_with($documentCode, 'KWT-') || str_starts_with($documentCode, 'PYT-')) {
+                                $documentQuery->where('subject_type', ReceivablePayment::class)
+                                    ->whereIn('subject_id', ReceivablePayment::query()
+                                        ->where('payment_number', $documentCode)
+                                        ->select('id'));
+                                return;
+                            }
+                            if (str_starts_with($documentCode, 'SPY-')) {
+                                $documentQuery->where('subject_type', SupplierPayment::class)
+                                    ->whereIn('subject_id', SupplierPayment::query()
+                                        ->where('payment_number', $documentCode)
+                                        ->select('id'));
+                            }
+                        });
+                });
             });
     }
 
@@ -182,6 +235,7 @@ class AuditLogPageController extends Controller
      *   subjectMap: array<int,string>,
      *   subjectCodeMap: array<int,string>,
      *   descriptionMap: array<int,string>,
+     *   beforeAfterMap: array<int,array{before:string,after:string}>,
      *   codeLinkMap: array<string,string>
      * }
      */
@@ -190,6 +244,7 @@ class AuditLogPageController extends Controller
         $subjectMap = [];
         $subjectCodeMap = [];
         $descriptionMap = [];
+        $beforeAfterMap = [];
         $codeLinkMap = $this->resolveCodeLinks($logs);
 
         $idsByType = [];
@@ -312,6 +367,7 @@ class AuditLogPageController extends Controller
             $subjectMap[$logId] = class_basename((string) $log->subject_type) ?: '-';
             $subjectCodeMap[$logId] = '';
             $descriptionMap[$logId] = (string) ($log->description ?: '-');
+            $beforeAfterMap[$logId] = ['before' => '-', 'after' => '-'];
             $subjectId = (int) ($log->subject_id ?? 0);
 
             if ($subjectId <= 0) {
@@ -351,25 +407,18 @@ class AuditLogPageController extends Controller
                 $descriptionMap[$logId],
                 $subjectCodeMap[$logId]
             );
-            $beforeText = is_array($log->before_data) ? json_encode($log->before_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '';
-            $afterText = is_array($log->after_data) ? json_encode($log->after_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '';
-            if ($beforeText !== '' || $afterText !== '') {
-                $parts = [$shortDesc];
-                if ($beforeText !== '') {
-                    $parts[] = 'Before: ' . $beforeText;
-                }
-                if ($afterText !== '') {
-                    $parts[] = 'After: ' . $afterText;
-                }
-                $shortDesc = implode(' | ', $parts);
-            }
             $descriptionMap[$logId] = $shortDesc;
+            $beforeAfterMap[$logId] = [
+                'before' => is_array($log->before_data) ? json_encode($log->before_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '-' : '-',
+                'after' => is_array($log->after_data) ? json_encode($log->after_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '-' : '-',
+            ];
         }
 
         return [
             'subjectMap' => $subjectMap,
             'subjectCodeMap' => $subjectCodeMap,
             'descriptionMap' => $descriptionMap,
+            'beforeAfterMap' => $beforeAfterMap,
             'codeLinkMap' => $codeLinkMap,
         ];
     }

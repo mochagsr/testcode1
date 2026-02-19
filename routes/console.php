@@ -2,6 +2,10 @@
 
 use App\Models\ReceivablePayment;
 use App\Models\ReceivableLedger;
+use App\Models\Customer;
+use App\Models\SupplierLedger;
+use App\Models\SupplierPayment;
+use App\Models\Supplier;
 use App\Models\OutgoingTransaction;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
@@ -400,4 +404,132 @@ Artisan::command('app:load-test-light {--loops=50}', function () {
     return 0;
 })->purpose('Run lightweight DB load test for list/search endpoints');
 
+Artisan::command('app:integrity-check', function () {
+    $customerMismatches = [];
+    Customer::query()
+        ->select(['id', 'name', 'outstanding_receivable'])
+        ->orderBy('id')
+        ->chunkById(200, function ($customers) use (&$customerMismatches): void {
+            foreach ($customers as $customer) {
+                $openBalance = (int) round((float) SalesInvoice::query()
+                    ->where('customer_id', (int) $customer->id)
+                    ->where('is_canceled', false)
+                    ->sum('balance'));
+                $stored = (int) round((float) $customer->outstanding_receivable);
+                if ($openBalance !== $stored) {
+                    $customerMismatches[] = [
+                        'id' => (int) $customer->id,
+                        'name' => (string) $customer->name,
+                        'stored' => $stored,
+                        'computed' => $openBalance,
+                    ];
+                }
+            }
+        });
+
+    $supplierMismatches = [];
+    Supplier::query()
+        ->select(['id', 'name', 'outstanding_payable'])
+        ->orderBy('id')
+        ->chunkById(200, function ($suppliers) use (&$supplierMismatches): void {
+            foreach ($suppliers as $supplier) {
+                $ledgerBalance = (int) round((float) SupplierLedger::query()
+                    ->where('supplier_id', (int) $supplier->id)
+                    ->sum(DB::raw('debit - credit')));
+                $stored = (int) round((float) $supplier->outstanding_payable);
+                if ($ledgerBalance !== $stored) {
+                    $supplierMismatches[] = [
+                        'id' => (int) $supplier->id,
+                        'name' => (string) $supplier->name,
+                        'stored' => $stored,
+                        'computed' => $ledgerBalance,
+                    ];
+                }
+            }
+        });
+
+    $invalidReceivableLinks = ReceivablePayment::query()
+        ->whereNotNull('customer_id')
+        ->whereNotIn('customer_id', Customer::query()->select('id'))
+        ->count();
+    $invalidSupplierLinks = SupplierPayment::query()
+        ->whereNotNull('supplier_id')
+        ->whereNotIn('supplier_id', Supplier::query()->select('id'))
+        ->count();
+
+    $this->info('Integrity check result');
+    $this->line('Customer balance mismatches: '.count($customerMismatches));
+    $this->line('Supplier payable mismatches: '.count($supplierMismatches));
+    $this->line('Invalid receivable customer links: '.$invalidReceivableLinks);
+    $this->line('Invalid supplier payment links: '.$invalidSupplierLinks);
+
+    if ($customerMismatches !== []) {
+        $this->warn('Sample customer mismatch: '.json_encode($customerMismatches[0], JSON_UNESCAPED_UNICODE));
+    }
+    if ($supplierMismatches !== []) {
+        $this->warn('Sample supplier mismatch: '.json_encode($supplierMismatches[0], JSON_UNESCAPED_UNICODE));
+    }
+
+    return (count($customerMismatches) === 0 && count($supplierMismatches) === 0 && $invalidReceivableLinks === 0 && $invalidSupplierLinks === 0) ? 0 : 1;
+})->purpose('Check cross-module financial integrity (invoice/receivable/supplier ledger)');
+
+Artisan::command('app:query-profile', function () {
+    $queries = [
+        'customers_list' => "EXPLAIN SELECT id, name, city, phone FROM customers ORDER BY name LIMIT 20",
+        'products_list' => "EXPLAIN SELECT id, code, name, stock FROM products ORDER BY name LIMIT 20",
+        'sales_invoice_list' => "EXPLAIN SELECT id, invoice_number, customer_id, invoice_date FROM sales_invoices ORDER BY invoice_date DESC, id DESC LIMIT 20",
+        'receivable_ledger_customer' => "EXPLAIN SELECT id, customer_id, sales_invoice_id, entry_date, debit, credit FROM receivable_ledgers WHERE customer_id = 1 ORDER BY entry_date DESC, id DESC LIMIT 50",
+    ];
+
+    foreach ($queries as $label => $sql) {
+        $this->line("== {$label} ==");
+        try {
+            $rows = DB::select($sql);
+            $this->line(json_encode($rows, JSON_UNESCAPED_UNICODE));
+        } catch (\Throwable $throwable) {
+            $this->error("Query profile failed for {$label}: ".$throwable->getMessage());
+        }
+    }
+
+    return 0;
+})->purpose('Run quick EXPLAIN profiling for high-frequency list/search queries');
+
+Artisan::command('app:restore-document {type} {id}', function () {
+    $type = strtolower(trim((string) $this->argument('type')));
+    $id = (int) $this->argument('id');
+    if ($id <= 0) {
+        $this->error('ID tidak valid.');
+        return 1;
+    }
+
+    $modelClass = match ($type) {
+        'invoice' => SalesInvoice::class,
+        'return' => SalesReturn::class,
+        'receivable_payment' => ReceivablePayment::class,
+        'outgoing' => OutgoingTransaction::class,
+        'supplier_payment' => SupplierPayment::class,
+        default => null,
+    };
+    if ($modelClass === null) {
+        $this->error('Type tidak valid. Gunakan: invoice|return|receivable_payment|outgoing|supplier_payment');
+        return 1;
+    }
+
+    $record = $modelClass::withTrashed()->whereKey($id)->first();
+    if ($record === null) {
+        $this->error('Dokumen tidak ditemukan.');
+        return 1;
+    }
+    if ($record->deleted_at === null) {
+        $this->warn('Dokumen tidak dalam status terhapus.');
+        return 0;
+    }
+
+    $record->restore();
+    $this->info('Dokumen berhasil direstore.');
+    return 0;
+})->purpose('Restore soft-deleted financial document by type and id');
+
 Schedule::command('app:db-backup --gzip')->dailyAt('01:00');
+Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
+Schedule::command('app:integrity-check')->dailyAt('03:00');

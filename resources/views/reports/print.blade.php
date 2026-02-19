@@ -30,9 +30,11 @@
 </head>
 <body>
 <div class="container">
-    <div class="no-print">
-        <button onclick="window.print()">{{ __('report.print_save_pdf') }}</button>
-    </div>
+    @if(empty($isPdf))
+        <div class="no-print">
+            <button onclick="window.print()">{{ __('report.print_save_pdf') }}</button>
+        </div>
+    @endif
     <div class="head">
         <div class="title">{{ $title }}</div>
         <div>{{ __('report.printed') }}: {{ $printedAt->format('d-m-Y H:i:s') }}</div>
@@ -252,4 +254,3 @@
 </div>
 </body>
 </html>
-

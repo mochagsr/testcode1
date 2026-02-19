@@ -21,7 +21,7 @@ class UserManagementController extends Controller
             ->onlyListColumns()
             ->searchKeyword($search)
             ->orderBy('name')
-            ->paginate(25)
+            ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
         return view('users.index', [
@@ -32,7 +32,9 @@ class UserManagementController extends Controller
 
     public function create(): View
     {
-        return view('users.create');
+        return view('users.create', [
+            'availablePermissions' => $this->availablePermissions(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -42,6 +44,8 @@ class UserManagementController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
             'role' => ['required', 'in:admin,user'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', Rule::in($this->availablePermissions())],
             'locale' => ['required', 'in:id,en'],
             'theme' => ['required', 'in:light,dark'],
             'finance_locked' => ['nullable', 'boolean'],
@@ -52,6 +56,7 @@ class UserManagementController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'role' => $data['role'],
+            'permissions' => $data['role'] === 'admin' ? ['*'] : array_values(array_unique((array) ($data['permissions'] ?? []))),
             'locale' => $data['locale'],
             'theme' => $data['theme'],
             'finance_locked' => (bool) ($data['finance_locked'] ?? false),
@@ -62,7 +67,10 @@ class UserManagementController extends Controller
 
     public function edit(User $user): View
     {
-        return view('users.edit', ['user' => $user]);
+        return view('users.edit', [
+            'user' => $user,
+            'availablePermissions' => $this->availablePermissions(),
+        ]);
     }
 
     public function update(Request $request, User $user): RedirectResponse
@@ -72,6 +80,8 @@ class UserManagementController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:6'],
             'role' => ['required', 'in:admin,user'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', Rule::in($this->availablePermissions())],
             'locale' => ['required', 'in:id,en'],
             'theme' => ['required', 'in:light,dark'],
             'finance_locked' => ['nullable', 'boolean'],
@@ -81,6 +91,7 @@ class UserManagementController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'role' => $data['role'],
+            'permissions' => $data['role'] === 'admin' ? ['*'] : array_values(array_unique((array) ($data['permissions'] ?? []))),
             'locale' => $data['locale'],
             'theme' => $data['theme'],
             'finance_locked' => (bool) ($data['finance_locked'] ?? false),
@@ -104,5 +115,18 @@ class UserManagementController extends Controller
         $user->delete();
 
         return redirect()->route('users.index')->with('success', 'User deleted successfully.');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function availablePermissions(): array
+    {
+        $allPermissions = (array) config('rbac.permissions', []);
+
+        return array_values(array_filter(array_map(
+            static fn ($permission): string => strtolower(trim((string) $permission)),
+            $allPermissions
+        ), static fn (string $permission): bool => $permission !== '' && $permission !== '*'));
     }
 }

@@ -71,6 +71,8 @@
                             <option value="{{ route('reports.print', $query) }}">{{ __('report.open_print') }}</option>
                             <option value="{{ route('reports.export.pdf', $query) }}">{{ __('report.download_pdf') }}</option>
                             <option value="{{ route('reports.export.csv', $query) }}">{{ __('report.download_csv') }}</option>
+                            <option value="{{ route('reports.queue', array_merge($query, ['format' => 'pdf'])) }}">Queue PDF</option>
+                            <option value="{{ route('reports.queue', array_merge($query, ['format' => 'excel'])) }}">Queue Excel</option>
                         </select>
                     </td>
                 </tr>
@@ -78,8 +80,43 @@
             </tbody>
         </table>
     </div>
-@endsection
 
+    <div class="card">
+        <h2 class="page-title" style="font-size:16px; margin:0 0 10px 0;">Queue Export</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Dataset</th>
+                    <th>Format</th>
+                    <th>Status</th>
+                    <th>Waktu</th>
+                    <th>File</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($exportTasks as $task)
+                    <tr>
+                        <td>{{ $datasets[$task->dataset] ?? $task->dataset }}</td>
+                        <td>{{ strtoupper($task->format) }}</td>
+                        <td>{{ strtoupper($task->status) }}</td>
+                        <td>{{ $task->created_at?->format('d-m-Y H:i') }}</td>
+                        <td>
+                            @if($task->status === 'ready')
+                                <a class="btn secondary" href="{{ route('reports.queue.download', $task) }}">Download</a>
+                            @elseif($task->status === 'failed')
+                                <span class="muted">{{ $task->error_message ?: '-' }}</span>
+                            @else
+                                <span class="muted">Menunggu...</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="5" class="muted">{{ __('report.no_data') }}</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+@endsection
 
 
 

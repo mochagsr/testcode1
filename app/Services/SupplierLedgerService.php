@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 
 final class SupplierLedgerService
 {
@@ -24,7 +25,7 @@ final class SupplierLedgerService
 
         $supplier->update(['outstanding_payable' => $next]);
 
-        return SupplierLedger::create([
+        $ledger = SupplierLedger::create([
             'supplier_id' => $supplierId,
             'outgoing_transaction_id' => $outgoingTransactionId,
             'supplier_payment_id' => null,
@@ -35,6 +36,10 @@ final class SupplierLedgerService
             'credit' => 0,
             'balance_after' => $next,
         ]);
+
+        $this->syncOutstandingFromLedger($supplierId);
+
+        return $ledger;
     }
 
     public function addCredit(
@@ -51,7 +56,7 @@ final class SupplierLedgerService
 
         $supplier->update(['outstanding_payable' => $next]);
 
-        return SupplierLedger::create([
+        $ledger = SupplierLedger::create([
             'supplier_id' => $supplierId,
             'outgoing_transaction_id' => null,
             'supplier_payment_id' => $supplierPaymentId,
@@ -62,5 +67,25 @@ final class SupplierLedgerService
             'credit' => (int) round($amount),
             'balance_after' => $next,
         ]);
+
+        $this->syncOutstandingFromLedger($supplierId);
+
+        return $ledger;
+    }
+
+    public function syncOutstandingFromLedger(int $supplierId): void
+    {
+        $supplier = Supplier::query()->lockForUpdate()->find($supplierId);
+        if ($supplier === null) {
+            return;
+        }
+
+        $ledgerBalance = (int) round((float) SupplierLedger::query()
+            ->where('supplier_id', $supplierId)
+            ->sum(DB::raw('debit - credit')));
+
+        if ((int) $supplier->outstanding_payable !== $ledgerBalance) {
+            $supplier->update(['outstanding_payable' => max(0, $ledgerBalance)]);
+        }
     }
 }

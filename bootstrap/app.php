@@ -9,6 +9,7 @@ use App\Http\Middleware\ApplyUserPreferences;
 use App\Http\Middleware\EnsureFinanceUnlocked;
 use App\Http\Middleware\EnsureSemesterOpen;
 use App\Http\Middleware\EnsureIdempotentRequest;
+use App\Http\Middleware\EnsurePermission;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'finance.unlocked' => EnsureFinanceUnlocked::class,
             'semester.open' => EnsureSemesterOpen::class,
             'idempotent' => EnsureIdempotentRequest::class,
+            'perm' => EnsurePermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

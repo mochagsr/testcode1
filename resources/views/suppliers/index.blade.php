@@ -12,7 +12,23 @@
             @if(auth()->user()->role === 'admin')
                 <a class="btn secondary" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
             @endif
+            <a class="btn secondary" href="{{ route('suppliers.import.template') }}">Template Import</a>
         </form>
+        <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="flex" style="margin-top:8px;">
+            @csrf
+            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width:320px;">
+            <button type="submit" class="btn secondary">Import</button>
+        </form>
+        @if(session('import_errors'))
+            <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
+                <strong>Error Import:</strong>
+                <ul style="margin:8px 0 0 18px;">
+                    @foreach(array_slice((array) session('import_errors'), 0, 20) as $importError)
+                        <li>{{ $importError }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
     </div>
 
     <div class="card">

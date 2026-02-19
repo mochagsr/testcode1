@@ -17,10 +17,11 @@
             <input id="audit-logs-date-from-input" type="date" name="date_from" value="{{ $selectedDateFrom }}" style="max-width: 180px;">
             <input id="audit-logs-date-to-input" type="date" name="date_to" value="{{ $selectedDateTo }}" style="max-width: 180px;">
             <input id="audit-logs-search-input" type="text" name="search" placeholder="{{ __('ui.search_audit_logs_placeholder') }}" value="{{ $search }}" style="max-width: 340px;">
+            <input id="audit-logs-doc-code-input" type="text" name="doc_code" placeholder="No dokumen (INV-/RTR-/KWT-)" value="{{ $selectedDocumentCode ?? '' }}" style="max-width: 220px;">
             <button type="submit">{{ __('ui.search') }}</button>
             <a
                 class="btn secondary"
-                href="{{ route('audit-logs.export.csv', ['module' => $selectedModule, 'date_from' => $selectedDateFrom, 'date_to' => $selectedDateTo, 'search' => $search]) }}"
+                href="{{ route('audit-logs.export.csv', ['module' => $selectedModule, 'date_from' => $selectedDateFrom, 'date_to' => $selectedDateTo, 'search' => $search, 'doc_code' => ($selectedDocumentCode ?? '')]) }}"
             >
                 {{ __('ui.export_audit_csv') }}
             </a>
@@ -36,6 +37,7 @@
                 <th>{{ __('ui.actions') }}</th>
                 <th>{{ __('ui.subject') }}</th>
                 <th>{{ __('ui.description') }}</th>
+                <th>Before / After</th>
                 <th>{{ __('ui.ip') }}</th>
             </tr>
             </thead>
@@ -104,10 +106,30 @@
                         @endif
                     </td>
                     <td>{!! audit_linkify_codes((string) ($descriptionMap[$log->id] ?? ($log->description ?: '-')), $codeLinkMap ?? []) !!}</td>
+                    <td style="min-width: 280px;">
+                        @php
+                            $beforeText = (string) (($beforeAfterMap[$log->id]['before'] ?? '-'));
+                            $afterText = (string) (($beforeAfterMap[$log->id]['after'] ?? '-'));
+                            $hasDiff = $beforeText !== '-' || $afterText !== '-';
+                        @endphp
+                        @if($hasDiff)
+                            <details>
+                                <summary>Lihat perubahan</summary>
+                                <div style="margin-top:6px;">
+                                    <strong>Before:</strong>
+                                    <pre style="white-space: pre-wrap; margin:4px 0;">{{ $beforeText }}</pre>
+                                    <strong>After:</strong>
+                                    <pre style="white-space: pre-wrap; margin:4px 0;">{{ $afterText }}</pre>
+                                </div>
+                            </details>
+                        @else
+                            -
+                        @endif
+                    </td>
                     <td>{{ $log->ip_address ?: '-' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="muted">{{ __('ui.no_audit_logs') }}</td></tr>
+                <tr><td colspan="7" class="muted">{{ __('ui.no_audit_logs') }}</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -124,7 +146,8 @@
             const moduleInput = document.getElementById('audit-logs-module-input');
             const dateFromInput = document.getElementById('audit-logs-date-from-input');
             const dateToInput = document.getElementById('audit-logs-date-to-input');
-            if (!form || !searchInput || !moduleInput || !dateFromInput || !dateToInput) {
+            const docCodeInput = document.getElementById('audit-logs-doc-code-input');
+            if (!form || !searchInput || !moduleInput || !dateFromInput || !dateToInput || !docCodeInput) {
                 return;
             }
 
@@ -144,6 +167,10 @@
                 form.requestSubmit();
             }, 100);
             searchInput.addEventListener('input', onSearchInput);
+            const onDocInput = debounce(() => {
+                form.requestSubmit();
+            }, 250);
+            docCodeInput.addEventListener('input', onDocInput);
 
             moduleInput.addEventListener('change', () => {
                 form.requestSubmit();

@@ -9,10 +9,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SalesReturn extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     /**
      * @var list<string>
@@ -41,6 +43,7 @@ class SalesReturn extends Model
             'total' => 'integer',
             'is_canceled' => 'boolean',
             'canceled_at' => 'datetime',
+            'deleted_at' => 'datetime',
         ];
     }
 

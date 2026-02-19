@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\ReceivableLedger;
+use App\Models\SalesInvoice;
 use Carbon\CarbonInterface;
 
 final class ReceivableLedgerService
@@ -35,7 +36,7 @@ final class ReceivableLedgerService
 
         $customer->update(['outstanding_receivable' => $next]);
 
-        return ReceivableLedger::create([
+        $ledger = ReceivableLedger::create([
             'customer_id' => $customerId,
             'sales_invoice_id' => $invoiceId,
             'entry_date' => $entryDate->toDateString(),
@@ -45,6 +46,10 @@ final class ReceivableLedgerService
             'credit' => 0,
             'balance_after' => $next,
         ]);
+
+        $this->syncOutstandingFromOpenInvoices($customerId);
+
+        return $ledger;
     }
 
     /**
@@ -72,7 +77,7 @@ final class ReceivableLedgerService
 
         $customer->update(['outstanding_receivable' => $next]);
 
-        return ReceivableLedger::create([
+        $ledger = ReceivableLedger::create([
             'customer_id' => $customerId,
             'sales_invoice_id' => $invoiceId,
             'entry_date' => $entryDate->toDateString(),
@@ -82,5 +87,26 @@ final class ReceivableLedgerService
             'credit' => $amount,
             'balance_after' => $next,
         ]);
+
+        $this->syncOutstandingFromOpenInvoices($customerId);
+
+        return $ledger;
+    }
+
+    public function syncOutstandingFromOpenInvoices(int $customerId): void
+    {
+        $customer = Customer::query()->lockForUpdate()->find($customerId);
+        if ($customer === null) {
+            return;
+        }
+
+        $openBalance = (int) round((float) SalesInvoice::query()
+            ->where('customer_id', $customerId)
+            ->where('is_canceled', false)
+            ->sum('balance'));
+
+        if ((int) round((float) $customer->outstanding_receivable) !== $openBalance) {
+            $customer->update(['outstanding_receivable' => $openBalance]);
+        }
     }
 }

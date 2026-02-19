@@ -30,7 +30,7 @@ class SupplierPageController extends Controller
             ->onlyListColumns()
             ->searchKeyword($search)
             ->orderBy('name')
-            ->paginate(25)
+            ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
         return view('suppliers.index', [

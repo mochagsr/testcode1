@@ -25,6 +25,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'permissions',
         'locale',
         'theme',
         'finance_locked',
@@ -51,7 +52,36 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'finance_locked' => 'boolean',
+            'permissions' => 'array',
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function resolvedPermissions(): array
+    {
+        $userPermissions = collect($this->permissions ?? [])
+            ->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter(fn (string $value): bool => $value !== '')
+            ->values()
+            ->all();
+
+        if ($userPermissions !== []) {
+            return $userPermissions;
+        }
+
+        $role = strtolower(trim((string) $this->role));
+        if ($role === '') {
+            $role = 'user';
+        }
+        $rolePermissions = config('rbac.roles.'.$role, []);
+
+        return collect(is_array($rolePermissions) ? $rolePermissions : [])
+            ->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter(fn (string $value): bool => $value !== '')
+            ->values()
+            ->all();
     }
 
     /**

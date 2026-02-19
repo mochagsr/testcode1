@@ -83,7 +83,7 @@ class SalesInvoicePageController extends Controller
                 $query->where('invoice_date', '>=', $recentRangeStart);
             })
             ->orderByDate()
-            ->paginate(20)
+            ->paginate((int) config('pagination.default_per_page', 20))
             ->withQueryString();
 
         $todaySummary = Cache::remember(

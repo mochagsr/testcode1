@@ -39,7 +39,7 @@ class ProductPageController extends Controller
             ->withCategoryInfo()
             ->searchKeyword($search)
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
         return view('products.index', [
