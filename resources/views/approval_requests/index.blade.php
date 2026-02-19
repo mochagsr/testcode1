@@ -22,6 +22,7 @@
                 <th>Module</th>
                 <th>Aksi</th>
                 <th>Status</th>
+                <th>Eksekusi</th>
                 <th>Diminta Oleh</th>
                 <th>Waktu</th>
                 <th>Proses</th>
@@ -34,6 +35,16 @@
                     <td>{{ $item->module }}</td>
                     <td>{{ $item->action }}</td>
                     <td>{{ strtoupper($item->status) }}</td>
+                    <td>
+                        @php($execution = is_array($item->payload) ? ($item->payload['execution'] ?? null) : null)
+                        @if(is_array($execution))
+                            <span class="badge {{ ($execution['status'] ?? '') === 'success' ? 'success' : (($execution['status'] ?? '') === 'failed' ? 'danger' : 'warning') }}">
+                                {{ strtoupper((string) ($execution['status'] ?? '-')) }}
+                            </span>
+                        @else
+                            -
+                        @endif
+                    </td>
                     <td>{{ $item->requestedBy?->name ?: '-' }}</td>
                     <td>{{ optional($item->created_at)->format('d-m-Y H:i') }}</td>
                     <td>
@@ -54,11 +65,10 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">Belum ada approval request.</td></tr>
+                <tr><td colspan="8" class="muted">Belum ada approval request.</td></tr>
             @endforelse
             </tbody>
         </table>
         {{ $requests->links() }}
     </div>
 @endsection
-

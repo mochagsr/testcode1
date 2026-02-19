@@ -56,10 +56,10 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/sales-invoices/{salesInvoice}/pdf', [SalesInvoicePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('sales-invoices.export.pdf');
     Route::get('/sales-invoices/{salesInvoice}/excel', [SalesInvoicePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('sales-invoices.export.excel');
     Route::put('/sales-invoices/{salesInvoice}/admin-update', [SalesInvoicePageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'semester.open'])
+        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
         ->name('sales-invoices.admin-update');
     Route::post('/sales-invoices/{salesInvoice}/cancel', [SalesInvoicePageController::class, 'cancel'])
-        ->middleware(['admin', 'semester.open'])
+        ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
         ->name('sales-invoices.cancel');
 
     Route::get('/sales-returns', [SalesReturnPageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-returns.index');
@@ -157,11 +157,14 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         ->middleware(['admin', 'semester.open'])
         ->name('receivable-payments.cancel');
     Route::get('/transaction-corrections/create', [TransactionCorrectionWizardController::class, 'create'])
-        ->middleware('perm:transactions.view')
+        ->middleware('perm:transactions.correction.request')
         ->name('transaction-corrections.create');
     Route::post('/transaction-corrections', [TransactionCorrectionWizardController::class, 'store'])
-        ->middleware('perm:transactions.create')
+        ->middleware('perm:transactions.correction.request')
         ->name('transaction-corrections.store');
+    Route::post('/transaction-corrections/preview-stock', [TransactionCorrectionWizardController::class, 'stockImpactPreview'])
+        ->middleware('perm:transactions.correction.request')
+        ->name('transaction-corrections.preview-stock');
 
     Route::get('/reports', [ReportExportController::class, 'index'])->middleware('perm:reports.view')->name('reports.index');
     Route::get('/reports/{dataset}/csv', [ReportExportController::class, 'exportCsv'])->middleware('perm:reports.export')->name('reports.export.csv');
@@ -206,6 +209,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::get('/products/export.csv', [ProductPageController::class, 'exportCsv'])->middleware('perm:masters.products.view')->name('products.export.csv');
         Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:masters.products.manage')->name('products.import.template');
         Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:masters.products.manage')->name('products.import');
+        Route::get('/sales-invoices/import/template', [MassImportController::class, 'templateSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import.template');
+        Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
         Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('products.create');
         Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('products.store');
         Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('products.edit');
@@ -244,10 +249,10 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::get('/audit-logs', [AuditLogPageController::class, 'index'])->middleware('perm:audit_logs.view')->name('audit-logs.index');
         Route::get('/audit-logs/export.csv', [AuditLogPageController::class, 'exportCsv'])->middleware('perm:audit_logs.view')->name('audit-logs.export.csv');
         Route::get('/semester-transactions', [SemesterTransactionPageController::class, 'index'])->middleware('perm:settings.admin')->name('semester-transactions.index');
-        Route::post('/semester-transactions/bulk-action', [SemesterTransactionPageController::class, 'bulkAction'])->middleware('perm:settings.admin')->name('semester-transactions.bulk-action');
-        Route::get('/approvals', [ApprovalRequestController::class, 'index'])->middleware('perm:settings.admin')->name('approvals.index');
-        Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware('perm:settings.admin')->name('approvals.approve');
-        Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware('perm:settings.admin')->name('approvals.reject');
+        Route::post('/semester-transactions/bulk-action', [SemesterTransactionPageController::class, 'bulkAction'])->middleware('perm:semester.bulk')->name('semester-transactions.bulk-action');
+        Route::get('/approvals', [ApprovalRequestController::class, 'index'])->middleware('perm:transactions.correction.approve')->name('approvals.index');
+        Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware('perm:transactions.correction.approve')->name('approvals.approve');
+        Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware('perm:transactions.correction.approve')->name('approvals.reject');
         Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
     });
 });

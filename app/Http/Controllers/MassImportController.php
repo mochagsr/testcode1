@@ -6,12 +6,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\CustomerLevel;
+use App\Models\InvoicePayment;
 use App\Models\ItemCategory;
 use App\Models\Product;
+use App\Models\SalesInvoice;
+use App\Models\SalesInvoiceItem;
+use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Services\AuditLogService;
+use App\Services\AccountingService;
+use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +33,9 @@ class MassImportController extends Controller
 {
     public function __construct(
         private readonly AuditLogService $auditLogService,
-        private readonly ProductCodeGenerator $productCodeGenerator
+        private readonly ProductCodeGenerator $productCodeGenerator,
+        private readonly ReceivableLedgerService $receivableLedgerService,
+        private readonly AccountingService $accountingService
     ) {}
 
     public function templateProducts(): StreamedResponse
@@ -51,6 +60,14 @@ class MassImportController extends Controller
             ['name', 'company_name', 'phone', 'address', 'notes'],
             ['PT Kertas Maju', 'PT Kertas Maju', '081212121212', 'Surabaya', 'Pembayaran 30 hari'],
         ], 'Suppliers');
+    }
+
+    public function templateSalesInvoices(): StreamedResponse
+    {
+        return $this->downloadTemplate('template-import-sales-invoices.xlsx', [
+            ['customer', 'invoice_date', 'due_date', 'semester_period', 'payment_method', 'product', 'quantity', 'unit_price', 'discount', 'notes'],
+            ['Toko Sumber Ilmu', '2026-02-20', '2026-02-27', 'S2-2526', 'kredit', 'MAT1E5S12526', 10, 50000, 0, 'Import transaksi awal'],
+        ], 'SalesInvoices');
     }
 
     public function importProducts(Request $request): RedirectResponse
@@ -282,6 +299,170 @@ class MassImportController extends Controller
             ->with('import_errors', $errors);
     }
 
+    public function importSalesInvoices(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+        ]);
+
+        $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
+        if ($rows === []) {
+            return back()->with('error', 'File import kosong.');
+        }
+
+        $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $errors = [];
+        $created = 0;
+
+        DB::transaction(function () use ($rows, $headers, &$errors, &$created): void {
+            foreach ($rows as $rowIndex => $row) {
+                $line = $rowIndex + 2;
+                $data = $this->mapRow($headers, $row);
+                if ($this->isEmptyRow($data)) {
+                    continue;
+                }
+
+                $validator = Validator::make($data, [
+                    'customer' => ['required', 'string', 'max:150'],
+                    'invoice_date' => ['required', 'date'],
+                    'due_date' => ['nullable', 'date'],
+                    'semester_period' => ['nullable', 'string', 'max:30'],
+                    'payment_method' => ['required', 'in:tunai,kredit'],
+                    'product' => ['required', 'string', 'max:200'],
+                    'quantity' => ['required', 'integer', 'min:1'],
+                    'unit_price' => ['required', 'numeric', 'min:0'],
+                    'discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+                    'notes' => ['nullable', 'string'],
+                ]);
+
+                if ($validator->fails()) {
+                    $errors[] = 'Baris '.$line.': '.implode('; ', $validator->errors()->all());
+                    continue;
+                }
+
+                $customer = Customer::query()
+                    ->where('name', (string) $data['customer'])
+                    ->orWhere('code', (string) $data['customer'])
+                    ->first();
+                if ($customer === null) {
+                    $errors[] = 'Baris '.$line.': customer tidak ditemukan.';
+                    continue;
+                }
+
+                $product = Product::query()
+                    ->where('code', (string) $data['product'])
+                    ->orWhere('name', (string) $data['product'])
+                    ->first();
+                if ($product === null) {
+                    $errors[] = 'Baris '.$line.': produk tidak ditemukan.';
+                    continue;
+                }
+
+                $quantity = (int) $data['quantity'];
+                if ((int) $product->stock < $quantity) {
+                    $errors[] = 'Baris '.$line.': stok produk '.$product->name.' tidak cukup.';
+                    continue;
+                }
+
+                $invoiceDate = Carbon::parse((string) $data['invoice_date']);
+                $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
+                $unitPrice = (float) round((float) $data['unit_price']);
+                $discountPercent = max(0.0, min(100.0, (float) ($data['discount'] ?? 0)));
+                $gross = $quantity * $unitPrice;
+                $discount = (float) round($gross * ($discountPercent / 100));
+                $lineTotal = max(0, $gross - $discount);
+
+                $invoice = SalesInvoice::create([
+                    'invoice_number' => $invoiceNumber,
+                    'customer_id' => (int) $customer->id,
+                    'invoice_date' => $invoiceDate->toDateString(),
+                    'due_date' => $data['due_date'] ?? null,
+                    'semester_period' => (string) ($data['semester_period'] ?? ''),
+                    'subtotal' => $lineTotal,
+                    'total' => $lineTotal,
+                    'total_paid' => 0,
+                    'balance' => $lineTotal,
+                    'payment_status' => 'unpaid',
+                    'notes' => (string) ($data['notes'] ?? ''),
+                ]);
+
+                SalesInvoiceItem::create([
+                    'sales_invoice_id' => $invoice->id,
+                    'product_id' => $product->id,
+                    'product_code' => $product->code,
+                    'product_name' => $product->name,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'discount' => $discount,
+                    'line_total' => $lineTotal,
+                ]);
+
+                $product->decrement('stock', $quantity);
+                StockMutation::create([
+                    'product_id' => $product->id,
+                    'reference_type' => SalesInvoice::class,
+                    'reference_id' => $invoice->id,
+                    'mutation_type' => 'out',
+                    'quantity' => $quantity,
+                    'notes' => "Import sales invoice {$invoice->invoice_number}",
+                    'created_by_user_id' => auth()->id(),
+                ]);
+
+                $this->receivableLedgerService->addDebit(
+                    customerId: (int) $invoice->customer_id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: $invoiceDate,
+                    amount: $lineTotal,
+                    periodCode: $invoice->semester_period,
+                    description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number
+                );
+
+                if ((string) $data['payment_method'] === 'tunai') {
+                    InvoicePayment::create([
+                        'sales_invoice_id' => $invoice->id,
+                        'payment_date' => $invoiceDate->toDateString(),
+                        'amount' => $lineTotal,
+                        'method' => 'cash',
+                        'notes' => 'Import pembayaran tunai',
+                    ]);
+                    $invoice->update([
+                        'total_paid' => $lineTotal,
+                        'balance' => 0,
+                        'payment_status' => 'paid',
+                    ]);
+                    $this->receivableLedgerService->addCredit(
+                        customerId: (int) $invoice->customer_id,
+                        invoiceId: (int) $invoice->id,
+                        entryDate: $invoiceDate,
+                        amount: $lineTotal,
+                        periodCode: $invoice->semester_period,
+                        description: __('receivable.payment_for_invoice', ['invoice' => $invoice->invoice_number])
+                    );
+                }
+
+                $this->accountingService->postSalesInvoice(
+                    invoiceId: (int) $invoice->id,
+                    date: $invoiceDate,
+                    amount: (int) round($lineTotal),
+                    paymentMethod: (string) $data['payment_method']
+                );
+
+                $created++;
+            }
+        });
+
+        $this->auditLogService->log(
+            'sales.invoice.import',
+            null,
+            "Import sales invoices: created={$created}, errors=".count($errors),
+            $request
+        );
+        AppCache::forgetAfterFinancialMutation();
+
+        return back()->with('success', "Import transaksi selesai. Baru: {$created}, Error: ".count($errors))
+            ->with('import_errors', $errors);
+    }
+
     /**
      * @param array<int, array<int, mixed>> $rows
      * @return array<int, string>
@@ -386,6 +567,17 @@ class MassImportController extends Controller
         } while (Customer::query()->where('code', $code)->exists());
 
         return $code;
+    }
+
+    private function generateInvoiceNumber(string $date): string
+    {
+        $prefix = 'INV-' . date('Ymd', strtotime($date));
+        $count = SalesInvoice::query()
+            ->whereDate('invoice_date', $date)
+            ->lockForUpdate()
+            ->count() + 1;
+
+        return sprintf('%s-%04d', $prefix, $count);
     }
 
     /**
