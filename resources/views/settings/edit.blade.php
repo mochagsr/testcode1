@@ -105,6 +105,14 @@
                                         <label>{{ __('ui.settings_company_invoice_notes') }}</label>
                                         <textarea name="company_invoice_notes" rows="12">{{ old('company_invoice_notes', $companyInvoiceNotes) }}</textarea>
                                     </div>
+                                    <div class="col-12">
+                                        <label>Template Header Report</label>
+                                        <textarea name="report_header_text" rows="3" placeholder="Contoh: FAKTUR RESMI - CV. PUSTAKA GRAFIKA">{{ old('report_header_text', $reportHeaderText ?? '') }}</textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label>Template Footer Report</label>
+                                        <textarea name="report_footer_text" rows="3" placeholder="Contoh: Barang yang sudah dibeli tidak dapat ditukar">{{ old('report_footer_text', $reportFooterText ?? '') }}</textarea>
+                                    </div>
                                 </div>
                             </div>
                         </div>

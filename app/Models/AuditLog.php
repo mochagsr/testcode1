@@ -24,6 +24,7 @@ class AuditLog extends Model
         'before_data',
         'after_data',
         'meta_data',
+        'request_id',
         'ip_address',
         'user_agent',
     ];

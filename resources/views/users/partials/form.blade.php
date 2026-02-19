@@ -54,17 +54,34 @@
             $selectedPermissions = collect(old('permissions', (array) ($user?->permissions ?? [])))
                 ->map(fn ($permission) => strtolower((string) $permission))
                 ->all();
+            $permissionGroups = collect($availablePermissions ?? [])
+                ->groupBy(function (string $permission): string {
+                    $prefix = explode('.', $permission)[0] ?? 'other';
+                    return strtoupper(str_replace('_', ' ', $prefix));
+                })
+                ->sortKeys();
         @endphp
         <div class="row" id="permission-grid-wrapper" style="{{ old('role', $user?->role ?? 'user') === 'admin' ? 'display:none;' : '' }}">
             <div class="col-12">
                 <label>Hak Akses Detail</label>
                 <div class="card" style="padding:10px;">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
-                        @foreach(($availablePermissions ?? []) as $permission)
-                            <label style="display:flex; align-items:center; gap:8px; margin:0;">
-                                <input type="checkbox" name="permissions[]" value="{{ $permission }}" @checked(in_array($permission, $selectedPermissions, true))>
-                                <span style="font-size:12px;">{{ $permission }}</span>
-                            </label>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:10px;">
+                        @foreach($permissionGroups as $groupLabel => $permissions)
+                            @php
+                                $groupKey = strtolower((string) preg_replace('/[^a-z0-9]+/', '-', (string) $groupLabel));
+                            @endphp
+                            <div class="form-section" style="margin:0;">
+                                <label style="display:flex; align-items:center; gap:8px; margin:0 0 6px 0;">
+                                    <input type="checkbox" class="permission-group-toggle" data-group="{{ $groupKey }}">
+                                    <strong style="font-size:12px;">{{ $groupLabel }}</strong>
+                                </label>
+                                @foreach($permissions as $permission)
+                                    <label style="display:flex; align-items:center; gap:8px; margin:0 0 4px 0;">
+                                        <input type="checkbox" class="permission-checkbox permission-group-{{ $groupKey }}" name="permissions[]" value="{{ $permission }}" @checked(in_array($permission, $selectedPermissions, true))>
+                                        <span style="font-size:12px;">{{ $permission }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
                         @endforeach
                     </div>
                 </div>
@@ -88,5 +105,19 @@
         };
         roleSelect.addEventListener('change', syncPermissionVisibility);
         syncPermissionVisibility();
+
+        const groupToggles = document.querySelectorAll('.permission-group-toggle');
+        groupToggles.forEach((toggle) => {
+            toggle.addEventListener('change', () => {
+                const groupName = toggle.getAttribute('data-group');
+                if (!groupName) {
+                    return;
+                }
+                const checkboxes = document.querySelectorAll('.permission-group-' + CSS.escape(groupName));
+                checkboxes.forEach((cb) => {
+                    cb.checked = toggle.checked;
+                });
+            });
+        });
     })();
 </script>

@@ -156,6 +156,7 @@ class AuditLogPageController extends Controller
                 'description',
                 'before_data',
                 'after_data',
+                'request_id',
                 'ip_address',
                 'created_at',
             ])
@@ -173,6 +174,7 @@ class AuditLogPageController extends Controller
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('action', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhere('request_id', 'like', "%{$search}%")
                         ->orWhereHas('user', function ($userQuery) use ($search): void {
                             $userQuery->where('name', 'like', "%{$search}%")
                                 ->orWhere('email', 'like', "%{$search}%");

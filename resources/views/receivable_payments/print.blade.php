@@ -54,6 +54,8 @@
         $companyPhone = trim((string) \App\Models\AppSetting::getValue('company_phone', ''));
         $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
+        $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
+        $reportFooterText = trim((string) \App\Models\AppSetting::getValue('report_footer_text', ''));
         $printNotes = trim((string) ($payment->notes ?? ''));
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
@@ -92,7 +94,7 @@
                 </div>
             </div>
             <div class="kwitansi-box">
-                <div class="kwitansi-title">KWITANSI</div>
+                <div class="kwitansi-title">{{ $reportHeaderText !== '' ? $reportHeaderText : 'KWITANSI' }}</div>
                 <div class="meta">{{ __('txn.no') }}: {{ $payment->payment_number }}</div>
                 <div class="meta">{{ __('txn.date') }}: {{ $payment->payment_date?->format('d-m-Y') }}</div>
             </div>
@@ -138,6 +140,11 @@
                 <div class="sign-name">{{ $payment->user_signature }}</div>
             </div>
         </div>
+        @if($reportFooterText !== '')
+            <div style="margin-top: 10px; border-top: 1px solid #111; padding-top: 6px; font-size: 10px;">
+                {{ $reportFooterText }}
+            </div>
+        @endif
     </div>
 </div>
 </body>

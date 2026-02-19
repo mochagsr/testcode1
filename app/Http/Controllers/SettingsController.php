@@ -36,6 +36,8 @@ class SettingsController extends Controller
             'company_invoice_notes' => '',
             'company_billing_note' => '',
             'company_transfer_accounts' => '',
+            'report_header_text' => '',
+            'report_footer_text' => '',
         ]);
 
         $rawSemesterOptions = (string) ($settings['semester_period_options'] ?? '');
@@ -101,6 +103,8 @@ class SettingsController extends Controller
             'companyInvoiceNotes' => $settings['company_invoice_notes'] ?? '',
             'companyBillingNote' => $settings['company_billing_note'] ?? '',
             'companyTransferAccounts' => $settings['company_transfer_accounts'] ?? '',
+            'reportHeaderText' => $settings['report_header_text'] ?? '',
+            'reportFooterText' => $settings['report_footer_text'] ?? '',
             'semesterPeriodOptions' => $rawSemesterOptions,
             'unitOptions' => $rawUnitOptions,
             'unitOptionRows' => $unitOptionRows,
@@ -135,6 +139,8 @@ class SettingsController extends Controller
             'company_invoice_notes' => ['nullable', 'string', 'max:2000'],
             'company_billing_note' => ['nullable', 'string', 'max:4000'],
             'company_transfer_accounts' => ['nullable', 'string', 'max:4000'],
+            'report_header_text' => ['nullable', 'string', 'max:2000'],
+            'report_footer_text' => ['nullable', 'string', 'max:2000'],
             'semester_period_options' => ['nullable', 'string', 'max:4000'],
             'semester_period_codes' => ['nullable', 'array'],
             'semester_period_codes.*' => ['nullable', 'string', 'max:30'],
@@ -251,6 +257,8 @@ class SettingsController extends Controller
                 'company_invoice_notes' => trim((string) ($data['company_invoice_notes'] ?? '')),
                 'company_billing_note' => trim((string) ($data['company_billing_note'] ?? '')),
                 'company_transfer_accounts' => trim((string) ($data['company_transfer_accounts'] ?? '')),
+                'report_header_text' => trim((string) ($data['report_header_text'] ?? '')),
+                'report_footer_text' => trim((string) ($data['report_footer_text'] ?? '')),
             ]);
             AppCache::forgetReportOptionCaches();
         }

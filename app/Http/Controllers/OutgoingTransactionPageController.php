@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Services\AuditLogService;
+use App\Services\AccountingService;
 use App\Services\SupplierLedgerService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
@@ -36,7 +37,8 @@ class OutgoingTransactionPageController extends Controller
     public function __construct(
         private readonly AuditLogService $auditLogService,
         private readonly SemesterBookService $semesterBookService,
-        private readonly SupplierLedgerService $supplierLedgerService
+        private readonly SupplierLedgerService $supplierLedgerService,
+        private readonly AccountingService $accountingService
     ) {}
 
     public function index(Request $request): View
@@ -331,6 +333,12 @@ class OutgoingTransactionPageController extends Controller
                 ['outstanding_payable' => $beforeOutstanding],
                 ['outstanding_payable' => (int) $ledger->balance_after],
                 ['supplier_id' => $supplierId]
+            );
+
+            $this->accountingService->postOutgoingTransaction(
+                transactionId: (int) $transaction->id,
+                date: $transactionDate,
+                amount: (int) round($grandTotal)
             );
 
             return $transaction;

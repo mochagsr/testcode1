@@ -13,6 +13,7 @@ use App\Models\SalesReturn;
 use App\Models\SalesReturnItem;
 use App\Models\StockMutation;
 use App\Services\AuditLogService;
+use App\Services\AccountingService;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
@@ -37,7 +38,8 @@ class SalesReturnPageController extends Controller
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService,
         private readonly AuditLogService $auditLogService,
-        private readonly SemesterBookService $semesterBookService
+        private readonly SemesterBookService $semesterBookService,
+        private readonly AccountingService $accountingService
     ) {}
 
     public function index(Request $request): View
@@ -343,6 +345,12 @@ class SalesReturnPageController extends Controller
                 amount: $total,
                 periodCode: $salesReturn->semester_period,
                 description: __('txn.return') . ' ' . $salesReturn->return_number
+            );
+
+            $this->accountingService->postSalesReturn(
+                returnId: (int) $salesReturn->id,
+                date: $returnDate,
+                amount: (int) round($total)
             );
 
             return $salesReturn;

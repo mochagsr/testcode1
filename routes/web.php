@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditLogPageController;
+use App\Http\Controllers\ApprovalRequestController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerPageController;
 use App\Http\Controllers\CustomerLevelController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ItemCategoryPageController;
 use App\Http\Controllers\MassImportController;
 use App\Http\Controllers\OrderNotePageController;
+use App\Http\Controllers\OpsHealthController;
 use App\Http\Controllers\OutgoingTransactionPageController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPageController;
@@ -235,5 +237,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::get('/audit-logs', [AuditLogPageController::class, 'index'])->middleware('perm:audit_logs.view')->name('audit-logs.index');
         Route::get('/audit-logs/export.csv', [AuditLogPageController::class, 'exportCsv'])->middleware('perm:audit_logs.view')->name('audit-logs.export.csv');
         Route::get('/semester-transactions', [SemesterTransactionPageController::class, 'index'])->middleware('perm:settings.admin')->name('semester-transactions.index');
+        Route::get('/approvals', [ApprovalRequestController::class, 'index'])->middleware('perm:settings.admin')->name('approvals.index');
+        Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware('perm:settings.admin')->name('approvals.approve');
+        Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware('perm:settings.admin')->name('approvals.reject');
+        Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
     });
 });

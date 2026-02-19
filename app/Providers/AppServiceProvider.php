@@ -19,6 +19,8 @@ use App\Observers\FinancialModelAuditObserver;
 use App\Observers\ProductAuditObserver;
 use App\Observers\SalesInvoiceAuditObserver;
 use App\Services\AuditLogService;
+use App\Services\ApprovalWorkflowService;
+use App\Services\AccountingService;
 use App\Services\ConfigurationService;
 use App\Support\PerformanceMonitor;
 use Illuminate\Pagination\Paginator;
@@ -36,6 +38,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Bind audit log service for dependency injection
         $this->app->singleton(AuditLogService::class);
+        $this->app->singleton(AccountingService::class);
+        $this->app->singleton(ApprovalWorkflowService::class);
     }
 
     /**

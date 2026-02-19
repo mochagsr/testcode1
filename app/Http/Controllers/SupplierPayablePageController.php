@@ -8,6 +8,7 @@ use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use App\Models\SupplierPayment;
 use App\Services\AuditLogService;
+use App\Services\AccountingService;
 use App\Services\SupplierLedgerService;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -23,7 +24,8 @@ class SupplierPayablePageController extends Controller
     public function __construct(
         private readonly SupplierLedgerService $supplierLedgerService,
         private readonly AuditLogService $auditLogService,
-        private readonly SemesterBookService $semesterBookService
+        private readonly SemesterBookService $semesterBookService,
+        private readonly AccountingService $accountingService
     ) {}
 
     public function index(Request $request): View
@@ -146,6 +148,12 @@ class SupplierPayablePageController extends Controller
                 ['outstanding_payable' => $beforeOutstanding],
                 ['outstanding_payable' => $afterOutstanding],
                 ['supplier_id' => (int) $supplier->id, 'payment_number' => $payment->payment_number]
+            );
+
+            $this->accountingService->postSupplierPayment(
+                paymentId: (int) $payment->id,
+                date: $paymentDate,
+                amount: (int) round($amount)
             );
 
             return $payment;

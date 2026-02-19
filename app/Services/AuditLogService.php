@@ -40,8 +40,32 @@ final class AuditLogService
             'before_data' => $beforeData,
             'after_data' => $afterData,
             'meta_data' => $metaData,
+            'request_id' => $this->resolveRequestId($request),
             'ip_address' => $request?->ip(),
             'user_agent' => $request?->userAgent(),
         ]);
+    }
+
+    private function resolveRequestId(?Request $request): string
+    {
+        $activeRequest = $request ?? request();
+        if (! $activeRequest instanceof Request) {
+            return (string) \Illuminate\Support\Str::uuid();
+        }
+
+        $headerRequestId = trim((string) $activeRequest->headers->get('X-Request-Id', ''));
+        if ($headerRequestId !== '') {
+            return substr($headerRequestId, 0, 100);
+        }
+
+        $generated = (string) $activeRequest->attributes->get('_request_id', '');
+        if ($generated !== '') {
+            return substr($generated, 0, 100);
+        }
+
+        $generated = (string) \Illuminate\Support\Str::uuid();
+        $activeRequest->attributes->set('_request_id', $generated);
+
+        return $generated;
     }
 }

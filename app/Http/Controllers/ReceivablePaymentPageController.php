@@ -9,6 +9,7 @@ use App\Models\InvoicePayment;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Services\ReceivableLedgerService;
+use App\Services\AccountingService;
 use App\Support\AppCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -21,7 +22,8 @@ use Illuminate\Support\Facades\DB;
 class ReceivablePaymentPageController extends Controller
 {
     public function __construct(
-        private readonly ReceivableLedgerService $receivableLedgerService
+        private readonly ReceivableLedgerService $receivableLedgerService,
+        private readonly AccountingService $accountingService
     ) {}
 
     public function index(Request $request): View
@@ -153,6 +155,7 @@ class ReceivablePaymentPageController extends Controller
             ]);
 
             $remaining = $amount;
+            $appliedToInvoices = 0.0;
             $invoices = SalesInvoice::query()
                 ->where('customer_id', $customer->id)
                 ->active()
@@ -212,6 +215,7 @@ class ReceivablePaymentPageController extends Controller
                 );
 
                 $remaining -= $payAmount;
+                $appliedToInvoices += $payAmount;
             }
 
             if ($remaining > 0) {
@@ -229,6 +233,13 @@ class ReceivablePaymentPageController extends Controller
                     description: __('receivable.receivable_payment', ['payment' => $payment->payment_number])
                 );
             }
+
+            $this->accountingService->postReceivablePayment(
+                paymentId: (int) $payment->id,
+                date: $paymentDate,
+                appliedAmount: (int) round($appliedToInvoices),
+                overPayment: (int) round(max(0, $remaining))
+            );
 
             return $payment;
         });

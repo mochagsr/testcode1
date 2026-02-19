@@ -64,6 +64,8 @@
         $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $companyInvoiceNotes = trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', ''));
+        $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
+        $reportFooterText = trim((string) \App\Models\AppSetting::getValue('report_footer_text', ''));
         $printNotes = trim((string) ($invoice->notes ?: $companyInvoiceNotes));
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
@@ -102,7 +104,7 @@
             </div>
         </div>
         <div class="doc-title-center">
-            <div class="doc-title">{{ __('txn.sales_invoices_title') }}</div>
+            <div class="doc-title">{{ $reportHeaderText !== '' ? $reportHeaderText : __('txn.sales_invoices_title') }}</div>
             <div class="doc-number">{{ __('txn.no') }}: {{ $invoice->invoice_number }}</div>
         </div>
         <div class="doc-meta-right">
@@ -177,6 +179,11 @@
             <td>________________</td>
         </tr>
     </table>
+    @if($reportFooterText !== '')
+        <div style="margin-top: 10px; border-top: 1px solid #111; padding-top: 6px; font-size: 10px;">
+            {{ $reportFooterText }}
+        </div>
+    @endif
 </div>
 </body>
 </html>

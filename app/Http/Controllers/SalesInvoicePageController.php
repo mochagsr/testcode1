@@ -15,6 +15,7 @@ use App\Models\SalesInvoiceItem;
 use App\Models\StockMutation;
 use App\Services\ReceivableLedgerService;
 use App\Services\AuditLogService;
+use App\Services\AccountingService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
@@ -38,7 +39,8 @@ class SalesInvoicePageController extends Controller
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService,
         private readonly AuditLogService $auditLogService,
-        private readonly SemesterBookService $semesterBookService
+        private readonly SemesterBookService $semesterBookService,
+        private readonly AccountingService $accountingService
     ) {}
 
     public function index(Request $request): View
@@ -429,6 +431,13 @@ class SalesInvoicePageController extends Controller
                     ])
                 );
             }
+
+            $this->accountingService->postSalesInvoice(
+                invoiceId: (int) $invoice->id,
+                date: $invoiceDate,
+                amount: (int) round($subtotal),
+                paymentMethod: (string) $data['payment_method']
+            );
 
             return $invoice;
         });

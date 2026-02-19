@@ -39,6 +39,7 @@
                 <th>{{ __('ui.description') }}</th>
                 <th>Before / After</th>
                 <th>{{ __('ui.ip') }}</th>
+                <th>Req ID</th>
             </tr>
             </thead>
             <tbody>
@@ -127,9 +128,10 @@
                         @endif
                     </td>
                     <td>{{ $log->ip_address ?: '-' }}</td>
+                    <td>{{ $log->request_id ?: '-' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">{{ __('ui.no_audit_logs') }}</td></tr>
+                <tr><td colspan="8" class="muted">{{ __('ui.no_audit_logs') }}</td></tr>
             @endforelse
             </tbody>
         </table>

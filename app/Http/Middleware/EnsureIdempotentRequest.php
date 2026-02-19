@@ -32,9 +32,17 @@ class EnsureIdempotentRequest
         if (!Cache::add($cacheKey, now()->timestamp, now()->addSeconds(30))) {
             return back()
                 ->withErrors(['submit' => __('ui.duplicate_submit_blocked')])
-                ->withInput();
+                ->withInput()
+                ->withHeaders(['Retry-After' => '3']);
         }
 
-        return $next($request);
+        $response = $next($request);
+
+        // Allow re-submit when request fails (validation/error), keep lock for successful processing.
+        if ((int) $response->getStatusCode() >= 400) {
+            Cache::forget($cacheKey);
+        }
+
+        return $response;
     }
 }
