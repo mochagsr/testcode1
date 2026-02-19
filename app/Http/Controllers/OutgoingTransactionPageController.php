@@ -626,9 +626,28 @@ class OutgoingTransactionPageController extends Controller
             'creator:id,name',
             'items.product:id,code,name,unit',
         ]);
+        $itemProductIds = $outgoingTransaction->items
+            ->pluck('product_id')
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
+            ->values();
+        $products = Product::query()
+            ->onlyOutgoingFormColumns()
+            ->active()
+            ->orderBy('name')
+            ->limit(50)
+            ->get();
+        if ($itemProductIds->isNotEmpty()) {
+            $itemProducts = Product::query()
+                ->onlyOutgoingFormColumns()
+                ->whereIn('id', $itemProductIds->all())
+                ->get();
+            $products = $itemProducts->concat($products)->unique('id')->values();
+        }
 
         return view('outgoing_transactions.show', [
             'transaction' => $outgoingTransaction,
+            'products' => $products,
         ]);
     }
 

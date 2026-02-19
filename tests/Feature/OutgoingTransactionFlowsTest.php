@@ -4,8 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\AppSetting;
 use App\Models\ItemCategory;
+use App\Models\OutgoingTransaction;
+use App\Models\OutgoingTransactionItem;
 use App\Models\Product;
 use App\Models\Supplier;
+use App\Models\SupplierLedger;
+use App\Models\SupplierPayment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -134,5 +138,170 @@ class OutgoingTransactionFlowsTest extends TestCase
         $this->assertDatabaseMissing('outgoing_transactions', [
             'note_number' => 'NOTA-002',
         ]);
+    }
+
+    public function test_admin_can_update_outgoing_transaction_and_rebalance_stock(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Edit',
+            'company_name' => 'PT Edit',
+            'outstanding_payable' => 60000,
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-EDIT-OT',
+            'name' => 'Kategori Edit OT',
+        ]);
+        $productA = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'OT-A',
+            'name' => 'Produk OT A',
+            'unit' => 'exp',
+            'stock' => 10,
+            'price_general' => 10000,
+            'is_active' => true,
+        ]);
+        $productB = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'OT-B',
+            'name' => 'Produk OT B',
+            'unit' => 'exp',
+            'stock' => 7,
+            'price_general' => 5000,
+            'is_active' => true,
+        ]);
+
+        $transaction = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-20260220-0001',
+            'transaction_date' => '2026-02-20',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'note_number' => 'NOTA-OLD',
+            'total' => 60000,
+            'notes' => 'Awal',
+            'created_by_user_id' => $admin->id,
+        ]);
+        OutgoingTransactionItem::query()->create([
+            'outgoing_transaction_id' => $transaction->id,
+            'product_id' => $productA->id,
+            'product_code' => $productA->code,
+            'product_name' => $productA->name,
+            'unit' => 'exp',
+            'quantity' => 6,
+            'unit_cost' => 10000,
+            'line_total' => 60000,
+        ]);
+        SupplierLedger::query()->create([
+            'supplier_id' => $supplier->id,
+            'outgoing_transaction_id' => $transaction->id,
+            'supplier_payment_id' => null,
+            'entry_date' => '2026-02-20',
+            'period_code' => 'S2-2526',
+            'description' => 'Initial outgoing',
+            'debit' => 60000,
+            'credit' => 0,
+            'balance_after' => 60000,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('outgoing-transactions.admin-update', $transaction), [
+            'transaction_date' => '2026-02-20',
+            'semester_period' => 'S2-2526',
+            'supplier_id' => $supplier->id,
+            'note_number' => 'NOTA-NEW',
+            'notes' => 'Admin edit',
+            'items' => [
+                [
+                    'product_id' => $productA->id,
+                    'product_name' => $productA->name,
+                    'unit' => 'exp',
+                    'quantity' => 4,
+                    'unit_cost' => 10000,
+                    'notes' => '',
+                ],
+                [
+                    'product_id' => $productB->id,
+                    'product_name' => $productB->name,
+                    'unit' => 'exp',
+                    'quantity' => 2,
+                    'unit_cost' => 5000,
+                    'notes' => '',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('outgoing-transactions.show', $transaction));
+        $transaction->refresh();
+        $productA->refresh();
+        $productB->refresh();
+        $supplier->refresh();
+
+        $this->assertSame(50000.0, (float) $transaction->total);
+        $this->assertSame('NOTA-NEW', (string) $transaction->note_number);
+        $this->assertSame(8.0, (float) $productA->stock);
+        $this->assertSame(9.0, (float) $productB->stock);
+        $this->assertSame(50000.0, (float) $supplier->outstanding_payable);
+    }
+
+    public function test_admin_can_update_supplier_payment_and_adjust_outstanding(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Bayar',
+            'company_name' => 'PT Bayar',
+            'outstanding_payable' => 80000,
+        ]);
+        SupplierLedger::query()->create([
+            'supplier_id' => $supplier->id,
+            'outgoing_transaction_id' => null,
+            'supplier_payment_id' => null,
+            'entry_date' => '2026-02-10',
+            'period_code' => 'S2-2526',
+            'description' => 'Initial payable',
+            'debit' => 100000,
+            'credit' => 0,
+            'balance_after' => 100000,
+        ]);
+
+        $payment = SupplierPayment::query()->create([
+            'payment_number' => 'KWTS-20260220-0002',
+            'supplier_id' => $supplier->id,
+            'payment_date' => '2026-02-20',
+            'proof_number' => 'PRF-01',
+            'amount' => 20000,
+            'amount_in_words' => 'dua puluh ribu rupiah',
+            'supplier_signature' => 'Supplier',
+            'user_signature' => 'Admin',
+            'notes' => 'Awal',
+            'created_by_user_id' => $admin->id,
+        ]);
+        SupplierLedger::query()->create([
+            'supplier_id' => $supplier->id,
+            'outgoing_transaction_id' => null,
+            'supplier_payment_id' => $payment->id,
+            'entry_date' => '2026-02-20',
+            'period_code' => 'S2-2526',
+            'description' => 'Initial payment',
+            'debit' => 0,
+            'credit' => 20000,
+            'balance_after' => 80000,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('supplier-payables.admin-update', $payment), [
+            'payment_date' => '2026-02-20',
+            'proof_number' => 'PRF-02',
+            'amount' => 30000,
+            'supplier_signature' => 'Supplier',
+            'user_signature' => 'Admin',
+            'notes' => 'Edit admin',
+        ]);
+
+        $response->assertRedirect(route('supplier-payables.show-payment', $payment));
+        $payment->refresh();
+        $supplier->refresh();
+
+        $this->assertSame(30000.0, (float) $payment->amount);
+        $this->assertSame('PRF-02', (string) $payment->proof_number);
+        $this->assertSame('Edit admin', (string) $payment->notes);
+        $this->assertSame(70000.0, (float) $supplier->outstanding_payable);
     }
 }
