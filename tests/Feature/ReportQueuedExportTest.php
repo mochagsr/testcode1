@@ -66,4 +66,48 @@ class ReportQueuedExportTest extends TestCase
             ->get(route('reports.queue.download', $task))
             ->assertOk();
     }
+
+    public function test_queue_export_enforces_pending_limit(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create(['role' => 'admin']);
+
+        foreach (range(1, 5) as $idx) {
+            ReportExportTask::query()->create([
+                'user_id' => $user->id,
+                'dataset' => 'customers',
+                'format' => 'excel',
+                'status' => 'queued',
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('reports.queue', [
+            'dataset' => 'customers',
+            'format' => 'excel',
+        ]));
+
+        $response->assertRedirect(route('reports.index'));
+        $response->assertSessionHas('error');
+        Queue::assertNothingPushed();
+    }
+
+    public function test_owner_can_cancel_queued_task(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $task = ReportExportTask::query()->create([
+            'user_id' => $user->id,
+            'dataset' => 'customers',
+            'format' => 'excel',
+            'status' => 'queued',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('reports.queue.cancel', $task));
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('report_export_tasks', [
+            'id' => $task->id,
+            'status' => 'canceled',
+        ]);
+    }
 }

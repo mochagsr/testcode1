@@ -39,6 +39,9 @@ class GenerateReportExportTaskJob implements ShouldQueue
         if ($task === null) {
             return;
         }
+        if ((string) $task->status === 'canceled') {
+            return;
+        }
 
         $task->update([
             'status' => 'processing',
@@ -78,6 +81,10 @@ class GenerateReportExportTaskJob implements ShouldQueue
 
             $fileName = $task->dataset.'-'.$printedAt->format('Ymd-His').'.'.$extension;
             $filePath = 'private/report_exports/'.(int) $task->user_id.'/'.(int) $task->id.'/'.$fileName;
+            $task->refresh();
+            if ((string) $task->status === 'canceled') {
+                return;
+            }
             Storage::disk('local')->put($filePath, $binary);
 
             $task->update([

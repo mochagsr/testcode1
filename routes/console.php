@@ -552,7 +552,23 @@ Artisan::command('app:report-exports-prune {--days=14}', function () {
     return 0;
 })->purpose('Prune old queued export files/tasks from storage and database');
 
+Artisan::command('app:report-exports-fix-stuck {--minutes=30}', function () {
+    $minutes = max(1, (int) $this->option('minutes'));
+    $threshold = now()->subMinutes($minutes);
+    $affected = ReportExportTask::query()
+        ->where('status', 'processing')
+        ->where('updated_at', '<', $threshold)
+        ->update([
+            'status' => 'failed',
+            'error_message' => "Auto fail: processing timeout > {$minutes} minutes",
+        ]);
+
+    $this->info("Fixed stuck export tasks: {$affected}");
+    return 0;
+})->purpose('Mark processing export tasks as failed when stuck for too long');
+
 Schedule::command('app:db-backup --gzip')->dailyAt('01:00');
 Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
 Schedule::command('app:integrity-check')->dailyAt('03:00');
 Schedule::command('app:report-exports-prune --days=14')->dailyAt('04:00');
+Schedule::command('app:report-exports-fix-stuck --minutes=30')->hourly();

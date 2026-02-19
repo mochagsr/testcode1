@@ -11,6 +11,7 @@ return [
     'download_pdf' => 'Download PDF',
     'open_print' => 'Open Print View',
     'export_queued_success' => 'Export has been queued. Check queue export table below.',
+    'export_queue_limit_reached' => 'Too many queued exports. Please wait until current tasks are completed.',
     'print_save_pdf' => 'Print / Save as PDF',
     'printed' => 'Printed',
     'no_data' => 'No data.',

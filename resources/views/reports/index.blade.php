@@ -109,6 +109,14 @@
                                     @csrf
                                     <button type="submit" class="btn secondary">Retry</button>
                                 </form>
+                            @elseif(in_array($task->status, ['queued', 'processing'], true))
+                                <span class="muted">Menunggu...</span>
+                                <form method="post" action="{{ route('reports.queue.cancel', $task) }}" style="display:inline;">
+                                    @csrf
+                                    <button type="submit" class="btn secondary">Batal</button>
+                                </form>
+                            @elseif($task->status === 'canceled')
+                                <span class="muted">Dibatalkan</span>
                             @else
                                 <span class="muted">Menunggu...</span>
                             @endif
@@ -127,6 +135,7 @@
             if (!tableBody) return;
             const statusUrl = @json(route('reports.queue.status'));
             const retryUrlTemplate = @json(route('reports.queue.retry', ['task' => '__TASK__']));
+            const cancelUrlTemplate = @json(route('reports.queue.cancel', ['task' => '__TASK__']));
             const csrf = @json(csrf_token());
 
             const renderRows = (rows) => {
@@ -146,9 +155,18 @@
                                 <input type="hidden" name="_token" value="${csrf}">
                                 <button type="submit" class="btn secondary">Retry</button>
                             </form>`;
+                    } else if (status === 'QUEUED' || status === 'PROCESSING') {
+                        const cancelUrl = cancelUrlTemplate.replace('__TASK__', String(row.id));
+                        actionHtml = `<span class="muted">Menunggu...</span>
+                            <form method="post" action="${cancelUrl}" style="display:inline;">
+                                <input type="hidden" name="_token" value="${csrf}">
+                                <button type="submit" class="btn secondary">Batal</button>
+                            </form>`;
+                    } else if (status === 'CANCELED') {
+                        actionHtml = `<span class="muted">Dibatalkan</span>`;
                     }
                     return `<tr>
-                        <td>${row.dataset}</td>
+                        <td>${row.dataset_label || row.dataset}</td>
                         <td>${row.format}</td>
                         <td>${status}</td>
                         <td>${row.created_at || '-'}</td>
@@ -170,6 +188,5 @@
         })();
     </script>
 @endsection
-
 
 

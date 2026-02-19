@@ -34,6 +34,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportExportController extends Controller
 {
+    private const MAX_PENDING_EXPORT_TASKS_PER_USER = 5;
+
     public function __construct(
         private readonly SemesterBookService $semesterBookService
     ) {}
@@ -80,9 +82,23 @@ class ReportExportController extends Controller
 
     public function queueExport(Request $request, string $dataset, string $format)
     {
+        if (! array_key_exists($dataset, $this->datasets())) {
+            abort(404);
+        }
+
         $normalizedFormat = strtolower(trim($format));
         if (! in_array($normalizedFormat, ['pdf', 'excel'], true)) {
             abort(404);
+        }
+
+        $pendingTaskCount = ReportExportTask::query()
+            ->where('user_id', (int) $request->user()->id)
+            ->whereIn('status', ['queued', 'processing'])
+            ->count();
+        if ($pendingTaskCount >= self::MAX_PENDING_EXPORT_TASKS_PER_USER) {
+            return redirect()
+                ->route('reports.index', $request->query())
+                ->with('error', __('report.export_queue_limit_reached'));
         }
 
         $task = ReportExportTask::create([
@@ -125,13 +141,16 @@ class ReportExportController extends Controller
             ->limit(20)
             ->get(['id', 'dataset', 'format', 'status', 'file_name', 'error_message', 'created_at'])
             ->map(function (ReportExportTask $task): array {
+                $datasetKey = (string) $task->dataset;
                 return [
                     'id' => (int) $task->id,
-                    'dataset' => (string) $task->dataset,
+                    'dataset' => $datasetKey,
+                    'dataset_label' => $this->datasets()[$datasetKey] ?? $datasetKey,
                     'format' => strtoupper((string) $task->format),
                     'status' => strtoupper((string) $task->status),
                     'created_at' => $task->created_at?->format('d-m-Y H:i'),
                     'download_url' => (string) route('reports.queue.download', $task),
+                    'cancel_url' => (string) route('reports.queue.cancel', $task),
                     'error_message' => (string) ($task->error_message ?: ''),
                 ];
             })
@@ -156,6 +175,21 @@ class ReportExportController extends Controller
         GenerateReportExportTaskJob::dispatch((int) $task->id)->onQueue('exports');
 
         return back()->with('success', 'Retry export dimasukkan ke antrian.');
+    }
+
+    public function cancelQueuedExport(Request $request, ReportExportTask $task)
+    {
+        $this->authorizeTaskAccess($request, $task);
+        if (! in_array((string) $task->status, ['queued', 'processing'], true)) {
+            return back()->with('error', 'Task tidak bisa dibatalkan.');
+        }
+
+        $task->update([
+            'status' => 'canceled',
+            'error_message' => null,
+        ]);
+
+        return back()->with('success', 'Task export dibatalkan.');
     }
 
     public function exportCsv(Request $request, string $dataset): StreamedResponse
