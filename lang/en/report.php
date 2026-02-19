@@ -35,6 +35,7 @@ return [
         'semester' => 'Semester',
         'customer' => 'Customer',
         'supplier' => 'Supplier',
+        'type' => 'Type',
     ],
     'columns' => [
         'invoice_no' => 'Invoice No',
@@ -71,6 +72,10 @@ return [
         'semester' => 'Semester',
         'outstanding_receivable' => 'Outstanding Receivable',
         'created_by' => 'Created By',
+        'account' => 'Account',
+        'type' => 'Type',
+        'debit' => 'Debit',
+        'credit' => 'Credit',
     ],
     'datasets' => [
         'products' => 'Products',
@@ -82,6 +87,9 @@ return [
         'delivery_notes' => 'Delivery Notes',
         'order_notes' => 'Order Notes',
         'outgoing_transactions' => 'Outgoing Transactions',
+        'income_statement' => 'Income Statement',
+        'balance_sheet' => 'Balance Sheet',
+        'semester_transactions' => 'Semester Transactions',
     ],
     'titles' => [
         'products' => 'Products Report',
@@ -93,6 +101,9 @@ return [
         'delivery_notes' => 'Delivery Notes Report',
         'order_notes' => 'Order Notes Report',
         'outgoing_transactions' => 'Outgoing Transactions Report',
+        'income_statement' => 'Income Statement',
+        'balance_sheet' => 'Balance Sheet',
+        'semester_transactions' => 'Semester Transactions Report',
     ],
     'values' => [
         'role_admin' => 'Admin',

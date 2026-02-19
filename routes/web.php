@@ -26,6 +26,7 @@ use App\Http\Controllers\SemesterTransactionPageController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupplierPageController;
 use App\Http\Controllers\SupplierPayablePageController;
+use App\Http\Controllers\TransactionCorrectionWizardController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -155,6 +156,12 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::post('/receivable-payments/{receivablePayment}/cancel', [ReceivablePaymentPageController::class, 'cancel'])
         ->middleware(['admin', 'semester.open'])
         ->name('receivable-payments.cancel');
+    Route::get('/transaction-corrections/create', [TransactionCorrectionWizardController::class, 'create'])
+        ->middleware('perm:transactions.view')
+        ->name('transaction-corrections.create');
+    Route::post('/transaction-corrections', [TransactionCorrectionWizardController::class, 'store'])
+        ->middleware('perm:transactions.create')
+        ->name('transaction-corrections.store');
 
     Route::get('/reports', [ReportExportController::class, 'index'])->middleware('perm:reports.view')->name('reports.index');
     Route::get('/reports/{dataset}/csv', [ReportExportController::class, 'exportCsv'])->middleware('perm:reports.export')->name('reports.export.csv');
@@ -237,6 +244,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::get('/audit-logs', [AuditLogPageController::class, 'index'])->middleware('perm:audit_logs.view')->name('audit-logs.index');
         Route::get('/audit-logs/export.csv', [AuditLogPageController::class, 'exportCsv'])->middleware('perm:audit_logs.view')->name('audit-logs.export.csv');
         Route::get('/semester-transactions', [SemesterTransactionPageController::class, 'index'])->middleware('perm:settings.admin')->name('semester-transactions.index');
+        Route::post('/semester-transactions/bulk-action', [SemesterTransactionPageController::class, 'bulkAction'])->middleware('perm:settings.admin')->name('semester-transactions.bulk-action');
         Route::get('/approvals', [ApprovalRequestController::class, 'index'])->middleware('perm:settings.admin')->name('approvals.index');
         Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware('perm:settings.admin')->name('approvals.approve');
         Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware('perm:settings.admin')->name('approvals.reject');

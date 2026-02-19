@@ -35,7 +35,11 @@
         <input type="email" name="email" value="{{ old('email') }}" required>
 
         <label>{{ __('ui.password') }} <span class="label-required">*</span></label>
-        <input type="password" name="password" required>
+        <input id="login-password-input" type="password" name="password" required>
+        <label style="display:flex; align-items:center; gap:6px; margin: -6px 0 12px 0;">
+            <input id="toggle-login-password" type="checkbox" style="width:auto; margin:0;">
+            Lihat password
+        </label>
 
         <label style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
             <input type="checkbox" name="remember" value="1" style="width:auto; margin:0;">
@@ -46,5 +50,17 @@
         <div class="hint">{{ __('ui.login_hint') }}</div>
     </form>
 </div>
+<script>
+    (function () {
+        const passwordInput = document.getElementById('login-password-input');
+        const toggle = document.getElementById('toggle-login-password');
+        if (!passwordInput || !toggle) {
+            return;
+        }
+        toggle.addEventListener('change', () => {
+            passwordInput.type = toggle.checked ? 'text' : 'password';
+        });
+    })();
+</script>
 </body>
 </html>

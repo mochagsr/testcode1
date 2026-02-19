@@ -11,7 +11,10 @@ use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\AppSetting;
 use App\Models\ReportExportTask;
+use App\Models\JournalEntry;
+use App\Models\JournalEntryLine;
 use App\Support\SemesterBookService;
+use App\Services\AccountingService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -313,12 +316,22 @@ Artisan::command('app:db-backup {--path=} {--gzip}', function () {
 })->purpose('Create database backup file');
 
 Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
+    $startedAt = microtime(true);
     $connection = config('database.default');
     $config = config("database.connections.{$connection}");
     $driver = (string) ($config['driver'] ?? '');
 
     if ($driver !== 'mysql') {
         $this->warn('Restore test currently supported for MySQL only.');
+        DB::table('restore_drill_logs')->insert([
+            'backup_file' => null,
+            'status' => 'skipped',
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'message' => 'Restore test skipped (non-mysql driver).',
+            'tested_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         return 0;
     }
 
@@ -332,6 +345,15 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
     }
     if ($file === '' || !File::exists($file)) {
         $this->error('No SQL backup file found for restore test.');
+        DB::table('restore_drill_logs')->insert([
+            'backup_file' => $file !== '' ? $file : null,
+            'status' => 'failed',
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'message' => 'No SQL backup file found.',
+            'tested_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         return 1;
     }
 
@@ -353,6 +375,15 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
     exec($dropCreate, $o1, $e1);
     if ($e1 !== 0) {
         $this->error('Failed preparing temporary database.');
+        DB::table('restore_drill_logs')->insert([
+            'backup_file' => $file,
+            'status' => 'failed',
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'message' => 'Failed preparing temporary database.',
+            'tested_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         return 1;
     }
 
@@ -379,12 +410,100 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
 
     if ($e2 !== 0) {
         $this->error('Restore test failed.');
+        DB::table('restore_drill_logs')->insert([
+            'backup_file' => $file,
+            'status' => 'failed',
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'message' => 'Restore command failed.',
+            'tested_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         return 1;
     }
 
+    DB::table('restore_drill_logs')->insert([
+        'backup_file' => $file,
+        'status' => 'passed',
+        'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        'message' => 'Restore test passed.',
+        'tested_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
     $this->info('Restore test passed for backup: ' . $file);
     return 0;
 })->purpose('Run restore validation test on latest backup');
+
+Artisan::command('app:financial-rebuild {--rebuild-journal}', function () {
+    $customerUpdated = 0;
+    Customer::query()->select(['id'])->orderBy('id')->chunkById(200, function ($rows) use (&$customerUpdated): void {
+        foreach ($rows as $row) {
+            $balance = (int) round((float) SalesInvoice::query()
+                ->where('customer_id', (int) $row->id)
+                ->where('is_canceled', false)
+                ->sum('balance'));
+            Customer::query()->whereKey((int) $row->id)->update(['outstanding_receivable' => max(0, $balance)]);
+            $customerUpdated++;
+        }
+    });
+
+    $supplierUpdated = 0;
+    Supplier::query()->select(['id'])->orderBy('id')->chunkById(200, function ($rows) use (&$supplierUpdated): void {
+        foreach ($rows as $row) {
+            $balance = (int) round((float) SupplierLedger::query()
+                ->where('supplier_id', (int) $row->id)
+                ->sum(DB::raw('debit - credit')));
+            Supplier::query()->whereKey((int) $row->id)->update(['outstanding_payable' => max(0, $balance)]);
+            $supplierUpdated++;
+        }
+    });
+
+    $journalRebuilt = false;
+    if ((bool) $this->option('rebuild-journal')) {
+        DB::transaction(function () use (&$journalRebuilt): void {
+            JournalEntryLine::query()->delete();
+            JournalEntry::query()->delete();
+            /** @var AccountingService $accounting */
+            $accounting = app(AccountingService::class);
+
+            SalesInvoice::query()->orderBy('invoice_date')->orderBy('id')->chunkById(200, function ($invoices) use ($accounting): void {
+                foreach ($invoices as $invoice) {
+                    if ((bool) $invoice->is_canceled) {
+                        continue;
+                    }
+                    $method = ((float) $invoice->total_paid >= (float) $invoice->total && (float) $invoice->total > 0) ? 'tunai' : 'kredit';
+                    $accounting->postSalesInvoice((int) $invoice->id, Carbon::parse((string) $invoice->invoice_date), (int) round((float) $invoice->total), $method);
+                }
+            });
+            SalesReturn::query()->orderBy('return_date')->orderBy('id')->chunkById(200, function ($returns) use ($accounting): void {
+                foreach ($returns as $return) {
+                    if ((bool) $return->is_canceled) {
+                        continue;
+                    }
+                    $accounting->postSalesReturn((int) $return->id, Carbon::parse((string) $return->return_date), (int) round((float) $return->total));
+                }
+            });
+            OutgoingTransaction::query()->orderBy('transaction_date')->orderBy('id')->chunkById(200, function ($rows) use ($accounting): void {
+                foreach ($rows as $row) {
+                    $accounting->postOutgoingTransaction((int) $row->id, Carbon::parse((string) $row->transaction_date), (int) round((float) $row->total));
+                }
+            });
+            SupplierPayment::query()->orderBy('payment_date')->orderBy('id')->chunkById(200, function ($rows) use ($accounting): void {
+                foreach ($rows as $row) {
+                    if ((bool) $row->is_canceled) {
+                        continue;
+                    }
+                    $accounting->postSupplierPayment((int) $row->id, Carbon::parse((string) $row->payment_date), (int) round((float) $row->amount));
+                }
+            });
+            $journalRebuilt = true;
+        });
+    }
+
+    $this->info("Financial rebuild selesai. customers={$customerUpdated}, suppliers={$supplierUpdated}, journals_rebuilt=".($journalRebuilt ? 'yes' : 'no'));
+    return 0;
+})->purpose('Rebuild financial aggregates (customer/supplier) and optional journal rebuild');
 
 Artisan::command('app:load-test-light {--loops=50}', function () {
     $loops = max(1, (int) $this->option('loops'));
@@ -570,5 +689,6 @@ Artisan::command('app:report-exports-fix-stuck {--minutes=30}', function () {
 Schedule::command('app:db-backup --gzip')->dailyAt('01:00');
 Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
 Schedule::command('app:integrity-check')->dailyAt('03:00');
+Schedule::command('app:financial-rebuild')->dailyAt('03:30');
 Schedule::command('app:report-exports-prune --days=14')->dailyAt('04:00');
 Schedule::command('app:report-exports-fix-stuck --minutes=30')->hourly();

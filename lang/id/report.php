@@ -35,6 +35,7 @@ return [
         'semester' => 'Semester',
         'customer' => 'Customer',
         'supplier' => 'Supplier',
+        'type' => 'Tipe',
     ],
     'columns' => [
         'invoice_no' => 'No Faktur',
@@ -71,6 +72,10 @@ return [
         'semester' => 'Semester',
         'outstanding_receivable' => 'Sisa Piutang',
         'created_by' => 'Dibuat Oleh',
+        'account' => 'Akun',
+        'type' => 'Tipe',
+        'debit' => 'Debit',
+        'credit' => 'Kredit',
     ],
     'datasets' => [
         'products' => 'Barang',
@@ -82,6 +87,9 @@ return [
         'delivery_notes' => 'Surat Jalan',
         'order_notes' => 'Surat Pesanan',
         'outgoing_transactions' => 'Transaksi Keluar',
+        'income_statement' => 'Laba Rugi',
+        'balance_sheet' => 'Neraca',
+        'semester_transactions' => 'Transaksi Semester',
     ],
     'titles' => [
         'products' => 'Laporan Barang',
@@ -93,6 +101,9 @@ return [
         'delivery_notes' => 'Laporan Surat Jalan',
         'order_notes' => 'Laporan Surat Pesanan',
         'outgoing_transactions' => 'Laporan Transaksi Keluar',
+        'income_statement' => 'Laporan Laba Rugi',
+        'balance_sheet' => 'Laporan Neraca',
+        'semester_transactions' => 'Laporan Transaksi Semester',
     ],
     'values' => [
         'role_admin' => 'Admin',

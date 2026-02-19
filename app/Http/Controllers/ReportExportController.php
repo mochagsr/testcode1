@@ -48,6 +48,7 @@ class ReportExportController extends Controller
         $selectedUserRole = $this->selectedUserRole($request);
         $selectedFinanceLock = $this->selectedFinanceLock($request);
         $selectedOutgoingSupplierId = $this->selectedOutgoingSupplierId($request);
+        $selectedTransactionType = $this->selectedTransactionType($request);
         $receivableCustomers = Cache::remember(AppCache::lookupCacheKey('reports.receivable_customers.options'), $now->copy()->addSeconds(60), function () {
             return Customer::query()
                 ->onlyOptionColumns()
@@ -68,8 +69,9 @@ class ReportExportController extends Controller
             'selectedUserRole' => $selectedUserRole,
             'selectedFinanceLock' => $selectedFinanceLock,
             'selectedOutgoingSupplierId' => $selectedOutgoingSupplierId,
+            'selectedTransactionType' => $selectedTransactionType,
             'semesterOptions' => $this->semesterOptions(),
-            'semesterEnabledDatasets' => ['sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'receivables', 'outgoing_transactions'],
+            'semesterEnabledDatasets' => ['sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'receivables', 'outgoing_transactions', 'balance_sheet', 'income_statement', 'semester_transactions'],
             'receivableCustomers' => $receivableCustomers,
             'outgoingSuppliers' => $outgoingSuppliers,
             'exportTasks' => ReportExportTask::query()
@@ -113,6 +115,7 @@ class ReportExportController extends Controller
                 'user_role' => $this->selectedUserRole($request),
                 'finance_lock' => $this->selectedFinanceLock($request),
                 'outgoing_supplier_id' => $this->selectedOutgoingSupplierId($request),
+                'transaction_type' => $this->selectedTransactionType($request),
             ],
         ]);
 
@@ -200,7 +203,7 @@ class ReportExportController extends Controller
         $selectedUserRole = $this->selectedUserRole($request);
         $selectedFinanceLock = $this->selectedFinanceLock($request);
         $selectedOutgoingSupplierId = $this->selectedOutgoingSupplierId($request);
-        $report = $this->reportData($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock, $selectedCustomerIds, $selectedOutgoingSupplierId);
+        $report = $this->reportData($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock, $selectedCustomerIds, $selectedOutgoingSupplierId, $this->selectedTransactionType($request));
         $printedAt = $this->nowWib();
         $filename = $dataset . '-' . $printedAt->format('Ymd-His') . '.xlsx';
 
@@ -327,7 +330,8 @@ class ReportExportController extends Controller
             $this->selectedUserRole($request),
             $this->selectedFinanceLock($request),
             $this->selectedCustomerIds($request),
-            $this->selectedOutgoingSupplierId($request)
+            $this->selectedOutgoingSupplierId($request),
+            $this->selectedTransactionType($request)
         );
 
         return view('reports.print', [
@@ -352,7 +356,8 @@ class ReportExportController extends Controller
             $this->selectedUserRole($request),
             $this->selectedFinanceLock($request),
             $this->selectedCustomerIds($request),
-            $this->selectedOutgoingSupplierId($request)
+            $this->selectedOutgoingSupplierId($request),
+            $this->selectedTransactionType($request)
         );
         $filename = $dataset . '-' . $printedAt->format('Ymd-His') . '.pdf';
 
@@ -386,6 +391,9 @@ class ReportExportController extends Controller
             'delivery_notes' => __('report.datasets.delivery_notes'),
             'order_notes' => __('report.datasets.order_notes'),
             'outgoing_transactions' => __('report.datasets.outgoing_transactions'),
+            'income_statement' => __('report.datasets.income_statement'),
+            'balance_sheet' => __('report.datasets.balance_sheet'),
+            'semester_transactions' => __('report.datasets.semester_transactions'),
         ];
     }
 
@@ -418,6 +426,8 @@ class ReportExportController extends Controller
             strtolower(__('report.columns.price_agent')),
             strtolower(__('report.columns.price_sales')),
             strtolower(__('report.columns.price_general')),
+            strtolower(__('report.columns.debit')),
+            strtolower(__('report.columns.credit')),
         ];
 
         return $headers;
@@ -450,7 +460,8 @@ class ReportExportController extends Controller
         ?string $selectedUserRole = null,
         ?int $selectedFinanceLock = null,
         array $selectedCustomerIds = [],
-        ?int $selectedOutgoingSupplierId = null
+        ?int $selectedOutgoingSupplierId = null,
+        ?string $selectedTransactionType = null
     ): array {
         $semesterRange = $this->semesterDateRange($selectedSemester);
         $receivableSemesterCodes = $dataset === 'receivables'
@@ -869,6 +880,149 @@ class ReportExportController extends Controller
                         ->all();
                 },
             ],
+            'income_statement' => [
+                'title' => __('report.titles.income_statement'),
+                'headers' => [
+                    __('report.columns.account'),
+                    __('report.columns.type'),
+                    __('report.columns.debit'),
+                    __('report.columns.credit'),
+                    __('report.columns.balance'),
+                ],
+                'rows' => function () use ($semesterRange): array {
+                    $query = DB::table('journal_entry_lines as jl')
+                        ->join('journal_entries as je', 'je.id', '=', 'jl.journal_entry_id')
+                        ->join('accounts as a', 'a.id', '=', 'jl.account_id')
+                        ->whereIn('a.type', ['revenue', 'expense'])
+                        ->selectRaw('a.code, a.name, a.type, COALESCE(SUM(jl.debit),0) as debit_total, COALESCE(SUM(jl.credit),0) as credit_total')
+                        ->groupBy('a.code', 'a.name', 'a.type')
+                        ->orderBy('a.code');
+
+                    if ($semesterRange !== null) {
+                        $query->whereBetween('je.entry_date', [$semesterRange['start'], $semesterRange['end']]);
+                    }
+
+                    return $query->get()->map(function ($row): array {
+                        $debit = (int) round((float) $row->debit_total);
+                        $credit = (int) round((float) $row->credit_total);
+                        $balance = $credit - $debit;
+                        return [
+                            "{$row->code} - {$row->name}",
+                            ucfirst((string) $row->type),
+                            $debit,
+                            $credit,
+                            $balance,
+                        ];
+                    })->all();
+                },
+            ],
+            'balance_sheet' => [
+                'title' => __('report.titles.balance_sheet'),
+                'headers' => [
+                    __('report.columns.account'),
+                    __('report.columns.type'),
+                    __('report.columns.balance'),
+                ],
+                'rows' => function () use ($semesterRange): array {
+                    $query = DB::table('journal_entry_lines as jl')
+                        ->join('journal_entries as je', 'je.id', '=', 'jl.journal_entry_id')
+                        ->join('accounts as a', 'a.id', '=', 'jl.account_id')
+                        ->whereIn('a.type', ['asset', 'liability', 'equity'])
+                        ->selectRaw('a.code, a.name, a.type, COALESCE(SUM(jl.debit),0) as debit_total, COALESCE(SUM(jl.credit),0) as credit_total')
+                        ->groupBy('a.code', 'a.name', 'a.type')
+                        ->orderBy('a.type')
+                        ->orderBy('a.code');
+
+                    if ($semesterRange !== null) {
+                        $query->whereBetween('je.entry_date', [$semesterRange['start'], $semesterRange['end']]);
+                    }
+
+                    return $query->get()->map(function ($row): array {
+                        $debit = (int) round((float) $row->debit_total);
+                        $credit = (int) round((float) $row->credit_total);
+                        $balance = in_array((string) $row->type, ['liability', 'equity'], true)
+                            ? ($credit - $debit)
+                            : ($debit - $credit);
+                        return [
+                            "{$row->code} - {$row->name}",
+                            ucfirst((string) $row->type),
+                            $balance,
+                        ];
+                    })->all();
+                },
+            ],
+            'semester_transactions' => [
+                'title' => __('report.titles.semester_transactions'),
+                'headers' => [
+                    __('report.columns.date'),
+                    __('report.columns.type'),
+                    __('report.columns.note_no'),
+                    __('report.columns.customer'),
+                    __('report.columns.city'),
+                    __('report.columns.total'),
+                    __('report.columns.status'),
+                ],
+                'rows' => function () use ($selectedSemester, $selectedTransactionType): array {
+                    $semester = $selectedSemester ?? $this->semesterBookService()->currentSemester();
+                    $semesterRange = $this->semesterDateRange($semester);
+                    if ($semesterRange === null) {
+                        return [];
+                    }
+                    $start = Carbon::parse($semesterRange['start']);
+                    $end = Carbon::parse($semesterRange['end']);
+                    $type = $selectedTransactionType ?? 'all';
+
+                    $invoiceQuery = DB::table('sales_invoices as si')
+                        ->leftJoin('customers as c', 'c.id', '=', 'si.customer_id')
+                        ->selectRaw("'sales_invoice' as tx_type, si.id as tx_id, si.invoice_date as tx_date, si.invoice_number as tx_number, COALESCE(c.name, '-') as party_name, COALESCE(c.city, '-') as city, si.total as amount, si.is_canceled as is_canceled")
+                        ->where('si.semester_period', $semester);
+                    $returnQuery = DB::table('sales_returns as sr')
+                        ->leftJoin('customers as c', 'c.id', '=', 'sr.customer_id')
+                        ->selectRaw("'sales_return' as tx_type, sr.id as tx_id, sr.return_date as tx_date, sr.return_number as tx_number, COALESCE(c.name, '-') as party_name, COALESCE(c.city, '-') as city, sr.total as amount, sr.is_canceled as is_canceled")
+                        ->where('sr.semester_period', $semester);
+                    $deliveryQuery = DB::table('delivery_notes as dn')
+                        ->selectRaw("'delivery_note' as tx_type, dn.id as tx_id, dn.note_date as tx_date, dn.note_number as tx_number, COALESCE(dn.recipient_name, '-') as party_name, COALESCE(dn.city, '-') as city, NULL as amount, dn.is_canceled as is_canceled")
+                        ->whereBetween('dn.note_date', [$start, $end]);
+                    $orderQuery = DB::table('order_notes as onote')
+                        ->selectRaw("'order_note' as tx_type, onote.id as tx_id, onote.note_date as tx_date, onote.note_number as tx_number, COALESCE(onote.customer_name, '-') as party_name, COALESCE(onote.city, '-') as city, NULL as amount, onote.is_canceled as is_canceled")
+                        ->whereBetween('onote.note_date', [$start, $end]);
+                    $outgoingQuery = DB::table('outgoing_transactions as ot')
+                        ->leftJoin('suppliers as s', 's.id', '=', 'ot.supplier_id')
+                        ->selectRaw("'outgoing_transaction' as tx_type, ot.id as tx_id, ot.transaction_date as tx_date, ot.transaction_number as tx_number, COALESCE(s.name, s.company_name, '-') as party_name, '-' as city, ot.total as amount, 0 as is_canceled")
+                        ->where('ot.semester_period', $semester);
+                    $receivablePaymentQuery = DB::table('receivable_payments as rp')
+                        ->leftJoin('customers as c', 'c.id', '=', 'rp.customer_id')
+                        ->selectRaw("'receivable_payment' as tx_type, rp.id as tx_id, rp.payment_date as tx_date, rp.payment_number as tx_number, COALESCE(c.name, '-') as party_name, COALESCE(c.city, '-') as city, rp.amount as amount, rp.is_canceled as is_canceled")
+                        ->whereBetween('rp.payment_date', [$start, $end]);
+
+                    $union = $invoiceQuery
+                        ->unionAll($returnQuery)
+                        ->unionAll($deliveryQuery)
+                        ->unionAll($orderQuery)
+                        ->unionAll($outgoingQuery)
+                        ->unionAll($receivablePaymentQuery);
+                    $query = DB::query()->fromSub($union, 'semester_transactions');
+                    if ($type !== 'all' && in_array($type, ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)) {
+                        $query->where('tx_type', $type);
+                    }
+
+                    return $query->orderByDesc('tx_date')
+                        ->orderByDesc('tx_id')
+                        ->get()
+                        ->map(function ($row): array {
+                            return [
+                                $row->tx_date ? Carbon::parse((string) $row->tx_date)->format('d-m-Y') : '-',
+                                (string) $row->tx_type,
+                                (string) $row->tx_number,
+                                (string) $row->party_name,
+                                (string) $row->city,
+                                $row->amount === null ? 0 : (int) round((float) $row->amount),
+                                ((bool) $row->is_canceled) ? __('txn.status_canceled') : __('txn.status_active'),
+                            ];
+                        })
+                        ->all();
+                },
+            ],
             default => abort(404),
         };
     }
@@ -883,9 +1037,10 @@ class ReportExportController extends Controller
         ?string $selectedUserRole = null,
         ?int $selectedFinanceLock = null,
         array $selectedCustomerIds = [],
-        ?int $selectedOutgoingSupplierId = null
+        ?int $selectedOutgoingSupplierId = null,
+        ?string $selectedTransactionType = null
     ): array {
-        $config = $this->datasetConfig($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock, $selectedCustomerIds, $selectedOutgoingSupplierId);
+        $config = $this->datasetConfig($dataset, $selectedSemester, $selectedCustomerId, $selectedUserRole, $selectedFinanceLock, $selectedCustomerIds, $selectedOutgoingSupplierId, $selectedTransactionType);
         $rows = $config['rows']();
         $headers = $config['headers'];
         $layout = $config['layout'] ?? null;
@@ -918,6 +1073,30 @@ class ReportExportController extends Controller
         }
         if ($dataset === 'receivables') {
             $filters = $this->receivableFilters($selectedSemester, $selectedCustomerId);
+        }
+        if ($dataset === 'income_statement' || $dataset === 'balance_sheet') {
+            $filters = [[
+                'label' => __('report.filters.semester'),
+                'value' => $selectedSemester ?? __('report.all_semesters'),
+            ]];
+        }
+        if ($dataset === 'semester_transactions') {
+            $filters = [
+                [
+                    'label' => __('report.filters.semester'),
+                    'value' => $selectedSemester ?? __('report.all_semesters'),
+                ],
+                [
+                    'label' => __('report.filters.type'),
+                    'value' => $selectedTransactionType ?? 'all',
+                ],
+            ];
+        }
+        if ($dataset === 'income_statement') {
+            $summary = $this->incomeStatementSummary($selectedSemester);
+        }
+        if ($dataset === 'balance_sheet') {
+            $summary = $this->balanceSheetSummary($selectedSemester);
         }
 
         return [
@@ -993,6 +1172,78 @@ class ReportExportController extends Controller
         }
 
         return in_array($raw, ['0', '1'], true) ? (int) $raw : null;
+    }
+
+    /**
+     * @return array<int, array{label:string,value:int|float,type:string}>
+     */
+    private function incomeStatementSummary(?string $selectedSemester): array
+    {
+        $range = $this->semesterDateRange($selectedSemester);
+        $query = DB::table('journal_entry_lines as jl')
+            ->join('journal_entries as je', 'je.id', '=', 'jl.journal_entry_id')
+            ->join('accounts as a', 'a.id', '=', 'jl.account_id')
+            ->whereIn('a.type', ['revenue', 'expense'])
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN a.type='revenue' THEN jl.credit - jl.debit ELSE 0 END),0) as revenue_total,
+                COALESCE(SUM(CASE WHEN a.type='expense' THEN jl.debit - jl.credit ELSE 0 END),0) as expense_total
+            ");
+        if ($range !== null) {
+            $query->whereBetween('je.entry_date', [$range['start'], $range['end']]);
+        }
+        $row = $query->first();
+        $revenue = (int) round((float) ($row->revenue_total ?? 0));
+        $expense = (int) round((float) ($row->expense_total ?? 0));
+        $net = $revenue - $expense;
+
+        return [
+            ['label' => 'Total Pendapatan', 'value' => $revenue, 'type' => 'currency'],
+            ['label' => 'Total Beban', 'value' => $expense, 'type' => 'currency'],
+            ['label' => 'Laba / Rugi Bersih', 'value' => $net, 'type' => 'currency'],
+        ];
+    }
+
+    /**
+     * @return array<int, array{label:string,value:int|float,type:string}>
+     */
+    private function balanceSheetSummary(?string $selectedSemester): array
+    {
+        $range = $this->semesterDateRange($selectedSemester);
+        $query = DB::table('journal_entry_lines as jl')
+            ->join('journal_entries as je', 'je.id', '=', 'jl.journal_entry_id')
+            ->join('accounts as a', 'a.id', '=', 'jl.account_id')
+            ->whereIn('a.type', ['asset', 'liability', 'equity'])
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN a.type='asset' THEN jl.debit - jl.credit ELSE 0 END),0) as asset_total,
+                COALESCE(SUM(CASE WHEN a.type='liability' THEN jl.credit - jl.debit ELSE 0 END),0) as liability_total,
+                COALESCE(SUM(CASE WHEN a.type='equity' THEN jl.credit - jl.debit ELSE 0 END),0) as equity_total
+            ");
+        if ($range !== null) {
+            $query->whereBetween('je.entry_date', [$range['start'], $range['end']]);
+        }
+        $row = $query->first();
+        $asset = (int) round((float) ($row->asset_total ?? 0));
+        $liability = (int) round((float) ($row->liability_total ?? 0));
+        $equity = (int) round((float) ($row->equity_total ?? 0));
+
+        return [
+            ['label' => 'Total Aset', 'value' => $asset, 'type' => 'currency'],
+            ['label' => 'Total Liabilitas', 'value' => $liability, 'type' => 'currency'],
+            ['label' => 'Total Ekuitas', 'value' => $equity, 'type' => 'currency'],
+            ['label' => 'Liabilitas + Ekuitas', 'value' => $liability + $equity, 'type' => 'currency'],
+        ];
+    }
+
+    private function selectedTransactionType(Request $request): ?string
+    {
+        $type = strtolower(trim((string) $request->string('transaction_type', '')));
+        if ($type === '') {
+            return null;
+        }
+
+        return in_array($type, ['all', 'sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)
+            ? $type
+            : null;
     }
 
     /**

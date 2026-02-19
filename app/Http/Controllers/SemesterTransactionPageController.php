@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\SalesInvoice;
 use App\Support\SemesterBookService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -69,6 +71,90 @@ class SemesterTransactionPageController extends Controller
             'selectedType' => $selectedType,
             'search' => $search,
         ]);
+    }
+
+    public function bulkAction(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'semester' => ['required', 'string', 'max:30'],
+            'type' => ['nullable', 'string', 'max:40'],
+            'action' => ['required', 'in:close_customer_all,open_customer_all,close_supplier_all,open_supplier_all,export_print,export_pdf,export_excel'],
+            'search' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $semester = $this->semesterBookService->normalizeSemester((string) $data['semester']);
+        if ($semester === null) {
+            return back()->withErrors(['semester' => __('ui.invalid_semester_format')]);
+        }
+
+        $action = (string) $data['action'];
+        if (str_starts_with($action, 'export_')) {
+            $dataset = $this->reportDatasetFromType((string) ($data['type'] ?? 'all'));
+            $route = match ($action) {
+                'export_print' => 'reports.print',
+                'export_pdf' => 'reports.export.pdf',
+                default => 'reports.export.csv',
+            };
+
+            return redirect()->route($route, [
+                'dataset' => $dataset,
+                'semester' => $semester,
+                'transaction_type' => (string) ($data['type'] ?? 'all'),
+            ]);
+        }
+
+        $affected = 0;
+        if ($action === 'close_customer_all' || $action === 'open_customer_all') {
+            $customerIds = SalesInvoice::query()
+                ->where('semester_period', $semester)
+                ->distinct()
+                ->pluck('customer_id')
+                ->filter(fn ($id): bool => (int) $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->values();
+
+            foreach ($customerIds as $customerId) {
+                if ($action === 'close_customer_all') {
+                    $this->semesterBookService->closeCustomerSemester($customerId, $semester);
+                } else {
+                    $this->semesterBookService->openCustomerSemester($customerId, $semester);
+                }
+                $affected++;
+            }
+
+            return redirect()->route('semester-transactions.index', [
+                'semester' => $semester,
+                'type' => $data['type'] ?? 'all',
+                'search' => $data['search'] ?? '',
+            ])->with('success', "Bulk action selesai. Customer terproses: {$affected}");
+        }
+
+        if ($action === 'close_supplier_all' || $action === 'open_supplier_all') {
+            $supplierIds = DB::table('outgoing_transactions')
+                ->where('semester_period', $semester)
+                ->distinct()
+                ->pluck('supplier_id')
+                ->filter(fn ($id): bool => (int) $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->values();
+
+            foreach ($supplierIds as $supplierId) {
+                if ($action === 'close_supplier_all') {
+                    $this->semesterBookService->closeSupplierSemester($supplierId, $semester);
+                } else {
+                    $this->semesterBookService->openSupplierSemester($supplierId, $semester);
+                }
+                $affected++;
+            }
+
+            return redirect()->route('semester-transactions.index', [
+                'semester' => $semester,
+                'type' => $data['type'] ?? 'all',
+                'search' => $data['search'] ?? '',
+            ])->with('success', "Bulk action selesai. Supplier terproses: {$affected}");
+        }
+
+        return back()->withErrors(['action' => 'Aksi bulk tidak dikenali.']);
     }
 
     private function buildQuery(string $semester, Carbon $start, Carbon $end): \Illuminate\Database\Query\Builder
@@ -210,5 +296,18 @@ class SemesterTransactionPageController extends Controller
             ->unique()
             ->sortDesc()
             ->values();
+    }
+
+    private function reportDatasetFromType(string $type): string
+    {
+        return match ($type) {
+            'sales_invoice' => 'sales_invoices',
+            'sales_return' => 'sales_returns',
+            'delivery_note' => 'delivery_notes',
+            'order_note' => 'order_notes',
+            'outgoing_transaction' => 'outgoing_transactions',
+            'receivable_payment' => 'receivables',
+            default => 'semester_transactions',
+        };
     }
 }

@@ -58,6 +58,7 @@ class GenerateReportExportTaskJob implements ShouldQueue
                 isset($filters['finance_lock']) && $filters['finance_lock'] !== '' ? (int) $filters['finance_lock'] : null,
                 $this->toIntArray($filters['customer_ids'] ?? []),
                 $this->toNullableInt($filters['outgoing_supplier_id'] ?? null),
+                $this->toNullableString($filters['transaction_type'] ?? null),
             );
             $printedAt = now('Asia/Jakarta');
 

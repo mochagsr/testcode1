@@ -46,6 +46,31 @@
     </div>
 
     <div class="card">
+        <form method="post" action="{{ route('semester-transactions.bulk-action') }}" class="row inline" style="align-items:end;">
+            @csrf
+            <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+            <input type="hidden" name="type" value="{{ $selectedType }}">
+            <input type="hidden" name="search" value="{{ $search }}">
+            <div class="col-8">
+                <label for="bulk-action">{{ __('txn.action_menu') }} (Bulk)</label>
+                <select id="bulk-action" name="action" required>
+                    <option value="" selected disabled>Pilih aksi</option>
+                    <option value="close_customer_all">Tutup semester semua customer ({{ $selectedSemester }})</option>
+                    <option value="open_customer_all">Buka semester semua customer ({{ $selectedSemester }})</option>
+                    <option value="close_supplier_all">Tutup semester semua supplier ({{ $selectedSemester }})</option>
+                    <option value="open_supplier_all">Buka semester semua supplier ({{ $selectedSemester }})</option>
+                    <option value="export_print">Export Print (bulk)</option>
+                    <option value="export_pdf">Export PDF (bulk)</option>
+                    <option value="export_excel">Export Excel (bulk)</option>
+                </select>
+            </div>
+            <div class="col-4 flex" style="justify-content:flex-end;">
+                <button type="submit">Jalankan Bulk</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
         <table>
             <thead>
                 <tr>

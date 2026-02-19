@@ -33,6 +33,17 @@
                 <option value="1" @selected($selectedFinanceLock === 1)>{{ __('report.finance_lock_yes') }}</option>
                 <option value="0" @selected($selectedFinanceLock === 0)>{{ __('report.finance_lock_no') }}</option>
             </select>
+            <label for="transaction_type" style="min-width: 130px; align-self: center;">{{ __('report.filters.type') }}</label>
+            <select id="transaction_type" name="transaction_type" style="max-width: 180px;">
+                <option value="" @selected($selectedTransactionType === null)>All</option>
+                <option value="all" @selected($selectedTransactionType === 'all')>All</option>
+                <option value="sales_invoice" @selected($selectedTransactionType === 'sales_invoice')>Sales Invoice</option>
+                <option value="sales_return" @selected($selectedTransactionType === 'sales_return')>Sales Return</option>
+                <option value="delivery_note" @selected($selectedTransactionType === 'delivery_note')>Delivery Note</option>
+                <option value="order_note" @selected($selectedTransactionType === 'order_note')>Order Note</option>
+                <option value="outgoing_transaction" @selected($selectedTransactionType === 'outgoing_transaction')>Outgoing</option>
+                <option value="receivable_payment" @selected($selectedTransactionType === 'receivable_payment')>Receivable Payment</option>
+            </select>
             <button type="submit">{{ __('report.apply_filter') }}</button>
         </form>
         <p class="muted" style="margin-top: -4px;">
@@ -61,6 +72,9 @@
                     if ($key === 'users') {
                         $query['user_role'] = $selectedUserRole;
                         $query['finance_lock'] = $selectedFinanceLock;
+                    }
+                    if ($key === 'semester_transactions') {
+                        $query['transaction_type'] = $selectedTransactionType;
                     }
                 @endphp
                 <tr>
@@ -188,5 +202,4 @@
         })();
     </script>
 @endsection
-
 

@@ -67,6 +67,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.invoice') }} {{ $invoice->invoice_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('sales-invoices.index') }}">{{ __('txn.back') }}</a>
+            <a class="btn secondary" href="{{ route('transaction-corrections.create', ['type' => 'sales_invoice', 'id' => $invoice->id]) }}">Wizard Koreksi</a>
             @if($isAdminUser)
                 <button type="button" class="btn secondary" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @elseif($requiresAdminToEdit)
