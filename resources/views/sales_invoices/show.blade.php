@@ -90,6 +90,12 @@
                 <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $invoice->customer->name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $invoice->customer->city }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $invoice->customer->phone ?: '-' }}</div></div>
+                <div class="col-4"><strong>{{ __('school_bulk.bill_to') }}</strong><div>{{ $invoice->customer->name }}</div></div>
+                <div class="col-4"><strong>{{ __('school_bulk.ship_to') }}</strong><div>{{ $invoice->ship_to_name ?: '-' }}</div></div>
+                <div class="col-4"><strong>{{ __('school_bulk.school_name') }}</strong><div>{{ $invoice->shipLocation?->school_name ?: ($invoice->ship_to_name ?: '-') }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $invoice->ship_to_phone ?: '-' }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $invoice->ship_to_city ?: '-' }}</div></div>
+                <div class="col-12"><strong>{{ __('txn.address') }}</strong><div>{{ $invoice->ship_to_address ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.invoice_date') }}</strong><div>{{ $invoice->invoice_date->format('d-m-Y') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.semester_period') }}</strong><div>{{ $invoice->semester_period ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.status') }}</strong><div>{{ $transactionStatusLabel }}</div></div>
@@ -227,6 +233,22 @@
                                     <option value="{{ $semester }}" @selected(old('semester_period', $invoice->semester_period) === $semester)>{{ $semester }}</option>
                                 @endforeach
                             </select>
+                        </div>
+                        <div class="col-3">
+                            <label>{{ __('school_bulk.ship_to') }}</label>
+                            <input type="text" name="ship_to_name" value="{{ old('ship_to_name', $invoice->ship_to_name) }}" maxlength="150">
+                        </div>
+                        <div class="col-3">
+                            <label>{{ __('txn.phone') }}</label>
+                            <input type="text" name="ship_to_phone" value="{{ old('ship_to_phone', $invoice->ship_to_phone) }}" maxlength="30">
+                        </div>
+                        <div class="col-3">
+                            <label>{{ __('txn.city') }}</label>
+                            <input type="text" name="ship_to_city" value="{{ old('ship_to_city', $invoice->ship_to_city) }}" maxlength="100">
+                        </div>
+                        <div class="col-12">
+                            <label>{{ __('txn.address') }}</label>
+                            <textarea name="ship_to_address" rows="2">{{ old('ship_to_address', $invoice->ship_to_address) }}</textarea>
                         </div>
                         <div class="col-12">
                             <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">

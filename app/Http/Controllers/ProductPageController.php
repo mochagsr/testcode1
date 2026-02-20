@@ -6,7 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesProductUnits;
 use App\Models\ItemCategory;
+use App\Models\OutgoingTransaction;
 use App\Models\Product;
+use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
+use App\Models\StockMutation;
 use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
@@ -15,6 +19,9 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -126,6 +133,17 @@ class ProductPageController extends Controller
         $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name']);
         $data['is_active'] = true;
         $product = Product::create($data);
+        if ((int) $product->stock > 0) {
+            StockMutation::query()->create([
+                'product_id' => (int) $product->id,
+                'reference_type' => Product::class,
+                'reference_id' => (int) $product->id,
+                'mutation_type' => 'in',
+                'quantity' => (int) $product->stock,
+                'notes' => __('ui.stock_mutation_initial_stock'),
+                'created_by_user_id' => $request->user()?->id,
+            ]);
+        }
         $this->auditLogService->log('master.product.create', $product, "Product created: {$product->code}", $request);
         AppCache::forgetAfterFinancialMutation();
 
@@ -134,13 +152,22 @@ class ProductPageController extends Controller
             ->with('success', __('ui.product_created_success'));
     }
 
-    public function edit(Product $product): View
+    public function edit(Request $request, Product $product): View
     {
+        $stockMutations = $product->stockMutations()
+            ->with('creator:id,name')
+            ->latest('id')
+            ->paginate((int) config('pagination.default_per_page', 20), ['*'], 'mutation_page')
+            ->withQueryString();
+        $mutationReferenceMap = $this->buildStockMutationReferenceMap($stockMutations);
+
         return view('products.edit', [
             'product' => $product,
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
             'unitOptions' => $this->configuredProductUnitOptions(),
             'defaultUnit' => $this->defaultProductUnitCode(),
+            'stockMutations' => $stockMutations,
+            'mutationReferenceMap' => $mutationReferenceMap,
         ]);
     }
 
@@ -154,7 +181,34 @@ class ProductPageController extends Controller
         $data = $this->validatePayload($request, $product->id);
         $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name'], $product->id);
         $data['is_active'] = true;
-        $product->update($data);
+
+        DB::transaction(function () use (&$product, $data, $request): void {
+            $lockedProduct = Product::query()
+                ->whereKey($product->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $oldStock = (int) $lockedProduct->stock;
+            $newStock = (int) ($data['stock'] ?? 0);
+            $lockedProduct->update($data);
+
+            if ($newStock !== $oldStock) {
+                $delta = $newStock - $oldStock;
+                StockMutation::query()->create([
+                    'product_id' => (int) $lockedProduct->id,
+                    'reference_type' => Product::class,
+                    'reference_id' => (int) $lockedProduct->id,
+                    'mutation_type' => $delta > 0 ? 'in' : 'out',
+                    'quantity' => abs($delta),
+                    'notes' => $delta > 0
+                        ? __('ui.stock_mutation_manual_add_note')
+                        : __('ui.stock_mutation_manual_reduce_note'),
+                    'created_by_user_id' => $request->user()?->id,
+                ]);
+            }
+
+            $product = $lockedProduct;
+        });
         $this->auditLogService->log('master.product.update', $product, "Product updated: {$product->code}", $request);
         AppCache::forgetAfterFinancialMutation();
 
@@ -197,6 +251,78 @@ class ProductPageController extends Controller
         ], [
             'code.unique' => __('ui.product_code_unique_error'),
         ]);
+    }
+
+    /**
+     * @return array<string, array{number:string, url:string}>
+     */
+    private function buildStockMutationReferenceMap(LengthAwarePaginator $paginator): array
+    {
+        /** @var Collection<int, StockMutation> $mutations */
+        $mutations = collect($paginator->items());
+        $idsByType = [
+            SalesInvoice::class => [],
+            SalesReturn::class => [],
+            OutgoingTransaction::class => [],
+        ];
+
+        foreach ($mutations as $mutation) {
+            $type = (string) ($mutation->reference_type ?? '');
+            $referenceId = (int) ($mutation->reference_id ?? 0);
+            if ($referenceId <= 0 || ! array_key_exists($type, $idsByType)) {
+                continue;
+            }
+            $idsByType[$type][] = $referenceId;
+        }
+
+        $map = [];
+        $salesInvoices = collect();
+        if ($idsByType[SalesInvoice::class] !== []) {
+            $salesInvoices = SalesInvoice::query()
+                ->select(['id', 'invoice_number'])
+                ->whereIn('id', array_values(array_unique($idsByType[SalesInvoice::class])))
+                ->get()
+                ->keyBy('id');
+        }
+
+        $salesReturns = collect();
+        if ($idsByType[SalesReturn::class] !== []) {
+            $salesReturns = SalesReturn::query()
+                ->select(['id', 'return_number'])
+                ->whereIn('id', array_values(array_unique($idsByType[SalesReturn::class])))
+                ->get()
+                ->keyBy('id');
+        }
+
+        $outgoingTransactions = collect();
+        if ($idsByType[OutgoingTransaction::class] !== []) {
+            $outgoingTransactions = OutgoingTransaction::query()
+                ->select(['id', 'transaction_number'])
+                ->whereIn('id', array_values(array_unique($idsByType[OutgoingTransaction::class])))
+                ->get()
+                ->keyBy('id');
+        }
+
+        foreach ($salesInvoices as $invoice) {
+            $map[SalesInvoice::class.'#'.(int) $invoice->id] = [
+                'number' => (string) $invoice->invoice_number,
+                'url' => route('sales-invoices.show', $invoice),
+            ];
+        }
+        foreach ($salesReturns as $salesReturn) {
+            $map[SalesReturn::class.'#'.(int) $salesReturn->id] = [
+                'number' => (string) $salesReturn->return_number,
+                'url' => route('sales-returns.show', $salesReturn),
+            ];
+        }
+        foreach ($outgoingTransactions as $transaction) {
+            $map[OutgoingTransaction::class.'#'.(int) $transaction->id] = [
+                'number' => (string) $transaction->transaction_number,
+                'url' => route('outgoing-transactions.show', $transaction),
+            ];
+        }
+
+        return $map;
     }
 
 }

@@ -112,10 +112,11 @@
             <div><strong>{{ __('txn.due_date') }}</strong> : {{ $invoice->due_date?->format('d-m-Y') ?: '-' }}</div>
             <div><strong>{{ __('txn.payment_method') }}</strong> : {{ $paymentMethodLabel }}</div>
             <div><strong>{{ __('txn.semester_period') }}</strong> : {{ $invoice->semester_period ?: '-' }}</div>
-            <div><strong>{{ __('txn.name') }}</strong> : {{ $invoice->customer?->name ?: '-' }}</div>
-            <div><strong>{{ __('txn.phone') }}</strong> : {{ $invoice->customer?->phone ?: '-' }}</div>
-            <div><strong>{{ __('txn.address') }}</strong> : {{ $invoice->customer?->address ?: '-' }}</div>
-            <div><strong>{{ __('txn.city') }}</strong> : {{ $invoice->customer?->city ?: '-' }}</div>
+            <div><strong>{{ __('school_bulk.bill_to') }}</strong> : {{ $invoice->customer?->name ?: '-' }}</div>
+            <div><strong>{{ __('school_bulk.ship_to') }}</strong> : {{ $invoice->ship_to_name ?: '-' }}</div>
+            <div><strong>{{ __('txn.phone') }}</strong> : {{ $invoice->ship_to_phone ?: ($invoice->customer?->phone ?: '-') }}</div>
+            <div><strong>{{ __('txn.address') }}</strong> : {{ $invoice->ship_to_address ?: ($invoice->customer?->address ?: '-') }}</div>
+            <div><strong>{{ __('txn.city') }}</strong> : {{ $invoice->ship_to_city ?: ($invoice->customer?->city ?: '-') }}</div>
         </div>
     </div>
     @if($invoice->is_canceled)

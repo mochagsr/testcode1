@@ -12,6 +12,9 @@
         label { display:block; margin-bottom:6px; font-size:14px; }
         .label-required { color:#c0392b; font-weight:700; }
         input { width:100%; box-sizing:border-box; border:1px solid #ccc; border-radius:8px; padding:10px; margin-bottom:12px; }
+        .password-wrap { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+        .password-wrap input { margin-bottom:0; }
+        .password-wrap button { width:auto; padding:10px 12px; border-radius:8px; background:#2f2f2f; color:#fff; border:none; white-space:nowrap; cursor:pointer; }
         button { width:100%; border:none; border-radius:8px; padding:10px; background:#111; color:#fff; cursor:pointer; }
         .error { background:#fff0f0; border:1px solid #f1a5a5; border-radius:8px; padding:10px; margin-bottom:10px; }
         .hint { margin-top:10px; font-size:12px; color:#666; }
@@ -35,11 +38,10 @@
         <input type="email" name="email" value="{{ old('email') }}" required>
 
         <label>{{ __('ui.password') }} <span class="label-required">*</span></label>
-        <input id="login-password-input" type="password" name="password" required>
-        <label style="display:flex; align-items:center; gap:6px; margin: -6px 0 12px 0;">
-            <input id="toggle-login-password" type="checkbox" style="width:auto; margin:0;">
-            Lihat password
-        </label>
+        <div class="password-wrap">
+            <input id="login-password-input" type="password" name="password" required>
+            <button id="toggle-login-password" type="button" aria-controls="login-password-input" aria-label="Tampilkan password">Tampilkan</button>
+        </div>
 
         <label style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
             <input type="checkbox" name="remember" value="1" style="width:auto; margin:0;">
@@ -57,8 +59,11 @@
         if (!passwordInput || !toggle) {
             return;
         }
-        toggle.addEventListener('change', () => {
-            passwordInput.type = toggle.checked ? 'text' : 'password';
+        toggle.addEventListener('click', () => {
+            const show = passwordInput.type === 'password';
+            passwordInput.type = show ? 'text' : 'password';
+            toggle.textContent = show ? 'Sembunyikan' : 'Tampilkan';
+            toggle.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
         });
     })();
 </script>

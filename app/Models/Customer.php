@@ -90,6 +90,22 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<CustomerShipLocation, $this>
+     */
+    public function shipLocations(): HasMany
+    {
+        return $this->hasMany(CustomerShipLocation::class)->orderBy('school_name');
+    }
+
+    /**
+     * @return HasMany<SchoolBulkTransaction, $this>
+     */
+    public function schoolBulkTransactions(): HasMany
+    {
+        return $this->hasMany(SchoolBulkTransaction::class);
+    }
+
+    /**
      * Scope: Only select essential columns for list views.
      *
      * @param  Builder<Customer>  $query

@@ -5,6 +5,7 @@ use App\Http\Controllers\AuditLogPageController;
 use App\Http\Controllers\ApprovalRequestController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerPageController;
+use App\Http\Controllers\CustomerShipLocationPageController;
 use App\Http\Controllers\CustomerLevelController;
 use App\Http\Controllers\CustomerLevelPageController;
 use App\Http\Controllers\DashboardController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\ReceivablePaymentPageController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\SalesInvoicePageController;
 use App\Http\Controllers\SalesReturnPageController;
+use App\Http\Controllers\SchoolBulkTransactionPageController;
 use App\Http\Controllers\SemesterTransactionPageController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupplierPageController;
@@ -168,6 +170,22 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::post('/transaction-corrections/preview-stock', [TransactionCorrectionWizardController::class, 'stockImpactPreview'])
         ->middleware('perm:transactions.correction.request')
         ->name('transaction-corrections.preview-stock');
+
+    Route::get('/customer-ship-locations', [CustomerShipLocationPageController::class, 'index'])->middleware('perm:transactions.view')->name('customer-ship-locations.index');
+    Route::get('/customer-ship-locations/create', [CustomerShipLocationPageController::class, 'create'])->middleware('perm:transactions.create')->name('customer-ship-locations.create');
+    Route::post('/customer-ship-locations', [CustomerShipLocationPageController::class, 'store'])->middleware('perm:transactions.create')->name('customer-ship-locations.store');
+    Route::get('/customer-ship-locations/{customerShipLocation}/edit', [CustomerShipLocationPageController::class, 'edit'])->middleware('perm:transactions.create')->name('customer-ship-locations.edit');
+    Route::put('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'update'])->middleware('perm:transactions.create')->name('customer-ship-locations.update');
+    Route::delete('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'destroy'])->middleware('perm:transactions.create')->name('customer-ship-locations.destroy');
+    Route::get('/customer-ship-locations/lookup', [CustomerShipLocationPageController::class, 'lookup'])->middleware('perm:transactions.create')->name('customer-ship-locations.lookup');
+
+    Route::get('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'index'])->middleware('perm:transactions.view')->name('school-bulk-transactions.index');
+    Route::get('/school-bulk-transactions/create', [SchoolBulkTransactionPageController::class, 'create'])->middleware('perm:transactions.create')->name('school-bulk-transactions.create');
+    Route::post('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'store'])->middleware(['semester.open', 'idempotent'])->name('school-bulk-transactions.store');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}', [SchoolBulkTransactionPageController::class, 'show'])->middleware('perm:transactions.view')->name('school-bulk-transactions.show');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/print', [SchoolBulkTransactionPageController::class, 'print'])->middleware('perm:transactions.export')->name('school-bulk-transactions.print');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/pdf', [SchoolBulkTransactionPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('school-bulk-transactions.export.pdf');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/excel', [SchoolBulkTransactionPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('school-bulk-transactions.export.excel');
 
     Route::get('/reports', [ReportExportController::class, 'index'])->middleware('perm:reports.view')->name('reports.index');
     Route::get('/reports/{dataset}/csv', [ReportExportController::class, 'exportCsv'])->middleware('perm:reports.export')->name('reports.export.csv');

@@ -22,6 +22,7 @@ class SalesInvoice extends Model
     protected $fillable = [
         'invoice_number',
         'customer_id',
+        'customer_ship_location_id',
         'invoice_date',
         'due_date',
         'semester_period',
@@ -30,6 +31,10 @@ class SalesInvoice extends Model
         'total_paid',
         'balance',
         'payment_status',
+        'ship_to_name',
+        'ship_to_phone',
+        'ship_to_city',
+        'ship_to_address',
         'notes',
         'is_canceled',
         'canceled_at',
@@ -61,6 +66,14 @@ class SalesInvoice extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * @return BelongsTo<CustomerShipLocation, $this>
+     */
+    public function shipLocation(): BelongsTo
+    {
+        return $this->belongsTo(CustomerShipLocation::class, 'customer_ship_location_id');
     }
 
     /**

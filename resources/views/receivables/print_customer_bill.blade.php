@@ -180,6 +180,44 @@
         </tbody>
     </table>
 
+    @if(($schoolBreakdown ?? collect())->isNotEmpty())
+        <div style="margin-top: 12px; font-weight: 700;">{{ __('receivable.school_breakdown_title') }}</div>
+        @foreach($schoolBreakdown as $group)
+            <div style="margin-top: 8px; font-weight: 700;">
+                {{ __('receivable.school_name') }}: {{ $group['school_name'] ?? '-' }}
+                ({{ __('receivable.school_city') }}: {{ $group['school_city'] ?? '-' }})
+            </div>
+            <table style="margin-top: 4px;">
+                <thead>
+                <tr>
+                    <th style="width: 16%;">{{ __('receivable.bill_date') }}</th>
+                    <th style="width: 28%;">{{ __('receivable.bill_proof_number') }}</th>
+                    <th style="width: 18%;">{{ __('receivable.school_invoice_total') }}</th>
+                    <th style="width: 18%;">{{ __('receivable.school_paid_total') }}</th>
+                    <th style="width: 20%;">{{ __('receivable.school_balance_total') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach(($group['rows'] ?? collect()) as $row)
+                    <tr>
+                        <td>{{ $row['date_label'] ?? '-' }}</td>
+                        <td>{{ $row['invoice_number'] ?? '-' }}</td>
+                        <td class="num">{{ number_format((int) round((float) ($row['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">{{ number_format((int) round((float) ($row['paid_total'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">{{ number_format((int) round((float) ($row['balance_total'] ?? 0)), 0, ',', '.') }}</td>
+                    </tr>
+                @endforeach
+                <tr class="total-row">
+                    <td colspan="2" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
+                    <td class="num">{{ number_format((int) round((float) (($group['totals']['invoice_total'] ?? 0))), 0, ',', '.') }}</td>
+                    <td class="num">{{ number_format((int) round((float) (($group['totals']['paid_total'] ?? 0))), 0, ',', '.') }}</td>
+                    <td class="num">{{ number_format((int) round((float) (($group['totals']['balance_total'] ?? 0))), 0, ',', '.') }}</td>
+                </tr>
+                </tbody>
+            </table>
+        @endforeach
+    @endif
+
     @if($notesText !== '')
         <div class="notes-wrap">
             <div class="notes-title">{{ __('receivable.note_label') }} :</div>

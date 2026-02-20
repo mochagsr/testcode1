@@ -39,19 +39,33 @@
                             $oldCustomerId = old('customer_id');
                             $oldCustomerLabel = $oldCustomerId && $customerMap->has($oldCustomerId)
                                 ? $customerMap[$oldCustomerId]->name.' ('.($customerMap[$oldCustomerId]->city ?: '-').')'
-                                : old('recipient_name', '');
+                                : '';
                         @endphp
                         <input type="text"
                                id="customer-search"
-                               name="recipient_name"
                                list="customers-list"
                                value="{{ $oldCustomerLabel }}"
                                placeholder="{{ __('txn.no_linked_customer') }}"
                                required>
+                        <input type="hidden" id="recipient_name" name="recipient_name" value="{{ old('recipient_name') }}">
                         <input type="hidden" id="customer_id" name="customer_id" value="{{ $oldCustomerId }}">
                         <datalist id="customers-list">
                             @foreach($customers as $customer)
                                 <option value="{{ $customer->name }} ({{ $customer->city ?: '-' }})"></option>
+                            @endforeach
+                        </datalist>
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('school_bulk.ship_to_school') }}</label>
+                        <input type="text"
+                               id="ship-location-search"
+                               list="ship-locations-list"
+                               value="{{ old('ship_location_label') }}"
+                               placeholder="{{ __('school_bulk.school_name') }}">
+                        <input type="hidden" id="customer_ship_location_id" name="customer_ship_location_id" value="{{ old('customer_ship_location_id') }}">
+                        <datalist id="ship-locations-list">
+                            @foreach($shipLocations as $shipLocation)
+                                <option value="{{ $shipLocation->school_name }}{{ $shipLocation->city ? ' ('.$shipLocation->city.')' : '' }}"></option>
                             @endforeach
                         </datalist>
                     </div>
@@ -101,29 +115,39 @@
 
     <script>
         let customers = @json($customers->values());
+        let shipLocations = @json($shipLocations->values());
         let products = @json($products);
         let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
         let customerByLabel = new Map();
         let customerByName = new Map();
+        let shipByLabel = new Map();
+        let shipByName = new Map();
         let productByLabel = new Map();
         let productByCode = new Map();
         let productByName = new Map();
         const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
+        const SHIP_LOCATION_LOOKUP_URL = @json(route('customer-ship-locations.lookup'));
         const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
         const LOOKUP_LIMIT = 20;
         const tbody = document.querySelector('#items-table tbody');
         const productsList = document.getElementById('products-list');
         const customersList = document.getElementById('customers-list');
+        const shipLocationsList = document.getElementById('ship-locations-list');
         const addBtn = document.getElementById('add-item');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
+        const recipientNameField = document.getElementById('recipient_name');
+        const shipLocationSearch = document.getElementById('ship-location-search');
+        const shipLocationIdField = document.getElementById('customer_ship_location_id');
         const recipientPhoneField = document.getElementById('recipient_phone');
         const cityField = document.getElementById('city');
         const addressField = document.getElementById('address');
         const SEARCH_DEBOUNCE_MS = 100;
         let customerLookupAbort = null;
+        let shipLookupAbort = null;
         let productLookupAbort = null;
         let lastCustomerLookupQuery = '';
+        let lastShipLookupQuery = '';
         let lastProductLookupQuery = '';
 
         function normalizeLookup(value) {
@@ -148,6 +172,13 @@
             rebuildCustomerIndexes();
         }
 
+        function upsertShipLocations(rows) {
+            const byId = new Map(shipLocations.map((row) => [String(row.id), row]));
+            (rows || []).forEach((row) => byId.set(String(row.id), row));
+            shipLocations = Array.from(byId.values());
+            rebuildShipIndexes();
+        }
+
         function upsertProducts(rows) {
             const byId = new Map(products.map((row) => [String(row.id), row]));
             (rows || []).forEach((row) => byId.set(String(row.id), row));
@@ -161,6 +192,20 @@
             customers.forEach((customer) => {
                 customerByLabel.set(normalizeLookup(customerLabel(customer)), customer);
                 customerByName.set(normalizeLookup(customer.name), customer);
+            });
+        }
+
+        function shipLocationLabel(location) {
+            const city = location.city || '';
+            return city !== '' ? `${location.school_name} (${city})` : `${location.school_name}`;
+        }
+
+        function rebuildShipIndexes() {
+            shipByLabel = new Map();
+            shipByName = new Map();
+            shipLocations.forEach((location) => {
+                shipByLabel.set(normalizeLookup(shipLocationLabel(location)), location);
+                shipByName.set(normalizeLookup(location.school_name), location);
             });
         }
 
@@ -197,6 +242,23 @@
                 .join('');
         }
 
+        function renderShipLocationSuggestions(query) {
+            if (!shipLocationsList) {
+                return;
+            }
+            const normalized = (query || '').trim().toLowerCase();
+            const matches = shipLocations.filter((location) => {
+                const label = shipLocationLabel(location).toLowerCase();
+                const name = (location.school_name || '').toLowerCase();
+                const city = (location.city || '').toLowerCase();
+                return normalized === '' || label.includes(normalized) || name.includes(normalized) || city.includes(normalized);
+            }).slice(0, 60);
+
+            shipLocationsList.innerHTML = matches
+                .map((location) => `<option value="${escapeAttribute(shipLocationLabel(location))}"></option>`)
+                .join('');
+        }
+
         async function fetchCustomerSuggestions(query) {
             const normalizedQuery = normalizeLookup(query);
             if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
@@ -229,6 +291,44 @@
             }
         }
 
+        async function fetchShipLocationSuggestions(query) {
+            const customerId = Number(customerIdField.value || 0);
+            if (customerId <= 0) {
+                renderShipLocationSuggestions(query);
+                return;
+            }
+
+            const normalizedQuery = normalizeLookup(query);
+            if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                lastShipLookupQuery = '';
+                renderShipLocationSuggestions(query);
+                return;
+            }
+            if (normalizedQuery !== '' && normalizedQuery === lastShipLookupQuery) {
+                renderShipLocationSuggestions(query);
+                return;
+            }
+            try {
+                if (shipLookupAbort) {
+                    shipLookupAbort.abort();
+                }
+                shipLookupAbort = new AbortController();
+                const url = `${SHIP_LOCATION_LOOKUP_URL}?customer_id=${customerId}&search=${encodeURIComponent(query)}&per_page=${LOOKUP_LIMIT}`;
+                const response = await fetch(url, { signal: shipLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) {
+                    return;
+                }
+                const payload = await response.json();
+                lastShipLookupQuery = normalizedQuery;
+                upsertShipLocations(payload.data || []);
+                renderShipLocationSuggestions(query);
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+            }
+        }
+
         function findCustomerByLabel(label) {
             if (!label) {
                 return null;
@@ -249,18 +349,72 @@
                 || null;
         }
 
+        function findShipLocationByLabel(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = normalizeLookup(label);
+            return shipByLabel.get(normalized)
+                || shipByName.get(normalized)
+                || null;
+        }
+
+        function findShipLocationLoose(label) {
+            if (!label) {
+                return null;
+            }
+            const normalized = String(label).trim().toLowerCase();
+            return shipLocations.find((location) => shipLocationLabel(location).toLowerCase().includes(normalized))
+                || shipLocations.find((location) => String(location.school_name || '').toLowerCase().includes(normalized))
+                || null;
+        }
+
         function getCustomerById(id) {
             return customerById.get(String(id)) || null;
         }
 
         function applyCustomerFields(customer) {
             customerIdField.value = customer ? customer.id : '';
+            if (recipientNameField) {
+                recipientNameField.value = customer ? (customer.name || '') : '';
+            }
             if (!customer) {
                 return;
             }
             if (recipientPhoneField) recipientPhoneField.value = customer.phone || '';
             if (cityField) cityField.value = customer.city || '';
             if (addressField) addressField.value = customer.address || '';
+        }
+
+        function applyShipLocationFields(location) {
+            if (!shipLocationIdField) {
+                return;
+            }
+            shipLocationIdField.value = location ? location.id : '';
+            if (!location) {
+                return;
+            }
+            if (recipientNameField) {
+                recipientNameField.value = location.school_name || location.recipient_name || recipientNameField.value || '';
+            }
+            if (recipientPhoneField) {
+                recipientPhoneField.value = location.recipient_phone || recipientPhoneField.value || '';
+            }
+            if (cityField) {
+                cityField.value = location.city || cityField.value || '';
+            }
+            if (addressField) {
+                addressField.value = location.address || addressField.value || '';
+            }
+        }
+
+        function resetShipLocationSelection() {
+            if (shipLocationSearch) {
+                shipLocationSearch.value = '';
+            }
+            if (shipLocationIdField) {
+                shipLocationIdField.value = '';
+            }
         }
 
         function productLabel(product) {
@@ -397,25 +551,59 @@
                 : findCustomerByLabel(customerSearch.value);
             applyCustomerFields(bootCustomer);
             const onCustomerInput = debounce(async (event) => {
+                const previousCustomerId = String(customerIdField.value || '');
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 applyCustomerFields(customer);
+                if (String(customerIdField.value || '') !== previousCustomerId) {
+                    shipLocations = [];
+                    rebuildShipIndexes();
+                    resetShipLocationSelection();
+                    renderShipLocationSuggestions('');
+                }
             });
             customerSearch.addEventListener('input', onCustomerInput);
             customerSearch.addEventListener('change', (event) => {
+                const previousCustomerId = String(customerIdField.value || '');
                 const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
                 applyCustomerFields(customer);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
                 }
+                if (String(customerIdField.value || '') !== previousCustomerId) {
+                    shipLocations = [];
+                    rebuildShipIndexes();
+                    resetShipLocationSelection();
+                    renderShipLocationSuggestions('');
+                }
             });
         }
 
         rebuildCustomerIndexes();
+        rebuildShipIndexes();
         rebuildProductIndexes();
         addBtn.addEventListener('click', addRow);
         renderCustomerSuggestions('');
+        renderShipLocationSuggestions('');
         renderProductSuggestions('');
+        if (shipLocationSearch) {
+            const onShipInput = debounce(async (event) => {
+                await fetchShipLocationSuggestions(event.currentTarget.value);
+                const location = findShipLocationByLabel(event.currentTarget.value);
+                applyShipLocationFields(location);
+            });
+            shipLocationSearch.addEventListener('input', onShipInput);
+            shipLocationSearch.addEventListener('focus', (event) => {
+                renderShipLocationSuggestions(event.currentTarget.value);
+            });
+            shipLocationSearch.addEventListener('change', (event) => {
+                const location = findShipLocationByLabel(event.currentTarget.value) || findShipLocationLoose(event.currentTarget.value);
+                applyShipLocationFields(location);
+                if (location) {
+                    shipLocationSearch.value = shipLocationLabel(location);
+                }
+            });
+        }
         addRow();
     </script>
 

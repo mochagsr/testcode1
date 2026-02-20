@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\Customer;
+use App\Models\CustomerShipLocation;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\Product;
@@ -21,6 +22,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -172,9 +174,21 @@ class DeliveryNotePageController extends Controller
             $products = $oldProducts->concat($products)->unique('id')->values();
         }
 
+        $shipLocations = collect();
+        if ($oldCustomerId > 0) {
+            $shipLocations = CustomerShipLocation::query()
+                ->select(['id', 'customer_id', 'school_name', 'recipient_name', 'recipient_phone', 'city', 'address'])
+                ->where('customer_id', $oldCustomerId)
+                ->where('is_active', true)
+                ->orderBy('school_name')
+                ->limit(20)
+                ->get();
+        }
+
         return view('delivery_notes.create', [
             'customers' => $customers,
             'products' => $products,
+            'shipLocations' => $shipLocations,
         ]);
     }
 
@@ -183,6 +197,7 @@ class DeliveryNotePageController extends Controller
         $data = $request->validate([
             'note_date' => ['required', 'date'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
             'recipient_name' => ['required', 'string', 'max:150'],
             'recipient_phone' => ['nullable', 'string', 'max:30'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -201,15 +216,48 @@ class DeliveryNotePageController extends Controller
         $note = DB::transaction(function () use ($data): DeliveryNote {
             $noteDate = $data['note_date'];
             $noteNumber = $this->generateNoteNumber($noteDate);
+            $customerId = isset($data['customer_id']) ? (int) $data['customer_id'] : null;
+            $shipLocationId = (int) ($data['customer_ship_location_id'] ?? 0);
+            $shipLocation = null;
+            if ($shipLocationId > 0) {
+                $shipLocationQuery = CustomerShipLocation::query()->where('is_active', true);
+                if ($customerId !== null) {
+                    $shipLocationQuery->where('customer_id', $customerId);
+                }
+                $shipLocation = $shipLocationQuery->find($shipLocationId);
+                if ($shipLocation === null) {
+                    throw ValidationException::withMessages([
+                        'customer_ship_location_id' => __('school_bulk.invalid_ship_location_customer'),
+                    ]);
+                }
+            }
+
+            $recipientName = trim((string) ($data['recipient_name'] ?? ''));
+            $recipientPhone = trim((string) ($data['recipient_phone'] ?? ''));
+            $city = trim((string) ($data['city'] ?? ''));
+            $address = trim((string) ($data['address'] ?? ''));
+            if ($recipientName === '' && $shipLocation !== null) {
+                $recipientName = (string) ($shipLocation->school_name ?: $shipLocation->recipient_name);
+            }
+            if ($recipientPhone === '' && $shipLocation !== null) {
+                $recipientPhone = (string) ($shipLocation->recipient_phone ?? '');
+            }
+            if ($city === '' && $shipLocation !== null) {
+                $city = (string) ($shipLocation->city ?? '');
+            }
+            if ($address === '' && $shipLocation !== null) {
+                $address = (string) ($shipLocation->address ?? '');
+            }
 
             $note = DeliveryNote::create([
                 'note_number' => $noteNumber,
                 'note_date' => $noteDate,
-                'customer_id' => $data['customer_id'] ?? null,
-                'recipient_name' => $data['recipient_name'],
-                'recipient_phone' => $data['recipient_phone'] ?? null,
-                'city' => $data['city'] ?? null,
-                'address' => $data['address'] ?? null,
+                'customer_id' => $customerId,
+                'customer_ship_location_id' => $shipLocation?->id,
+                'recipient_name' => $recipientName,
+                'recipient_phone' => $recipientPhone !== '' ? $recipientPhone : null,
+                'city' => $city !== '' ? $city : null,
+                'address' => $address !== '' ? $address : null,
                 'notes' => $data['notes'] ?? null,
                 'created_by_name' => auth()->user()?->name ?? __('txn.system_user'),
             ]);
@@ -261,7 +309,7 @@ class DeliveryNotePageController extends Controller
     public function show(DeliveryNote $deliveryNote): View
     {
         $now = now();
-        $deliveryNote->load(['customer:id,name,city,phone,address', 'items']);
+        $deliveryNote->load(['customer:id,name,city,phone,address', 'shipLocation:id,school_name,recipient_name,recipient_phone,city,address', 'items']);
         $itemProductIds = $deliveryNote->items
             ->pluck('product_id')
             ->map(fn($id): int => (int) $id)
@@ -399,7 +447,7 @@ class DeliveryNotePageController extends Controller
 
     public function print(DeliveryNote $deliveryNote): View
     {
-        $deliveryNote->load(['customer:id,name,city,phone,address', 'items']);
+        $deliveryNote->load(['customer:id,name,city,phone,address', 'shipLocation:id,school_name,recipient_name,recipient_phone,city,address', 'items']);
 
         return view('delivery_notes.print', [
             'note' => $deliveryNote,
@@ -408,7 +456,7 @@ class DeliveryNotePageController extends Controller
 
     public function exportPdf(DeliveryNote $deliveryNote)
     {
-        $deliveryNote->load(['customer:id,name,city,phone,address', 'items']);
+        $deliveryNote->load(['customer:id,name,city,phone,address', 'shipLocation:id,school_name,recipient_name,recipient_phone,city,address', 'items']);
 
         $filename = $deliveryNote->note_number . '.pdf';
         $pdf = Pdf::loadView('delivery_notes.print', [
@@ -421,7 +469,7 @@ class DeliveryNotePageController extends Controller
 
     public function exportExcel(DeliveryNote $deliveryNote): StreamedResponse
     {
-        $deliveryNote->load(['customer:id,name,city,phone,address', 'items']);
+        $deliveryNote->load(['customer:id,name,city,phone,address', 'shipLocation:id,school_name,recipient_name,recipient_phone,city,address', 'items']);
         $filename = $deliveryNote->note_number . '.xlsx';
 
         return response()->streamDownload(function () use ($deliveryNote): void {

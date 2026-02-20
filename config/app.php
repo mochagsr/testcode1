@@ -50,6 +50,7 @@ return [
     |
     */
     'slow_query_threshold_ms' => (int) env('APP_SLOW_QUERY_THRESHOLD_MS', 100),
+    'slow_query_log_sqlite' => (bool) env('APP_SLOW_QUERY_LOG_SQLITE', false),
 
     /*
     |--------------------------------------------------------------------------

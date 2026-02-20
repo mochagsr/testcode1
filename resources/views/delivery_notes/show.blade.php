@@ -45,6 +45,7 @@
                 <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $note->city ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.created_by') }}</strong><div>{{ $note->created_by_name ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.linked_customer') }}</strong><div>{{ $note->customer?->name ?: '-' }}</div></div>
+                <div class="col-4"><strong>{{ __('school_bulk.ship_to_school') }}</strong><div>{{ $note->shipLocation?->school_name ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.status') }}</strong><div>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</div></div>
                 <div class="col-12"><strong>{{ __('txn.address') }}</strong><div>{{ $note->address ?: '-' }}</div></div>
                 <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $note->notes ?: '-' }}</div></div>

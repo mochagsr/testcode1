@@ -92,6 +92,8 @@
             <div><strong>{{ __('txn.date') }}</strong> : {{ $note->note_date->format('d-m-Y') }}</div>
             <div><strong>{{ __('txn.created_by') }}</strong> : {{ $note->created_by_name ?: '-' }}</div>
             <div><strong>{{ __('txn.note_number') }}</strong> : {{ $note->note_number }}</div>
+            <div><strong>{{ __('txn.linked_customer') }}</strong> : {{ $note->customer?->name ?: '-' }}</div>
+            <div><strong>{{ __('school_bulk.ship_to_school') }}</strong> : {{ $note->shipLocation?->school_name ?: '-' }}</div>
             <div><strong>{{ __('txn.name') }}</strong> : {{ $note->recipient_name ?: '-' }}</div>
             <div><strong>{{ __('txn.phone') }}</strong> : {{ $note->recipient_phone ?: '-' }}</div>
             <div><strong>{{ __('txn.address') }}</strong> : {{ $note->address ?: '-' }}</div>

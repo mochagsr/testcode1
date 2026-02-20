@@ -446,13 +446,28 @@
                             <a href="{{ route('customers-web.index') }}" class="{{ request()->routeIs('customers-web.*') ? 'active' : '' }}">{{ __('menu.customers') }}</a>
                         </div>
                     </div>
-                    <div class="nav-group">
-                        <span class="nav-group-title {{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</span>
-                        <div class="nav-sub">
-                            <a href="{{ route('suppliers.index') }}" class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</a>
-                        </div>
-                    </div>
                 @endif
+            @endauth
+            @auth
+                <div class="nav-group">
+                    <span class="nav-group-title {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</span>
+                    <div class="nav-sub">
+                        @if(auth()->user()->role === 'admin')
+                            <a href="{{ route('suppliers.index') }}" class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</a>
+                        @endif
+                        <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
+                        <a href="{{ route('supplier-payables.index') }}" class="{{ request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.supplier_payables') }}</a>
+                    </div>
+                </div>
+            @endauth
+            @auth
+                <div class="nav-group">
+                    <span class="nav-group-title {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">{{ __('menu.school_distribution') }}</span>
+                    <div class="nav-sub">
+                        <a href="{{ route('customer-ship-locations.index') }}" class="{{ request()->routeIs('customer-ship-locations.*') ? 'active' : '' }}">{{ __('menu.ship_locations') }}</a>
+                        <a href="{{ route('school-bulk-transactions.index') }}" class="{{ request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">{{ __('menu.school_bulk_transactions') }}</a>
+                    </div>
+                </div>
             @endauth
             <span class="nav-section-title">{{ __('ui.nav_transactions') }}</span>
             <div class="nav-sub">
@@ -460,14 +475,12 @@
                 <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
                 <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
                 <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
-                <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
             </div>
             <div class="nav-group">
-                <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') || request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
+                <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
                 <div class="nav-sub">
                     <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
                     <a href="{{ route('receivable-payments.index') }}" class="{{ request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivable_payments') }}</a>
-                    <a href="{{ route('supplier-payables.index') }}" class="{{ request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.supplier_payables') }}</a>
                 </div>
             </div>
             <span class="nav-section-title">{{ __('ui.nav_reports') }}</span>

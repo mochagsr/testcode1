@@ -27,6 +27,13 @@ final class PerformanceMonitor
             return;
         }
 
+        $connectionName = (string) config('database.default');
+        $driver = (string) config("database.connections.{$connectionName}.driver");
+        $allowSqlite = (bool) config('app.slow_query_log_sqlite', false);
+        if ($driver === 'sqlite' && ! $allowSqlite) {
+            return;
+        }
+
         $thresholdMs = max(1, (int) config('app.slow_query_threshold_ms', 100));
 
         DB::listen(function ($query) use ($thresholdMs): void {

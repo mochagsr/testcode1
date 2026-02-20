@@ -86,7 +86,7 @@ class MassImportController extends Controller
         $created = 0;
         $updated = 0;
 
-        DB::transaction(function () use ($rows, $headers, &$errors, &$created, &$updated): void {
+        DB::transaction(function () use ($rows, $headers, &$errors, &$created, &$updated, $request): void {
             foreach ($rows as $rowIndex => $row) {
                 $data = $this->mapRow($headers, $row);
                 if ($this->isEmptyRow($data)) {
@@ -131,14 +131,44 @@ class MassImportController extends Controller
                     'is_active' => true,
                 ];
 
-                $existing = Product::query()->where('code', $code)->first();
+                $existing = Product::query()
+                    ->where('code', $code)
+                    ->lockForUpdate()
+                    ->first();
                 if ($existing !== null) {
+                    $oldStock = (int) $existing->stock;
                     $existing->update($payload);
+                    $newStock = (int) $existing->stock;
+                    if ($oldStock !== $newStock) {
+                        $delta = $newStock - $oldStock;
+                        StockMutation::query()->create([
+                            'product_id' => (int) $existing->id,
+                            'reference_type' => Product::class,
+                            'reference_id' => (int) $existing->id,
+                            'mutation_type' => $delta > 0 ? 'in' : 'out',
+                            'quantity' => abs($delta),
+                            'notes' => $delta > 0
+                                ? __('ui.stock_mutation_import_add_note')
+                                : __('ui.stock_mutation_import_reduce_note'),
+                            'created_by_user_id' => $request->user()?->id,
+                        ]);
+                    }
                     $updated++;
                     continue;
                 }
 
-                Product::create($payload);
+                $createdProduct = Product::create($payload);
+                if ((int) $createdProduct->stock > 0) {
+                    StockMutation::query()->create([
+                        'product_id' => (int) $createdProduct->id,
+                        'reference_type' => Product::class,
+                        'reference_id' => (int) $createdProduct->id,
+                        'mutation_type' => 'in',
+                        'quantity' => (int) $createdProduct->stock,
+                        'notes' => __('ui.stock_mutation_import_initial_note'),
+                        'created_by_user_id' => $request->user()?->id,
+                    ]);
+                }
                 $created++;
             }
         });

@@ -21,6 +21,7 @@ class DeliveryNote extends Model
         'note_number',
         'note_date',
         'customer_id',
+        'customer_ship_location_id',
         'recipient_name',
         'recipient_phone',
         'city',
@@ -51,6 +52,14 @@ class DeliveryNote extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * @return BelongsTo<CustomerShipLocation, $this>
+     */
+    public function shipLocation(): BelongsTo
+    {
+        return $this->belongsTo(CustomerShipLocation::class, 'customer_ship_location_id');
     }
 
     /**

@@ -337,9 +337,10 @@ class ReceivablePageController extends Controller
     {
         $data = $this->customerBillViewData($request, $customer);
         $rows = collect($data['rows'] ?? []);
+        $schoolBreakdown = collect($data['schoolBreakdown'] ?? []);
         $filename = 'tagihan-' . $customer->id . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx';
 
-        return response()->streamDownload(function () use ($rows, $data): void {
+        return response()->streamDownload(function () use ($rows, $data, $schoolBreakdown): void {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Tagihan');
@@ -388,6 +389,48 @@ class ReceivablePageController extends Controller
                 __('receivable.bill_total_receivable'),
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
             ];
+
+            if ($schoolBreakdown->isNotEmpty()) {
+                $rowsOut[] = [];
+                $rowsOut[] = [__('receivable.school_breakdown_title')];
+                $rowsOut[] = [
+                    __('receivable.school_name'),
+                    __('receivable.school_city'),
+                    __('receivable.bill_date'),
+                    __('receivable.bill_proof_number'),
+                    __('receivable.school_invoice_total'),
+                    __('receivable.school_paid_total'),
+                    __('receivable.school_balance_total'),
+                ];
+                foreach ($schoolBreakdown as $group) {
+                    $groupRows = collect($group['rows'] ?? []);
+                    if ($groupRows->isEmpty()) {
+                        continue;
+                    }
+                    foreach ($groupRows as $groupRow) {
+                        $rowsOut[] = [
+                            (string) ($group['school_name'] ?? '-'),
+                            (string) ($group['school_city'] ?? '-'),
+                            (string) ($groupRow['date_label'] ?? ''),
+                            (string) ($groupRow['invoice_number'] ?? ''),
+                            number_format((int) round((float) ($groupRow['invoice_total'] ?? 0)), 0, ',', '.'),
+                            number_format((int) round((float) ($groupRow['paid_total'] ?? 0)), 0, ',', '.'),
+                            number_format((int) round((float) ($groupRow['balance_total'] ?? 0)), 0, ',', '.'),
+                        ];
+                    }
+
+                    $totalsPerSchool = (array) ($group['totals'] ?? []);
+                    $rowsOut[] = [
+                        '',
+                        '',
+                        '',
+                        __('receivable.bill_total'),
+                        number_format((int) round((float) ($totalsPerSchool['invoice_total'] ?? 0)), 0, ',', '.'),
+                        number_format((int) round((float) ($totalsPerSchool['paid_total'] ?? 0)), 0, ',', '.'),
+                        number_format((int) round((float) ($totalsPerSchool['balance_total'] ?? 0)), 0, ',', '.'),
+                    ];
+                }
+            }
 
             $sheet->fromArray($rowsOut, null, 'A1');
             $writer = new Xlsx($spreadsheet);
@@ -531,6 +574,10 @@ class ReceivablePageController extends Controller
         $statementData = $this->cachedCustomerBillStatement((int) $customer->id, $selectedSemester !== '' ? $selectedSemester : null);
         $statementRows = $statementData['rows'];
         $totals = $statementData['totals'];
+        $schoolBreakdown = $this->buildCustomerBillSchoolBreakdown(
+            (int) $customer->id,
+            $selectedSemester !== '' ? $selectedSemester : null
+        );
         $settings = AppSetting::getValues([
             'company_logo_path' => null,
             'company_name' => 'CV. PUSTAKA GRAFIKA',
@@ -547,6 +594,7 @@ class ReceivablePageController extends Controller
             'rows' => $statementRows,
             'totalOutstanding' => (int) round((float) $totals['running_balance']),
             'totals' => $totals,
+            'schoolBreakdown' => $schoolBreakdown,
             'companyLogoPath' => $settings['company_logo_path'] ?? null,
             'companyName' => trim((string) ($settings['company_name'] ?? 'CV. PUSTAKA GRAFIKA')),
             'companyAddress' => trim((string) ($settings['company_address'] ?? '')),
@@ -707,6 +755,89 @@ class ReceivablePageController extends Controller
             'rows' => $statementRows,
             'totals' => $totals,
         ];
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     school_name:string,
+     *     school_city:string,
+     *     rows:Collection<int, array{
+     *         invoice_id:int|null,
+     *         invoice_number:string,
+     *         date_label:string,
+     *         invoice_total:int,
+     *         paid_total:int,
+     *         balance_total:int
+     *     }>,
+     *     totals:array{invoice_total:int,paid_total:int,balance_total:int}
+     * }>
+     */
+    private function buildCustomerBillSchoolBreakdown(int $customerId, ?string $selectedSemester): Collection
+    {
+        $semester = $selectedSemester ?? '';
+        $rows = SalesInvoice::query()
+            ->select([
+                'id',
+                'invoice_number',
+                'invoice_date',
+                'semester_period',
+                'total',
+                'total_paid',
+                'balance',
+                'ship_to_name',
+                'ship_to_city',
+                'customer_ship_location_id',
+            ])
+            ->with(['shipLocation:id,school_name,city'])
+            ->forCustomer($customerId)
+            ->active()
+            ->when($semester !== '', function ($query) use ($semester): void {
+                $query->forSemester($semester);
+            })
+            ->orderBy('invoice_date')
+            ->orderBy('id')
+            ->get()
+            ->map(function (SalesInvoice $invoice): array {
+                $schoolName = trim((string) ($invoice->ship_to_name ?: ($invoice->shipLocation?->school_name ?: '')));
+                $schoolCity = trim((string) ($invoice->ship_to_city ?: ($invoice->shipLocation?->city ?: '')));
+                if ($schoolName === '') {
+                    $schoolName = (string) __('receivable.unknown_school');
+                }
+
+                return [
+                    'school_name' => $schoolName,
+                    'school_city' => $schoolCity !== '' ? $schoolCity : '-',
+                    'invoice_id' => $invoice->id ? (int) $invoice->id : null,
+                    'invoice_number' => (string) ($invoice->invoice_number ?? '-'),
+                    'date_label' => $this->formatBillDate($invoice->invoice_date),
+                    'invoice_total' => (int) round((float) ($invoice->total ?? 0)),
+                    'paid_total' => (int) round((float) ($invoice->total_paid ?? 0)),
+                    'balance_total' => (int) round((float) ($invoice->balance ?? 0)),
+                ];
+            });
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        return $rows
+            ->groupBy(fn(array $row): string => mb_strtolower(($row['school_name'] ?? '-') . '|' . ($row['school_city'] ?? '-')))
+            ->map(function (Collection $group): array {
+                $first = (array) $group->first();
+
+                return [
+                    'school_name' => (string) ($first['school_name'] ?? '-'),
+                    'school_city' => (string) ($first['school_city'] ?? '-'),
+                    'rows' => $group->values(),
+                    'totals' => [
+                        'invoice_total' => (int) $group->sum(fn(array $row): int => (int) ($row['invoice_total'] ?? 0)),
+                        'paid_total' => (int) $group->sum(fn(array $row): int => (int) ($row['paid_total'] ?? 0)),
+                        'balance_total' => (int) $group->sum(fn(array $row): int => (int) ($row['balance_total'] ?? 0)),
+                    ],
+                ];
+            })
+            ->sortBy(fn(array $group): string => mb_strtolower((string) ($group['school_name'] ?? '-')))
+            ->values();
     }
 
     private function formatBillDate(mixed $value): string

@@ -16,8 +16,12 @@ class AuthController extends Controller
     ) {
     }
 
-    public function showLogin(): View
+    public function showLogin(): View|RedirectResponse
     {
+        if (Auth::check()) {
+            return redirect()->route('dashboard');
+        }
+
         return view('auth.login');
     }
 
@@ -37,7 +41,13 @@ class AuthController extends Controller
         $request->session()->regenerate();
         $this->auditLogService->log('auth.login', null, "User logged in: {$request->input('email')}", $request);
 
-        return redirect()->intended(route('dashboard'));
+        $intended = (string) $request->session()->pull('url.intended', '');
+        $intendedPath = parse_url($intended, PHP_URL_PATH) ?: '';
+        if ($intended !== '' && ! in_array($intendedPath, ['/login', '/logout'], true)) {
+            return redirect()->to($intended);
+        }
+
+        return redirect()->route('dashboard');
     }
 
     public function logout(Request $request): RedirectResponse

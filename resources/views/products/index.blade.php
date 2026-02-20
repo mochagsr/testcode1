@@ -58,7 +58,13 @@
             <tbody>
             @forelse($products as $product)
                 <tr>
-                    <td>{{ $product->code ?: '-' }}</td>
+                    <td>
+                        @if($product->code)
+                            <a href="{{ route('products.edit', ['product' => $product, 'mutation_page' => 1]) }}#stock-mutations">{{ $product->code }}</a>
+                        @else
+                            -
+                        @endif
+                    </td>
                     <td>{{ $product->name }}</td>
                     <td>{{ $product->category?->name ?: '-' }}</td>
                     <td>{{ (int) round($product->stock) }}</td>
