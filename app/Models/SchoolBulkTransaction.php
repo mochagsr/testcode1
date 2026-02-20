@@ -77,6 +77,16 @@ class SchoolBulkTransaction extends Model
     }
 
     /**
+     * @return HasMany<SalesInvoice, $this>
+     */
+    public function generatedInvoices(): HasMany
+    {
+        return $this->hasMany(SalesInvoice::class, 'school_bulk_transaction_id')
+            ->orderBy('invoice_date')
+            ->orderBy('id');
+    }
+
+    /**
      * @param  Builder<SchoolBulkTransaction>  $query
      * @return Builder<SchoolBulkTransaction>
      */
@@ -96,4 +106,3 @@ class SchoolBulkTransaction extends Model
         });
     }
 }
-

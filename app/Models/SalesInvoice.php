@@ -23,6 +23,8 @@ class SalesInvoice extends Model
         'invoice_number',
         'customer_id',
         'customer_ship_location_id',
+        'school_bulk_transaction_id',
+        'school_bulk_location_id',
         'invoice_date',
         'due_date',
         'semester_period',
@@ -74,6 +76,22 @@ class SalesInvoice extends Model
     public function shipLocation(): BelongsTo
     {
         return $this->belongsTo(CustomerShipLocation::class, 'customer_ship_location_id');
+    }
+
+    /**
+     * @return BelongsTo<SchoolBulkTransaction, $this>
+     */
+    public function schoolBulkTransaction(): BelongsTo
+    {
+        return $this->belongsTo(SchoolBulkTransaction::class, 'school_bulk_transaction_id');
+    }
+
+    /**
+     * @return BelongsTo<SchoolBulkTransactionLocation, $this>
+     */
+    public function schoolBulkLocation(): BelongsTo
+    {
+        return $this->belongsTo(SchoolBulkTransactionLocation::class, 'school_bulk_location_id');
     }
 
     /**

@@ -83,6 +83,7 @@ return [
     'outgoing_header_note' => 'Choose supplier, transaction date, and supplier invoice note number.',
     'invoice_date' => 'Invoice Date',
     'due_date' => 'Due Date',
+    'due_date_after_invoice' => 'Due date cannot be earlier than invoice date.',
     'return_date' => 'Return Date',
     'semester_period' => 'Semester Period',
     'payment_setup' => 'Payment Setup',

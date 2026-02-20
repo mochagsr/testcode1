@@ -91,5 +91,43 @@ class ProductStockMutationTest extends TestCase
         $response->assertSee(__('ui.stock_mutations_title'));
         $response->assertSee('mutation_page=2', false);
     }
-}
 
+    public function test_product_mutations_page_loads_and_shows_pagination(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-02',
+            'name' => 'Alat',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'alt001',
+            'name' => 'Alat 1',
+            'unit' => 'exp',
+            'stock' => 12,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+            'is_active' => true,
+        ]);
+
+        foreach (range(1, 24) as $index) {
+            StockMutation::query()->create([
+                'product_id' => $product->id,
+                'reference_type' => Product::class,
+                'reference_id' => $product->id,
+                'mutation_type' => $index % 2 === 0 ? 'out' : 'in',
+                'quantity' => $index,
+                'notes' => 'Mutasi produk-'.$index,
+                'created_by_user_id' => $admin->id,
+            ]);
+        }
+
+        $response = $this->actingAs($admin)->get(route('products.mutations', $product));
+
+        $response->assertOk();
+        $response->assertSee(__('ui.stock_mutations_title'));
+        $response->assertSee($product->code);
+        $response->assertSee('mutation_page=2', false);
+    }
+}

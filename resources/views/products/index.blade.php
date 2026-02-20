@@ -60,7 +60,7 @@
                 <tr>
                     <td>
                         @if($product->code)
-                            <a href="{{ route('products.edit', ['product' => $product, 'mutation_page' => 1]) }}#stock-mutations">{{ $product->code }}</a>
+                            <a href="{{ route('products.mutations', ['product' => $product, 'mutation_page' => 1]) }}#stock-mutations">{{ $product->code }}</a>
                         @else
                             -
                         @endif
@@ -73,6 +73,7 @@
                     <td>Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
                     <td>
                         <div class="flex">
+                            <a class="btn secondary product-action-btn" href="{{ route('products.mutations', $product) }}">{{ __('ui.stock_mutations_title') }}</a>
                             <a class="btn secondary product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('products.destroy', $product) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_product') }}');">
                                 @csrf

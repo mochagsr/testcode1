@@ -170,6 +170,134 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertStringStartsWith('PK', $excelResponse->streamedContent());
     }
 
+    public function test_school_bulk_generate_invoices_creates_one_invoice_per_school_and_skips_duplicates(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BULK-GEN',
+            'name' => 'Customer Bulk Generate',
+            'city' => 'Malang',
+        ]);
+        $shipLocationA = CustomerShipLocation::query()->create([
+            'customer_id' => $customer->id,
+            'school_name' => 'SDN A',
+            'recipient_name' => 'TU A',
+            'recipient_phone' => '081230000001',
+            'city' => 'Malang',
+            'address' => 'Jl. A',
+            'is_active' => true,
+        ]);
+        $shipLocationB = CustomerShipLocation::query()->create([
+            'customer_id' => $customer->id,
+            'school_name' => 'SDN B',
+            'recipient_name' => 'TU B',
+            'recipient_phone' => '081230000002',
+            'city' => 'Malang',
+            'address' => 'Jl. B',
+            'is_active' => true,
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-BULK-GEN',
+            'name' => 'Kategori Bulk Gen',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-BULK-GEN',
+            'name' => 'Buku Bulk Gen',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 15000,
+            'is_active' => true,
+        ]);
+
+        $transaction = SchoolBulkTransaction::query()->create([
+            'transaction_number' => 'BLK-20260220-0001',
+            'transaction_date' => '2026-02-20',
+            'customer_id' => $customer->id,
+            'semester_period' => 'S2-2526',
+            'total_locations' => 2,
+            'total_items' => 1,
+            'notes' => 'Generate invoice test',
+            'created_by_user_id' => $user->id,
+        ]);
+        $transaction->locations()->createMany([
+            [
+                'customer_ship_location_id' => $shipLocationA->id,
+                'school_name' => 'SDN A',
+                'recipient_name' => 'TU A',
+                'recipient_phone' => '081230000001',
+                'city' => 'Malang',
+                'address' => 'Jl. A',
+                'sort_order' => 0,
+            ],
+            [
+                'customer_ship_location_id' => $shipLocationB->id,
+                'school_name' => 'SDN B',
+                'recipient_name' => 'TU B',
+                'recipient_phone' => '081230000002',
+                'city' => 'Malang',
+                'address' => 'Jl. B',
+                'sort_order' => 1,
+            ],
+        ]);
+        $transaction->items()->create([
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'unit' => 'exp',
+            'quantity' => 5,
+            'unit_price' => 15000,
+            'sort_order' => 0,
+        ]);
+
+        $firstResponse = $this->actingAs($user)->post(
+            route('school-bulk-transactions.generate-invoices', $transaction),
+            [
+                '_idempotency_key' => 'bulk-generate-first',
+                'invoice_date' => '2026-02-20',
+                'due_date' => '2026-03-01',
+            ]
+        );
+        $firstResponse->assertRedirect(route('school-bulk-transactions.show', $transaction));
+
+        $this->assertDatabaseCount('sales_invoices', 2);
+        $generatedInvoices = SalesInvoice::query()
+            ->where('school_bulk_transaction_id', $transaction->id)
+            ->orderBy('id')
+            ->get();
+        $this->assertCount(2, $generatedInvoices);
+        $this->assertSame(2, $generatedInvoices->pluck('school_bulk_location_id')->filter()->unique()->count());
+        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) round((float) $invoice->total) === 75000));
+        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (string) $invoice->payment_status === 'unpaid'));
+        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) round((float) $invoice->balance) === 75000));
+
+        $product->refresh();
+        $this->assertSame(90, (int) $product->stock);
+        $this->assertDatabaseCount('sales_invoice_items', 2);
+        $this->assertDatabaseCount('stock_mutations', 2);
+        $this->assertDatabaseCount('receivable_ledgers', 2);
+        $this->assertDatabaseHas('receivable_ledgers', [
+            'customer_id' => $customer->id,
+            'debit' => 75000,
+            'credit' => 0,
+        ]);
+        $this->assertDatabaseCount('journal_entries', 2);
+        $this->assertDatabaseHas('journal_entries', [
+            'entry_type' => 'sales_invoice_create',
+            'reference_type' => SalesInvoice::class,
+        ]);
+
+        $secondResponse = $this->actingAs($user)->post(
+            route('school-bulk-transactions.generate-invoices', $transaction),
+            [
+                '_idempotency_key' => 'bulk-generate-second',
+                'invoice_date' => '2026-02-20',
+            ]
+        );
+        $secondResponse->assertRedirect(route('school-bulk-transactions.show', $transaction));
+        $this->assertDatabaseCount('sales_invoices', 2);
+    }
+
     public function test_customer_bill_print_includes_school_breakdown_section(): void
     {
         $user = User::factory()->create(['role' => 'user']);
@@ -217,4 +345,3 @@ class SchoolDistributionFlowsTest extends TestCase
         $response->assertSee('INV-BILL-002');
     }
 }
-

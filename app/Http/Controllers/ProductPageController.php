@@ -154,18 +154,24 @@ class ProductPageController extends Controller
 
     public function edit(Request $request, Product $product): View
     {
-        $stockMutations = $product->stockMutations()
-            ->with('creator:id,name')
-            ->latest('id')
-            ->paginate((int) config('pagination.default_per_page', 20), ['*'], 'mutation_page')
-            ->withQueryString();
-        $mutationReferenceMap = $this->buildStockMutationReferenceMap($stockMutations);
+        [$stockMutations, $mutationReferenceMap] = $this->loadStockMutations($product);
 
         return view('products.edit', [
             'product' => $product,
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
             'unitOptions' => $this->configuredProductUnitOptions(),
             'defaultUnit' => $this->defaultProductUnitCode(),
+            'stockMutations' => $stockMutations,
+            'mutationReferenceMap' => $mutationReferenceMap,
+        ]);
+    }
+
+    public function mutations(Request $request, Product $product): View
+    {
+        [$stockMutations, $mutationReferenceMap] = $this->loadStockMutations($product);
+
+        return view('products.mutations', [
+            'product' => $product,
             'stockMutations' => $stockMutations,
             'mutationReferenceMap' => $mutationReferenceMap,
         ]);
@@ -323,6 +329,21 @@ class ProductPageController extends Controller
         }
 
         return $map;
+    }
+
+    /**
+     * @return array{0:LengthAwarePaginator,1:array<string, array{number:string, url:string}>}
+     */
+    private function loadStockMutations(Product $product): array
+    {
+        $stockMutations = $product->stockMutations()
+            ->with('creator:id,name')
+            ->latest('id')
+            ->paginate((int) config('pagination.default_per_page', 20), ['*'], 'mutation_page')
+            ->withQueryString();
+        $mutationReferenceMap = $this->buildStockMutationReferenceMap($stockMutations);
+
+        return [$stockMutations, $mutationReferenceMap];
     }
 
 }

@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SchoolBulkTransactionLocation extends Model
 {
@@ -51,5 +52,12 @@ class SchoolBulkTransactionLocation extends Model
     {
         return $this->belongsTo(CustomerShipLocation::class, 'customer_ship_location_id');
     }
-}
 
+    /**
+     * @return HasMany<SalesInvoice, $this>
+     */
+    public function generatedInvoices(): HasMany
+    {
+        return $this->hasMany(SalesInvoice::class, 'school_bulk_location_id');
+    }
+}

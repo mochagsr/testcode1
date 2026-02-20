@@ -83,6 +83,7 @@ return [
     'outgoing_header_note' => 'Pilih supplier, tanggal transaksi, dan no nota pembelian.',
     'invoice_date' => 'Tanggal Faktur',
     'due_date' => 'Jatuh Tempo',
+    'due_date_after_invoice' => 'Jatuh tempo tidak boleh lebih awal dari tanggal faktur.',
     'return_date' => 'Tanggal Retur',
     'semester_period' => 'Periode Semester',
     'payment_setup' => 'Pengaturan Pembayaran',

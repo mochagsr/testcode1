@@ -182,6 +182,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'index'])->middleware('perm:transactions.view')->name('school-bulk-transactions.index');
     Route::get('/school-bulk-transactions/create', [SchoolBulkTransactionPageController::class, 'create'])->middleware('perm:transactions.create')->name('school-bulk-transactions.create');
     Route::post('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'store'])->middleware(['semester.open', 'idempotent'])->name('school-bulk-transactions.store');
+    Route::post('/school-bulk-transactions/{schoolBulkTransaction}/generate-invoices', [SchoolBulkTransactionPageController::class, 'generateInvoices'])
+        ->middleware(['perm:transactions.create', 'finance.unlocked', 'semester.open', 'idempotent'])
+        ->name('school-bulk-transactions.generate-invoices');
     Route::get('/school-bulk-transactions/{schoolBulkTransaction}', [SchoolBulkTransactionPageController::class, 'show'])->middleware('perm:transactions.view')->name('school-bulk-transactions.show');
     Route::get('/school-bulk-transactions/{schoolBulkTransaction}/print', [SchoolBulkTransactionPageController::class, 'print'])->middleware('perm:transactions.export')->name('school-bulk-transactions.print');
     Route::get('/school-bulk-transactions/{schoolBulkTransaction}/pdf', [SchoolBulkTransactionPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('school-bulk-transactions.export.pdf');
@@ -237,6 +240,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
         Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('products.create');
         Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('products.store');
+        Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
         Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('products.edit');
         Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('products.update');
         Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('products.destroy');
