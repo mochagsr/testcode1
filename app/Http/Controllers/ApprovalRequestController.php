@@ -45,7 +45,10 @@ class ApprovalRequestController extends Controller
             return back()->withErrors(['approval' => 'Approval request sudah diproses.']);
         }
 
-        $this->approvalWorkflowService->approve($approvalRequest, $data['approval_note'] ?? null, $request);
+        $approvedNow = $this->approvalWorkflowService->approve($approvalRequest, $data['approval_note'] ?? null, $request);
+        if (! $approvedNow) {
+            return back()->withErrors(['approval' => 'Approval request sudah diproses oleh user lain.']);
+        }
 
         return back()->with('success', 'Approval disetujui.');
     }
@@ -59,9 +62,25 @@ class ApprovalRequestController extends Controller
             return back()->withErrors(['approval' => 'Approval request sudah diproses.']);
         }
 
-        $this->approvalWorkflowService->reject($approvalRequest, $data['approval_note'] ?? null, $request);
+        $rejectedNow = $this->approvalWorkflowService->reject($approvalRequest, $data['approval_note'] ?? null, $request);
+        if (! $rejectedNow) {
+            return back()->withErrors(['approval' => 'Approval request sudah diproses oleh user lain.']);
+        }
 
         return back()->with('success', 'Approval ditolak.');
     }
-}
 
+    public function reExecute(Request $request, ApprovalRequest $approvalRequest): RedirectResponse
+    {
+        if ((string) $approvalRequest->status !== 'approved') {
+            return back()->withErrors(['approval' => 'Hanya approval berstatus approved yang bisa dieksekusi ulang.']);
+        }
+
+        $executionSuccess = $this->approvalWorkflowService->reExecute($approvalRequest, $request);
+        if ($executionSuccess) {
+            return back()->with('success', 'Eksekusi ulang berhasil.');
+        }
+
+        return back()->withErrors(['approval' => 'Eksekusi ulang gagal. Silakan cek detail pada kolom eksekusi.']);
+    }
+}

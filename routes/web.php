@@ -279,8 +279,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::get('/semester-transactions', [SemesterTransactionPageController::class, 'index'])->middleware('perm:settings.admin')->name('semester-transactions.index');
         Route::post('/semester-transactions/bulk-action', [SemesterTransactionPageController::class, 'bulkAction'])->middleware('perm:semester.bulk')->name('semester-transactions.bulk-action');
         Route::get('/approvals', [ApprovalRequestController::class, 'index'])->middleware('perm:transactions.correction.approve')->name('approvals.index');
-        Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware('perm:transactions.correction.approve')->name('approvals.approve');
-        Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware('perm:transactions.correction.approve')->name('approvals.reject');
+        Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.approve');
+        Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.reject');
+        Route::post('/approvals/{approvalRequest}/re-execute', [ApprovalRequestController::class, 'reExecute'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.re-execute');
         Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
     });
 });

@@ -13,7 +13,9 @@ use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\SupplierPayment;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 final class ApprovalWorkflowService
@@ -50,14 +52,34 @@ final class ApprovalWorkflowService
         return $approval;
     }
 
-    public function approve(ApprovalRequest $approvalRequest, ?string $note, ?Request $request = null): ApprovalRequest
+    public function approve(ApprovalRequest $approvalRequest, ?string $note, ?Request $request = null): bool
     {
-        $approvalRequest->update([
-            'status' => 'approved',
-            'approved_by_user_id' => (int) auth()->id(),
-            'approved_at' => now(),
-            'approval_note' => $note,
-        ]);
+        $approvedNow = false;
+        DB::transaction(function () use ($approvalRequest, $note, &$approvedNow): void {
+            $locked = ApprovalRequest::query()
+                ->whereKey($approvalRequest->id)
+                ->lockForUpdate()
+                ->first();
+            if (! $locked) {
+                throw new ModelNotFoundException('Approval request not found.');
+            }
+            if ((string) $locked->status !== 'pending') {
+                return;
+            }
+
+            $locked->update([
+                'status' => 'approved',
+                'approved_by_user_id' => (int) auth()->id(),
+                'approved_at' => now(),
+                'approval_note' => $note,
+            ]);
+
+            $approvedNow = true;
+        });
+        $approvalRequest->refresh();
+        if (! $approvedNow) {
+            return false;
+        }
 
         app(AuditLogService::class)->log(
             'approval.request.approve',
@@ -68,17 +90,49 @@ final class ApprovalWorkflowService
 
         $this->executeApprovedRequest($approvalRequest, $request);
 
-        return $approvalRequest->refresh();
+        return true;
     }
 
-    public function reject(ApprovalRequest $approvalRequest, ?string $note, ?Request $request = null): ApprovalRequest
+    public function reExecute(ApprovalRequest $approvalRequest, ?Request $request = null): bool
     {
-        $approvalRequest->update([
-            'status' => 'rejected',
-            'approved_by_user_id' => (int) auth()->id(),
-            'rejected_at' => now(),
-            'approval_note' => $note,
-        ]);
+        if ((string) $approvalRequest->status !== 'approved') {
+            return false;
+        }
+
+        $this->executeApprovedRequest($approvalRequest, $request);
+        $executionStatus = (string) data_get($approvalRequest->fresh()->payload, 'execution.status');
+
+        return $executionStatus === 'success';
+    }
+
+    public function reject(ApprovalRequest $approvalRequest, ?string $note, ?Request $request = null): bool
+    {
+        $rejectedNow = false;
+        DB::transaction(function () use ($approvalRequest, $note, &$rejectedNow): void {
+            $locked = ApprovalRequest::query()
+                ->whereKey($approvalRequest->id)
+                ->lockForUpdate()
+                ->first();
+            if (! $locked) {
+                throw new ModelNotFoundException('Approval request not found.');
+            }
+            if ((string) $locked->status !== 'pending') {
+                return;
+            }
+
+            $locked->update([
+                'status' => 'rejected',
+                'approved_by_user_id' => (int) auth()->id(),
+                'rejected_at' => now(),
+                'approval_note' => $note,
+            ]);
+
+            $rejectedNow = true;
+        });
+        $approvalRequest->refresh();
+        if (! $rejectedNow) {
+            return false;
+        }
 
         app(AuditLogService::class)->log(
             'approval.request.reject',
@@ -87,7 +141,7 @@ final class ApprovalWorkflowService
             $request
         );
 
-        return $approvalRequest->refresh();
+        return true;
     }
 
     private function executeApprovedRequest(ApprovalRequest $approvalRequest, ?Request $request = null): void

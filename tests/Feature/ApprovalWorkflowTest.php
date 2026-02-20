@@ -213,4 +213,114 @@ class ApprovalWorkflowTest extends TestCase
         $this->assertSame('Revisi approval', (string) $payment->notes);
         $this->assertSame(70000.0, (float) $supplier->outstanding_payable);
     }
+
+    public function test_admin_can_reexecute_failed_approved_request(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-APV-REX-01',
+            'name' => 'Customer Approval ReExecute',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-APV-REX',
+            'name' => 'Kategori Approval ReExecute',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-APV-REX',
+            'name' => 'Produk Approval ReExecute',
+            'unit' => 'pcs',
+            'stock' => 10,
+            'price_general' => 10000,
+            'is_active' => true,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-APV-REX-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-11',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 20000,
+            'total' => 20000,
+            'total_paid' => 0,
+            'balance' => 20000,
+            'payment_status' => 'unpaid',
+        ]);
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'quantity' => 2,
+            'unit_price' => 10000,
+            'discount' => 0,
+            'line_total' => 20000,
+        ]);
+
+        $approval = ApprovalRequest::query()->create([
+            'module' => 'transaction',
+            'action' => 'correction',
+            'status' => 'approved',
+            'subject_id' => $invoice->id,
+            'subject_type' => SalesInvoice::class,
+            'payload' => [
+                'type' => 'sales_invoice',
+                'requested_changes' => 'Ubah qty jadi 1',
+                'patch' => [
+                    'invoice_date' => '2026-02-11',
+                    'semester_period' => 'S2-2526',
+                    'notes' => 'Re-execute patch',
+                    'items' => [
+                        [
+                            'product_id' => $product->id,
+                            'quantity' => 1,
+                            'unit_price' => 10000,
+                            'discount' => 0,
+                        ],
+                    ],
+                ],
+                'execution' => [
+                    'status' => 'failed',
+                    'message' => 'Simulated previous failure',
+                ],
+            ],
+            'reason' => 'Retry execution',
+            'requested_by_user_id' => $admin->id,
+            'approved_by_user_id' => $admin->id,
+            'approved_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('approvals.re-execute', $approval));
+        $response->assertRedirect();
+
+        $approval->refresh();
+        $invoice->refresh();
+        $product->refresh();
+
+        $this->assertSame('approved', (string) $approval->status);
+        $this->assertSame('success', (string) data_get($approval->payload, 'execution.status'));
+        $this->assertSame('Re-execute patch', (string) $invoice->notes);
+        $this->assertSame(10000.0, (float) $invoice->total);
+        $this->assertSame(11.0, (float) $product->stock);
+    }
+
+    public function test_reexecute_rejects_non_approved_request_status(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $approval = ApprovalRequest::query()->create([
+            'module' => 'transaction',
+            'action' => 'correction',
+            'status' => 'pending',
+            'payload' => [
+                'type' => 'sales_invoice',
+                'patch' => ['items' => []],
+            ],
+            'requested_by_user_id' => $admin->id,
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('approvals.re-execute', $approval));
+        $response->assertRedirect();
+        $response->assertSessionHasErrors(['approval']);
+    }
 }

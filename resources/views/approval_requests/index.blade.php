@@ -62,6 +62,16 @@
                                     <button type="submit" class="btn secondary">Tolak</button>
                                 </form>
                             </div>
+                        @elseif($item->status === 'approved')
+                            @php($executionStatus = (string) data_get($item->payload, 'execution.status', ''))
+                            @if(in_array($executionStatus, ['failed', 'skipped'], true))
+                                <form method="post" action="{{ route('approvals.re-execute', $item) }}">
+                                    @csrf
+                                    <button type="submit" class="btn secondary">Ulangi Eksekusi</button>
+                                </form>
+                            @else
+                                -
+                            @endif
                         @else
                             -
                         @endif
