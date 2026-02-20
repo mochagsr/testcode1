@@ -40,6 +40,7 @@
                 <div class="flex">
                     <input type="number" id="school-count" min="1" max="100" value="1" style="max-width: 110px;">
                     <button type="button" class="btn secondary" id="generate-locations">{{ __('school_bulk.generate_school_rows') }}</button>
+                    <button type="button" class="btn secondary" id="fill-from-master">{{ __('school_bulk.fill_from_master') }}</button>
                     <button type="button" class="btn secondary" id="add-location">{{ __('txn.add_row') }}</button>
                 </div>
             </div>
@@ -109,6 +110,7 @@
             const SEARCH_DEBOUNCE_MS = 100;
             const schoolCountInput = document.getElementById('school-count');
             const generateLocationsBtn = document.getElementById('generate-locations');
+            const fillFromMasterBtn = document.getElementById('fill-from-master');
             const addLocationBtn = document.getElementById('add-location');
             const addItemBtn = document.getElementById('add-item');
             const customerSelect = document.getElementById('customer-id');
@@ -319,6 +321,54 @@
                 }
             }
 
+            async function fetchShipLocationPage(customerId, page = 1) {
+                try {
+                    if (shipLookupAbort) {
+                        shipLookupAbort.abort();
+                    }
+                    shipLookupAbort = new AbortController();
+                    const url = `${SHIP_LOCATION_LOOKUP_URL}?customer_id=${customerId}&search=&per_page=25&page=${page}`;
+                    const response = await fetch(url, { signal: shipLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!response.ok) {
+                        return null;
+                    }
+                    return await response.json();
+                } catch (error) {
+                    if (error && error.name === 'AbortError') {
+                        return null;
+                    }
+                    return null;
+                }
+            }
+
+            async function ensureMasterShipLocations(customerId, minimumCount) {
+                if (!Number.isFinite(minimumCount) || minimumCount <= 0) {
+                    return;
+                }
+                if (shipLocations.length >= minimumCount) {
+                    return;
+                }
+
+                const firstPage = await fetchShipLocationPage(customerId, 1);
+                if (!firstPage || !Array.isArray(firstPage.data)) {
+                    return;
+                }
+                upsertShipLocations(firstPage.data || []);
+                renderShipLocationSuggestions('');
+
+                const lastPage = Number(firstPage.last_page || 1);
+                let currentPage = 2;
+                while (shipLocations.length < minimumCount && currentPage <= lastPage) {
+                    const nextPage = await fetchShipLocationPage(customerId, currentPage);
+                    if (!nextPage || !Array.isArray(nextPage.data) || nextPage.data.length === 0) {
+                        break;
+                    }
+                    upsertShipLocations(nextPage.data || []);
+                    currentPage += 1;
+                }
+                renderShipLocationSuggestions('');
+            }
+
             function findShipLocationByLabel(label) {
                 if (!label) {
                     return null;
@@ -498,6 +548,35 @@
                         hiddenLocationId.value = '';
                     }
                 });
+            });
+            fillFromMasterBtn?.addEventListener('click', async () => {
+                const customerId = Number(customerSelect?.value || 0);
+                if (customerId <= 0) {
+                    alert(@json(__('school_bulk.select_customer_first')));
+                    return;
+                }
+                const count = Math.max(1, Math.min(100, Number(schoolCountInput?.value || 1)));
+                await ensureMasterShipLocations(customerId, count);
+                if (shipLocations.length === 0) {
+                    alert(@json(__('school_bulk.no_master_locations')));
+                    return;
+                }
+                const picked = shipLocations.slice(0, count);
+                locationsTbody.innerHTML = '';
+                picked.forEach((location) => {
+                    addLocationRow({
+                        customer_ship_location_id: location.id,
+                        school_name: location.school_name || '',
+                        recipient_phone: location.recipient_phone || '',
+                        city: location.city || '',
+                        address: location.address || '',
+                    });
+                });
+                if (picked.length < count) {
+                    for (let i = picked.length; i < count; i += 1) {
+                        addLocationRow();
+                    }
+                }
             });
 
             form?.addEventListener('submit', (event) => {
