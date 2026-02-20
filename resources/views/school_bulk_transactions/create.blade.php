@@ -12,12 +12,25 @@
             <div class="row">
                 <div class="col-6">
                     <label>{{ __('txn.customer') }} <span class="label-required">*</span></label>
-                    <select id="customer-id" name="customer_id" required>
-                        <option value="">{{ __('school_bulk.select_customer') }}</option>
+                    @php
+                        $customerMap = $customers->keyBy('id');
+                        $oldCustomerId = (int) old('customer_id', 0);
+                        $oldCustomerLabel = $oldCustomerId > 0 && $customerMap->has($oldCustomerId)
+                            ? $customerMap[$oldCustomerId]->name.' ('.($customerMap[$oldCustomerId]->city ?: '-').')'
+                            : '';
+                    @endphp
+                    <input type="text"
+                           id="customer-search"
+                           list="customers-list"
+                           value="{{ $oldCustomerLabel }}"
+                           placeholder="{{ __('school_bulk.select_customer') }}"
+                           required>
+                    <input type="hidden" id="customer-id" name="customer_id" value="{{ $oldCustomerId }}" required>
+                    <datalist id="customers-list">
                         @foreach($customers as $customer)
-                            <option value="{{ $customer->id }}" @selected((int) old('customer_id') === (int) $customer->id)>{{ $customer->name }}</option>
+                            <option value="{{ $customer->name }} ({{ $customer->city ?: '-' }})"></option>
                         @endforeach
-                    </select>
+                    </datalist>
                 </div>
                 <div class="col-3">
                     <label>{{ __('txn.date') }} <span class="label-required">*</span></label>
@@ -97,6 +110,10 @@
 
     <script>
         (function () {
+            let customers = @json($customers->values());
+            let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
+            let customerByLabel = new Map();
+            let customerByName = new Map();
             let products = @json($products->values());
             let productByLabel = new Map();
             let productByCode = new Map();
@@ -104,6 +121,7 @@
             let shipLocations = @json($shipLocations->values());
             let shipByLabel = new Map();
             let shipByName = new Map();
+            const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
             const SHIP_LOCATION_LOOKUP_URL = @json(route('customer-ship-locations.lookup'));
             const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
             const LOOKUP_LIMIT = 20;
@@ -113,7 +131,9 @@
             const fillFromMasterBtn = document.getElementById('fill-from-master');
             const addLocationBtn = document.getElementById('add-location');
             const addItemBtn = document.getElementById('add-item');
-            const customerSelect = document.getElementById('customer-id');
+            const customerSearch = document.getElementById('customer-search');
+            const customerIdField = document.getElementById('customer-id');
+            const customersList = document.getElementById('customers-list');
             const schoolLocationsList = document.getElementById('school-locations-list');
             const locationsTbody = document.querySelector('#locations-table tbody');
             const itemsTbody = document.querySelector('#items-table tbody');
@@ -122,6 +142,8 @@
             const form = document.querySelector('form');
             const oldLocations = @json(old('locations', []));
             const oldItems = @json(old('items', []));
+            let customerLookupAbort = null;
+            let lastCustomerLookupQuery = '';
             let shipLookupAbort = null;
             let lastShipLookupQuery = '';
             let productLookupAbort = null;
@@ -147,6 +169,111 @@
 
             function normalizeLookup(value) {
                 return String(value || '').trim().toLowerCase();
+            }
+
+            function customerLabel(customer) {
+                const city = customer.city || '-';
+                return `${customer.name} (${city})`;
+            }
+
+            function rebuildCustomerIndexes() {
+                customerByLabel = new Map();
+                customerByName = new Map();
+                customers.forEach((customer) => {
+                    customerByLabel.set(normalizeLookup(customerLabel(customer)), customer);
+                    customerByName.set(normalizeLookup(customer.name), customer);
+                });
+            }
+
+            function upsertCustomers(rows) {
+                const byId = new Map(customers.map((row) => [String(row.id), row]));
+                (rows || []).forEach((row) => byId.set(String(row.id), row));
+                customers = Array.from(byId.values());
+                customerById = new Map(customers.map((customer) => [String(customer.id), customer]));
+                rebuildCustomerIndexes();
+            }
+
+            function renderCustomerSuggestions(query) {
+                if (!customersList) {
+                    return;
+                }
+                const normalized = (query || '').trim().toLowerCase();
+                const matches = customers.filter((customer) => {
+                    const label = customerLabel(customer).toLowerCase();
+                    const name = (customer.name || '').toLowerCase();
+                    const city = (customer.city || '').toLowerCase();
+                    return normalized === '' || label.includes(normalized) || name.includes(normalized) || city.includes(normalized);
+                }).slice(0, 60);
+
+                customersList.innerHTML = matches
+                    .map((customer) => `<option value="${escapeAttribute(customerLabel(customer))}"></option>`)
+                    .join('');
+            }
+
+            async function fetchCustomerSuggestions(query) {
+                const normalizedQuery = normalizeLookup(query);
+                if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+                    lastCustomerLookupQuery = '';
+                    renderCustomerSuggestions(query);
+                    return;
+                }
+                if (normalizedQuery !== '' && normalizedQuery === lastCustomerLookupQuery) {
+                    renderCustomerSuggestions(query);
+                    return;
+                }
+                try {
+                    if (customerLookupAbort) {
+                        customerLookupAbort.abort();
+                    }
+                    customerLookupAbort = new AbortController();
+                    const url = `${CUSTOMER_LOOKUP_URL}?search=${encodeURIComponent(query)}&per_page=${LOOKUP_LIMIT}`;
+                    const response = await fetch(url, { signal: customerLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!response.ok) {
+                        return;
+                    }
+                    const payload = await response.json();
+                    lastCustomerLookupQuery = normalizedQuery;
+                    upsertCustomers(payload.data || []);
+                    renderCustomerSuggestions(query);
+                } catch (error) {
+                    if (error && error.name === 'AbortError') {
+                        return;
+                    }
+                }
+            }
+
+            function findCustomerByLabel(label) {
+                if (!label) {
+                    return null;
+                }
+                const normalized = normalizeLookup(label);
+                return customerByLabel.get(normalized)
+                    || customerByName.get(normalized)
+                    || null;
+            }
+
+            function findCustomerLoose(label) {
+                if (!label) {
+                    return null;
+                }
+                const normalized = String(label).trim().toLowerCase();
+                return customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
+                    || customers.find((customer) => String(customer.name || '').toLowerCase().includes(normalized))
+                    || null;
+            }
+
+            function getCustomerById(id) {
+                return customerById.get(String(id)) || null;
+            }
+
+            function applyCustomerSelection(customer) {
+                if (!customerIdField) {
+                    return;
+                }
+                customerIdField.value = customer ? customer.id : '';
+                if (customer && customerSearch) {
+                    customerSearch.value = customerLabel(customer);
+                }
             }
 
             function productLabel(product) {
@@ -285,7 +412,7 @@
             }
 
             async function fetchShipLocationSuggestions(query) {
-                const customerId = Number(customerSelect?.value || 0);
+                const customerId = Number(customerIdField?.value || 0);
                 if (customerId <= 0) {
                     renderShipLocationSuggestions(query);
                     return;
@@ -537,7 +664,7 @@
             });
             addLocationBtn?.addEventListener('click', () => addLocationRow());
             addItemBtn?.addEventListener('click', () => addItemRow());
-            customerSelect?.addEventListener('change', () => {
+            const resetMasterShipLocations = () => {
                 shipLocations = [];
                 lastShipLookupQuery = '';
                 rebuildShipIndexes();
@@ -548,9 +675,33 @@
                         hiddenLocationId.value = '';
                     }
                 });
-            });
+            };
+            if (customerSearch) {
+                const bootCustomer = customerIdField.value
+                    ? getCustomerById(customerIdField.value)
+                    : findCustomerByLabel(customerSearch.value);
+                applyCustomerSelection(bootCustomer);
+                const onCustomerInput = debounce(async (event) => {
+                    const previousCustomerId = String(customerIdField.value || '');
+                    await fetchCustomerSuggestions(event.currentTarget.value);
+                    const customer = findCustomerByLabel(event.currentTarget.value);
+                    applyCustomerSelection(customer);
+                    if (String(customerIdField.value || '') !== previousCustomerId) {
+                        resetMasterShipLocations();
+                    }
+                });
+                customerSearch.addEventListener('input', onCustomerInput);
+                customerSearch.addEventListener('change', (event) => {
+                    const previousCustomerId = String(customerIdField.value || '');
+                    const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
+                    applyCustomerSelection(customer);
+                    if (String(customerIdField.value || '') !== previousCustomerId) {
+                        resetMasterShipLocations();
+                    }
+                });
+            }
             fillFromMasterBtn?.addEventListener('click', async () => {
-                const customerId = Number(customerSelect?.value || 0);
+                const customerId = Number(customerIdField?.value || 0);
                 if (customerId <= 0) {
                     alert(@json(__('school_bulk.select_customer_first')));
                     return;
@@ -603,8 +754,10 @@
             } else {
                 addItemRow();
             }
+            rebuildCustomerIndexes();
             rebuildShipIndexes();
             rebuildProductIndexes();
+            renderCustomerSuggestions('');
             renderShipLocationSuggestions('');
             renderProductSuggestions('');
             syncSemesterFromDate();
