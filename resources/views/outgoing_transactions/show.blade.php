@@ -130,21 +130,31 @@
                         </tr>
                         </thead>
                         <tbody>
-                        @php($oldItems = old('items', $transaction->items->map(fn($item) => [
-                            'product_id' => $item->product_id,
-                            'product_name' => $item->product_name,
-                            'unit' => $item->unit,
-                            'quantity' => (int) round((float) $item->quantity),
-                            'unit_cost' => (int) round((float) $item->unit_cost),
-                            'notes' => $item->notes,
-                        ])->all()))
+                        @php
+                            $oldItems = old('items');
+                            if (! is_array($oldItems) || $oldItems === []) {
+                                $oldItems = $transaction->items->map(function ($item): array {
+                                    return [
+                                        'product_id' => $item->product_id,
+                                        'product_name' => $item->product_name,
+                                        'unit' => $item->unit,
+                                        'quantity' => (int) round((float) $item->quantity),
+                                        'unit_cost' => (int) round((float) $item->unit_cost),
+                                        'notes' => $item->notes,
+                                    ];
+                                })->all();
+                            }
+                        @endphp
                         @foreach($oldItems as $idx => $item)
+                            @php
+                                $match = $products->firstWhere('id', (int) ($item['product_id'] ?? 0));
+                                $productSearchValue = $match
+                                    ? (($match->code ? $match->code.' - ' : '').$match->name)
+                                    : '';
+                            @endphp
                             <tr>
                                 <td>
-                                    <input type="text" class="admin-product-search" list="admin-outgoing-products-list" value="@php
-                                        $match = $products->firstWhere('id', (int) ($item['product_id'] ?? 0));
-                                        echo e($match ? (($match->code ? $match->code.' - ' : '').$match->name) : '');
-                                    @endphp" placeholder="{{ __('txn.select_product') }}">
+                                    <input type="text" class="admin-product-search" list="admin-outgoing-products-list" value="{{ $productSearchValue }}" placeholder="{{ __('txn.select_product') }}">
                                     <input type="hidden" class="admin-product-id" name="items[{{ $idx }}][product_id]" value="{{ (int) ($item['product_id'] ?? 0) }}">
                                 </td>
                                 <td><input type="text" class="admin-product-name" name="items[{{ $idx }}][product_name]" value="{{ $item['product_name'] ?? '' }}" required></td>

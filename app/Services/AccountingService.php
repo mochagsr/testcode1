@@ -192,6 +192,61 @@ final class AccountingService
         );
     }
 
+    public function postDeliveryTripExpense(int $tripId, CarbonInterface $date, int $amount): void
+    {
+        if ($amount <= 0) {
+            return;
+        }
+
+        $this->postEntry(
+            entryType: 'delivery_trip_create',
+            entryDate: $date,
+            referenceType: \App\Models\DeliveryTrip::class,
+            referenceId: $tripId,
+            description: "Posting biaya perjalanan #{$tripId}",
+            lines: [
+                ['code' => '5102', 'debit' => $amount, 'memo' => 'Biaya operasional pengiriman'],
+                ['code' => '1101', 'credit' => $amount, 'memo' => 'Kas keluar'],
+            ]
+        );
+    }
+
+    public function postDeliveryTripAdjustment(int $tripId, CarbonInterface $date, int $difference): void
+    {
+        if ($difference === 0) {
+            return;
+        }
+
+        if ($difference > 0) {
+            $this->postEntry(
+                entryType: 'delivery_trip_adjustment',
+                entryDate: $date,
+                referenceType: \App\Models\DeliveryTrip::class,
+                referenceId: $tripId,
+                description: "Penyesuaian naik biaya perjalanan #{$tripId}",
+                lines: [
+                    ['code' => '5102', 'debit' => $difference, 'memo' => 'Koreksi biaya pengiriman (+)'],
+                    ['code' => '1101', 'credit' => $difference, 'memo' => 'Kas keluar koreksi'],
+                ]
+            );
+
+            return;
+        }
+
+        $abs = abs($difference);
+        $this->postEntry(
+            entryType: 'delivery_trip_adjustment',
+            entryDate: $date,
+            referenceType: \App\Models\DeliveryTrip::class,
+            referenceId: $tripId,
+            description: "Penyesuaian turun biaya perjalanan #{$tripId}",
+            lines: [
+                ['code' => '1101', 'debit' => $abs, 'memo' => 'Kas kembali koreksi'],
+                ['code' => '5102', 'credit' => $abs, 'memo' => 'Koreksi biaya pengiriman (-)'],
+            ]
+        );
+    }
+
     private function generateEntryNumber(string $date): string
     {
         $prefix = 'JR-'.date('Ymd', strtotime($date)).'-';
@@ -207,4 +262,3 @@ final class AccountingService
         return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 }
-

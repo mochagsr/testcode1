@@ -24,7 +24,7 @@ class SemesterTransactionPageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $type = trim((string) $request->string('type', ''));
         $semester = trim((string) $request->string('semester', ''));
-        $selectedType = in_array($type, ['all', 'sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)
+        $selectedType = in_array($type, ['all', 'sales_invoice', 'sales_return', 'delivery_note', 'delivery_trip', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)
             ? $type
             : 'all';
 
@@ -177,6 +177,11 @@ class SemesterTransactionPageController extends Controller
             ->selectRaw("'order_note' as tx_type, onote.id as tx_id, onote.note_date as tx_date, onote.note_number as tx_number, COALESCE(onote.customer_name, '-') as party_name, COALESCE(onote.city, '-') as city, NULL as amount, onote.is_canceled as is_canceled")
             ->whereBetween('onote.note_date', [$start, $end]);
 
+        $deliveryTripQuery = DB::table('delivery_trips as dt')
+            ->selectRaw("'delivery_trip' as tx_type, dt.id as tx_id, dt.trip_date as tx_date, dt.trip_number as tx_number, COALESCE(dt.driver_name, '-') as party_name, '-' as city, dt.total_cost as amount, 0 as is_canceled")
+            ->whereNull('dt.deleted_at')
+            ->whereBetween('dt.trip_date', [$start, $end]);
+
         $outgoingQuery = DB::table('outgoing_transactions as ot')
             ->leftJoin('suppliers as s', 's.id', '=', 'ot.supplier_id')
             ->selectRaw("'outgoing_transaction' as tx_type, ot.id as tx_id, ot.transaction_date as tx_date, ot.transaction_number as tx_number, COALESCE(s.name, s.company_name, '-') as party_name, '-' as city, ot.total as amount, 0 as is_canceled")
@@ -190,6 +195,7 @@ class SemesterTransactionPageController extends Controller
         $union = $invoiceQuery
             ->unionAll($returnQuery)
             ->unionAll($deliveryQuery)
+            ->unionAll($deliveryTripQuery)
             ->unionAll($orderQuery)
             ->unionAll($outgoingQuery)
             ->unionAll($receivablePaymentQuery);
@@ -203,6 +209,7 @@ class SemesterTransactionPageController extends Controller
             'sales_invoice' => route('sales-invoices.show', $id),
             'sales_return' => route('sales-returns.show', $id),
             'delivery_note' => route('delivery-notes.show', $id),
+            'delivery_trip' => route('delivery-trips.show', $id),
             'order_note' => route('order-notes.show', $id),
             'outgoing_transaction' => route('outgoing-transactions.show', $id),
             'receivable_payment' => route('receivable-payments.show', $id),
@@ -216,6 +223,7 @@ class SemesterTransactionPageController extends Controller
             'sales_invoice' => __('menu.sales_invoices'),
             'sales_return' => __('menu.sales_returns'),
             'delivery_note' => __('menu.delivery_notes'),
+            'delivery_trip' => __('menu.delivery_trip_logs'),
             'order_note' => __('menu.order_notes'),
             'outgoing_transaction' => __('menu.outgoing_transactions'),
             'receivable_payment' => __('menu.receivable_payments'),
@@ -304,6 +312,7 @@ class SemesterTransactionPageController extends Controller
             'sales_invoice' => 'sales_invoices',
             'sales_return' => 'sales_returns',
             'delivery_note' => 'delivery_notes',
+            'delivery_trip' => 'delivery_trips',
             'order_note' => 'order_notes',
             'outgoing_transaction' => 'outgoing_transactions',
             'receivable_payment' => 'receivables',

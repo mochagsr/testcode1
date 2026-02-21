@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\DeliveryNote;
+use App\Models\DeliveryTrip;
 use App\Models\OutgoingTransaction;
 use App\Models\OrderNote;
 use App\Models\Product;
@@ -71,7 +72,7 @@ class ReportExportController extends Controller
             'selectedOutgoingSupplierId' => $selectedOutgoingSupplierId,
             'selectedTransactionType' => $selectedTransactionType,
             'semesterOptions' => $this->semesterOptions(),
-            'semesterEnabledDatasets' => ['sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'receivables', 'outgoing_transactions', 'balance_sheet', 'income_statement', 'semester_transactions'],
+            'semesterEnabledDatasets' => ['sales_invoices', 'sales_returns', 'delivery_notes', 'delivery_trips', 'order_notes', 'receivables', 'outgoing_transactions', 'balance_sheet', 'income_statement', 'semester_transactions'],
             'receivableCustomers' => $receivableCustomers,
             'outgoingSuppliers' => $outgoingSuppliers,
             'exportTasks' => ReportExportTask::query()
@@ -389,6 +390,7 @@ class ReportExportController extends Controller
             'receivables' => __('report.datasets.receivables'),
             'sales_returns' => __('report.datasets.sales_returns'),
             'delivery_notes' => __('report.datasets.delivery_notes'),
+            'delivery_trips' => __('report.datasets.delivery_trips'),
             'order_notes' => __('report.datasets.order_notes'),
             'outgoing_transactions' => __('report.datasets.outgoing_transactions'),
             'income_statement' => __('report.datasets.income_statement'),
@@ -813,6 +815,38 @@ class ReportExportController extends Controller
                         ->all();
                 },
             ],
+            'delivery_trips' => [
+                'title' => __('report.titles.delivery_trips'),
+                'headers' => [
+                    __('delivery_trip.trip_number'),
+                    __('report.columns.date'),
+                    __('delivery_trip.driver_name'),
+                    __('delivery_trip.vehicle_plate'),
+                    __('delivery_trip.member_count'),
+                    __('delivery_trip.total_cost'),
+                    __('report.columns.created_by'),
+                ],
+                'rows' => function () use ($semesterRange): array {
+                    return DeliveryTrip::query()
+                        ->with('creator:id,name')
+                        ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
+                            $query->whereBetween('trip_date', [$semesterRange['start'], $semesterRange['end']]);
+                        })
+                        ->orderByDesc('trip_date')
+                        ->orderByDesc('id')
+                        ->get()
+                        ->map(fn(DeliveryTrip $row): array => [
+                            $row->trip_number,
+                            $row->trip_date?->format('d-m-Y'),
+                            $row->driver_name,
+                            $row->vehicle_plate ?: '-',
+                            (int) $row->member_count,
+                            (int) $row->total_cost,
+                            $row->creator?->name ?: '-',
+                        ])
+                        ->all();
+                },
+            ],
             'order_notes' => [
                 'title' => __('report.titles.order_notes'),
                 'headers' => [
@@ -983,6 +1017,10 @@ class ReportExportController extends Controller
                     $deliveryQuery = DB::table('delivery_notes as dn')
                         ->selectRaw("'delivery_note' as tx_type, dn.id as tx_id, dn.note_date as tx_date, dn.note_number as tx_number, COALESCE(dn.recipient_name, '-') as party_name, COALESCE(dn.city, '-') as city, NULL as amount, dn.is_canceled as is_canceled")
                         ->whereBetween('dn.note_date', [$start, $end]);
+                    $deliveryTripQuery = DB::table('delivery_trips as dt')
+                        ->selectRaw("'delivery_trip' as tx_type, dt.id as tx_id, dt.trip_date as tx_date, dt.trip_number as tx_number, COALESCE(dt.driver_name, '-') as party_name, '-' as city, dt.total_cost as amount, 0 as is_canceled")
+                        ->whereNull('dt.deleted_at')
+                        ->whereBetween('dt.trip_date', [$start, $end]);
                     $orderQuery = DB::table('order_notes as onote')
                         ->selectRaw("'order_note' as tx_type, onote.id as tx_id, onote.note_date as tx_date, onote.note_number as tx_number, COALESCE(onote.customer_name, '-') as party_name, COALESCE(onote.city, '-') as city, NULL as amount, onote.is_canceled as is_canceled")
                         ->whereBetween('onote.note_date', [$start, $end]);
@@ -998,11 +1036,12 @@ class ReportExportController extends Controller
                     $union = $invoiceQuery
                         ->unionAll($returnQuery)
                         ->unionAll($deliveryQuery)
+                        ->unionAll($deliveryTripQuery)
                         ->unionAll($orderQuery)
                         ->unionAll($outgoingQuery)
                         ->unionAll($receivablePaymentQuery);
                     $query = DB::query()->fromSub($union, 'semester_transactions');
-                    if ($type !== 'all' && in_array($type, ['sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)) {
+                    if ($type !== 'all' && in_array($type, ['sales_invoice', 'sales_return', 'delivery_note', 'delivery_trip', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)) {
                         $query->where('tx_type', $type);
                     }
 
@@ -1241,7 +1280,7 @@ class ReportExportController extends Controller
             return null;
         }
 
-        return in_array($type, ['all', 'sales_invoice', 'sales_return', 'delivery_note', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)
+        return in_array($type, ['all', 'sales_invoice', 'sales_return', 'delivery_note', 'delivery_trip', 'order_note', 'outgoing_transaction', 'receivable_payment'], true)
             ? $type
             : null;
     }

@@ -12,6 +12,7 @@ return [
     'sales_returns' => 'Retur Penjualan',
     'delivery_notes' => 'Surat Jalan',
     'order_notes' => 'Surat Pesanan',
+    'delivery_trip_logs' => 'Catatan Perjalanan',
     'outgoing_transactions' => 'Transaksi Keluar',
     'receivables' => 'Piutang',
     'receivable_ledger' => 'Piutang',

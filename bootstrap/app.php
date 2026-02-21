@@ -1,5 +1,21 @@
 <?php
 
+// Prevent stale optimized bootstrap cache from leaking into PHPUnit runs.
+if ((string) ($_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?? '') === 'testing') {
+    $cacheFiles = [
+        __DIR__.'/cache/config.php',
+        __DIR__.'/cache/routes-v7.php',
+        __DIR__.'/cache/events.php',
+        __DIR__.'/cache/services.php',
+        __DIR__.'/cache/packages.php',
+    ];
+    foreach ($cacheFiles as $cacheFile) {
+        if (is_file($cacheFile)) {
+            @unlink($cacheFile);
+        }
+    }
+}
+
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;

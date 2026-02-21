@@ -22,6 +22,7 @@
                     <option value="sales_invoice" @selected($selectedType === 'sales_invoice')>{{ __('menu.sales_invoices') }}</option>
                     <option value="sales_return" @selected($selectedType === 'sales_return')>{{ __('menu.sales_returns') }}</option>
                     <option value="delivery_note" @selected($selectedType === 'delivery_note')>{{ __('menu.delivery_notes') }}</option>
+                    <option value="delivery_trip" @selected($selectedType === 'delivery_trip')>{{ __('menu.delivery_trip_logs') }}</option>
                     <option value="order_note" @selected($selectedType === 'order_note')>{{ __('menu.order_notes') }}</option>
                     <option value="outgoing_transaction" @selected($selectedType === 'outgoing_transaction')>{{ __('menu.outgoing_transactions') }}</option>
                     <option value="receivable_payment" @selected($selectedType === 'receivable_payment')>{{ __('menu.receivable_payments') }}</option>

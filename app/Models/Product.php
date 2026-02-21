@@ -222,14 +222,14 @@ class Product extends Model
     }
 
     /**
-     * Scope: Filter by low stock (useful for inventory alerts).
+     * Scope: Filter by low stock (stock <= threshold).
      *
      * @param  Builder<Product>  $query
      * @param  int  $threshold
      * @return Builder<Product>
      */
-    public function scopeLowStock(Builder $query, int $threshold = 10): Builder
+    public function scopeLowStock(Builder $query, int $threshold = 0): Builder
     {
-        return $query->where('stock', '<', $threshold);
+        return $query->where('stock', '<=', max(0, $threshold));
     }
 }

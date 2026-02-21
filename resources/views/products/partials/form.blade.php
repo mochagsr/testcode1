@@ -10,9 +10,15 @@
                         @php
                             $categoryMap = $categories->keyBy('id');
                             $oldCategoryId = old('item_category_id', $product?->item_category_id);
-                            $oldCategoryLabel = $oldCategoryId && $categoryMap->has($oldCategoryId)
-                                ? $categoryMap[$oldCategoryId]->code.' - '.$categoryMap[$oldCategoryId]->name
-                                : '';
+                            $oldCategoryLabel = '';
+                            if ($oldCategoryId && $categoryMap->has($oldCategoryId)) {
+                                $selectedCategory = $categoryMap[$oldCategoryId];
+                                $selectedCode = trim((string) $selectedCategory->code);
+                                $selectedName = trim((string) $selectedCategory->name);
+                                $oldCategoryLabel = $selectedCode !== '' && strcasecmp($selectedCode, $selectedName) !== 0
+                                    ? $selectedCode.' - '.$selectedName
+                                    : $selectedName;
+                            }
                         @endphp
                         <input
                             id="product-category-search"
@@ -25,7 +31,14 @@
                         <input id="product-category" type="hidden" name="item_category_id" value="{{ $oldCategoryId }}" required>
                         <datalist id="product-categories-list">
                             @foreach($categories as $category)
-                                <option value="{{ $category->code }} - {{ $category->name }}"></option>
+                                @php
+                                    $categoryCode = trim((string) $category->code);
+                                    $categoryName = trim((string) $category->name);
+                                    $categoryLabel = $categoryCode !== '' && strcasecmp($categoryCode, $categoryName) !== 0
+                                        ? $categoryCode.' - '.$categoryName
+                                        : $categoryName;
+                                @endphp
+                                <option value="{{ $categoryLabel }}"></option>
                             @endforeach
                         </datalist>
                     </div>
@@ -70,25 +83,25 @@
                 <h3 class="form-section-title">{{ __('ui.product_stock_price') }}</h3>
                 <p class="form-section-note">{{ __('ui.product_stock_price_note') }}</p>
                 <div class="row">
-                    <div class="col-3">
+                    <div class="col-4">
                         <label>{{ __('ui.stock') }} <span class="label-required">*</span></label>
                         @php $stockValue = old('stock', $product?->stock); @endphp
                         <input id="product-stock-display" type="text" inputmode="numeric" value="{{ $stockValue !== null ? number_format((int) round((float) $stockValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
                         <input id="product-stock" type="hidden" name="stock" value="{{ $stockValue !== null ? (int) round((float) $stockValue) : '' }}" required>
                     </div>
-                    <div class="col-3">
+                    <div class="col-4">
                         <label>{{ __('ui.price_agent') }} <span class="label-required">*</span></label>
                         @php $priceAgentValue = old('price_agent', $product?->price_agent); @endphp
                         <input id="product-price-agent-display" type="text" inputmode="numeric" value="{{ $priceAgentValue !== null ? number_format((int) round((float) $priceAgentValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
                         <input id="product-price-agent" type="hidden" name="price_agent" value="{{ $priceAgentValue !== null ? (int) round((float) $priceAgentValue) : '' }}" required>
                     </div>
-                    <div class="col-3">
+                    <div class="col-4">
                         <label>{{ __('ui.price_sales') }} <span class="label-required">*</span></label>
                         @php $priceSalesValue = old('price_sales', $product?->price_sales); @endphp
                         <input id="product-price-sales-display" type="text" inputmode="numeric" value="{{ $priceSalesValue !== null ? number_format((int) round((float) $priceSalesValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
                         <input id="product-price-sales" type="hidden" name="price_sales" value="{{ $priceSalesValue !== null ? (int) round((float) $priceSalesValue) : '' }}" required>
                     </div>
-                    <div class="col-3">
+                    <div class="col-4">
                         <label>{{ __('ui.price_general') }} <span class="label-required">*</span></label>
                         @php $priceGeneralValue = old('price_general', $product?->price_general); @endphp
                         <input id="product-price-general-display" type="text" inputmode="numeric" value="{{ $priceGeneralValue !== null ? number_format((int) round((float) $priceGeneralValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
@@ -202,7 +215,12 @@
         }
 
         function categoryLabel(category) {
-            return `${category.code} - ${category.name}`;
+            const code = String(category.code || '').trim();
+            const name = String(category.name || '').trim();
+            if (code !== '' && code.toLowerCase() !== name.toLowerCase()) {
+                return `${code} - ${name}`;
+            }
+            return name;
         }
 
         function findCategoryByLabel(value) {

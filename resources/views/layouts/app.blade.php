@@ -474,6 +474,7 @@
                 <a href="{{ route('sales-invoices.index') }}" class="{{ request()->routeIs('sales-invoices.*') ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
                 <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
                 <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
+                <a href="{{ route('delivery-trips.index') }}" class="{{ request()->routeIs('delivery-trips.*') ? 'active' : '' }}">{{ __('menu.delivery_trip_logs') }}</a>
                 <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
             </div>
             <div class="nav-group">

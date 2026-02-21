@@ -94,13 +94,12 @@
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
                 <tr>
-                    <th style="width: 30%">{{ __('txn.product') }} *</th>
-                    <th style="width: 20%">{{ __('txn.name') }}</th>
+                    <th style="width: 42%">{{ __('txn.product') }} *</th>
                     <th style="width: 9%">{{ __('txn.unit') }}</th>
                     <th style="width: 9%">{{ __('txn.qty') }} *</th>
                     <th style="width: 14%">{{ __('txn.price') }} *</th>
                     <th style="width: 14%">{{ __('txn.subtotal') }}</th>
-                    <th style="width: 22%">{{ __('txn.notes') }}</th>
+                    <th style="width: 20%">{{ __('txn.notes') }}</th>
                     <th></th>
                 </tr>
                 </thead>
@@ -391,7 +390,7 @@
                 Array.from(tableBody.querySelectorAll('tr')).forEach((row, index) => {
                     const mapping = [
                         ['.product-id', `items[${index}][product_id]`],
-                        ['.product-name-manual', `items[${index}][product_name]`],
+                        ['.product-name', `items[${index}][product_name]`],
                         ['.unit', `items[${index}][unit]`],
                         ['.qty', `items[${index}][quantity]`],
                         ['.unit-cost', `items[${index}][unit_cost]`],
@@ -451,9 +450,7 @@
                     <td>
                         <input type="text" class="product-search" list="outgoing-products-list" placeholder="{{ __('txn.select_product') }}">
                         <input type="hidden" class="product-id" name="items[${index}][product_id]" value="">
-                    </td>
-                    <td>
-                        <input type="text" class="product-name-manual" name="items[${index}][product_name]" placeholder="{{ __('txn.manual_item') }}" required>
+                        <input type="hidden" class="product-name" name="items[${index}][product_name]" value="">
                     </td>
                     <td>
                         <select class="unit w-xs" name="items[${index}][unit]">${buildUnitOptions(unitValue)}</select>
@@ -472,7 +469,7 @@
 
                 const productSearch = tr.querySelector('.product-search');
                 const productId = tr.querySelector('.product-id');
-                const productName = tr.querySelector('.product-name-manual');
+                const productName = tr.querySelector('.product-name');
                 const unitField = tr.querySelector('.unit');
                 const unitCostField = tr.querySelector('.unit-cost');
 
@@ -485,9 +482,11 @@
 
                 const onProductInput = debounce(async () => {
                     await fetchProductSuggestions(productSearch.value);
+                    const typedName = String(productSearch.value || '').trim();
                     const product = findProductByLabel(productSearch.value);
                     if (!product) {
                         productId.value = '';
+                        productName.value = typedName;
                         return;
                     }
                     productId.value = product.id;
@@ -504,9 +503,11 @@
                 });
 
                 productSearch.addEventListener('change', () => {
+                    const typedName = String(productSearch.value || '').trim();
                     const product = findProductByLabel(productSearch.value) || findProductLoose(productSearch.value);
                     if (!product) {
                         productId.value = '';
+                        productName.value = typedName;
                         return;
                     }
                     productSearch.value = productLabel(product);
@@ -558,7 +559,7 @@
                 const rows = Array.from(tableBody.querySelectorAll('tr'));
                 const hasRows = rows.length > 0;
                 const invalidRows = rows.some((row) => {
-                    const productName = String(row.querySelector('.product-name-manual')?.value || '').trim();
+                    const productName = String(row.querySelector('.product-name')?.value || '').trim();
                     const qty = Number(row.querySelector('.qty')?.value || 0);
                     const cost = Number(row.querySelector('.unit-cost')?.value || 0);
                     return productName === '' || qty < 1 || cost < 0;

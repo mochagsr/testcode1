@@ -40,6 +40,7 @@
                 <option value="sales_invoice" @selected($selectedTransactionType === 'sales_invoice')>Sales Invoice</option>
                 <option value="sales_return" @selected($selectedTransactionType === 'sales_return')>Sales Return</option>
                 <option value="delivery_note" @selected($selectedTransactionType === 'delivery_note')>Delivery Note</option>
+                <option value="delivery_trip" @selected($selectedTransactionType === 'delivery_trip')>Delivery Trip</option>
                 <option value="order_note" @selected($selectedTransactionType === 'order_note')>Order Note</option>
                 <option value="outgoing_transaction" @selected($selectedTransactionType === 'outgoing_transaction')>Outgoing</option>
                 <option value="receivable_payment" @selected($selectedTransactionType === 'receivable_payment')>Receivable Payment</option>
@@ -202,4 +203,3 @@
         })();
     </script>
 @endsection
-

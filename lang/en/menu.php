@@ -12,6 +12,7 @@ return [
     'sales_returns' => 'Sales Returns',
     'delivery_notes' => 'Delivery Notes',
     'order_notes' => 'Order Notes',
+    'delivery_trip_logs' => 'Delivery Trip Logs',
     'outgoing_transactions' => 'Outgoing Transactions',
     'receivables' => 'Receivables',
     'receivable_ledger' => 'Receivables',

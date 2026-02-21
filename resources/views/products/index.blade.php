@@ -49,6 +49,7 @@
                 <th>{{ __('ui.name') }}</th>
                 <th>{{ __('ui.category') }}</th>
                 <th>{{ __('ui.stock') }}</th>
+                <th>{{ __('ui.stock_alert') }}</th>
                 <th>{{ __('ui.price_agent') }}</th>
                 <th>{{ __('ui.price_sales') }}</th>
                 <th>{{ __('ui.price_general') }}</th>
@@ -68,6 +69,13 @@
                     <td>{{ $product->name }}</td>
                     <td>{{ $product->category?->name ?: '-' }}</td>
                     <td>{{ (int) round($product->stock) }}</td>
+                    <td>
+                        @if((int) round($product->stock) <= 0)
+                            <span class="badge danger">{{ __('ui.stock_alert_low') }}</span>
+                        @else
+                            <span class="badge success">{{ __('ui.stock_alert_ok') }}</span>
+                        @endif
+                    </td>
                     <td>Rp {{ number_format((int) round($product->price_agent), 0, ',', '.') }}</td>
                     <td>Rp {{ number_format((int) round($product->price_sales), 0, ',', '.') }}</td>
                     <td>Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
@@ -84,7 +92,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="muted">{{ __('ui.no_products') }}</td></tr>
+                <tr><td colspan="9" class="muted">{{ __('ui.no_products') }}</td></tr>
             @endforelse
             </tbody>
         </table>

@@ -10,6 +10,7 @@ use App\Http\Controllers\CustomerLevelController;
 use App\Http\Controllers\CustomerLevelPageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryNotePageController;
+use App\Http\Controllers\DeliveryTripPageController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ItemCategoryPageController;
 use App\Http\Controllers\MassImportController;
@@ -105,6 +106,16 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::post('/order-notes/{orderNote}/cancel', [OrderNotePageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
         ->name('order-notes.cancel');
+
+    Route::get('/delivery-trips', [DeliveryTripPageController::class, 'index'])->middleware('perm:transactions.view')->name('delivery-trips.index');
+    Route::get('/delivery-trips/create', [DeliveryTripPageController::class, 'create'])->middleware('perm:transactions.create')->name('delivery-trips.create');
+    Route::post('/delivery-trips', [DeliveryTripPageController::class, 'store'])->middleware(['finance.unlocked', 'idempotent'])->name('delivery-trips.store');
+    Route::get('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'show'])->middleware('perm:transactions.view')->name('delivery-trips.show');
+    Route::get('/delivery-trips/{deliveryTrip}/edit', [DeliveryTripPageController::class, 'edit'])->middleware('perm:transactions.create')->name('delivery-trips.edit');
+    Route::put('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'update'])->middleware(['finance.unlocked', 'perm:transactions.create'])->name('delivery-trips.update');
+    Route::get('/delivery-trips/{deliveryTrip}/print', [DeliveryTripPageController::class, 'print'])->middleware('perm:transactions.export')->name('delivery-trips.print');
+    Route::get('/delivery-trips/{deliveryTrip}/pdf', [DeliveryTripPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('delivery-trips.export.pdf');
+    Route::get('/delivery-trips/{deliveryTrip}/excel', [DeliveryTripPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('delivery-trips.export.excel');
 
     Route::get('/outgoing-transactions', [OutgoingTransactionPageController::class, 'index'])->middleware('perm:transactions.view')->name('outgoing-transactions.index');
     Route::get('/outgoing-transactions/create', [OutgoingTransactionPageController::class, 'create'])->middleware('perm:transactions.create')->name('outgoing-transactions.create');
