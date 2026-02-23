@@ -191,8 +191,12 @@ class SupplierStockCardPageController extends Controller
             'date_from' => ['nullable', 'string'],
             'date_to' => ['nullable', 'string'],
         ]);
+        $flashMeta = [
+            'type' => 'edit',
+            'message' => __('supplier_stock.stock_updated_success', ['product' => (string) ($data['product_name'] ?? '-')]),
+        ];
 
-        $result = DB::transaction(function () use ($data, $request): array {
+        $result = DB::transaction(function () use ($data, $request, &$flashMeta): array {
             $product = $this->resolveProductForStockUpdate($data);
             $supplierId = max(0, (int) ($data['supplier_id'] ?? 0));
             $targetStock = (int) $data['stock'];
@@ -202,6 +206,7 @@ class SupplierStockCardPageController extends Controller
                 $displayStockBefore = $this->resolveSupplierProductBalance($supplierId, $product);
                 $supplierDelta = $targetStock - $displayStockBefore;
                 if ($supplierDelta === 0) {
+                    $flashMeta = $this->buildSupplierStockFlashMeta($product, $displayStockBefore, $targetStock);
                     return [
                         'product' => $product,
                         'display_stock' => $displayStockBefore,
@@ -231,6 +236,9 @@ class SupplierStockCardPageController extends Controller
                     ['stock' => $oldStock, 'supplier_stock' => $displayStockBefore],
                     ['stock' => $newStock, 'supplier_stock' => $targetStock]
                 );
+                $product->refresh();
+                $product->load('category:id,code,name');
+                $flashMeta = $this->buildSupplierStockFlashMeta($product, $displayStockBefore, $targetStock);
 
                 return [
                     'product' => $product->fresh(),
@@ -239,6 +247,7 @@ class SupplierStockCardPageController extends Controller
             }
 
             if ($oldStock === $targetStock) {
+                $flashMeta = $this->buildSupplierStockFlashMeta($product, $oldStock, $targetStock);
                 return [
                     'product' => $product,
                     'display_stock' => $oldStock,
@@ -268,6 +277,9 @@ class SupplierStockCardPageController extends Controller
                 ['stock' => $oldStock],
                 ['stock' => $targetStock]
             );
+            $product->refresh();
+            $product->load('category:id,code,name');
+            $flashMeta = $this->buildSupplierStockFlashMeta($product, $oldStock, $targetStock);
 
             return [
                 'product' => $product->fresh(),
@@ -288,7 +300,8 @@ class SupplierStockCardPageController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'ok' => true,
-                'message' => __('supplier_stock.stock_updated_success', ['product' => $product->name]),
+                'message' => (string) ($flashMeta['message'] ?? __('supplier_stock.stock_updated_success', ['product' => $product->name])),
+                'message_type' => (string) ($flashMeta['type'] ?? 'edit'),
                 'product' => [
                     'id' => (int) $product->id,
                     'name' => (string) $product->name,
@@ -300,7 +313,88 @@ class SupplierStockCardPageController extends Controller
 
         return redirect()
             ->route('supplier-stock-cards.index', array_filter($query, fn($value): bool => $value !== null && $value !== ''))
-            ->with('success', __('supplier_stock.stock_updated_success', ['product' => $product->name]));
+            ->with('success', (string) ($flashMeta['message'] ?? __('supplier_stock.stock_updated_success', ['product' => $product->name])))
+            ->with('success_type', (string) ($flashMeta['type'] ?? 'edit'));
+    }
+
+    /**
+     * @return array{type:string,message:string}
+     */
+    private function buildSupplierStockFlashMeta(Product $product, int $oldStock, int $newStock): array
+    {
+        $priceSegment = __('ui.stock_change_price_segment', [
+            'agent' => number_format((int) round((float) $product->price_agent), 0, ',', '.'),
+            'sales' => number_format((int) round((float) $product->price_sales), 0, ',', '.'),
+            'general' => number_format((int) round((float) $product->price_general), 0, ',', '.'),
+        ]);
+
+        $category = $this->productCategoryLabel($product);
+        $code = trim((string) ($product->code ?? '')) !== '' ? (string) $product->code : '-';
+        $name = (string) $product->name;
+        $stockText = number_format($newStock, 0, ',', '.');
+        $delta = $newStock - $oldStock;
+
+        if ($delta > 0) {
+            return [
+                'type' => 'increase',
+                'message' => __('ui.stock_change_increase_message', [
+                    'code' => $code,
+                    'category' => $category,
+                    'name' => $name,
+                    'stock' => $stockText,
+                    'delta' => number_format($delta, 0, ',', '.'),
+                    'price_segment' => $priceSegment,
+                ]),
+            ];
+        }
+
+        if ($delta < 0) {
+            return [
+                'type' => 'decrease',
+                'message' => __('ui.stock_change_decrease_message', [
+                    'code' => $code,
+                    'category' => $category,
+                    'name' => $name,
+                    'stock' => $stockText,
+                    'delta' => number_format(abs($delta), 0, ',', '.'),
+                    'price_segment' => $priceSegment,
+                ]),
+            ];
+        }
+
+        return [
+            'type' => 'edit',
+            'message' => __('ui.stock_change_edit_message', [
+                'code' => $code,
+                'category' => $category,
+                'name' => $name,
+                'changes' => __('ui.stock_change_fields_none'),
+                'price_segment' => $priceSegment,
+            ]),
+        ];
+    }
+
+    private function productCategoryLabel(Product $product): string
+    {
+        $product->loadMissing('category:id,code,name');
+        $category = $product->category;
+        if (! $category) {
+            return '-';
+        }
+
+        $code = trim((string) ($category->code ?? ''));
+        $name = trim((string) ($category->name ?? ''));
+        if ($code !== '' && $name !== '') {
+            return "{$code} - {$name}";
+        }
+        if ($name !== '') {
+            return $name;
+        }
+        if ($code !== '') {
+            return $code;
+        }
+
+        return '-';
     }
 
     /**

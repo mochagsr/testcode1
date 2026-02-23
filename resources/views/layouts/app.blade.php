@@ -19,6 +19,15 @@
             --alert-success-bg: #effaf0;
             --alert-success-border: #9bd3a1;
             --alert-success-text: #12301a;
+            --alert-increase-bg: #e7f8ee;
+            --alert-increase-border: #58a36e;
+            --alert-increase-text: #10351e;
+            --alert-decrease-bg: #fdecec;
+            --alert-decrease-border: #d16363;
+            --alert-decrease-text: #4a1212;
+            --alert-edit-bg: #fff8da;
+            --alert-edit-border: #d6b24a;
+            --alert-edit-text: #4d3a00;
             --alert-error-bg: #fff0f0;
             --alert-error-border: #f1a5a5;
             --alert-error-text: #3a1515;
@@ -332,16 +341,36 @@
             border-radius: 8px;
             margin-bottom: 12px;
             border: 1px solid;
+            transition: opacity 0.2s ease, transform 0.2s ease;
         }
         .alert.success {
             background: var(--alert-success-bg);
             border-color: var(--alert-success-border);
             color: var(--alert-success-text);
         }
+        .alert.increase {
+            background: var(--alert-increase-bg);
+            border-color: var(--alert-increase-border);
+            color: var(--alert-increase-text);
+        }
+        .alert.decrease {
+            background: var(--alert-decrease-bg);
+            border-color: var(--alert-decrease-border);
+            color: var(--alert-decrease-text);
+        }
+        .alert.edit {
+            background: var(--alert-edit-bg);
+            border-color: var(--alert-edit-border);
+            color: var(--alert-edit-text);
+        }
         .alert.error {
             background: var(--alert-error-bg);
             border-color: var(--alert-error-border);
             color: var(--alert-error-text);
+        }
+        .alert.is-hiding {
+            opacity: 0;
+            transform: translateY(-4px);
         }
         .muted { color: var(--muted); }
         .flex {
@@ -444,7 +473,7 @@
 @php
     $isDark = auth()->check() && auth()->user()->theme === 'dark';
 @endphp
-<body @if($isDark) style="--bg:#111;--card:#1b1b1b;--text:#f2f2f2;--muted:#b3b3b3;--border:#333;--accent:#fff;--btn-primary-bg:#f2f2f2;--btn-primary-text:#111111;--btn-secondary-bg:#1b1b1b;--btn-secondary-text:#f2f2f2;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
+<body @if($isDark) style="--bg:#111;--card:#1b1b1b;--text:#f2f2f2;--muted:#b3b3b3;--border:#333;--accent:#fff;--btn-primary-bg:#f2f2f2;--btn-primary-text:#111111;--btn-secondary-bg:#1b1b1b;--btn-secondary-text:#f2f2f2;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-increase-bg:#11301f;--alert-increase-border:#4fb06e;--alert-increase-text:#d9ffe7;--alert-decrease-bg:#3a1717;--alert-decrease-border:#d86868;--alert-decrease-text:#ffd9d9;--alert-edit-bg:#3f3415;--alert-edit-border:#d3b25a;--alert-edit-text:#ffedb8;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
 <div class="wrap">
     <aside class="sidebar">
         <div class="brand">PgPOS ERP</div>
@@ -541,8 +570,25 @@
         </nav>
     </aside>
     <main class="main">
-        @if (session('success'))
-            <div class="alert success">{{ session('success') }}</div>
+        @php
+            $successMessage = (string) session('success', '');
+            $successTypeRaw = (string) session('success_type', '');
+            $successType = in_array($successTypeRaw, ['increase', 'decrease', 'edit'], true) ? $successTypeRaw : '';
+            if ($successType === '' && $successMessage !== '') {
+                $successMessageLower = mb_strtolower($successMessage);
+                if (str_contains($successMessageLower, 'dikurang') || str_contains($successMessageLower, 'berkurang') || str_contains($successMessageLower, 'pengurangan') || str_contains($successMessageLower, 'batal') || str_contains($successMessageLower, 'hapus') || str_contains($successMessageLower, 'decrease') || str_contains($successMessageLower, 'reduced') || str_contains($successMessageLower, 'cancel')) {
+                    $successType = 'decrease';
+                } elseif (str_contains($successMessageLower, 'ditambah') || str_contains($successMessageLower, 'bertambah') || str_contains($successMessageLower, 'penambahan') || str_contains($successMessageLower, 'tambah') || str_contains($successMessageLower, 'created') || str_contains($successMessageLower, 'added') || str_contains($successMessageLower, 'increase')) {
+                    $successType = 'increase';
+                } elseif (str_contains($successMessageLower, 'diperbarui') || str_contains($successMessageLower, 'diubah') || str_contains($successMessageLower, 'edit') || str_contains($successMessageLower, 'updated')) {
+                    $successType = 'edit';
+                } else {
+                    $successType = 'success';
+                }
+            }
+        @endphp
+        @if ($successMessage !== '')
+            <div class="alert {{ $successType }} js-auto-hide-alert">{{ $successMessage }}</div>
         @endif
         @if ($errors->any())
             <div class="alert error">
@@ -629,6 +675,39 @@
             canSearchInput,
             deriveSemesterFromDate,
         });
+    })();
+</script>
+<script>
+    (function () {
+        const autoHide = (alertNode) => {
+            if (!alertNode) return;
+            setTimeout(() => {
+                alertNode.classList.add('is-hiding');
+                setTimeout(() => alertNode.remove(), 220);
+            }, 3000);
+        };
+
+        const normalizeType = (type) => {
+            const value = String(type || '').toLowerCase();
+            if (value === 'increase' || value === 'decrease' || value === 'edit' || value === 'success' || value === 'error') {
+                return value;
+            }
+            return 'success';
+        };
+
+        window.PgposFlash = Object.assign({}, window.PgposFlash || {}, {
+            show(message, type = 'success') {
+                const target = document.querySelector('.main');
+                if (!target || !message) return;
+                const alertNode = document.createElement('div');
+                alertNode.className = 'alert ' + normalizeType(type) + ' js-auto-hide-alert';
+                alertNode.textContent = String(message);
+                target.insertBefore(alertNode, target.firstChild);
+                autoHide(alertNode);
+            }
+        });
+
+        document.querySelectorAll('.js-auto-hide-alert').forEach(autoHide);
     })();
 </script>
 </body>

@@ -188,16 +188,31 @@ class ProductPageController extends Controller
         $data = $this->validatePayload($request, $product->id);
         $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name'], $product->id);
         $data['is_active'] = true;
+        $flashMeta = [
+            'type' => 'edit',
+            'message' => __('ui.product_updated_success'),
+        ];
 
-        DB::transaction(function () use (&$product, $data, $request): void {
+        DB::transaction(function () use (&$product, $data, $request, &$flashMeta): void {
             $lockedProduct = Product::query()
+                ->with('category:id,code,name')
                 ->whereKey($product->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $oldSnapshot = [
+                'name' => (string) $lockedProduct->name,
+                'unit' => (string) $lockedProduct->unit,
+                'item_category_id' => (int) $lockedProduct->item_category_id,
+                'price_agent' => (int) round((float) $lockedProduct->price_agent),
+                'price_sales' => (int) round((float) $lockedProduct->price_sales),
+                'price_general' => (int) round((float) $lockedProduct->price_general),
+            ];
             $oldStock = (int) $lockedProduct->stock;
             $newStock = (int) ($data['stock'] ?? 0);
             $lockedProduct->update($data);
+            $lockedProduct->refresh();
+            $lockedProduct->load('category:id,code,name');
 
             if ($newStock !== $oldStock) {
                 $delta = $newStock - $oldStock;
@@ -214,6 +229,7 @@ class ProductPageController extends Controller
                 ]);
             }
 
+            $flashMeta = $this->buildProductChangeFlashMeta($lockedProduct, $oldSnapshot, $oldStock, $newStock);
             $product = $lockedProduct;
         });
         $this->auditLogService->log('master.product.update', $product, "Product updated: {$product->code}", $request);
@@ -221,7 +237,8 @@ class ProductPageController extends Controller
 
         return redirect()
             ->route('products.index')
-            ->with('success', __('ui.product_updated_success'));
+            ->with('success', (string) ($flashMeta['message'] ?? __('ui.product_updated_success')))
+            ->with('success_type', (string) ($flashMeta['type'] ?? 'edit'));
     }
 
     public function quickUpdateStock(Request $request, Product $product): RedirectResponse|JsonResponse
@@ -229,9 +246,14 @@ class ProductPageController extends Controller
         $data = $request->validate([
             'stock' => ['required', 'integer', 'min:0'],
         ]);
+        $flashMeta = [
+            'type' => 'edit',
+            'message' => __('ui.product_stock_updated_success', ['product' => $product->name]),
+        ];
 
-        DB::transaction(function () use ($request, $product, $data): void {
+        DB::transaction(function () use ($request, $product, $data, &$flashMeta): void {
             $lockedProduct = Product::query()
+                ->with('category:id,code,name')
                 ->whereKey($product->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -239,6 +261,7 @@ class ProductPageController extends Controller
             $oldStock = (int) $lockedProduct->stock;
             $newStock = (int) $data['stock'];
             if ($newStock === $oldStock) {
+                $flashMeta = $this->buildProductStockFlashMeta($lockedProduct, $oldStock, $newStock);
                 return;
             }
 
@@ -267,6 +290,9 @@ class ProductPageController extends Controller
                 ['stock' => $oldStock],
                 ['stock' => $newStock]
             );
+            $lockedProduct->refresh();
+            $lockedProduct->load('category:id,code,name');
+            $flashMeta = $this->buildProductStockFlashMeta($lockedProduct, $oldStock, $newStock);
         });
 
         AppCache::forgetAfterFinancialMutation();
@@ -283,13 +309,15 @@ class ProductPageController extends Controller
                 ],
                 'stock' => (int) $fresh->stock,
                 'alert' => (int) $fresh->stock <= 0 ? 'low' : 'ok',
-                'message' => __('ui.product_stock_updated_success', ['product' => $fresh->name]),
+                'message' => (string) ($flashMeta['message'] ?? __('ui.product_stock_updated_success', ['product' => $fresh->name])),
+                'message_type' => (string) ($flashMeta['type'] ?? 'edit'),
             ]);
         }
 
         return redirect()
             ->route('products.index')
-            ->with('success', __('ui.product_stock_updated_success', ['product' => $product->name]));
+            ->with('success', (string) ($flashMeta['message'] ?? __('ui.product_stock_updated_success', ['product' => $product->name])))
+            ->with('success_type', (string) ($flashMeta['type'] ?? 'edit'));
     }
 
     public function destroy(Request $request, Product $product): RedirectResponse
@@ -413,6 +441,133 @@ class ProductPageController extends Controller
         $mutationReferenceMap = $this->buildStockMutationReferenceMap($stockMutations);
 
         return [$stockMutations, $mutationReferenceMap];
+    }
+
+    /**
+     * @param array{
+     *     name:string,
+     *     unit:string,
+     *     item_category_id:int,
+     *     price_agent:int,
+     *     price_sales:int,
+     *     price_general:int
+     * } $oldSnapshot
+     * @return array{type:string,message:string}
+     */
+    private function buildProductChangeFlashMeta(Product $product, array $oldSnapshot, int $oldStock, int $newStock): array
+    {
+        $priceSegment = __('ui.stock_change_price_segment', [
+            'agent' => number_format((int) round((float) $product->price_agent), 0, ',', '.'),
+            'sales' => number_format((int) round((float) $product->price_sales), 0, ',', '.'),
+            'general' => number_format((int) round((float) $product->price_general), 0, ',', '.'),
+        ]);
+
+        $category = $this->productCategoryLabel($product);
+        $code = trim((string) ($product->code ?? '')) !== '' ? (string) $product->code : '-';
+        $name = (string) $product->name;
+        $stockText = number_format($newStock, 0, ',', '.');
+        $delta = $newStock - $oldStock;
+
+        if ($delta > 0) {
+            return [
+                'type' => 'increase',
+                'message' => __('ui.stock_change_increase_message', [
+                    'code' => $code,
+                    'category' => $category,
+                    'name' => $name,
+                    'stock' => $stockText,
+                    'delta' => number_format($delta, 0, ',', '.'),
+                    'price_segment' => $priceSegment,
+                ]),
+            ];
+        }
+
+        if ($delta < 0) {
+            return [
+                'type' => 'decrease',
+                'message' => __('ui.stock_change_decrease_message', [
+                    'code' => $code,
+                    'category' => $category,
+                    'name' => $name,
+                    'stock' => $stockText,
+                    'delta' => number_format(abs($delta), 0, ',', '.'),
+                    'price_segment' => $priceSegment,
+                ]),
+            ];
+        }
+
+        $changedFields = [];
+        if (($oldSnapshot['name'] ?? '') !== (string) $product->name) {
+            $changedFields[] = __('ui.name');
+        }
+        if ((int) ($oldSnapshot['item_category_id'] ?? 0) !== (int) $product->item_category_id) {
+            $changedFields[] = __('ui.category');
+        }
+        if (($oldSnapshot['unit'] ?? '') !== (string) $product->unit) {
+            $changedFields[] = __('ui.unit');
+        }
+        if ((int) ($oldSnapshot['price_agent'] ?? 0) !== (int) round((float) $product->price_agent)) {
+            $changedFields[] = __('ui.price_agent');
+        }
+        if ((int) ($oldSnapshot['price_sales'] ?? 0) !== (int) round((float) $product->price_sales)) {
+            $changedFields[] = __('ui.price_sales');
+        }
+        if ((int) ($oldSnapshot['price_general'] ?? 0) !== (int) round((float) $product->price_general)) {
+            $changedFields[] = __('ui.price_general');
+        }
+
+        $changes = ! empty($changedFields)
+            ? __('ui.stock_change_fields_segment', ['fields' => implode(', ', $changedFields)])
+            : __('ui.stock_change_fields_none');
+
+        return [
+            'type' => 'edit',
+            'message' => __('ui.stock_change_edit_message', [
+                'code' => $code,
+                'category' => $category,
+                'name' => $name,
+                'changes' => $changes,
+                'price_segment' => $priceSegment,
+            ]),
+        ];
+    }
+
+    /**
+     * @return array{type:string,message:string}
+     */
+    private function buildProductStockFlashMeta(Product $product, int $oldStock, int $newStock): array
+    {
+        return $this->buildProductChangeFlashMeta($product, [
+            'name' => (string) $product->name,
+            'unit' => (string) $product->unit,
+            'item_category_id' => (int) $product->item_category_id,
+            'price_agent' => (int) round((float) $product->price_agent),
+            'price_sales' => (int) round((float) $product->price_sales),
+            'price_general' => (int) round((float) $product->price_general),
+        ], $oldStock, $newStock);
+    }
+
+    private function productCategoryLabel(Product $product): string
+    {
+        $product->loadMissing('category:id,code,name');
+        $category = $product->category;
+        if (! $category) {
+            return '-';
+        }
+
+        $code = trim((string) ($category->code ?? ''));
+        $name = trim((string) ($category->name ?? ''));
+        if ($code !== '' && $name !== '') {
+            return "{$code} - {$name}";
+        }
+        if ($name !== '') {
+            return $name;
+        }
+        if ($code !== '') {
+            return $code;
+        }
+
+        return '-';
     }
 
 }

@@ -335,6 +335,7 @@ class OutgoingTransactionPageController extends Controller
                 ]);
 
                 if ($product) {
+                    $this->fillMissingProductSellingPricesFromUnitCost($product, (int) $row['unit_cost']);
                     $product->increment('stock', $quantity);
 
                     StockMutation::create([
@@ -526,6 +527,9 @@ class OutgoingTransactionPageController extends Controller
 
                 $productId = (int) ($row['product_id'] ?? 0);
                 $product = $productId > 0 ? $products->get($productId) : null;
+                if ($product) {
+                    $this->fillMissingProductSellingPricesFromUnitCost($product, $unitCost);
+                }
 
                 $transaction->items()->create([
                     'product_id' => $product?->id,
@@ -860,6 +864,31 @@ class OutgoingTransactionPageController extends Controller
         }
 
         return $options;
+    }
+
+    private function fillMissingProductSellingPricesFromUnitCost(Product $product, int $unitCost): void
+    {
+        if ($unitCost <= 0) {
+            return;
+        }
+
+        $updates = [];
+        if ((int) round((float) $product->price_agent) <= 0) {
+            $updates['price_agent'] = $unitCost;
+        }
+        if ((int) round((float) $product->price_sales) <= 0) {
+            $updates['price_sales'] = $unitCost;
+        }
+        if ((int) round((float) $product->price_general) <= 0) {
+            $updates['price_general'] = $unitCost;
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        $product->fill($updates);
+        $product->save();
     }
 
     private function nowWib(): Carbon

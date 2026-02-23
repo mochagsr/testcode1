@@ -192,6 +192,7 @@
             let isSubmitting = false;
             let originalStock = 0;
             let selectedProductId = 0;
+            const AUTO_SAVE_DELAY_MS = 5000;
 
             const setRowStock = (productId, value) => {
                 const stockValue = Number(value);
@@ -236,6 +237,25 @@
                     saveTimer = null;
                 }
             };
+            const hasPendingStockChange = () => {
+                const current = Number(currentStockInput.value || '0');
+                const next = Number(newStockInput.value || '0');
+                return !Number.isNaN(next) && next >= 0 && current !== next;
+            };
+            const requestCloseModal = () => {
+                if (saveTimer) {
+                    clearTimeout(saveTimer);
+                    saveTimer = null;
+                }
+                if (isSubmitting) {
+                    return;
+                }
+                if (hasPendingStockChange()) {
+                    triggerAutoSave();
+                    return;
+                }
+                closeModal();
+            };
 
             const triggerAutoSave = () => {
                 const current = Number(currentStockInput.value || '0');
@@ -277,7 +297,12 @@
                         currentStockInput.value = String(savedStock);
                         newStockInput.value = String(savedStock);
                         setRowStock(selectedProductId, savedStock);
-                        statusText.textContent = @json(__('ui.saved'));
+                        const serverMessage = String(data.message || @json(__('ui.saved')));
+                        const serverType = String(data.message_type || 'edit');
+                        statusText.textContent = serverMessage;
+                        if (window.PgposFlash && typeof window.PgposFlash.show === 'function') {
+                            window.PgposFlash.show(serverMessage, serverType);
+                        }
                         setTimeout(() => closeModal(), 250);
                     })
                     .catch((error) => {
@@ -291,26 +316,28 @@
                     });
             };
 
+            const scheduleAutoSave = () => {
+                if (saveTimer) clearTimeout(saveTimer);
+                saveTimer = setTimeout(triggerAutoSave, AUTO_SAVE_DELAY_MS);
+            };
+
             document.querySelectorAll('.js-open-product-stock-modal').forEach((button) => {
                 button.addEventListener('click', () => openModal(button));
             });
 
-            closeBtn.addEventListener('click', closeModal);
-            overlay.addEventListener('click', closeModal);
+            closeBtn.addEventListener('click', requestCloseModal);
+            overlay.addEventListener('click', requestCloseModal);
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && modal.style.display === 'block') {
-                    closeModal();
+                    requestCloseModal();
                 }
                 if (event.key === 'Enter' && modal.style.display === 'block') {
                     event.preventDefault();
-                    triggerAutoSave();
+                    scheduleAutoSave();
                 }
             });
-            newStockInput.addEventListener('input', () => {
-                if (saveTimer) clearTimeout(saveTimer);
-                saveTimer = setTimeout(triggerAutoSave, 700);
-            });
-            newStockInput.addEventListener('change', triggerAutoSave);
+            newStockInput.addEventListener('input', scheduleAutoSave);
+            newStockInput.addEventListener('change', scheduleAutoSave);
         })();
     </script>
 @endsection
