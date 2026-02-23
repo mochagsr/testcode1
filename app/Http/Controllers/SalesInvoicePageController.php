@@ -8,7 +8,6 @@ use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\Customer;
 use App\Models\AuditLog;
-use App\Models\CustomerShipLocation;
 use App\Models\InvoicePayment;
 use App\Models\Product;
 use App\Models\SalesInvoice;
@@ -241,21 +240,9 @@ class SalesInvoicePageController extends Controller
             $initialProducts = $oldProducts->concat($initialProducts)->unique('id')->values();
         }
 
-        $initialShipLocations = collect();
-        if ($oldCustomerId > 0) {
-            $initialShipLocations = CustomerShipLocation::query()
-                ->select(['id', 'customer_id', 'school_name', 'recipient_name', 'recipient_phone', 'city', 'address'])
-                ->where('customer_id', $oldCustomerId)
-                ->where('is_active', true)
-                ->orderBy('school_name')
-                ->limit(20)
-                ->get();
-        }
-
         return view('sales_invoices.create', [
             'customers' => $initialCustomers,
             'products' => $initialProducts,
-            'shipLocations' => $initialShipLocations,
             'defaultSemesterPeriod' => $defaultSemester,
             'semesterOptions' => $semesterOptions,
         ]);
@@ -268,11 +255,6 @@ class SalesInvoicePageController extends Controller
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
-            'ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
-            'ship_to_name' => ['nullable', 'string', 'max:150'],
-            'ship_to_phone' => ['nullable', 'string', 'max:30'],
-            'ship_to_city' => ['nullable', 'string', 'max:100'],
-            'ship_to_address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'payment_method' => ['required', 'in:tunai,kredit'],
             'items' => ['required', 'array', 'min:1'],
@@ -290,36 +272,6 @@ class SalesInvoicePageController extends Controller
             $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
             $rows = collect($data['items']);
             $customerId = (int) $data['customer_id'];
-            $shipLocationId = (int) ($data['ship_location_id'] ?? 0);
-            $shipLocation = null;
-            if ($shipLocationId > 0) {
-                $shipLocation = CustomerShipLocation::query()
-                    ->where('customer_id', $customerId)
-                    ->where('is_active', true)
-                    ->find($shipLocationId);
-                if ($shipLocation === null) {
-                    throw ValidationException::withMessages([
-                        'ship_location_id' => __('school_bulk.invalid_ship_location_customer'),
-                    ]);
-                }
-            }
-
-            $shipToName = trim((string) ($data['ship_to_name'] ?? ''));
-            $shipToPhone = trim((string) ($data['ship_to_phone'] ?? ''));
-            $shipToCity = trim((string) ($data['ship_to_city'] ?? ''));
-            $shipToAddress = trim((string) ($data['ship_to_address'] ?? ''));
-            if ($shipToName === '' && $shipLocation !== null) {
-                $shipToName = (string) ($shipLocation->school_name ?: $shipLocation->recipient_name);
-            }
-            if ($shipToPhone === '' && $shipLocation !== null) {
-                $shipToPhone = (string) ($shipLocation->recipient_phone ?? '');
-            }
-            if ($shipToCity === '' && $shipLocation !== null) {
-                $shipToCity = (string) ($shipLocation->city ?? '');
-            }
-            if ($shipToAddress === '' && $shipLocation !== null) {
-                $shipToAddress = (string) ($shipLocation->address ?? '');
-            }
 
             $products = Product::query()
                 ->whereIn('id', $rows->pluck('product_id')->all())
@@ -364,7 +316,7 @@ class SalesInvoicePageController extends Controller
             $invoice = SalesInvoice::create([
                 'invoice_number' => $invoiceNumber,
                 'customer_id' => $customerId,
-                'customer_ship_location_id' => $shipLocation?->id,
+                'customer_ship_location_id' => null,
                 'invoice_date' => $invoiceDate->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $selectedSemester,
@@ -373,10 +325,10 @@ class SalesInvoicePageController extends Controller
                 'total_paid' => 0,
                 'balance' => $subtotal,
                 'payment_status' => 'unpaid',
-                'ship_to_name' => $shipToName !== '' ? $shipToName : null,
-                'ship_to_phone' => $shipToPhone !== '' ? $shipToPhone : null,
-                'ship_to_city' => $shipToCity !== '' ? $shipToCity : null,
-                'ship_to_address' => $shipToAddress !== '' ? $shipToAddress : null,
+                'ship_to_name' => null,
+                'ship_to_phone' => null,
+                'ship_to_city' => null,
+                'ship_to_address' => null,
                 'notes' => $data['notes'] ?? null,
             ]);
 
@@ -513,7 +465,6 @@ class SalesInvoicePageController extends Controller
     {
         $salesInvoice->load([
             'customer:id,name,city,phone,address',
-            'shipLocation:id,school_name,recipient_name,recipient_phone,city,address',
             'items.product:id,code,name',
             'payments',
         ]);
@@ -572,10 +523,6 @@ class SalesInvoicePageController extends Controller
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
-            'ship_to_name' => ['nullable', 'string', 'max:150'],
-            'ship_to_phone' => ['nullable', 'string', 'max:30'],
-            'ship_to_city' => ['nullable', 'string', 'max:100'],
-            'ship_to_address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -745,10 +692,6 @@ class SalesInvoicePageController extends Controller
                 'invoice_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $data['semester_period'] ?? null,
-                'ship_to_name' => $data['ship_to_name'] ?? null,
-                'ship_to_phone' => $data['ship_to_phone'] ?? null,
-                'ship_to_city' => $data['ship_to_city'] ?? null,
-                'ship_to_address' => $data['ship_to_address'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'subtotal' => $subtotal,
                 'total' => $subtotal,
@@ -880,7 +823,6 @@ class SalesInvoicePageController extends Controller
     {
         $salesInvoice->load([
             'customer:id,name,city,phone,address',
-            'shipLocation:id,school_name,recipient_name,recipient_phone,city,address',
             'items',
             'payments',
         ]);
@@ -894,7 +836,6 @@ class SalesInvoicePageController extends Controller
     {
         $salesInvoice->load([
             'customer:id,name,city,phone,address',
-            'shipLocation:id,school_name,recipient_name,recipient_phone,city,address',
             'items',
             'payments',
         ]);
@@ -912,7 +853,6 @@ class SalesInvoicePageController extends Controller
     {
         $salesInvoice->load([
             'customer:id,name,city,phone,address',
-            'shipLocation:id,school_name,recipient_name,recipient_phone,city,address',
             'items',
             'payments',
         ]);

@@ -117,7 +117,7 @@ class SchoolBulkTransactionPageController extends Controller
         $shipLocations = collect();
         if ($oldCustomerId > 0) {
             $shipLocations = CustomerShipLocation::query()
-                ->select(['id', 'customer_id', 'school_name', 'recipient_name', 'recipient_phone', 'city', 'address'])
+                ->select(['id', 'customer_id', 'school_name', 'recipient_phone', 'city', 'address'])
                 ->where('customer_id', $oldCustomerId)
                 ->where('is_active', true)
                 ->orderBy('school_name')
@@ -143,7 +143,6 @@ class SchoolBulkTransactionPageController extends Controller
             'locations' => ['required', 'array', 'min:1'],
             'locations.*.customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
             'locations.*.school_name' => ['required', 'string', 'max:150'],
-            'locations.*.recipient_name' => ['nullable', 'string', 'max:150'],
             'locations.*.recipient_phone' => ['nullable', 'string', 'max:30'],
             'locations.*.city' => ['nullable', 'string', 'max:100'],
             'locations.*.address' => ['nullable', 'string'],
@@ -214,7 +213,6 @@ class SchoolBulkTransactionPageController extends Controller
                 }
 
                 $schoolName = trim((string) ($row['school_name'] ?? ''));
-                $recipientName = trim((string) ($row['recipient_name'] ?? ''));
                 $recipientPhone = trim((string) ($row['recipient_phone'] ?? ''));
                 $city = trim((string) ($row['city'] ?? ''));
                 $address = trim((string) ($row['address'] ?? ''));
@@ -223,7 +221,7 @@ class SchoolBulkTransactionPageController extends Controller
                     'school_bulk_transaction_id' => $transaction->id,
                     'customer_ship_location_id' => $shipLocation?->id,
                     'school_name' => $schoolName !== '' ? $schoolName : (string) ($shipLocation?->school_name ?: '-'),
-                    'recipient_name' => $recipientName !== '' ? $recipientName : ($shipLocation?->recipient_name ?: null),
+                    'recipient_name' => null,
                     'recipient_phone' => $recipientPhone !== '' ? $recipientPhone : ($shipLocation?->recipient_phone ?: null),
                     'city' => $city !== '' ? $city : ($shipLocation?->city ?: null),
                     'address' => $address !== '' ? $address : ($shipLocation?->address ?: null),

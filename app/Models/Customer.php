@@ -199,7 +199,7 @@ class Customer extends Model
      */
     public function scopeWithLevel(Builder $query): Builder
     {
-        return $query->with('level:id,name,discount_percentage');
+        return $query->with('level:id,code,name');
     }
 
     /**
@@ -229,7 +229,11 @@ class Customer extends Model
         return $query->where(function (Builder $subQuery) use ($search): void {
             $subQuery->where('name', 'like', "%{$search}%")
                 ->orWhere('city', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%");
+                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhereHas('level', function (Builder $levelQuery) use ($search): void {
+                    $levelQuery->where('code', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%");
+                });
         });
     }
 

@@ -183,13 +183,18 @@
                     return;
                 }
 
-                let products = @json($products->map(fn ($product) => [
-                    'id' => (int) $product->id,
-                    'code' => (string) ($product->code ?? ''),
-                    'name' => (string) $product->name,
-                    'unit' => (string) ($product->unit ?? ''),
-                    'price_general' => (int) round((float) ($product->price_general ?? 0)),
-                ])->values()->all());
+                @php
+                    $adminProducts = $products->map(function ($product): array {
+                        return [
+                            'id' => (int) $product->id,
+                            'code' => (string) ($product->code ?? ''),
+                            'name' => (string) $product->name,
+                            'unit' => (string) ($product->unit ?? ''),
+                            'price_general' => (int) round((float) ($product->price_general ?? 0)),
+                        ];
+                    })->values()->all();
+                @endphp
+                let products = @json($adminProducts);
                 let productByLabel = new Map();
                 let productByCode = new Map();
                 let productByName = new Map();

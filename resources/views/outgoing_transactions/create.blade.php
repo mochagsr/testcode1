@@ -97,7 +97,7 @@
                     <th style="width: 42%">{{ __('txn.product') }} *</th>
                     <th style="width: 9%">{{ __('txn.unit') }}</th>
                     <th style="width: 9%">{{ __('txn.qty') }} *</th>
-                    <th style="width: 14%">{{ __('txn.price') }} *</th>
+                    <th style="width: 14%">{{ __('txn.price') }}</th>
                     <th style="width: 14%">{{ __('txn.subtotal') }}</th>
                     <th style="width: 20%">{{ __('txn.notes') }}</th>
                     <th></th>
@@ -459,7 +459,7 @@
                         <input type="number" min="1" class="qty w-xs" name="items[${index}][quantity]" value="${qtyValue}" required>
                     </td>
                     <td>
-                        <input type="number" min="0" step="1" class="unit-cost w-xs" name="items[${index}][unit_cost]" value="${unitCostValue}" required>
+                        <input type="number" min="0" step="1" class="unit-cost w-xs" name="items[${index}][unit_cost]" value="${unitCostValue}">
                     </td>
                     <td style="white-space: nowrap;">Rp <span class="line-total">0</span></td>
                     <td><input type="text" class="item-notes" name="items[${index}][notes]" placeholder="{{ __('txn.optional') }}"></td>

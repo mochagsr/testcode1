@@ -89,7 +89,7 @@
     @if((auth()->user()?->role ?? '') === 'admin')
         <div class="card">
             <div class="form-section">
-                <h3 class="form-section-title">Admin Edit Transaksi Keluar</h3>
+                <h3 class="form-section-title">{{ __('txn.admin_edit_outgoing_title') }}</h3>
                 <form method="post" action="{{ route('outgoing-transactions.admin-update', $transaction) }}">
                     @csrf
                     @method('PUT')
@@ -120,7 +120,6 @@
                     <table id="admin-outgoing-items-table" style="margin-top: 10px;">
                         <thead>
                         <tr>
-                            <th>{{ __('txn.product') }}</th>
                             <th>{{ __('txn.name') }}</th>
                             <th>{{ __('txn.unit') }}</th>
                             <th>{{ __('txn.qty') }}</th>
@@ -154,13 +153,12 @@
                             @endphp
                             <tr>
                                 <td>
-                                    <input type="text" class="admin-product-search" list="admin-outgoing-products-list" value="{{ $productSearchValue }}" placeholder="{{ __('txn.select_product') }}">
+                                    <input type="text" class="admin-product-name" list="admin-outgoing-products-list" name="items[{{ $idx }}][product_name]" value="{{ $item['product_name'] ?? $productSearchValue }}" placeholder="{{ __('txn.select_product') }}" required>
                                     <input type="hidden" class="admin-product-id" name="items[{{ $idx }}][product_id]" value="{{ (int) ($item['product_id'] ?? 0) }}">
                                 </td>
-                                <td><input type="text" class="admin-product-name" name="items[{{ $idx }}][product_name]" value="{{ $item['product_name'] ?? '' }}" required></td>
                                 <td><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
                                 <td><input type="number" min="1" class="admin-qty w-xs" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
-                                <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}" required></td>
+                                <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
                                 <td><input type="text" class="admin-item-notes" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
                                 <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>
                             </tr>
@@ -244,14 +242,13 @@
                 };
 
                 const bindRow = (row) => {
-                    const search = row.querySelector('.admin-product-search');
                     const idField = row.querySelector('.admin-product-id');
                     const nameField = row.querySelector('.admin-product-name');
                     const unitField = row.querySelector('.admin-unit');
                     const costField = row.querySelector('.admin-unit-cost');
                     const removeBtn = row.querySelector('.admin-remove-item');
-                    search.addEventListener('change', () => {
-                        const p = findProduct(search.value);
+                    nameField.addEventListener('change', () => {
+                        const p = findProduct(nameField.value);
                         if (!p) {
                             idField.value = '';
                             return;
@@ -275,11 +272,10 @@
                 const addRow = () => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td><input type="text" class="admin-product-search" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}"><input type="hidden" class="admin-product-id"></td>
-                        <td><input type="text" class="admin-product-name" required></td>
+                        <td><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"></td>
                         <td><input type="text" class="admin-unit"></td>
                         <td><input type="number" min="1" class="admin-qty w-xs" value="1" required></td>
-                        <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0" required></td>
+                        <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0"></td>
                         <td><input type="text" class="admin-item-notes"></td>
                         <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>
                     `;

@@ -109,7 +109,8 @@ class Supplier extends Model
         return $query->where(function (Builder $subQuery) use ($search): void {
             $subQuery->where('name', 'like', "%{$search}%")
                 ->orWhere('company_name', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%");
+                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhere('notes', 'like', "%{$search}%");
         });
     }
 }

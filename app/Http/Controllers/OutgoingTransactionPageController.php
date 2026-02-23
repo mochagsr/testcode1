@@ -248,7 +248,7 @@ class OutgoingTransactionPageController extends Controller
             'items.*.product_name' => ['required', 'string', 'max:200'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
         $selectedSemester = $this->normalizeSemesterPeriod(
@@ -281,7 +281,7 @@ class OutgoingTransactionPageController extends Controller
 
             foreach ($rows as $index => $row) {
                 $quantity = (int) $row['quantity'];
-                $unitCost = (int) round((float) $row['unit_cost']);
+                $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
                 $lineTotal = $quantity * $unitCost;
                 $grandTotal += $lineTotal;
                 $product = null;
@@ -397,7 +397,7 @@ class OutgoingTransactionPageController extends Controller
             'items.*.product_name' => ['required', 'string', 'max:200'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -726,10 +726,10 @@ class OutgoingTransactionPageController extends Controller
         return response()->streamDownload(function () use ($outgoingTransaction): void {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
-            $sheet->setTitle('Transaksi Keluar');
+            $sheet->setTitle('Tanda Terima Barang');
 
             $rowsOut = [];
-            $rowsOut[] = [__('txn.outgoing_transactions_title')];
+            $rowsOut[] = [__('txn.outgoing_receipt_title')];
             $rowsOut[] = [__('txn.transaction_number'), $outgoingTransaction->transaction_number];
             $rowsOut[] = [__('txn.date'), optional($outgoingTransaction->transaction_date)->format('d-m-Y')];
             $rowsOut[] = [__('txn.note_number'), (string) ($outgoingTransaction->note_number ?: '-')];

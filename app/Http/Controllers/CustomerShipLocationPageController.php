@@ -29,7 +29,6 @@ class CustomerShipLocationPageController extends Controller
                 'id',
                 'customer_id',
                 'school_name',
-                'recipient_name',
                 'recipient_phone',
                 'city',
                 'address',
@@ -132,7 +131,7 @@ class CustomerShipLocationPageController extends Controller
 
         $payload = Cache::remember($cacheKey, $now->copy()->addSeconds(20), function () use ($customerId, $search, $hasSearch, $perPage) {
             return CustomerShipLocation::query()
-                ->select(['id', 'customer_id', 'school_name', 'recipient_name', 'recipient_phone', 'city', 'address'])
+                ->select(['id', 'customer_id', 'school_name', 'recipient_phone', 'city', 'address'])
                 ->where('customer_id', $customerId)
                 ->where('is_active', true)
                 ->when($hasSearch, fn(Builder $query) => $query->searchKeyword($search))
@@ -153,7 +152,6 @@ class CustomerShipLocationPageController extends Controller
         return $request->validate([
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'school_name' => ['required', 'string', 'max:150'],
-            'recipient_name' => ['nullable', 'string', 'max:150'],
             'recipient_phone' => ['nullable', 'string', 'max:30'],
             'city' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string'],
@@ -162,4 +160,3 @@ class CustomerShipLocationPageController extends Controller
         ]);
     }
 }
-

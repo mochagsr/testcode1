@@ -352,6 +352,84 @@ class ReceivableFlowsTest extends TestCase
         $this->assertCount(2, $invoice->items()->get());
     }
 
+    public function test_admin_update_sales_invoice_ignores_ship_fields_from_request(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-LEGACY-01',
+            'name' => 'Customer Legacy',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-LEGACY',
+            'name' => 'Kategori Legacy',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-LEGACY',
+            'name' => 'Produk Legacy',
+            'unit' => 'pcs',
+            'stock' => 15,
+            'price_general' => 10000,
+            'is_active' => true,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-LEGACY-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-11',
+            'semester_period' => 'S1-2026',
+            'subtotal' => 20000,
+            'total' => 20000,
+            'total_paid' => 0,
+            'balance' => 20000,
+            'payment_status' => 'unpaid',
+            'ship_to_name' => 'SD Legacy',
+            'ship_to_phone' => '08123456789',
+            'ship_to_city' => 'Kota Legacy',
+            'ship_to_address' => 'Jl Legacy No 1',
+        ]);
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'quantity' => 2,
+            'unit_price' => 10000,
+            'discount' => 0,
+            'line_total' => 20000,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('sales-invoices.admin-update', $invoice), [
+            'invoice_date' => '2026-02-11',
+            'due_date' => null,
+            'semester_period' => 'S1-2026',
+            'notes' => 'Admin edit legacy invoice',
+            'ship_to_name' => 'Injected Name',
+            'ship_to_phone' => '0800000000',
+            'ship_to_city' => 'Injected City',
+            'ship_to_address' => 'Injected Address',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                    'unit_price' => 10000,
+                    'discount' => 0,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('sales-invoices.show', $invoice));
+
+        $invoice->refresh();
+        $this->assertSame('SD Legacy', (string) $invoice->ship_to_name);
+        $this->assertSame('08123456789', (string) $invoice->ship_to_phone);
+        $this->assertSame('Kota Legacy', (string) $invoice->ship_to_city);
+        $this->assertSame('Jl Legacy No 1', (string) $invoice->ship_to_address);
+        $this->assertSame(10000.0, (float) $invoice->total);
+        $this->assertSame(10000.0, (float) $invoice->balance);
+    }
+
     public function test_admin_can_edit_sales_return_items_and_stock_is_rebalanced(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -679,5 +757,75 @@ class ReceivableFlowsTest extends TestCase
         $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $content = $response->streamedContent();
         $this->assertStringStartsWith('PK', $content);
+    }
+
+    public function test_sales_invoice_create_page_hides_school_distribution_fields(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('sales-invoices.create'));
+
+        $response->assertOk();
+        $response->assertDontSee('ship-location-search', false);
+        $response->assertDontSee('ship-to-name', false);
+        $response->assertDontSee('ship-to-phone', false);
+        $response->assertDontSee('ship-to-city', false);
+        $response->assertDontSee('ship-to-address', false);
+    }
+
+    public function test_sales_invoice_store_ignores_ship_fields_for_regular_transaction(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-SALES-001',
+            'name' => 'Customer Sales',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-SALES',
+            'name' => 'Kategori Sales',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-SALES-001',
+            'name' => 'Produk Sales',
+            'unit' => 'exp',
+            'stock' => 25,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('sales-invoices.store'), [
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-23',
+            'due_date' => '2026-03-01',
+            'semester_period' => 'S2-2526',
+            'payment_method' => 'kredit',
+            'notes' => 'uji customer-only',
+            'ship_location_id' => 99999,
+            'ship_to_name' => 'Should Not Save',
+            'ship_to_phone' => '0800000000',
+            'ship_to_city' => 'Should Not Save',
+            'ship_to_address' => 'Should Not Save',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 2,
+                    'unit_price' => 12000,
+                    'discount' => 0,
+                ],
+            ],
+        ]);
+
+        $invoice = SalesInvoice::query()->first();
+        $this->assertNotNull($invoice);
+        $response->assertRedirect(route('sales-invoices.show', $invoice));
+
+        $invoice->refresh();
+        $this->assertNull($invoice->customer_ship_location_id);
+        $this->assertNull($invoice->ship_to_name);
+        $this->assertNull($invoice->ship_to_phone);
+        $this->assertNull($invoice->ship_to_city);
+        $this->assertNull($invoice->ship_to_address);
     }
 }

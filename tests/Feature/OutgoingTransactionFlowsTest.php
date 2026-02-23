@@ -29,6 +29,29 @@ class OutgoingTransactionFlowsTest extends TestCase
         $response->assertSee(__('ui.suppliers_title'));
     }
 
+    public function test_supplier_index_search_can_find_by_notes(): void
+    {
+        $user = User::factory()->create();
+        Supplier::query()->create([
+            'name' => 'Supplier Notes',
+            'company_name' => 'PT Notes',
+            'notes' => 'khusus tinta hitam',
+        ]);
+        Supplier::query()->create([
+            'name' => 'Supplier Lain',
+            'company_name' => 'PT Lain',
+            'notes' => 'kertas putih',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('suppliers.index', [
+            'search' => 'tinta',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Supplier Notes');
+        $response->assertDontSee('Supplier Lain');
+    }
+
     public function test_outgoing_transaction_store_creates_transaction_and_increments_stock(): void
     {
         $user = User::factory()->create([
@@ -90,6 +113,60 @@ class OutgoingTransactionFlowsTest extends TestCase
             'mutation_type' => 'in',
             'quantity' => 5,
         ]);
+    }
+
+    public function test_outgoing_transaction_store_allows_empty_unit_cost_and_defaults_to_zero(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'finance_locked' => false,
+        ]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Harga Kosong',
+            'company_name' => 'PT Harga Kosong',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-EMPTY-COST',
+            'name' => 'Kategori Empty Cost',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'BRG-EMPTY-COST',
+            'name' => 'Barang Empty Cost',
+            'unit' => 'exp',
+            'stock' => 2,
+            'price_general' => 10000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('outgoing-transactions.store'), [
+            'supplier_id' => $supplier->id,
+            'transaction_date' => '2026-02-12',
+            'semester_period' => 'S2-2526',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'unit' => 'exp',
+                    'quantity' => 3,
+                    'unit_cost' => '',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+
+        $transaction = OutgoingTransaction::query()->latest('id')->firstOrFail();
+        $this->assertSame(0.0, (float) $transaction->total);
+
+        $item = OutgoingTransactionItem::query()
+            ->where('outgoing_transaction_id', $transaction->id)
+            ->firstOrFail();
+        $this->assertSame(0.0, (float) $item->unit_cost);
+        $this->assertSame(0.0, (float) $item->line_total);
+
+        $product->refresh();
+        $this->assertSame(5.0, (float) $product->stock);
     }
 
     public function test_outgoing_transaction_store_fails_if_supplier_semester_closed(): void

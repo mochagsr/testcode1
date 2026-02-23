@@ -29,6 +29,7 @@ use App\Http\Controllers\SemesterTransactionPageController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupplierPageController;
 use App\Http\Controllers\SupplierPayablePageController;
+use App\Http\Controllers\SupplierStockCardPageController;
 use App\Http\Controllers\TransactionCorrectionWizardController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -224,6 +225,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/suppliers/{supplier}/edit', [SupplierPageController::class, 'edit'])->middleware('perm:masters.suppliers.edit')->name('suppliers.edit');
     Route::put('/suppliers/{supplier}', [SupplierPageController::class, 'update'])->middleware('perm:masters.suppliers.edit')->name('suppliers.update');
     Route::get('/supplier-payables', [SupplierPayablePageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-payables.index');
+    Route::get('/supplier-stock-cards', [SupplierStockCardPageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.index');
+    Route::post('/supplier-stock-cards/update-stock', [SupplierStockCardPageController::class, 'updateStock'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.update-stock');
     Route::get('/supplier-payables/create', [SupplierPayablePageController::class, 'create'])->middleware('perm:supplier_payables.pay')->name('supplier-payables.create');
     Route::post('/supplier-payables', [SupplierPayablePageController::class, 'store'])
         ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
@@ -254,6 +257,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
         Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('products.edit');
         Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('products.update');
+        Route::post('/products/{product}/quick-stock', [ProductPageController::class, 'quickUpdateStock'])->middleware('perm:masters.products.manage')->name('products.quick-stock');
         Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('products.destroy');
 
         Route::get('/customer-levels-web', [CustomerLevelPageController::class, 'index'])->name('customer-levels-web.index');
@@ -264,6 +268,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::delete('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'destroy'])->name('customer-levels-web.destroy');
 
         Route::get('/customers-web', [CustomerPageController::class, 'index'])->middleware('perm:masters.customers.view')->name('customers-web.index');
+        Route::get('/customers-web/level/{customerLevel}', [CustomerPageController::class, 'levelCustomers'])->middleware('perm:masters.customers.view')->name('customers-web.level-customers');
         Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->middleware('perm:masters.customers.view')->name('customers-web.export.csv');
         Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import.template');
         Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import');

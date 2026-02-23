@@ -411,8 +411,8 @@ class AuditLogPageController extends Controller
             );
             $descriptionMap[$logId] = $shortDesc;
             $beforeAfterMap[$logId] = [
-                'before' => is_array($log->before_data) ? json_encode($log->before_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '-' : '-',
-                'after' => is_array($log->after_data) ? json_encode($log->after_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '-' : '-',
+                'before' => is_array($log->before_data) ? $this->formatAuditPayloadForDisplay($log->before_data) : '-',
+                'after' => is_array($log->after_data) ? $this->formatAuditPayloadForDisplay($log->after_data) : '-',
             ];
         }
 
@@ -512,6 +512,171 @@ class AuditLogPageController extends Controller
         }
 
         return $normalized !== '' ? $normalized : '-';
+    }
+
+    /**
+     * @param array<string, mixed>|array<int, mixed> $payload
+     */
+    private function formatAuditPayloadForDisplay(array $payload): string
+    {
+        if ($payload === []) {
+            return '-';
+        }
+
+        $translated = $this->translateAuditPayload($payload);
+        $lines = [];
+        $this->flattenAuditPayloadLines($translated, $lines);
+
+        return $lines !== [] ? implode(PHP_EOL, $lines) : '-';
+    }
+
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
+    private function translateAuditPayload(mixed $value, ?string $fieldKey = null): mixed
+    {
+        if (is_array($value)) {
+            if (array_is_list($value)) {
+                return array_map(fn($row) => $this->translateAuditPayload($row), $value);
+            }
+
+            $translated = [];
+            foreach ($value as $key => $rowValue) {
+                $keyString = (string) $key;
+                $translated[$this->translateAuditFieldLabel($keyString)] = $this->translateAuditPayload($rowValue, $keyString);
+            }
+
+            return $translated;
+        }
+
+        if (is_bool($value)) {
+            return $value ? __('ui.yes') : __('ui.no');
+        }
+
+        if ($value === null) {
+            return '-';
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return '-';
+            }
+
+            if ($fieldKey !== null) {
+                $fieldNormalized = strtolower($fieldKey);
+                $enumMap = $this->auditFieldValueMap($fieldNormalized);
+                $enumKey = strtolower($trimmed);
+                if (isset($enumMap[$enumKey])) {
+                    return $enumMap[$enumKey];
+                }
+            }
+
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimmed) === 1) {
+                return Carbon::parse($trimmed)->format('d-m-Y');
+            }
+            if (preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/', $trimmed) === 1) {
+                return Carbon::parse($trimmed)->format('d-m-Y H:i:s');
+            }
+
+            return $trimmed;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param mixed $value
+     * @param array<int, string> $lines
+     */
+    private function flattenAuditPayloadLines(mixed $value, array &$lines, string $indent = ''): void
+    {
+        if (is_array($value)) {
+            if (array_is_list($value)) {
+                foreach ($value as $index => $row) {
+                    $number = (int) $index + 1;
+                    if (is_array($row)) {
+                        $lines[] = $indent.'- #'.$number;
+                        $this->flattenAuditPayloadLines($row, $lines, $indent.'  ');
+                        continue;
+                    }
+
+                    $lines[] = $indent.'- '.$this->stringifyAuditValue($row);
+                }
+
+                return;
+            }
+
+            foreach ($value as $key => $row) {
+                $keyText = (string) $key;
+                if (is_array($row)) {
+                    $lines[] = $indent.$keyText.':';
+                    $this->flattenAuditPayloadLines($row, $lines, $indent.'  ');
+                    continue;
+                }
+
+                $lines[] = $indent.$keyText.': '.$this->stringifyAuditValue($row);
+            }
+
+            return;
+        }
+
+        $lines[] = $indent.$this->stringifyAuditValue($value);
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function stringifyAuditValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+        if (is_bool($value)) {
+            return $value ? __('ui.yes') : __('ui.no');
+        }
+        if (is_scalar($value)) {
+            $text = trim((string) $value);
+            return $text !== '' ? $text : '-';
+        }
+
+        $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return is_string($encoded) && $encoded !== '' ? $encoded : '-';
+    }
+
+    private function translateAuditFieldLabel(string $field): string
+    {
+        $key = strtolower(trim($field));
+        $map = __('ui.audit_field_labels');
+        if (is_array($map) && isset($map[$key]) && is_string($map[$key])) {
+            return (string) $map[$key];
+        }
+
+        return ucfirst(str_replace('_', ' ', $field));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function auditFieldValueMap(string $field): array
+    {
+        return match ($field) {
+            'payment_method' => [
+                'cash' => __('txn.cash'),
+                'credit' => __('txn.credit'),
+            ],
+            'payment_status' => [
+                'paid' => __('txn.paid'),
+                'partial' => 'Partial',
+                'unpaid' => __('txn.unpaid'),
+            ],
+            'mutation_type' => [
+                'in' => __('ui.stock_mutation_type_in'),
+                'out' => __('ui.stock_mutation_type_out'),
+            ],
+            default => [],
+        };
     }
 
     private function nowWib(): Carbon

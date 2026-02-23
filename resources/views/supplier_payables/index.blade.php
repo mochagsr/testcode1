@@ -45,6 +45,9 @@
                                 <a class="btn secondary" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'semester' => $selectedSemester]) }}">
                                     {{ __('supplier_payable.mutation') }}
                                 </a>
+                                <a class="btn secondary" href="{{ route('supplier-stock-cards.index', ['supplier_id' => $supplier->id]) }}">
+                                    {{ __('menu.supplier_stock_cards') }}
+                                </a>
                                 @if((int) ($supplier->outstanding_payable ?? 0) > 0)
                                     <a class="btn" href="{{ route('supplier-payables.create', ['supplier_id' => $supplier->id]) }}">{{ __('supplier_payable.pay') }}</a>
                                 @endif

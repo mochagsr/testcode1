@@ -130,4 +130,45 @@ class ProductStockMutationTest extends TestCase
         $response->assertSee($product->code);
         $response->assertSee('mutation_page=2', false);
     }
+
+    public function test_quick_stock_update_from_products_index_updates_stock_and_creates_mutation(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-03',
+            'name' => 'Kertas',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'krt001',
+            'name' => 'Kertas A4',
+            'unit' => 'exp',
+            'stock' => 10,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->postJson(route('products.quick-stock', $product), [
+            'stock' => 0,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('stock', 0);
+
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'stock' => 0,
+        ]);
+        $this->assertDatabaseHas('stock_mutations', [
+            'product_id' => $product->id,
+            'reference_type' => Product::class,
+            'reference_id' => $product->id,
+            'mutation_type' => 'out',
+            'quantity' => 10,
+            'created_by_user_id' => $admin->id,
+        ]);
+    }
 }

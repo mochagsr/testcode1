@@ -37,7 +37,7 @@
                 <th>{{ __('ui.actions') }}</th>
                 <th>{{ __('ui.subject') }}</th>
                 <th>{{ __('ui.description') }}</th>
-                <th>Before / After</th>
+                <th>{{ __('ui.audit_changes') }}</th>
                 <th>{{ __('ui.ip') }}</th>
                 <th>Req ID</th>
             </tr>
@@ -115,12 +115,12 @@
                         @endphp
                         @if($hasDiff)
                             <details>
-                                <summary>Lihat perubahan</summary>
+                                <summary>{{ __('ui.audit_view_changes') }}</summary>
                                 <div style="margin-top:6px;">
-                                    <strong>Before:</strong>
-                                    <pre style="white-space: pre-wrap; margin:4px 0;">{{ $beforeText }}</pre>
-                                    <strong>After:</strong>
-                                    <pre style="white-space: pre-wrap; margin:4px 0;">{{ $afterText }}</pre>
+                                    <strong style="color:#b91c1c;">{{ __('ui.audit_before') }}:</strong>
+                                    <pre style="white-space: pre-wrap; margin:4px 0; color:#b91c1c; background:rgba(185,28,28,0.08); border:1px solid rgba(185,28,28,0.2); padding:8px; border-radius:6px;">{{ $beforeText }}</pre>
+                                    <strong style="color:#166534;">{{ __('ui.audit_after') }}:</strong>
+                                    <pre style="white-space: pre-wrap; margin:4px 0; color:#166534; background:rgba(22,101,52,0.08); border:1px solid rgba(22,101,52,0.2); padding:8px; border-radius:6px;">{{ $afterText }}</pre>
                                 </div>
                             </details>
                         @else

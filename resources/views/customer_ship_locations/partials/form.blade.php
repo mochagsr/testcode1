@@ -16,10 +16,6 @@
             <input type="text" name="school_name" value="{{ old('school_name', $location?->school_name) }}" maxlength="150" required>
         </div>
         <div class="col-6">
-            <label>{{ __('txn.recipient_name') }}</label>
-            <input type="text" name="recipient_name" value="{{ old('recipient_name', $location?->recipient_name) }}" maxlength="150">
-        </div>
-        <div class="col-6">
             <label>{{ __('txn.phone') }}</label>
             <input type="text" name="recipient_phone" value="{{ old('recipient_phone', $location?->recipient_phone) }}" maxlength="30">
         </div>
@@ -47,4 +43,3 @@
 
 <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
 <a class="btn secondary" href="{{ route('customer-ship-locations.index') }}">{{ __('txn.cancel') }}</a>
-

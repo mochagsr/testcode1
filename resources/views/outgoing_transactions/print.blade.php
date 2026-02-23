@@ -105,7 +105,7 @@
             </div>
         </div>
         <div class="doc-title-center">
-            <div class="doc-title">{{ $reportHeaderText !== '' ? $reportHeaderText : __('txn.outgoing_transactions_title') }}</div>
+            <div class="doc-title">{{ $reportHeaderText !== '' ? $reportHeaderText : __('txn.outgoing_receipt_title') }}</div>
             <div class="doc-number">{{ __('txn.no') }}: {{ $transaction->transaction_number }}</div>
         </div>
         <div class="doc-meta-right">

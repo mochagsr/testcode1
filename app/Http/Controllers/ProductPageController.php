@@ -17,6 +17,7 @@ use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -221,6 +222,74 @@ class ProductPageController extends Controller
         return redirect()
             ->route('products.index')
             ->with('success', __('ui.product_updated_success'));
+    }
+
+    public function quickUpdateStock(Request $request, Product $product): RedirectResponse|JsonResponse
+    {
+        $data = $request->validate([
+            'stock' => ['required', 'integer', 'min:0'],
+        ]);
+
+        DB::transaction(function () use ($request, $product, $data): void {
+            $lockedProduct = Product::query()
+                ->whereKey($product->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $oldStock = (int) $lockedProduct->stock;
+            $newStock = (int) $data['stock'];
+            if ($newStock === $oldStock) {
+                return;
+            }
+
+            $lockedProduct->update([
+                'stock' => $newStock,
+            ]);
+
+            $delta = $newStock - $oldStock;
+            StockMutation::query()->create([
+                'product_id' => (int) $lockedProduct->id,
+                'reference_type' => Product::class,
+                'reference_id' => (int) $lockedProduct->id,
+                'mutation_type' => $delta > 0 ? 'in' : 'out',
+                'quantity' => abs($delta),
+                'notes' => $delta > 0
+                    ? __('ui.stock_mutation_manual_add_note')
+                    : __('ui.stock_mutation_manual_reduce_note'),
+                'created_by_user_id' => $request->user()?->id,
+            ]);
+
+            $this->auditLogService->log(
+                'master.product.quick_stock_update',
+                $lockedProduct,
+                "Quick stock update: {$lockedProduct->code} ({$oldStock} -> {$newStock})",
+                $request,
+                ['stock' => $oldStock],
+                ['stock' => $newStock]
+            );
+        });
+
+        AppCache::forgetAfterFinancialMutation();
+
+        if ($request->expectsJson()) {
+            $fresh = $product->fresh(['category']);
+
+            return response()->json([
+                'ok' => true,
+                'product' => [
+                    'id' => (int) $fresh->id,
+                    'name' => (string) $fresh->name,
+                    'code' => (string) ($fresh->code ?? ''),
+                ],
+                'stock' => (int) $fresh->stock,
+                'alert' => (int) $fresh->stock <= 0 ? 'low' : 'ok',
+                'message' => __('ui.product_stock_updated_success', ['product' => $fresh->name]),
+            ]);
+        }
+
+        return redirect()
+            ->route('products.index')
+            ->with('success', __('ui.product_stock_updated_success', ['product' => $product->name]));
     }
 
     public function destroy(Request $request, Product $product): RedirectResponse

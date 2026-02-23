@@ -66,6 +66,16 @@
         }
         .nav-group {
             margin-bottom: 8px;
+            border-radius: 10px;
+            padding: 2px;
+        }
+        .nav-group:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .nav-group.active {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 4px;
         }
         .nav-section-title {
             display: block;
@@ -85,6 +95,17 @@
         }
         .nav-group-title.active {
             background: #2a2a2a;
+        }
+        .nav-group.active .nav-group-title {
+            background: #3a3a3a;
+        }
+        .nav-group.active .nav-sub a {
+            color: #f5f5f5;
+        }
+        .nav-group.active .nav-sub a.active {
+            background: #4a4a4a;
+            border-left: 3px solid #d9d9d9;
+            padding-left: 9px;
         }
         .nav-sub a {
             margin-bottom: 4px;
@@ -432,14 +453,14 @@
             @auth
                 @if(auth()->user()->role === 'admin')
                     <span class="nav-section-title">{{ __('ui.nav_master_data') }}</span>
-                    <div class="nav-group">
+                    <div class="nav-group {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}">
                         <span class="nav-group-title {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}">{{ __('ui.nav_items_group') }}</span>
                         <div class="nav-sub">
                             <a href="{{ route('item-categories.index') }}" class="{{ request()->routeIs('item-categories.*') ? 'active' : '' }}">{{ __('menu.item_categories') }}</a>
                             <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'active' : '' }}">{{ __('menu.items') }}</a>
                         </div>
                     </div>
-                    <div class="nav-group">
+                    <div class="nav-group {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}">
                         <span class="nav-group-title {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}">{{ __('ui.nav_customers_group') }}</span>
                         <div class="nav-sub">
                             <a href="{{ route('customer-levels-web.index') }}" class="{{ request()->routeIs('customer-levels-web.*') ? 'active' : '' }}">{{ __('menu.customer_levels') }}</a>
@@ -449,19 +470,20 @@
                 @endif
             @endauth
             @auth
-                <div class="nav-group">
-                    <span class="nav-group-title {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</span>
+                <div class="nav-group {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}">
+                    <span class="nav-group-title {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</span>
                     <div class="nav-sub">
                         @if(auth()->user()->role === 'admin')
                             <a href="{{ route('suppliers.index') }}" class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</a>
                         @endif
                         <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
                         <a href="{{ route('supplier-payables.index') }}" class="{{ request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.supplier_payables') }}</a>
+                        <a href="{{ route('supplier-stock-cards.index') }}" class="{{ request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}">{{ __('menu.supplier_stock_cards') }}</a>
                     </div>
                 </div>
             @endauth
             @auth
-                <div class="nav-group">
+                <div class="nav-group {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">
                     <span class="nav-group-title {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">{{ __('menu.school_distribution') }}</span>
                     <div class="nav-sub">
                         <a href="{{ route('customer-ship-locations.index') }}" class="{{ request()->routeIs('customer-ship-locations.*') ? 'active' : '' }}">{{ __('menu.ship_locations') }}</a>
@@ -469,36 +491,42 @@
                     </div>
                 </div>
             @endauth
-            <span class="nav-section-title">{{ __('ui.nav_transactions') }}</span>
-            <div class="nav-sub">
-                <a href="{{ route('sales-invoices.index') }}" class="{{ request()->routeIs('sales-invoices.*') ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
-                <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
-                <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
-                <a href="{{ route('delivery-trips.index') }}" class="{{ request()->routeIs('delivery-trips.*') ? 'active' : '' }}">{{ __('menu.delivery_trip_logs') }}</a>
-                <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
+            <div class="nav-group {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}">
+                <span class="nav-group-title {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('ui.nav_transactions') }}</span>
+                <div class="nav-sub">
+                    <a href="{{ route('sales-invoices.index') }}" class="{{ request()->routeIs('sales-invoices.*') ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
+                    <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
+                    <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
+                    <a href="{{ route('delivery-trips.index') }}" class="{{ request()->routeIs('delivery-trips.*') ? 'active' : '' }}">{{ __('menu.delivery_trip_logs') }}</a>
+                    <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
+                </div>
             </div>
-            <div class="nav-group">
+            <div class="nav-group {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">
                 <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
                 <div class="nav-sub">
                     <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
                     <a href="{{ route('receivable-payments.index') }}" class="{{ request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivable_payments') }}</a>
                 </div>
             </div>
-            <span class="nav-section-title">{{ __('ui.nav_reports') }}</span>
-            <div class="nav-sub">
-                <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('menu.reports') }}</a>
+            <div class="nav-group {{ request()->routeIs('reports.*') ? 'active' : '' }}">
+                <span class="nav-group-title {{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('ui.nav_reports') }}</span>
+                <div class="nav-sub">
+                    <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('menu.reports') }}</a>
+                </div>
             </div>
             @auth
-                <span class="nav-section-title">{{ __('ui.nav_system') }}</span>
-                <div class="nav-sub">
-                @if(auth()->user()->role === 'admin')
-                    <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'active' : '' }}">{{ __('menu.users') }}</a>
-                    <a href="{{ route('audit-logs.index') }}" class="{{ request()->routeIs('audit-logs.*') ? 'active' : '' }}">{{ __('ui.audit_logs') }}</a>
-                    <a href="{{ route('approvals.index') }}" class="{{ request()->routeIs('approvals.*') ? 'active' : '' }}">Approval</a>
-                    <a href="{{ route('semester-transactions.index') }}" class="{{ request()->routeIs('semester-transactions.*') ? 'active' : '' }}">{{ __('menu.semester_transactions') }}</a>
-                    <a href="{{ route('ops-health.index') }}" class="{{ request()->routeIs('ops-health.*') ? 'active' : '' }}">Ops Health</a>
-                @endif
-                <a href="{{ route('settings.edit') }}" class="{{ request()->routeIs('settings.*') ? 'active' : '' }}">{{ __('menu.settings') }}</a>
+                <div class="nav-group {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}">
+                    <span class="nav-group-title {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}">{{ __('ui.nav_system') }}</span>
+                    <div class="nav-sub">
+                    @if(auth()->user()->role === 'admin')
+                        <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'active' : '' }}">{{ __('menu.users') }}</a>
+                        <a href="{{ route('audit-logs.index') }}" class="{{ request()->routeIs('audit-logs.*') ? 'active' : '' }}">{{ __('ui.audit_logs') }}</a>
+                        <a href="{{ route('approvals.index') }}" class="{{ request()->routeIs('approvals.*') ? 'active' : '' }}">Approval</a>
+                        <a href="{{ route('semester-transactions.index') }}" class="{{ request()->routeIs('semester-transactions.*') ? 'active' : '' }}">{{ __('menu.semester_transactions') }}</a>
+                        <a href="{{ route('ops-health.index') }}" class="{{ request()->routeIs('ops-health.*') ? 'active' : '' }}">Ops Health</a>
+                    @endif
+                    <a href="{{ route('settings.edit') }}" class="{{ request()->routeIs('settings.*') ? 'active' : '' }}">{{ __('menu.settings') }}</a>
+                    </div>
                 </div>
                 <div style="margin-top: 14px; font-size: 12px; color: #d1d1d1;">
                     {{ __('ui.login') }}: {{ auth()->user()->name }} ({{ auth()->user()->role }})

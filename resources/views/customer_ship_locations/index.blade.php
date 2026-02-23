@@ -28,7 +28,6 @@
             <tr>
                 <th>{{ __('txn.customer') }}</th>
                 <th>{{ __('school_bulk.school_name') }}</th>
-                <th>{{ __('txn.recipient_name') }}</th>
                 <th>{{ __('txn.phone') }}</th>
                 <th>{{ __('txn.city') }}</th>
                 <th>{{ __('txn.address') }}</th>
@@ -41,7 +40,6 @@
                 <tr>
                     <td>{{ $location->customer?->name ?: '-' }}</td>
                     <td>{{ $location->school_name }}</td>
-                    <td>{{ $location->recipient_name ?: '-' }}</td>
                     <td>{{ $location->recipient_phone ?: '-' }}</td>
                     <td>{{ $location->city ?: '-' }}</td>
                     <td>{{ $location->address ?: '-' }}</td>
@@ -65,7 +63,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="muted">{{ __('school_bulk.no_ship_locations') }}</td>
+                    <td colspan="7" class="muted">{{ __('school_bulk.no_ship_locations') }}</td>
                 </tr>
             @endforelse
             </tbody>
@@ -76,4 +74,3 @@
         </div>
     </div>
 @endsection
-

@@ -10,6 +10,7 @@ use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -23,6 +24,7 @@ class CustomerPageController extends Controller
     public function index(Request $request): View
     {
         $search = trim((string) $request->string('search', ''));
+        $selectedLevelId = max(0, (int) $request->integer('level_id', 0));
 
         $customers = Customer::query()
             ->select([
@@ -36,6 +38,7 @@ class CustomerPageController extends Controller
                 'id_card_photo_path',
             ])
             ->withLevel()
+            ->when($selectedLevelId > 0, fn ($query) => $query->where('customer_level_id', $selectedLevelId))
             ->searchKeyword($search)
             ->orderBy('name')
             ->paginate((int) config('pagination.master_per_page', 20))
@@ -44,17 +47,21 @@ class CustomerPageController extends Controller
         return view('customers.index', [
             'customers' => $customers,
             'search' => $search,
+            'levels' => CustomerLevel::query()->orderBy('code')->orderBy('name')->get(['id', 'code', 'name']),
+            'selectedLevelId' => $selectedLevelId,
         ]);
     }
 
     public function exportCsv(Request $request): StreamedResponse
     {
         $search = trim((string) $request->string('search', ''));
+        $selectedLevelId = max(0, (int) $request->integer('level_id', 0));
         $printedAt = $this->nowWib();
         $filename = 'customers-' . $printedAt->format('Ymd-His') . '.xlsx';
 
         $customerQuery = Customer::query()
             ->select(['id', 'name', 'phone', 'city', 'address', 'outstanding_receivable'])
+            ->when($selectedLevelId > 0, fn ($query) => $query->where('customer_level_id', $selectedLevelId))
             ->searchKeyword($search)
             ->orderBy('id');
 
@@ -114,6 +121,31 @@ class CustomerPageController extends Controller
     private function nowWib(): Carbon
     {
         return now('Asia/Jakarta');
+    }
+
+    public function levelCustomers(CustomerLevel $customerLevel): JsonResponse
+    {
+        $customers = Customer::query()
+            ->select(['id', 'name', 'phone', 'city', 'address'])
+            ->where('customer_level_id', $customerLevel->id)
+            ->orderBy('name')
+            ->limit(500)
+            ->get();
+
+        return response()->json([
+            'level' => [
+                'id' => (int) $customerLevel->id,
+                'code' => (string) $customerLevel->code,
+                'name' => (string) $customerLevel->name,
+            ],
+            'customers' => $customers->map(static fn (Customer $customer): array => [
+                'id' => (int) $customer->id,
+                'name' => (string) $customer->name,
+                'phone' => (string) ($customer->phone ?? ''),
+                'city' => (string) ($customer->city ?? ''),
+                'address' => (string) ($customer->address ?? ''),
+            ])->values(),
+        ]);
     }
 
     public function create(): View

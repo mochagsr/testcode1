@@ -156,7 +156,9 @@ class SchoolDistributionFlowsTest extends TestCase
             ->get(route('school-bulk-transactions.print', $transaction))
             ->assertOk()
             ->assertSee('SDN 1 Bulk')
-            ->assertSee('SDN 2 Bulk');
+            ->assertSee('SDN 2 Bulk')
+            ->assertSee('school-page', false)
+            ->assertSee(__('txn.signature_created'));
 
         $this->actingAs($user)
             ->get(route('school-bulk-transactions.export.pdf', $transaction))
@@ -267,6 +269,13 @@ class SchoolDistributionFlowsTest extends TestCase
             ->get();
         $this->assertCount(2, $generatedInvoices);
         $this->assertSame(2, $generatedInvoices->pluck('school_bulk_location_id')->filter()->unique()->count());
+        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) ($invoice->customer_ship_location_id ?? 0) > 0));
+        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_name ?? '')) !== ''));
+        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_city ?? '')) !== ''));
+        $this->assertEqualsCanonicalizing(
+            ['SDN A', 'SDN B'],
+            $generatedInvoices->pluck('ship_to_name')->map(fn($name): string => trim((string) $name))->all()
+        );
         $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) round((float) $invoice->total) === 75000));
         $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (string) $invoice->payment_status === 'unpaid'));
         $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) round((float) $invoice->balance) === 75000));
