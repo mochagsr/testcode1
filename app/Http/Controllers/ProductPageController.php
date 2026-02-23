@@ -456,17 +456,12 @@ class ProductPageController extends Controller
      */
     private function buildProductChangeFlashMeta(Product $product, array $oldSnapshot, int $oldStock, int $newStock): array
     {
-        $priceSegment = __('ui.stock_change_price_segment', [
-            'agent' => number_format((int) round((float) $product->price_agent), 0, ',', '.'),
-            'sales' => number_format((int) round((float) $product->price_sales), 0, ',', '.'),
-            'general' => number_format((int) round((float) $product->price_general), 0, ',', '.'),
-        ]);
-
         $category = $this->productCategoryLabel($product);
         $code = trim((string) ($product->code ?? '')) !== '' ? (string) $product->code : '-';
         $name = (string) $product->name;
         $stockText = number_format($newStock, 0, ',', '.');
         $delta = $newStock - $oldStock;
+        $priceTail = $this->buildPriceChangeTail($product, $oldSnapshot);
 
         if ($delta > 0) {
             return [
@@ -477,7 +472,7 @@ class ProductPageController extends Controller
                     'name' => $name,
                     'stock' => $stockText,
                     'delta' => number_format($delta, 0, ',', '.'),
-                    'price_segment' => $priceSegment,
+                    'price_tail' => $priceTail,
                 ]),
             ];
         }
@@ -491,7 +486,7 @@ class ProductPageController extends Controller
                     'name' => $name,
                     'stock' => $stockText,
                     'delta' => number_format(abs($delta), 0, ',', '.'),
-                    'price_segment' => $priceSegment,
+                    'price_tail' => $priceTail,
                 ]),
             ];
         }
@@ -506,15 +501,6 @@ class ProductPageController extends Controller
         if (($oldSnapshot['unit'] ?? '') !== (string) $product->unit) {
             $changedFields[] = __('ui.unit');
         }
-        if ((int) ($oldSnapshot['price_agent'] ?? 0) !== (int) round((float) $product->price_agent)) {
-            $changedFields[] = __('ui.price_agent');
-        }
-        if ((int) ($oldSnapshot['price_sales'] ?? 0) !== (int) round((float) $product->price_sales)) {
-            $changedFields[] = __('ui.price_sales');
-        }
-        if ((int) ($oldSnapshot['price_general'] ?? 0) !== (int) round((float) $product->price_general)) {
-            $changedFields[] = __('ui.price_general');
-        }
 
         $changes = ! empty($changedFields)
             ? __('ui.stock_change_fields_segment', ['fields' => implode(', ', $changedFields)])
@@ -527,9 +513,48 @@ class ProductPageController extends Controller
                 'category' => $category,
                 'name' => $name,
                 'changes' => $changes,
-                'price_segment' => $priceSegment,
+                'price_tail' => $priceTail,
             ]),
         ];
+    }
+
+    /**
+     * @param array{
+     *     price_agent:int,
+     *     price_sales:int,
+     *     price_general:int
+     * } $oldSnapshot
+     */
+    private function buildPriceChangeTail(Product $product, array $oldSnapshot): string
+    {
+        $parts = [];
+        $priceAgent = (int) round((float) $product->price_agent);
+        $priceSales = (int) round((float) $product->price_sales);
+        $priceGeneral = (int) round((float) $product->price_general);
+
+        if ((int) ($oldSnapshot['price_agent'] ?? 0) !== $priceAgent) {
+            $parts[] = __('ui.stock_change_price_agent_segment', [
+                'value' => number_format($priceAgent, 0, ',', '.'),
+            ]);
+        }
+        if ((int) ($oldSnapshot['price_sales'] ?? 0) !== $priceSales) {
+            $parts[] = __('ui.stock_change_price_sales_segment', [
+                'value' => number_format($priceSales, 0, ',', '.'),
+            ]);
+        }
+        if ((int) ($oldSnapshot['price_general'] ?? 0) !== $priceGeneral) {
+            $parts[] = __('ui.stock_change_price_general_segment', [
+                'value' => number_format($priceGeneral, 0, ',', '.'),
+            ]);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return ' ' . __('ui.stock_change_price_changes_segment', [
+            'segments' => implode(' | ', $parts),
+        ]);
     }
 
     /**

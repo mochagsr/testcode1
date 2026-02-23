@@ -684,7 +684,7 @@
             setTimeout(() => {
                 alertNode.classList.add('is-hiding');
                 setTimeout(() => alertNode.remove(), 220);
-            }, 3000);
+            }, 10000);
         };
 
         const normalizeType = (type) => {

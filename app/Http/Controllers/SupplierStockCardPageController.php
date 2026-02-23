@@ -322,12 +322,6 @@ class SupplierStockCardPageController extends Controller
      */
     private function buildSupplierStockFlashMeta(Product $product, int $oldStock, int $newStock): array
     {
-        $priceSegment = __('ui.stock_change_price_segment', [
-            'agent' => number_format((int) round((float) $product->price_agent), 0, ',', '.'),
-            'sales' => number_format((int) round((float) $product->price_sales), 0, ',', '.'),
-            'general' => number_format((int) round((float) $product->price_general), 0, ',', '.'),
-        ]);
-
         $category = $this->productCategoryLabel($product);
         $code = trim((string) ($product->code ?? '')) !== '' ? (string) $product->code : '-';
         $name = (string) $product->name;
@@ -343,7 +337,7 @@ class SupplierStockCardPageController extends Controller
                     'name' => $name,
                     'stock' => $stockText,
                     'delta' => number_format($delta, 0, ',', '.'),
-                    'price_segment' => $priceSegment,
+                    'price_tail' => '',
                 ]),
             ];
         }
@@ -357,7 +351,7 @@ class SupplierStockCardPageController extends Controller
                     'name' => $name,
                     'stock' => $stockText,
                     'delta' => number_format(abs($delta), 0, ',', '.'),
-                    'price_segment' => $priceSegment,
+                    'price_tail' => '',
                 ]),
             ];
         }
@@ -369,7 +363,7 @@ class SupplierStockCardPageController extends Controller
                 'category' => $category,
                 'name' => $name,
                 'changes' => __('ui.stock_change_fields_none'),
-                'price_segment' => $priceSegment,
+                'price_tail' => '',
             ]),
         ];
     }
