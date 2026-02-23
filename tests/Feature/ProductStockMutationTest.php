@@ -13,6 +13,12 @@ class ProductStockMutationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        app()->setLocale('id');
+    }
+
     public function test_product_update_creates_manual_stock_mutation(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -170,5 +176,82 @@ class ProductStockMutationTest extends TestCase
             'quantity' => 10,
             'created_by_user_id' => $admin->id,
         ]);
+    }
+
+    public function test_stock_change_message_hides_price_when_price_not_changed(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-04',
+            'name' => 'Buku',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'bk004',
+            'name' => 'Buku 4',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('products.update', $product), [
+            'item_category_id' => $category->id,
+            'code' => 'bk004',
+            'name' => 'Buku 4',
+            'unit' => 'exp',
+            'stock' => 90,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+        ]);
+
+        $response->assertRedirect(route('products.index'));
+        $response->assertSessionHas('success', function (string $message): bool {
+            return str_contains($message, 'Pengurangan stok')
+                && ! str_contains($message, 'Perubahan harga');
+        });
+    }
+
+    public function test_stock_change_message_shows_only_changed_price_field(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-05',
+            'name' => 'Buku',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'bk005',
+            'name' => 'Buku 5',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('products.update', $product), [
+            'item_category_id' => $category->id,
+            'code' => 'bk005',
+            'name' => 'Buku 5',
+            'unit' => 'exp',
+            'stock' => 95,
+            'price_agent' => 11000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+        ]);
+
+        $response->assertRedirect(route('products.index'));
+        $response->assertSessionHas('success', function (string $message): bool {
+            return str_contains($message, 'Pengurangan stok')
+                && str_contains($message, 'Perubahan harga')
+                && str_contains($message, 'Agen Rp 11.000')
+                && ! str_contains($message, 'Sales Rp')
+                && ! str_contains($message, 'Umum Rp');
+        });
     }
 }
