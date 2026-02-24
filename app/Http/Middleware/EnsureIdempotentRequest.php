@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\ViewErrorBag;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureIdempotentRequest
@@ -39,10 +41,29 @@ class EnsureIdempotentRequest
         $response = $next($request);
 
         // Allow re-submit when request fails (validation/error), keep lock for successful processing.
-        if ((int) $response->getStatusCode() >= 400) {
+        if ($this->shouldUnlock($response)) {
             Cache::forget($cacheKey);
         }
 
         return $response;
+    }
+
+    private function shouldUnlock(Response $response): bool
+    {
+        if ((int) $response->getStatusCode() >= 400) {
+            return true;
+        }
+
+        if ($response instanceof RedirectResponse) {
+            $session = $response->getSession();
+            if ($session !== null) {
+                $errors = $session->get('errors');
+                if ($errors instanceof ViewErrorBag && $errors->any()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

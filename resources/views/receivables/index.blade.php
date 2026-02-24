@@ -3,6 +3,37 @@
 @section('title', __('receivable.title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .receivable-ledger-table,
+        .receivable-bill-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .receivable-ledger-table thead th,
+        .receivable-bill-table thead th {
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .receivable-ledger-table tbody td,
+        .receivable-bill-table tbody td {
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        .receivable-ledger-table td.num,
+        .receivable-ledger-table th.num,
+        .receivable-bill-table td.num,
+        .receivable-bill-table th.num {
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .receivable-ledger-table td.action,
+        .receivable-ledger-table th.action {
+            text-align: center;
+            white-space: nowrap;
+        }
+    </style>
     <h1 class="page-title">{{ __('receivable.title') }}</h1>
 
     <div class="card">
@@ -209,15 +240,23 @@
                     </div>
                 @endif
 
-                <table style="width: 100%;">
+                <table class="receivable-ledger-table">
+                    <colgroup>
+                        <col style="width: 11%;">
+                        <col style="width: 37%;">
+                        <col style="width: 14%;">
+                        <col style="width: 14%;">
+                        <col style="width: 14%;">
+                        <col style="width: 10%;">
+                    </colgroup>
                     <thead>
                     <tr>
-                        <th style="width: 10%;">{{ __('receivable.date') }}</th>
-                        <th style="width: 34%;">{{ __('receivable.description') }}</th>
-                        <th style="width: 12%;">{{ __('receivable.debit') }}</th>
-                        <th style="width: 12%;">{{ __('receivable.credit') }}</th>
-                        <th style="width: 12%;">{{ __('receivable.balance') }}</th>
-                        <th style="width: 12%;">{{ __('receivable.action') }}</th>
+                        <th>{{ __('receivable.date') }}</th>
+                        <th>{{ __('receivable.description') }}</th>
+                        <th class="num">{{ __('receivable.debit') }}</th>
+                        <th class="num">{{ __('receivable.credit') }}</th>
+                        <th class="num">{{ __('receivable.balance') }}</th>
+                        <th class="action">{{ __('receivable.action') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -283,24 +322,24 @@
                                         || str_contains($descriptionUpper, 'INVOICE CANCELLATION');
                                 @endphp
                             </td>
-                            <td style="text-align: right;">
+                            <td class="num">
                                 @if($row->debit > 0)
                                     Rp {{ number_format((int) round($row->debit), 0, ',', '.') }}
                                 @else
                                     -
                                 @endif
                             </td>
-                            <td style="text-align: right;">
+                            <td class="num">
                                 @if($row->credit > 0)
                                     Rp {{ number_format((int) round($row->credit), 0, ',', '.') }}
                                 @else
                                     -
                                 @endif
                             </td>
-                            <td style="text-align: right;">
+                            <td class="num">
                                 Rp {{ number_format((int) round($row->balance_after), 0, ',', '.') }}
                             </td>
-                            <td style="text-align: center;">
+                            <td class="action">
                                 @if($isAdminCancelInvoice)
                                     <span style="display: inline-block; background: #ffcdd2; color: #c62828; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500;">{{ __('txn.admin_badge_cancel') }}</span>
                                 @elseif($canPay)
@@ -317,7 +356,6 @@
                                     <span class="muted">-</span>
                                 @endif
                             </td>
-                        </tr>
                         </tr>
                         @endforeach
                     @endif
@@ -376,15 +414,23 @@
                     @if(($billStatementRows ?? collect())->isNotEmpty())
                         <div style="margin-top: 8px;">
                             <h4 style="margin: 0 0 8px 0;">{{ __('receivable.customer_bill_title') }}</h4>
-                            <table>
+                            <table class="receivable-bill-table">
+                                <colgroup>
+                                    <col style="width: 15%;">
+                                    <col style="width: 22%;">
+                                    <col style="width: 16%;">
+                                    <col style="width: 16%;">
+                                    <col style="width: 15%;">
+                                    <col style="width: 16%;">
+                                </colgroup>
                                 <thead>
                                 <tr>
                                     <th>{{ __('receivable.bill_date') }}</th>
                                     <th>{{ __('receivable.bill_proof_number') }}</th>
-                                    <th>{{ __('receivable.bill_credit_sales') }}</th>
-                                    <th>{{ __('receivable.bill_installment_payment') }}</th>
-                                    <th>{{ __('receivable.bill_sales_return') }}</th>
-                                    <th>{{ __('receivable.bill_running_balance') }}</th>
+                                    <th class="num">{{ __('receivable.bill_credit_sales') }}</th>
+                                    <th class="num">{{ __('receivable.bill_installment_payment') }}</th>
+                                    <th class="num">{{ __('receivable.bill_sales_return') }}</th>
+                                    <th class="num">{{ __('receivable.bill_running_balance') }}</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -394,7 +440,7 @@
                                         <tr>
                                             <td>{{ $billRow['date_label'] ?? '' }}</td>
                                             <td colspan="4"></td>
-                                            <td>{{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">{{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                                         </tr>
                                     @else
                                         <tr>
@@ -408,24 +454,24 @@
                                                     {{ $billRow['proof_number'] ?? '' }}
                                                 @endif
                                             </td>
-                                            <td>{{ number_format((int) round((float) ($billRow['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
-                                            <td>{{ number_format((int) round((float) ($billRow['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
-                                            <td>{{ number_format((int) round((float) ($billRow['sales_return'] ?? 0)), 0, ',', '.') }}</td>
-                                            <td>{{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">{{ number_format((int) round((float) ($billRow['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">{{ number_format((int) round((float) ($billRow['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">{{ number_format((int) round((float) ($billRow['sales_return'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">{{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                                         </tr>
                                     @endif
                                 @endforeach
                                 <tr style="font-weight:700;">
                                     <td colspan="2" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
-                                    <td>{{ number_format((int) round((float) (($billStatementTotals['credit_sales'] ?? 0))), 0, ',', '.') }}</td>
-                                    <td>{{ number_format((int) round((float) (($billStatementTotals['installment_payment'] ?? 0))), 0, ',', '.') }}</td>
-                                    <td>{{ number_format((int) round((float) (($billStatementTotals['sales_return'] ?? 0))), 0, ',', '.') }}</td>
-                                    <td>{{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['credit_sales'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['installment_payment'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['sales_return'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>
                                 <tr style="font-weight:700;">
                                     <td colspan="3"></td>
                                     <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
-                                    <td>{{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -626,6 +672,5 @@
         })();
     </script>
 @endsection
-
 
 
