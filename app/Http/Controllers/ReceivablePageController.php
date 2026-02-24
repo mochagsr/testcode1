@@ -89,7 +89,7 @@ class ReceivablePageController extends Controller
         }
 
         $customers = $customersQuery
-            ->paginate(25)
+            ->paginate((int) config('pagination.default_per_page', 20))
             ->withQueryString();
         $selectedSemesterGlobalClosed = $selectedSemester !== null
             ? $this->semesterBookService->isClosed($selectedSemester)
