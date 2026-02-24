@@ -66,6 +66,8 @@ return [
     'login_title' => 'Login',
     'remember_me' => 'Ingat saya',
     'sign_in' => 'Masuk',
+    'show_password' => 'Tampilkan',
+    'hide_password' => 'Sembunyikan',
     'login_hint' => 'Masukkan email dan password akun Anda.',
     'users' => 'User',
     'user' => 'User',

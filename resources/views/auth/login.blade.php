@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,7 +40,14 @@
         <label>{{ __('ui.password') }} <span class="label-required">*</span></label>
         <div class="password-wrap">
             <input id="login-password-input" type="password" name="password" required>
-            <button id="toggle-login-password" type="button" aria-controls="login-password-input" aria-label="Tampilkan password">Tampilkan</button>
+            <button
+                id="toggle-login-password"
+                type="button"
+                aria-controls="login-password-input"
+                aria-label="{{ __('ui.show_password') }}"
+                data-label-show="{{ __('ui.show_password') }}"
+                data-label-hide="{{ __('ui.hide_password') }}"
+            >{{ __('ui.show_password') }}</button>
         </div>
 
         <label style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
@@ -62,8 +69,10 @@
         toggle.addEventListener('click', () => {
             const show = passwordInput.type === 'password';
             passwordInput.type = show ? 'text' : 'password';
-            toggle.textContent = show ? 'Sembunyikan' : 'Tampilkan';
-            toggle.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
+            const showLabel = String(toggle.getAttribute('data-label-show') || 'Show');
+            const hideLabel = String(toggle.getAttribute('data-label-hide') || 'Hide');
+            toggle.textContent = show ? hideLabel : showLabel;
+            toggle.setAttribute('aria-label', show ? hideLabel : showLabel);
         });
     })();
 </script>

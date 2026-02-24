@@ -66,6 +66,8 @@ return [
     'login_title' => 'Login',
     'remember_me' => 'Remember me',
     'sign_in' => 'Sign In',
+    'show_password' => 'Show',
+    'hide_password' => 'Hide',
     'login_hint' => 'Enter your account email and password.',
     'users' => 'Users',
     'user' => 'User',
