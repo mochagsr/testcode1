@@ -252,6 +252,81 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('INV-DISC-001 - ' . __('receivable.method_discount'));
     }
 
+    public function test_receivable_index_uses_ledger_balance_as_single_source_of_truth(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-LEDGER-001',
+            'name' => 'Customer Ledger',
+            'city' => 'Sidoarjo',
+            // Deliberately wrong snapshot value. UI must follow ledger sum, not this field.
+            'outstanding_receivable' => 52500,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-LEDGER-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 52500,
+            'total' => 52500,
+            'total_paid' => 3500,
+            'balance' => 49000,
+            'payment_status' => 'partial',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'period_code' => 'S2-2526',
+            'description' => 'Invoice INV-LEDGER-001',
+            'debit' => 52500,
+            'credit' => 0,
+            'balance_after' => 52500,
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'period_code' => 'S2-2526',
+            'description' => 'Pembayaran untuk INV-LEDGER-001',
+            'debit' => 0,
+            'credit' => 52500,
+            'balance_after' => 0,
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'period_code' => 'S2-2526',
+            'description' => '[ADMIN EDIT FAKTUR +] Penyesuaian nilai faktur INV-LEDGER-001',
+            'debit' => 52500,
+            'credit' => 0,
+            'balance_after' => 52500,
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'period_code' => 'S2-2526',
+            'description' => 'Retur RTR-20260228-0001',
+            'debit' => 0,
+            'credit' => 3500,
+            'balance_after' => 49000,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+        ]));
+
+        $response->assertOk();
+        // Customer row + summary must use ledger final (49.000), not stale customer.outstanding_receivable (52.500).
+        $response->assertSee('Rp 49.000');
+        // Bill table amounts must show currency prefix.
+        $response->assertSee('Rp 52.500');
+    }
+
     public function test_admin_can_cancel_sales_invoice_and_stock_is_reverted(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -575,6 +650,107 @@ class ReceivableFlowsTest extends TestCase
         $this->assertSame(100000, (int) round((float) $invoice->balance));
         $this->assertSame('unpaid', (string) $invoice->payment_status);
         $this->assertSame(0, (int) round((float) $invoice->total_paid));
+    }
+
+    public function test_admin_update_sales_invoice_does_not_double_post_receivable_adjustment(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-INV-DBL-001',
+            'name' => 'Customer No Double',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-INV-DBL-001',
+            'name' => 'Kategori No Double',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-INV-DBL-001',
+            'name' => 'Produk No Double',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 100000,
+            'is_active' => true,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-DBL-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 100000,
+            'total' => 100000,
+            'total_paid' => 100000,
+            'balance' => 0,
+            'payment_status' => 'paid',
+        ]);
+
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'quantity' => 1,
+            'unit_price' => 100000,
+            'discount' => 0,
+            'line_total' => 100000,
+        ]);
+
+        InvoicePayment::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'payment_date' => '2026-03-01',
+            'amount' => 100000,
+            'method' => 'transfer',
+            'notes' => 'Pelunasan transfer',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'period_code' => 'S2-2526',
+            'description' => 'Invoice INV-DBL-001',
+            'debit' => 100000,
+            'credit' => 0,
+            'balance_after' => 100000,
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-03-01',
+            'period_code' => 'S2-2526',
+            'description' => 'Pembayaran untuk INV-DBL-001',
+            'debit' => 0,
+            'credit' => 100000,
+            'balance_after' => 0,
+        ]);
+
+        $this->actingAs($admin)->put(route('sales-invoices.admin-update', $invoice), [
+            'invoice_date' => '2026-02-28',
+            'due_date' => null,
+            'semester_period' => 'S2-2526',
+            'payment_method' => 'kredit',
+            'notes' => 'naik qty',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 2,
+                    'unit_price' => 100000,
+                    'discount' => 0,
+                ],
+            ],
+        ])->assertRedirect(route('sales-invoices.show', $invoice));
+
+        $invoice->refresh();
+        $this->assertSame(200000, (int) round((float) $invoice->total));
+        $this->assertSame(100000, (int) round((float) $invoice->total_paid));
+        $this->assertSame(100000, (int) round((float) $invoice->balance));
+
+        $ledgerOutstanding = (int) round((float) ReceivableLedger::query()
+            ->where('customer_id', $customer->id)
+            ->sum(\Illuminate\Support\Facades\DB::raw('debit - credit')));
+        $this->assertSame(100000, $ledgerOutstanding);
     }
 
     public function test_admin_can_edit_sales_return_items_and_stock_is_rebalanced(): void

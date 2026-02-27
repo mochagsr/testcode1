@@ -6,7 +6,6 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\ReceivableLedger;
-use App\Models\SalesInvoice;
 use Carbon\CarbonInterface;
 
 final class ReceivableLedgerService
@@ -31,7 +30,7 @@ final class ReceivableLedgerService
         ?string $description
     ): ReceivableLedger {
         $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
-        $current = (float) $customer->outstanding_receivable;
+        $current = $this->currentOutstandingFromLedger($customerId);
         $next = $current + $amount;
 
         $customer->update(['outstanding_receivable' => $next]);
@@ -72,7 +71,7 @@ final class ReceivableLedgerService
         ?string $description
     ): ReceivableLedger {
         $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
-        $current = (float) $customer->outstanding_receivable;
+        $current = $this->currentOutstandingFromLedger($customerId);
         $next = max(0, $current - $amount);
 
         $customer->update(['outstanding_receivable' => $next]);
@@ -100,13 +99,18 @@ final class ReceivableLedgerService
             return;
         }
 
-        $openBalance = (int) round((float) SalesInvoice::query()
-            ->where('customer_id', $customerId)
-            ->where('is_canceled', false)
-            ->sum('balance'));
+        // Keep customer outstanding consistent with ledger mutations (debit-credit).
+        $ledgerBalance = (int) round($this->currentOutstandingFromLedger($customerId));
 
-        if ((int) round((float) $customer->outstanding_receivable) !== $openBalance) {
-            $customer->update(['outstanding_receivable' => $openBalance]);
+        if ((int) round((float) $customer->outstanding_receivable) !== $ledgerBalance) {
+            $customer->update(['outstanding_receivable' => max(0, $ledgerBalance)]);
         }
+    }
+
+    private function currentOutstandingFromLedger(int $customerId): float
+    {
+        return (float) ReceivableLedger::query()
+            ->where('customer_id', $customerId)
+            ->sum(\Illuminate\Support\Facades\DB::raw('debit - credit'));
     }
 }

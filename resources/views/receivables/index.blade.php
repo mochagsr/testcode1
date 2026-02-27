@@ -596,6 +596,16 @@
                                             $descriptionWithoutInvoice = $invoiceNumber !== ''
                                                 ? trim(str_ireplace($invoiceNumber, '', $descriptionText))
                                                 : $descriptionText;
+                                            $returnNumber = '';
+                                            if (preg_match('/\bRTR-\d{8}-\d{4}\b/i', $descriptionText, $returnMatch) === 1) {
+                                                $returnNumber = strtoupper((string) $returnMatch[0]);
+                                            }
+                                            $returnId = ($returnNumber !== '' && isset($salesReturnLinkMap[$returnNumber]))
+                                                ? (int) $salesReturnLinkMap[$returnNumber]
+                                                : null;
+                                            $descriptionWithoutReturn = $returnNumber !== ''
+                                                ? trim(str_ireplace($returnNumber, '', $descriptionText))
+                                                : $descriptionText;
                                         @endphp
 
                                         @if($row->invoice)
@@ -604,6 +614,13 @@
                                             @endif
                                             <a href="{{ route('sales-invoices.show', $row->invoice) }}" target="_blank" rel="noopener noreferrer">
                                                 {{ $invoiceNumber }}
+                                            </a>
+                                        @elseif($returnId !== null)
+                                            @if($descriptionWithoutReturn !== '')
+                                                {{ $descriptionWithoutReturn }}
+                                            @endif
+                                            <a href="{{ route('sales-returns.show', $returnId) }}" target="_blank" rel="noopener noreferrer">
+                                                {{ $returnNumber }}
                                             </a>
                                         @else
                                             {{ $descriptionText !== '' ? $descriptionText : '-' }}
@@ -751,7 +768,7 @@
                                         <tr>
                                             <td>{{ $billRow['date_label'] ?? '' }}</td>
                                             <td colspan="4"></td>
-                                            <td class="num">{{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">Rp {{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                                         </tr>
                                     @else
                                         <tr>
@@ -764,25 +781,30 @@
                                                 @else
                                                     {{ $billRow['proof_number'] ?? '' }}
                                                 @endif
+                                                @if((int) ($billRow['adjustment_amount'] ?? 0) !== 0)
+                                                    <span class="muted" style="display:block; font-size:11px;">
+                                                        ({{ (int) ($billRow['adjustment_amount'] ?? 0) > 0 ? '+' : '-' }}Rp {{ number_format(abs((int) ($billRow['adjustment_amount'] ?? 0)), 0, ',', '.') }})
+                                                    </span>
+                                                @endif
                                             </td>
-                                            <td class="num">{{ number_format((int) round((float) ($billRow['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
-                                            <td class="num">{{ number_format((int) round((float) ($billRow['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
-                                            <td class="num">{{ number_format((int) round((float) ($billRow['sales_return'] ?? 0)), 0, ',', '.') }}</td>
-                                            <td class="num">{{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">Rp {{ number_format((int) round((float) ($billRow['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">Rp {{ number_format((int) round((float) ($billRow['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">Rp {{ number_format((int) round((float) ($billRow['sales_return'] ?? 0)), 0, ',', '.') }}</td>
+                                            <td class="num">Rp {{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                                         </tr>
                                     @endif
                                 @endforeach
                                 <tr style="font-weight:700;">
                                     <td colspan="2" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
-                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['credit_sales'] ?? 0))), 0, ',', '.') }}</td>
-                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['installment_payment'] ?? 0))), 0, ',', '.') }}</td>
-                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['sales_return'] ?? 0))), 0, ',', '.') }}</td>
-                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['credit_sales'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['installment_payment'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['sales_return'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>
                                 <tr style="font-weight:700;">
                                     <td colspan="3"></td>
                                     <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
-                                    <td class="num">{{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>
                                 </tbody>
                             </table>

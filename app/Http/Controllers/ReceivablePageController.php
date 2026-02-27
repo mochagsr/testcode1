@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\InvoicePayment;
 use App\Models\ReceivableLedger;
 use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\SemesterBookService;
@@ -76,16 +77,23 @@ class ReceivablePageController extends Controller
                 ->groupBy('customer_id');
 
             $customersQuery
-                ->joinSub($semesterLedger, 'semester_ledger', function ($join): void {
+                ->leftJoinSub($semesterLedger, 'semester_ledger', function ($join): void {
                     $join->on('customers.id', '=', 'semester_ledger.customer_id');
                 })
-                ->addSelect(DB::raw('semester_ledger.semester_outstanding as outstanding_receivable'))
-                ->orderByDesc('semester_ledger.semester_outstanding')
+                ->addSelect(DB::raw('COALESCE(semester_ledger.semester_outstanding, 0) as outstanding_receivable'))
+                ->orderByDesc(DB::raw('COALESCE(semester_ledger.semester_outstanding, 0)'))
                 ->orderBy('customers.name');
         } else {
+            $totalLedger = ReceivableLedger::query()
+                ->selectRaw('customer_id, SUM(debit - credit) as total_outstanding')
+                ->groupBy('customer_id');
+
             $customersQuery
-                ->addSelect('customers.outstanding_receivable')
-                ->orderByDesc('customers.outstanding_receivable')
+                ->leftJoinSub($totalLedger, 'total_ledger', function ($join): void {
+                    $join->on('customers.id', '=', 'total_ledger.customer_id');
+                })
+                ->addSelect(DB::raw('COALESCE(total_ledger.total_outstanding, 0) as outstanding_receivable'))
+                ->orderByDesc(DB::raw('COALESCE(total_ledger.total_outstanding, 0)'))
                 ->orderBy('customers.name');
         }
 
@@ -125,6 +133,7 @@ class ReceivablePageController extends Controller
         $customerOutstandingTotal = null;
         $selectedCustomerSemesterClosed = false;
         $paymentRefsWithAlloc = [];
+        $salesReturnLinkMap = [];
         if ($customerId > 0) {
             $selectedCustomer = Customer::query()
                 ->select(['id', 'name', 'city'])
@@ -148,8 +157,6 @@ class ReceivablePageController extends Controller
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                     $query->forSemester($selectedSemester);
                 });
-
-            $customerOutstandingTotal = (float) (clone $outstandingInvoiceQuery)->sum('balance');
 
             $outstandingInvoices = (clone $outstandingInvoiceQuery)
                 ->select(['id', 'invoice_number', 'invoice_date', 'semester_period', 'total', 'total_paid', 'balance'])
@@ -182,6 +189,30 @@ class ReceivablePageController extends Controller
                 ->get();
             $ledgerRows = $this->filterRedundantPaymentSummaryRows($ledgerRows);
             $paymentRefsWithAlloc = $this->paymentRefsWithAlloc($ledgerRows);
+            $customerOutstandingTotal = max(0, (float) $ledgerOutstandingTotal);
+            $returnNumbers = $ledgerRows
+                ->map(function (ReceivableLedger $row): ?string {
+                    $description = (string) ($row->description ?? '');
+                    if (preg_match('/\bRTR-\d{8}-\d{4}\b/i', $description, $match) !== 1) {
+                        return null;
+                    }
+
+                    return strtoupper((string) $match[0]);
+                })
+                ->filter(fn (?string $number): bool => $number !== null && $number !== '')
+                ->unique()
+                ->values();
+            if ($returnNumbers->isNotEmpty()) {
+                $salesReturnLinkMap = SalesReturn::query()
+                    ->select(['id', 'return_number'])
+                    ->where('customer_id', $customerId)
+                    ->whereIn('return_number', $returnNumbers->all())
+                    ->get()
+                    ->mapWithKeys(fn (SalesReturn $salesReturn): array => [
+                        strtoupper((string) $salesReturn->return_number) => (int) $salesReturn->id,
+                    ])
+                    ->all();
+            }
 
             if ($selectedCustomer) {
                 $statementData = $this->cachedCustomerBillStatement((int) $selectedCustomer->id, $selectedSemester);
@@ -212,6 +243,7 @@ class ReceivablePageController extends Controller
             'customerSemesterAutoClosedMap' => $customerSemesterAutoClosedMap,
             'customerSemesterManualClosedMap' => $customerSemesterManualClosedMap,
             'paymentRefsWithAlloc' => $paymentRefsWithAlloc,
+            'salesReturnLinkMap' => $salesReturnLinkMap,
             'selectedCustomerOption' => $selectedCustomerOption,
         ]);
     }
@@ -385,9 +417,18 @@ class ReceivablePageController extends Controller
             ];
 
             foreach ($rows as $row) {
+                $adjustmentAmount = (int) round((float) ($row['adjustment_amount'] ?? 0));
+                $proofNumber = (string) ($row['proof_number'] ?? '');
+                if ($adjustmentAmount !== 0) {
+                    $proofNumber .= sprintf(
+                        ' (%sRp %s)',
+                        $adjustmentAmount > 0 ? '+' : '-',
+                        number_format(abs($adjustmentAmount), 0, ',', '.')
+                    );
+                }
                 $rowsOut[] = [
                     (string) ($row['date_label'] ?? ''),
-                    (string) ($row['proof_number'] ?? ''),
+                    $proofNumber,
                     number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.'),
@@ -695,6 +736,8 @@ class ReceivablePageController extends Controller
                 'date_label' => __('receivable.bill_opening_balance'),
                 'invoice_id' => null,
                 'proof_number' => '',
+                'entry_type' => 'opening',
+                'adjustment_amount' => 0,
                 'credit_sales' => 0,
                 'installment_payment' => 0,
                 'sales_return' => 0,
@@ -706,6 +749,7 @@ class ReceivablePageController extends Controller
             'credit_sales' => 0,
             'installment_payment' => 0,
             'sales_return' => 0,
+            'adjustment_amount' => 0,
             'running_balance' => $openingBalance,
         ];
 
@@ -717,6 +761,10 @@ class ReceivablePageController extends Controller
             $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
             $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
             $isDiscount = str_contains($description, 'diskon') || str_contains($description, 'discount');
+            $isAdminInvoiceAdjustment = str_contains($description, 'admin edit faktur')
+                || str_contains($description, 'admin invoice edit')
+                || str_contains($description, 'penyesuaian nilai faktur')
+                || str_contains($description, 'invoice adjustment');
             $salesReturn = $isReturn ? $credit : 0;
             $installment = $isReturn ? 0 : $credit;
             $baseProofNumber = $ledgerRow->invoice?->invoice_number ?: (trim((string) ($ledgerRow->description ?? '')) ?: '-');
@@ -730,16 +778,24 @@ class ReceivablePageController extends Controller
             } elseif ($isDiscount) {
                 $entryType = 'discount';
             }
+            if ($isAdminInvoiceAdjustment) {
+                $entryType = 'adjustment';
+            }
 
             $proofNumber = match ($entryType) {
                 'writeoff' => $baseProofNumber . ' - ' . __('receivable.method_writeoff'),
                 'discount' => $baseProofNumber . ' - ' . __('receivable.method_discount'),
+                'adjustment' => (trim((string) ($ledgerRow->description ?? '')) !== '')
+                    ? trim((string) $ledgerRow->description)
+                    : $baseProofNumber,
                 default => $baseProofNumber,
             };
             $invoiceId = $ledgerRow->invoice?->id;
-            $groupKey = $invoiceId !== null
+            $groupKey = $isAdminInvoiceAdjustment
+                ? 'ledger:' . (int) $ledgerRow->id . ':adjustment'
+                : ($invoiceId !== null
                 ? 'invoice:' . $invoiceId . ':' . $entryType
-                : 'text:' . $baseProofNumber . ':' . $entryType;
+                : 'text:' . $baseProofNumber . ':' . $entryType);
             $dateValue = $debit > 0
                 ? ($ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date)
                 : $ledgerRow->entry_date;
@@ -750,15 +806,21 @@ class ReceivablePageController extends Controller
                     'date_ts' => $this->toTimestamp($dateValue),
                     'invoice_id' => $invoiceId,
                     'proof_number' => $proofNumber,
+                    'entry_type' => $entryType,
+                    'adjustment_amount' => 0,
                     'credit_sales' => 0,
                     'installment_payment' => 0,
                     'sales_return' => 0,
                 ];
             }
 
-            $groupedRows[$groupKey]['credit_sales'] += $debit;
-            $groupedRows[$groupKey]['installment_payment'] += $installment;
-            $groupedRows[$groupKey]['sales_return'] += $salesReturn;
+            if ($entryType === 'adjustment') {
+                $groupedRows[$groupKey]['adjustment_amount'] += ($debit - $credit);
+            } else {
+                $groupedRows[$groupKey]['credit_sales'] += $debit;
+                $groupedRows[$groupKey]['installment_payment'] += $installment;
+                $groupedRows[$groupKey]['sales_return'] += $salesReturn;
+            }
         }
 
         uasort($groupedRows, function (array $a, array $b): int {
@@ -775,13 +837,16 @@ class ReceivablePageController extends Controller
         foreach ($groupedRows as $groupedRow) {
             $delta = (int) $groupedRow['credit_sales']
                 - (int) $groupedRow['installment_payment']
-                - (int) $groupedRow['sales_return'];
+                - (int) $groupedRow['sales_return']
+                + (int) ($groupedRow['adjustment_amount'] ?? 0);
             $runningBalance += $delta;
 
             $statementRows->push([
                 'date_label' => $this->formatBillDate($groupedRow['date_value']),
                 'invoice_id' => $groupedRow['invoice_id'],
                 'proof_number' => $groupedRow['proof_number'],
+                'entry_type' => (string) ($groupedRow['entry_type'] ?? 'payment'),
+                'adjustment_amount' => (int) ($groupedRow['adjustment_amount'] ?? 0),
                 'credit_sales' => (int) $groupedRow['credit_sales'],
                 'installment_payment' => (int) $groupedRow['installment_payment'],
                 'sales_return' => (int) $groupedRow['sales_return'],
@@ -791,6 +856,7 @@ class ReceivablePageController extends Controller
             $totals['credit_sales'] += (int) $groupedRow['credit_sales'];
             $totals['installment_payment'] += (int) $groupedRow['installment_payment'];
             $totals['sales_return'] += (int) $groupedRow['sales_return'];
+            $totals['adjustment_amount'] += (int) ($groupedRow['adjustment_amount'] ?? 0);
             $totals['running_balance'] = $runningBalance;
         }
 

@@ -658,7 +658,6 @@ class SalesInvoicePageController extends Controller
                         ->all();
                 }
             }
-            $oldTotal = (float) $invoice->total;
             $oldBalance = (float) $invoice->balance;
             $selectedPaymentMethod = in_array((string) ($data['payment_method'] ?? ''), ['tunai', 'kredit'], true)
                 ? (string) $data['payment_method']
@@ -900,27 +899,6 @@ class SalesInvoicePageController extends Controller
                 'balance' => $newBalance,
                 'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
             ]);
-
-            $difference = (float) round($subtotal - $oldTotal);
-            if ($difference > 0) {
-                $this->receivableLedgerService->addDebit(
-                    customerId: (int) $invoice->customer_id,
-                    invoiceId: (int) $invoice->id,
-                    entryDate: Carbon::parse((string) $data['invoice_date']),
-                    amount: $difference,
-                    periodCode: $invoice->semester_period,
-                    description: __('txn.admin_invoice_edit_ledger_increase', ['invoice' => $invoice->invoice_number]),
-                );
-            } elseif ($difference < 0) {
-                $this->receivableLedgerService->addCredit(
-                    customerId: (int) $invoice->customer_id,
-                    invoiceId: (int) $invoice->id,
-                    entryDate: Carbon::parse((string) $data['invoice_date']),
-                    amount: abs($difference),
-                    periodCode: $invoice->semester_period,
-                    description: __('txn.admin_invoice_edit_ledger_decrease', ['invoice' => $invoice->invoice_number]),
-                );
-            }
 
             $balanceDifference = (float) round($newBalance - $oldBalance);
             if ($balanceDifference > 0) {

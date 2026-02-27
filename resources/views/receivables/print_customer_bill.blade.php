@@ -141,16 +141,24 @@
                     <tr>
                         <td>{{ $row['date_label'] ?? '' }}</td>
                         <td colspan="4"></td>
-                        <td class="num">{{ number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                     </tr>
                 @else
                     <tr>
                         <td>{{ $row['date_label'] ?? '' }}</td>
-                        <td>{{ $row['proof_number'] ?? '' }}</td>
-                        <td class="num">{{ number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
-                        <td class="num">{{ number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
-                        <td class="num">{{ number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.') }}</td>
-                        <td class="num">{{ number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+                        <td>
+                            {{ $row['proof_number'] ?? '' }}
+                            @if((int) ($row['adjustment_amount'] ?? 0) !== 0)
+                                <br>
+                                <span style="font-size:10px;">
+                                    ({{ (int) ($row['adjustment_amount'] ?? 0) > 0 ? '+' : '-' }}Rp {{ number_format(abs((int) ($row['adjustment_amount'] ?? 0)), 0, ',', '.') }})
+                                </span>
+                            @endif
+                        </td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                     </tr>
                 @endif
             @endforeach
@@ -167,15 +175,15 @@
         @endfor
         <tr class="total-row">
             <td colspan="2" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
-            <td class="num">{{ number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
-            <td class="num">{{ number_format((int) round((float) ($totals['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
-            <td class="num">{{ number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.') }}</td>
-            <td class="num">{{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+            <td class="num">Rp {{ number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
+            <td class="num">Rp {{ number_format((int) round((float) ($totals['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
+            <td class="num">Rp {{ number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.') }}</td>
+            <td class="num">Rp {{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
         </tr>
         <tr class="total-balance-row">
             <td colspan="3"></td>
             <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
-            <td class="num">{{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+            <td class="num">Rp {{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
         </tr>
         </tbody>
     </table>
@@ -202,16 +210,16 @@
                     <tr>
                         <td>{{ $row['date_label'] ?? '-' }}</td>
                         <td>{{ $row['invoice_number'] ?? '-' }}</td>
-                        <td class="num">{{ number_format((int) round((float) ($row['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
-                        <td class="num">{{ number_format((int) round((float) ($row['paid_total'] ?? 0)), 0, ',', '.') }}</td>
-                        <td class="num">{{ number_format((int) round((float) ($row['balance_total'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['paid_total'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($row['balance_total'] ?? 0)), 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
                 <tr class="total-row">
                     <td colspan="2" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
-                    <td class="num">{{ number_format((int) round((float) (($group['totals']['invoice_total'] ?? 0))), 0, ',', '.') }}</td>
-                    <td class="num">{{ number_format((int) round((float) (($group['totals']['paid_total'] ?? 0))), 0, ',', '.') }}</td>
-                    <td class="num">{{ number_format((int) round((float) (($group['totals']['balance_total'] ?? 0))), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) (($group['totals']['invoice_total'] ?? 0))), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) (($group['totals']['paid_total'] ?? 0))), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) (($group['totals']['balance_total'] ?? 0))), 0, ',', '.') }}</td>
                 </tr>
                 </tbody>
             </table>
