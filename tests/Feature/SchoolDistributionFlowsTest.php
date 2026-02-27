@@ -103,6 +103,7 @@ class SchoolDistributionFlowsTest extends TestCase
             'notes' => 'Transaksi sebar test',
             'locations' => [
                 [
+                    'uid' => 'loc-a',
                     'customer_ship_location_id' => $shipLocation->id,
                     'school_name' => 'SDN 1 Bulk',
                     'recipient_name' => 'TU SDN 1',
@@ -111,6 +112,7 @@ class SchoolDistributionFlowsTest extends TestCase
                     'address' => 'Jl. Sekolah 1',
                 ],
                 [
+                    'uid' => 'loc-b',
                     'school_name' => 'SDN 2 Bulk',
                     'recipient_name' => 'TU SDN 2',
                     'recipient_phone' => '08120000002',
@@ -118,14 +120,26 @@ class SchoolDistributionFlowsTest extends TestCase
                     'address' => 'Jl. Sekolah 2',
                 ],
             ],
-            'items' => [
-                [
-                    'product_id' => $product->id,
-                    'product_name' => 'Buku Bulk',
-                    'unit' => 'exp',
-                    'quantity' => 10,
-                    'unit_price' => 15000,
-                    'notes' => 'Item test',
+            'location_items' => [
+                'loc-a' => [
+                    [
+                        'product_id' => $product->id,
+                        'product_name' => 'Buku Bulk',
+                        'unit' => 'exp',
+                        'quantity' => 10,
+                        'unit_price' => 15000,
+                        'notes' => 'Item test A',
+                    ],
+                ],
+                'loc-b' => [
+                    [
+                        'product_id' => $product->id,
+                        'product_name' => 'Buku Bulk',
+                        'unit' => 'exp',
+                        'quantity' => 20,
+                        'unit_price' => 15000,
+                        'notes' => 'Item test B',
+                    ],
                 ],
             ],
         ]);
@@ -138,7 +152,7 @@ class SchoolDistributionFlowsTest extends TestCase
             'id' => $transaction->id,
             'customer_id' => $customer->id,
             'total_locations' => 2,
-            'total_items' => 1,
+            'total_items' => 2,
         ]);
         $this->assertDatabaseHas('school_bulk_transaction_locations', [
             'school_bulk_transaction_id' => $transaction->id,
@@ -150,6 +164,12 @@ class SchoolDistributionFlowsTest extends TestCase
             'product_id' => $product->id,
             'product_name' => 'Buku Bulk',
             'quantity' => 10,
+        ]);
+        $this->assertDatabaseHas('school_bulk_transaction_items', [
+            'school_bulk_transaction_id' => $transaction->id,
+            'product_id' => $product->id,
+            'product_name' => 'Buku Bulk',
+            'quantity' => 20,
         ]);
 
         $this->actingAs($user)
@@ -218,7 +238,7 @@ class SchoolDistributionFlowsTest extends TestCase
             'customer_id' => $customer->id,
             'semester_period' => 'S2-2526',
             'total_locations' => 2,
-            'total_items' => 1,
+            'total_items' => 2,
             'notes' => 'Generate invoice test',
             'created_by_user_id' => $user->id,
         ]);
@@ -242,12 +262,25 @@ class SchoolDistributionFlowsTest extends TestCase
                 'sort_order' => 1,
             ],
         ]);
+        $locationA = $transaction->locations()->where('school_name', 'SDN A')->firstOrFail();
+        $locationB = $transaction->locations()->where('school_name', 'SDN B')->firstOrFail();
         $transaction->items()->create([
             'product_id' => $product->id,
+            'school_bulk_transaction_location_id' => $locationA->id,
             'product_code' => $product->code,
             'product_name' => $product->name,
             'unit' => 'exp',
             'quantity' => 5,
+            'unit_price' => 15000,
+            'sort_order' => 0,
+        ]);
+        $transaction->items()->create([
+            'product_id' => $product->id,
+            'school_bulk_transaction_location_id' => $locationB->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'unit' => 'exp',
+            'quantity' => 7,
             'unit_price' => 15000,
             'sort_order' => 0,
         ]);
@@ -276,18 +309,24 @@ class SchoolDistributionFlowsTest extends TestCase
             ['SDN A', 'SDN B'],
             $generatedInvoices->pluck('ship_to_name')->map(fn($name): string => trim((string) $name))->all()
         );
-        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) round((float) $invoice->total) === 75000));
+        $this->assertEqualsCanonicalizing(
+            [75000, 105000],
+            $generatedInvoices->map(fn(SalesInvoice $invoice): int => (int) round((float) $invoice->total))->all()
+        );
         $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (string) $invoice->payment_status === 'unpaid'));
-        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) round((float) $invoice->balance) === 75000));
+        $this->assertEqualsCanonicalizing(
+            [75000, 105000],
+            $generatedInvoices->map(fn(SalesInvoice $invoice): int => (int) round((float) $invoice->balance))->all()
+        );
 
         $product->refresh();
-        $this->assertSame(90, (int) $product->stock);
+        $this->assertSame(88, (int) $product->stock);
         $this->assertDatabaseCount('sales_invoice_items', 2);
         $this->assertDatabaseCount('stock_mutations', 2);
         $this->assertDatabaseCount('receivable_ledgers', 2);
         $this->assertDatabaseHas('receivable_ledgers', [
             'customer_id' => $customer->id,
-            'debit' => 75000,
+            'debit' => 105000,
             'credit' => 0,
         ]);
         $this->assertDatabaseCount('journal_entries', 2);

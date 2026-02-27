@@ -3,6 +3,92 @@
 @section('title', __('txn.outgoing_transactions_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .outgoing-scroll-wrap {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 420px;
+            border: 1px solid color-mix(in srgb, var(--border) 75%, var(--text) 25%);
+            border-radius: 8px;
+            scrollbar-gutter: stable;
+        }
+        .outgoing-scroll-wrap table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--card);
+        }
+        .outgoing-transactions-table,
+        .outgoing-recap-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .outgoing-transactions-table {
+            min-width: 980px;
+            table-layout: fixed;
+        }
+        .outgoing-recap-table {
+            min-width: 640px;
+            table-layout: fixed;
+        }
+        .outgoing-transactions-table td,
+        .outgoing-transactions-table th,
+        .outgoing-recap-table td,
+        .outgoing-recap-table th {
+            border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--text) 30%);
+            vertical-align: middle;
+            padding: 10px 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .outgoing-transactions-table td.num,
+        .outgoing-transactions-table th.num,
+        .outgoing-recap-table td.num,
+        .outgoing-recap-table th.num {
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .outgoing-transactions-table td.action,
+        .outgoing-transactions-table th.action {
+            text-align: center;
+            white-space: nowrap;
+            width: 8%;
+            min-width: 86px;
+        }
+        .outgoing-transactions-table .action-menu.action-menu-sm {
+            min-width: 92px;
+            max-width: 92px;
+            padding: 5px 8px;
+            font-size: 11px;
+            min-height: 30px;
+        }
+        .outgoing-transactions-table td.num,
+        .outgoing-transactions-table th.num,
+        .outgoing-recap-table td.num,
+        .outgoing-recap-table th.num {
+            overflow: visible;
+            text-overflow: clip;
+        }
+        .outgoing-transactions-table td.supplier-col,
+        .outgoing-transactions-table th.supplier-col {
+            white-space: normal;
+            max-width: 0;
+        }
+        .outgoing-main-grid .outgoing-col-list {
+            grid-column: span 8;
+        }
+        .outgoing-main-grid .outgoing-col-recap {
+            grid-column: span 4;
+        }
+        @media (max-width: 1366px) {
+            .outgoing-main-grid .outgoing-col-list,
+            .outgoing-main-grid .outgoing-col-recap {
+                grid-column: span 12;
+            }
+        }
+    </style>
+
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.outgoing_transactions_title') }}</h1>
         <a class="btn" href="{{ route('outgoing-transactions.create') }}">{{ __('txn.create_outgoing_transaction') }}</a>
@@ -11,8 +97,8 @@
     <div class="card">
         <form id="outgoing-filter-form" method="get" class="flex">
             <input id="outgoing-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('txn.search_outgoing_placeholder') }}" style="max-width: 320px;">
-            <input id="outgoing-date-input" type="date" name="transaction_date" value="{{ $selectedTransactionDate ?? '' }}" style="max-width: 180px;">
-            <select id="outgoing-semester-input" name="semester" style="max-width: 180px;">
+            <input id="outgoing-date-input" type="date" name="transaction_date" value="{{ $selectedTransactionDate ?? '' }}" style="max-width: 150px;">
+            <select id="outgoing-semester-input" name="semester" style="max-width: 150px;">
                 <option value="">{{ __('txn.all_semesters') }}</option>
                 @foreach($semesterOptions as $semester)
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
@@ -43,25 +129,38 @@
             <strong>{{ __('txn.summary') }}</strong>
             <div class="muted">
                 {{ __('txn.outgoing_transaction_count') }}: {{ (int) ($supplierRecapSummary->total_transactions ?? 0) }} |
-                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((int) round((float) ($supplierRecapSummary->total_amount ?? 0), 0), 0, ',', '.') }}
+                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((int) round((float) ($supplierRecapSummary->total_amount ?? 0), 0), 0, ',', '.') }} |
+                {{ __('txn.total_weight') }}: {{ number_format((float) ($supplierRecapSummaryTotalWeight ?? 0), 3, ',', '.') }}
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-8">
+    <div class="row outgoing-main-grid">
+        <div class="col-8 outgoing-col-list">
             <div class="card">
                 <strong>{{ __('txn.outgoing_transactions_title') }}</strong>
-                <table style="margin-top: 10px;">
+                <div class="outgoing-scroll-wrap" style="margin-top: 10px;">
+                <table class="outgoing-transactions-table">
+                    <colgroup>
+                        <col style="width: 22%;">
+                        <col style="width: 11%;">
+                        <col style="width: 14%;">
+                        <col style="width: 14%;">
+                        <col style="width: 10%;">
+                        <col style="width: 11%;">
+                        <col style="width: 10%;">
+                        <col style="width: 8%;">
+                    </colgroup>
                     <thead>
                     <tr>
                         <th>{{ __('txn.transaction_number') }}</th>
                         <th>{{ __('txn.date') }}</th>
-                        <th>{{ __('txn.supplier') }}</th>
+                        <th class="supplier-col">{{ __('txn.supplier') }}</th>
                         <th>{{ __('txn.note_number') }}</th>
                         <th>{{ __('txn.semester_period') }}</th>
-                        <th>{{ __('txn.total') }}</th>
-                        <th>{{ __('txn.action') }}</th>
+                        <th class="num">{{ __('txn.total') }}</th>
+                        <th class="num">{{ __('txn.total_weight') }}</th>
+                        <th class="action">{{ __('txn.action') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -77,11 +176,12 @@
                                 @endif
                             </td>
                             <td>{{ optional($transaction->transaction_date)->format('d-m-Y') }}</td>
-                            <td>{{ $transaction->supplier?->name ?: '-' }}</td>
+                            <td class="supplier-col">{{ $transaction->supplier?->name ?: '-' }}</td>
                             <td>{{ $transaction->note_number ?: '-' }}</td>
                             <td>{{ $transaction->semester_period ?: '-' }}</td>
-                            <td>Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td>
-                            <td>
+                            <td class="num">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td>
+                            <td class="num">{{ number_format((float) ($transaction->total_weight ?? 0), 3, ',', '.') }}</td>
+                            <td class="action">
                                 <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                     <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                     <option value="{{ route('outgoing-transactions.print', $transaction) }}">{{ __('txn.print') }}</option>
@@ -91,24 +191,33 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="muted">{{ __('txn.no_outgoing_found') }}</td></tr>
+                        <tr><td colspan="8" class="muted">{{ __('txn.no_outgoing_found') }}</td></tr>
                     @endforelse
                     </tbody>
                 </table>
+                </div>
                 <div style="margin-top: 12px;">{{ $transactions->links() }}</div>
             </div>
         </div>
-        <div class="col-4">
+        <div class="col-4 outgoing-col-recap">
             <div class="card">
                 <div class="form-section">
                     <h3 class="form-section-title">{{ __('txn.outgoing_supplier_recap_title') }}</h3>
                     <p class="form-section-note">{{ __('txn.outgoing_supplier_recap_note') }}</p>
-                    <table>
+                    <div class="outgoing-scroll-wrap">
+                    <table class="outgoing-recap-table">
+                        <colgroup>
+                            <col style="width: 38%;">
+                            <col style="width: 16%;">
+                            <col style="width: 24%;">
+                            <col style="width: 22%;">
+                        </colgroup>
                         <thead>
                         <tr>
                             <th>{{ __('txn.supplier') }}</th>
-                            <th>{{ __('txn.outgoing_transaction_count') }}</th>
-                            <th>{{ __('txn.total') }}</th>
+                            <th class="num">{{ __('txn.outgoing_transaction_count') }}</th>
+                            <th class="num">{{ __('txn.total') }}</th>
+                            <th class="num">{{ __('txn.total_weight') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -132,14 +241,16 @@
                                         </div>
                                     @endif
                                 </td>
-                                <td>{{ (int) $recap->transaction_count }}</td>
-                                <td>Rp {{ number_format((int) round((float) $recap->total_amount, 0), 0, ',', '.') }}</td>
+                                <td class="num">{{ (int) $recap->transaction_count }}</td>
+                                <td class="num">Rp {{ number_format((int) round((float) $recap->total_amount, 0), 0, ',', '.') }}</td>
+                                <td class="num">{{ number_format((float) ($recap->total_weight ?? 0), 3, ',', '.') }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="muted">{{ __('txn.no_outgoing_supplier_recap') }}</td></tr>
+                            <tr><td colspan="4" class="muted">{{ __('txn.no_outgoing_supplier_recap') }}</td></tr>
                         @endforelse
                         </tbody>
                     </table>
+                    </div>
                     <div style="margin-top: 10px;">{{ $supplierRecap->links() }}</div>
                 </div>
             </div>

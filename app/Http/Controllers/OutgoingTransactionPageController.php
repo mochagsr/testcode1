@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
+use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
 use App\Models\StockMutation;
@@ -17,6 +18,7 @@ use App\Services\AccountingService;
 use App\Services\SupplierLedgerService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
+use App\Support\ProductCodeGenerator;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -39,7 +41,8 @@ class OutgoingTransactionPageController extends Controller
         private readonly AuditLogService $auditLogService,
         private readonly SemesterBookService $semesterBookService,
         private readonly SupplierLedgerService $supplierLedgerService,
-        private readonly AccountingService $accountingService
+        private readonly AccountingService $accountingService,
+        private readonly ProductCodeGenerator $productCodeGenerator
     ) {}
 
     public function index(Request $request): View
@@ -64,6 +67,10 @@ class OutgoingTransactionPageController extends Controller
         $selectedTransactionDateRange = $this->selectedDateRange($selectedTransactionDate);
         $isDefaultRecentMode = $selectedTransactionDateRange === null && $selectedSemester === null && $search === '';
         $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
+        $hasRecentData = OutgoingTransaction::query()
+            ->whereDate('transaction_date', '>=', $recentRangeStart->toDateString())
+            ->exists();
+        $applyDefaultRecentMode = $isDefaultRecentMode && $hasRecentData;
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
 
         $baseQuery = OutgoingTransaction::query()
@@ -78,13 +85,14 @@ class OutgoingTransactionPageController extends Controller
                 $query->whereBetween('transaction_date', $selectedTransactionDateRange);
             });
 
-        $baseQuery->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
-            $query->where('transaction_date', '>=', $recentRangeStart);
+        $baseQuery->when($applyDefaultRecentMode, function ($query) use ($recentRangeStart): void {
+            $query->whereDate('transaction_date', '>=', $recentRangeStart->toDateString());
         });
 
         $transactions = (clone $baseQuery)
             ->onlyListColumns()
             ->withSupplierInfo()
+            ->withSum('items as total_weight', 'weight')
             ->latest('transaction_date')
             ->latest('id')
             ->paginate(20)
@@ -92,7 +100,18 @@ class OutgoingTransactionPageController extends Controller
 
         $supplierRecap = (clone $baseQuery)
             ->join('suppliers', 'suppliers.id', '=', 'outgoing_transactions.supplier_id')
-            ->selectRaw('suppliers.id as supplier_id, suppliers.name as supplier_name, suppliers.company_name as supplier_company_name, COUNT(outgoing_transactions.id) as transaction_count, COALESCE(SUM(outgoing_transactions.total), 0) as total_amount')
+            ->leftJoinSub(
+                DB::table('outgoing_transaction_items as oti')
+                    ->join('outgoing_transactions as ot_weight', 'ot_weight.id', '=', 'oti.outgoing_transaction_id')
+                    ->whereIn('ot_weight.id', (clone $baseQuery)->select('outgoing_transactions.id'))
+                    ->selectRaw('ot_weight.supplier_id as supplier_id, COALESCE(SUM(oti.weight), 0) as total_weight')
+                    ->groupBy('ot_weight.supplier_id'),
+                'supplier_weight_agg',
+                'supplier_weight_agg.supplier_id',
+                '=',
+                'suppliers.id'
+            )
+            ->selectRaw('suppliers.id as supplier_id, suppliers.name as supplier_name, suppliers.company_name as supplier_company_name, COUNT(outgoing_transactions.id) as transaction_count, COALESCE(SUM(outgoing_transactions.total), 0) as total_amount, COALESCE(MAX(supplier_weight_agg.total_weight), 0) as total_weight')
             ->groupBy('suppliers.id', 'suppliers.name', 'suppliers.company_name')
             ->orderBy('suppliers.name')
             ->paginate(20, ['*'], 'recap_page')
@@ -101,6 +120,9 @@ class OutgoingTransactionPageController extends Controller
         $supplierRecapSummary = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_transactions, COALESCE(SUM(total), 0) as total_amount')
             ->first();
+        $supplierRecapSummaryTotalWeight = (float) DB::table('outgoing_transaction_items')
+            ->whereIn('outgoing_transaction_id', (clone $baseQuery)->select('outgoing_transactions.id'))
+            ->sum('weight');
         $transactionAdminActionMap = [];
         $transactionIds = collect($transactions->items())
             ->map(fn(OutgoingTransaction $transaction): int => (int) $transaction->id)
@@ -148,11 +170,12 @@ class OutgoingTransactionPageController extends Controller
             'transactions' => $transactions,
             'supplierRecap' => $supplierRecap,
             'supplierRecapSummary' => $supplierRecapSummary,
+            'supplierRecapSummaryTotalWeight' => $supplierRecapSummaryTotalWeight,
             'search' => $search,
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
             'selectedTransactionDate' => $selectedTransactionDate,
-            'isDefaultRecentMode' => $isDefaultRecentMode,
+            'isDefaultRecentMode' => $applyDefaultRecentMode,
             'selectedSupplierId' => $selectedSupplierId,
             'supplierOptions' => Cache::remember(
                 AppCache::lookupCacheKey('outgoing_transactions.index.supplier_options'),
@@ -224,10 +247,20 @@ class OutgoingTransactionPageController extends Controller
                 ->get();
             $initialProducts = $oldProducts->concat($initialProducts)->unique('id')->values();
         }
+        $initialCategories = Cache::remember(
+            AppCache::lookupCacheKey('forms.outgoing_transactions.item_categories', ['limit' => 200]),
+            $now->copy()->addSeconds(60),
+            fn() => ItemCategory::query()
+                ->onlyListColumns()
+                ->orderBy('code')
+                ->limit(200)
+                ->get()
+        );
 
         return view('outgoing_transactions.create', [
             'suppliers' => $initialSuppliers,
             'products' => $initialProducts,
+            'itemCategories' => $initialCategories,
             'defaultSemesterPeriod' => $defaultSemester,
             'semesterOptions' => $semesterOptions,
             'outgoingUnitOptions' => $outgoingUnitOptions,
@@ -246,8 +279,10 @@ class OutgoingTransactionPageController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.product_name' => ['required', 'string', 'max:200'],
+            'items.*.item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.weight' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
@@ -269,6 +304,17 @@ class OutgoingTransactionPageController extends Controller
             $transactionDate = Carbon::parse($data['transaction_date']);
             $transactionNumber = $this->generateTransactionNumber($transactionDate->toDateString());
             $rows = collect($data['items']);
+            $manualCategoryIds = $rows
+                ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) <= 0)
+                ->pluck('item_category_id')
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+            $categoryNamesById = ItemCategory::query()
+                ->whereIn('id', $manualCategoryIds)
+                ->pluck('name', 'id');
 
             $products = Product::query()
                 ->whereIn('id', $rows->pluck('product_id')->all())
@@ -281,6 +327,7 @@ class OutgoingTransactionPageController extends Controller
 
             foreach ($rows as $index => $row) {
                 $quantity = (int) $row['quantity'];
+                $weight = $this->parseNullableWeight($row['weight'] ?? null);
                 $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
                 $lineTotal = $quantity * $unitCost;
                 $grandTotal += $lineTotal;
@@ -291,13 +338,25 @@ class OutgoingTransactionPageController extends Controller
                     if (! $product) {
                         abort(422, "Product not found for row {$index}");
                     }
+                } else {
+                    $product = $this->resolveOrCreateOutgoingProductFromRow(
+                        row: $row,
+                        categoryNamesById: $categoryNamesById
+                    );
+                    if ($product !== null) {
+                        $products->put((int) $product->id, $product);
+                    }
                 }
 
                 $computedRows[] = [
                     'product' => $product,
+                    'item_category_id' => $product
+                        ? (int) $product->item_category_id
+                        : ((int) ($row['item_category_id'] ?? 0) > 0 ? (int) $row['item_category_id'] : null),
                     'product_name' => trim((string) ($row['product_name'] ?? '')),
                     'unit' => trim((string) ($row['unit'] ?? '')),
                     'quantity' => $quantity,
+                    'weight' => $weight,
                     'unit_cost' => $unitCost,
                     'line_total' => $lineTotal,
                     'notes' => (string) ($row['notes'] ?? ''),
@@ -325,10 +384,12 @@ class OutgoingTransactionPageController extends Controller
 
                 $transaction->items()->create([
                     'product_id' => $product?->id,
+                    'item_category_id' => $row['item_category_id'],
                     'product_code' => $product?->code,
                     'product_name' => $product?->name ?: $row['product_name'],
                     'unit' => $product?->unit ?: ($row['unit'] !== '' ? $row['unit'] : null),
                     'quantity' => $quantity,
+                    'weight' => $row['weight'],
                     'unit_cost' => $row['unit_cost'],
                     'line_total' => $row['line_total'],
                     'notes' => $row['notes'] !== '' ? $row['notes'] : null,
@@ -396,8 +457,10 @@ class OutgoingTransactionPageController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.product_name' => ['required', 'string', 'max:200'],
+            'items.*.item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.weight' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
@@ -428,7 +491,11 @@ class OutgoingTransactionPageController extends Controller
             );
 
             $auditBefore = $transaction->items
-                ->map(fn($item): string => "{$item->product_name}:qty{$item->quantity}:cost" . (int) round((float) $item->unit_cost))
+                ->map(function ($item): string {
+                    $weight = $item->weight !== null ? (float) $item->weight : null;
+                    $weightLabel = $weight !== null ? ":w{$weight}" : '';
+                    return "{$item->product_name}:qty{$item->quantity}{$weightLabel}:cost" . (int) round((float) $item->unit_cost);
+                })
                 ->implode(' | ');
 
             $oldQtyByProduct = [];
@@ -440,16 +507,22 @@ class OutgoingTransactionPageController extends Controller
                 $oldQtyByProduct[$productId] = ($oldQtyByProduct[$productId] ?? 0) + (int) $existingItem->quantity;
             }
 
-            $newQtyByProduct = [];
-            foreach ($rows as $row) {
-                $productId = (int) ($row['product_id'] ?? 0);
-                if ($productId <= 0) {
-                    continue;
-                }
-                $newQtyByProduct[$productId] = ($newQtyByProduct[$productId] ?? 0) + (int) ($row['quantity'] ?? 0);
-            }
+            $manualCategoryIds = $rows
+                ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) <= 0)
+                ->pluck('item_category_id')
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+            $categoryNamesById = ItemCategory::query()
+                ->whereIn('id', $manualCategoryIds)
+                ->pluck('name', 'id');
 
-            $productIds = collect(array_merge(array_keys($oldQtyByProduct), array_keys($newQtyByProduct)))
+            $productIds = collect(array_merge(
+                array_keys($oldQtyByProduct),
+                $rows->pluck('product_id')->map(fn ($id): int => (int) $id)->filter(fn (int $id): bool => $id > 0)->all()
+            ))
                 ->unique()
                 ->values()
                 ->all();
@@ -458,6 +531,54 @@ class OutgoingTransactionPageController extends Controller
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
+
+            $resolvedRows = [];
+            $newQtyByProduct = [];
+            foreach ($rows as $row) {
+                $quantity = (int) ($row['quantity'] ?? 0);
+                $weight = $this->parseNullableWeight($row['weight'] ?? null);
+                $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
+                $lineTotal = $quantity * $unitCost;
+                $productId = (int) ($row['product_id'] ?? 0);
+                $product = $productId > 0 ? $products->get($productId) : null;
+                if ($productId > 0 && ! $product) {
+                    throw ValidationException::withMessages([
+                        'items' => __('txn.product_not_found'),
+                    ]);
+                }
+                if ($product === null) {
+                    $product = $this->resolveOrCreateOutgoingProductFromRow(
+                        row: $row,
+                        categoryNamesById: $categoryNamesById
+                    );
+                    if ($product !== null) {
+                        $products->put((int) $product->id, $product);
+                    }
+                }
+
+                if ($product !== null) {
+                    $newQtyByProduct[(int) $product->id] = ($newQtyByProduct[(int) $product->id] ?? 0) + $quantity;
+                }
+
+                $resolvedRows[] = [
+                    'product' => $product,
+                    'product_name' => (string) ($row['product_name'] ?? ''),
+                    'unit' => (string) ($row['unit'] ?? ''),
+                    'quantity' => $quantity,
+                    'weight' => $weight,
+                    'unit_cost' => $unitCost,
+                    'line_total' => $lineTotal,
+                    'notes' => (string) ($row['notes'] ?? ''),
+                    'item_category_id' => $product
+                        ? (int) $product->item_category_id
+                        : ((int) ($row['item_category_id'] ?? 0) > 0 ? (int) $row['item_category_id'] : null),
+                ];
+            }
+
+            $productIds = collect(array_merge(array_keys($oldQtyByProduct), array_keys($newQtyByProduct)))
+                ->unique()
+                ->values()
+                ->all();
 
             foreach ($productIds as $productId) {
                 $product = $products->get((int) $productId);
@@ -519,27 +640,29 @@ class OutgoingTransactionPageController extends Controller
             $transaction->items()->delete();
             $newTotal = 0.0;
 
-            foreach ($rows as $row) {
-                $quantity = (int) ($row['quantity'] ?? 0);
-                $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
-                $lineTotal = $quantity * $unitCost;
+            foreach ($resolvedRows as $resolvedRow) {
+                $quantity = (int) $resolvedRow['quantity'];
+                $unitCost = (int) $resolvedRow['unit_cost'];
+                $lineTotal = (int) $resolvedRow['line_total'];
                 $newTotal += $lineTotal;
 
-                $productId = (int) ($row['product_id'] ?? 0);
-                $product = $productId > 0 ? $products->get($productId) : null;
+                /** @var Product|null $product */
+                $product = $resolvedRow['product'];
                 if ($product) {
                     $this->fillMissingProductSellingPricesFromUnitCost($product, $unitCost);
                 }
 
                 $transaction->items()->create([
                     'product_id' => $product?->id,
+                    'item_category_id' => $resolvedRow['item_category_id'],
                     'product_code' => $product?->code,
-                    'product_name' => $product?->name ?: (string) ($row['product_name'] ?? ''),
-                    'unit' => $product?->unit ?: (string) ($row['unit'] ?? ''),
+                    'product_name' => $product?->name ?: (string) $resolvedRow['product_name'],
+                    'unit' => $product?->unit ?: (string) $resolvedRow['unit'],
                     'quantity' => $quantity,
+                    'weight' => $resolvedRow['weight'],
                     'unit_cost' => $unitCost,
                     'line_total' => $lineTotal,
-                    'notes' => (string) ($row['notes'] ?? ''),
+                    'notes' => (string) $resolvedRow['notes'],
                 ]);
             }
 
@@ -572,14 +695,17 @@ class OutgoingTransactionPageController extends Controller
                 );
             }
 
-            $auditAfter = $rows
-                ->map(function (array $row) use ($products): string {
-                    $product = $products->get((int) ($row['product_id'] ?? 0));
-                    $name = $product?->name ?: (string) ($row['product_name'] ?? '-');
-                    $qty = (int) ($row['quantity'] ?? 0);
-                    $cost = (int) round((float) ($row['unit_cost'] ?? 0));
+            $auditAfter = collect($resolvedRows)
+                ->map(function (array $resolvedRow): string {
+                    /** @var Product|null $product */
+                    $product = $resolvedRow['product'];
+                    $name = $product?->name ?: (string) ($resolvedRow['product_name'] ?? '-');
+                    $qty = (int) ($resolvedRow['quantity'] ?? 0);
+                    $weight = $resolvedRow['weight'] !== null ? (float) $resolvedRow['weight'] : null;
+                    $weightLabel = $weight !== null ? ":w{$weight}" : '';
+                    $cost = (int) ($resolvedRow['unit_cost'] ?? 0);
 
-                    return "{$name}:qty{$qty}:cost{$cost}";
+                    return "{$name}:qty{$qty}{$weightLabel}:cost{$cost}";
                 })
                 ->implode(' | ');
         });
@@ -731,6 +857,7 @@ class OutgoingTransactionPageController extends Controller
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Tanda Terima Barang');
+            $totalWeight = (float) $outgoingTransaction->items->sum(fn($item) => (float) ($item->weight ?? 0));
 
             $rowsOut = [];
             $rowsOut[] = [__('txn.outgoing_receipt_title')];
@@ -744,10 +871,10 @@ class OutgoingTransactionPageController extends Controller
             $rowsOut[] = [];
             $rowsOut[] = [
                 __('txn.no'),
-                __('txn.code'),
                 __('txn.name'),
                 __('txn.unit'),
                 __('txn.qty'),
+                __('txn.weight'),
                 __('txn.price'),
                 __('txn.subtotal'),
                 __('txn.notes'),
@@ -756,10 +883,10 @@ class OutgoingTransactionPageController extends Controller
             foreach ($outgoingTransaction->items as $index => $item) {
                 $rowsOut[] = [
                     $index + 1,
-                    (string) ($item->product_code ?: '-'),
                     (string) $item->product_name,
                     (string) ($item->unit ?: '-'),
                     (int) round((float) $item->quantity),
+                    $item->weight !== null ? (float) $item->weight : '',
                     (int) round((float) $item->unit_cost),
                     (int) round((float) $item->line_total),
                     (string) ($item->notes ?: '-'),
@@ -767,6 +894,7 @@ class OutgoingTransactionPageController extends Controller
             }
 
             $rowsOut[] = [];
+            $rowsOut[] = [__('txn.total_weight'), $totalWeight];
             $rowsOut[] = [__('txn.grand_total'), (int) round((float) $outgoingTransaction->total)];
             $rowsOut[] = [__('txn.notes'), (string) ($outgoingTransaction->notes ?: '-')];
 
@@ -774,7 +902,8 @@ class OutgoingTransactionPageController extends Controller
             $itemsCount = $outgoingTransaction->items->count();
             $itemsHeaderRow = 10;
             ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 8, $itemsCount, true);
-            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [1, 5, 6, 7], '#,##0');
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [1, 4, 6, 7], '#,##0');
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [5], '#,##0.###');
 
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -831,6 +960,61 @@ class OutgoingTransactionPageController extends Controller
     private function semesterBookService(): SemesterBookService
     {
         return $this->semesterBookService;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function resolveOrCreateOutgoingProductFromRow(array $row, $categoryNamesById): ?Product
+    {
+        $productName = trim((string) ($row['product_name'] ?? ''));
+        if ($productName === '') {
+            return null;
+        }
+
+        $categoryId = (int) ($row['item_category_id'] ?? 0);
+        $normalizedName = mb_strtolower($productName, 'UTF-8');
+        $existingQuery = Product::query()
+            ->lockForUpdate()
+            ->whereRaw('LOWER(name) = ?', [$normalizedName]);
+
+        if ($categoryId > 0) {
+            $existingByCategory = (clone $existingQuery)
+                ->where('item_category_id', $categoryId)
+                ->first();
+            if ($existingByCategory !== null) {
+                return $existingByCategory;
+            }
+        } else {
+            $existing = (clone $existingQuery)->first();
+            if ($existing !== null) {
+                return $existing;
+            }
+            throw ValidationException::withMessages([
+                'items' => __('txn.outgoing_manual_item_requires_category'),
+            ]);
+        }
+
+        $categoryName = trim((string) ($categoryNamesById[$categoryId] ?? ''));
+        $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
+        $resolvedCode = $this->productCodeGenerator->resolve(
+            requestedCode: null,
+            name: $productName,
+            ignoreId: null,
+            categoryName: $categoryName !== '' ? $categoryName : null
+        );
+
+        return Product::query()->create([
+            'item_category_id' => $categoryId,
+            'code' => $resolvedCode,
+            'name' => $productName,
+            'unit' => trim((string) ($row['unit'] ?? '')) !== '' ? trim((string) ($row['unit'] ?? '')) : 'exp',
+            'stock' => 0,
+            'price_agent' => max(0, $unitCost),
+            'price_sales' => max(0, $unitCost),
+            'price_general' => max(0, $unitCost),
+            'is_active' => true,
+        ]);
     }
 
     private function configuredOutgoingUnitOptions()
@@ -894,5 +1078,19 @@ class OutgoingTransactionPageController extends Controller
     private function nowWib(): Carbon
     {
         return now('Asia/Jakarta');
+    }
+
+    private function parseNullableWeight(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        return round(max(0, (float) $raw), 3);
     }
 }

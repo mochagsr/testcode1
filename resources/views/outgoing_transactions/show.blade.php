@@ -3,6 +3,9 @@
 @section('title', __('txn.outgoing_transactions_title').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $totalWeight = (float) $transaction->items->sum(fn($item) => (float) ($item->weight ?? 0));
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ $transaction->transaction_number }}</h1>
         <div class="flex">
@@ -41,6 +44,7 @@
                 <div class="col-4"><strong>{{ __('txn.created_by') }}</strong><div>{{ $transaction->creator?->name ?: __('txn.system_user') }}</div></div>
                 <div class="col-8"><strong>{{ __('txn.notes') }}</strong><div>{{ $transaction->notes ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.grand_total') }}</strong><div>Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.total_weight') }}</strong><div>{{ number_format($totalWeight, 3, ',', '.') }}</div></div>
             </div>
         </div>
     </div>
@@ -56,6 +60,7 @@
                     <th>{{ __('txn.name') }}</th>
                     <th>{{ __('txn.unit') }}</th>
                     <th>{{ __('txn.qty') }}</th>
+                    <th>{{ __('txn.weight') }}</th>
                     <th>{{ __('txn.price') }}</th>
                     <th>{{ __('txn.subtotal') }}</th>
                     <th>{{ __('txn.notes') }}</th>
@@ -69,6 +74,7 @@
                         <td>{{ $item->product_name }}</td>
                         <td>{{ $item->unit ?: '-' }}</td>
                         <td>{{ (int) round((float) $item->quantity, 0) }}</td>
+                        <td>{{ $item->weight !== null ? number_format((float) $item->weight, 3, ',', '.') : '-' }}</td>
                         <td>Rp {{ number_format((int) round((float) $item->unit_cost, 0), 0, ',', '.') }}</td>
                         <td>Rp {{ number_format((int) round((float) $item->line_total, 0), 0, ',', '.') }}</td>
                         <td>{{ $item->notes ?: '-' }}</td>
@@ -77,7 +83,13 @@
                 </tbody>
                 <tfoot>
                 <tr>
-                    <th colspan="6" style="text-align: right;">{{ __('txn.grand_total') }}</th>
+                    <th colspan="6" style="text-align: right;">{{ __('txn.total_weight') }}</th>
+                    <th>{{ number_format($totalWeight, 3, ',', '.') }}</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+                <tr>
+                    <th colspan="7" style="text-align: right;">{{ __('txn.grand_total') }}</th>
                     <th>Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</th>
                     <th></th>
                 </tr>
@@ -123,6 +135,7 @@
                             <th>{{ __('txn.name') }}</th>
                             <th>{{ __('txn.unit') }}</th>
                             <th>{{ __('txn.qty') }}</th>
+                            <th>{{ __('txn.weight') }}</th>
                             <th>{{ __('txn.price') }}</th>
                             <th>{{ __('txn.notes') }}</th>
                             <th></th>
@@ -138,6 +151,7 @@
                                         'product_name' => $item->product_name,
                                         'unit' => $item->unit,
                                         'quantity' => (int) round((float) $item->quantity),
+                                        'weight' => $item->weight !== null ? (float) $item->weight : null,
                                         'unit_cost' => (int) round((float) $item->unit_cost),
                                         'notes' => $item->notes,
                                     ];
@@ -158,6 +172,7 @@
                                 </td>
                                 <td><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
                                 <td><input type="number" min="1" class="admin-qty w-xs" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
+                                <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
                                 <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
                                 <td><input type="text" class="admin-item-notes" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
                                 <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>
@@ -236,6 +251,7 @@
                         row.querySelector('.admin-product-name').name = `items[${idx}][product_name]`;
                         row.querySelector('.admin-unit').name = `items[${idx}][unit]`;
                         row.querySelector('.admin-qty').name = `items[${idx}][quantity]`;
+                        row.querySelector('.admin-weight').name = `items[${idx}][weight]`;
                         row.querySelector('.admin-unit-cost').name = `items[${idx}][unit_cost]`;
                         row.querySelector('.admin-item-notes').name = `items[${idx}][notes]`;
                     });
@@ -275,6 +291,7 @@
                         <td><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"></td>
                         <td><input type="text" class="admin-unit"></td>
                         <td><input type="number" min="1" class="admin-qty w-xs" value="1" required></td>
+                        <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" value=""></td>
                         <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0"></td>
                         <td><input type="text" class="admin-item-notes"></td>
                         <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>

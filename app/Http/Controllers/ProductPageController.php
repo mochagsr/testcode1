@@ -131,7 +131,15 @@ class ProductPageController extends Controller
         ]);
 
         $data = $this->validatePayload($request);
-        $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name']);
+        $categoryName = ItemCategory::query()
+            ->whereKey((int) ($data['item_category_id'] ?? 0))
+            ->value('name');
+        $data['code'] = $this->productCodeGenerator->resolve(
+            $data['code'] ?? null,
+            (string) $data['name'],
+            null,
+            $categoryName ? (string) $categoryName : null
+        );
         $data['is_active'] = true;
         $product = Product::create($data);
         if ((int) $product->stock > 0) {
@@ -186,7 +194,15 @@ class ProductPageController extends Controller
         ]);
 
         $data = $this->validatePayload($request, $product->id);
-        $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name'], $product->id);
+        $categoryName = ItemCategory::query()
+            ->whereKey((int) ($data['item_category_id'] ?? 0))
+            ->value('name');
+        $data['code'] = $this->productCodeGenerator->resolve(
+            $data['code'] ?? null,
+            (string) $data['name'],
+            $product->id,
+            $categoryName ? (string) $categoryName : null
+        );
         $data['is_active'] = true;
         $flashMeta = [
             'type' => 'edit',
@@ -583,6 +599,9 @@ class ProductPageController extends Controller
         $code = trim((string) ($category->code ?? ''));
         $name = trim((string) ($category->name ?? ''));
         if ($code !== '' && $name !== '') {
+            if (strcasecmp($code, $name) === 0) {
+                return $name;
+            }
             return "{$code} - {$name}";
         }
         if ($name !== '') {

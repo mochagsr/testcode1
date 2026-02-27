@@ -198,6 +198,60 @@ class ReceivableFlowsTest extends TestCase
         $this->assertGreaterThanOrEqual(1, ReceivableLedger::query()->where('customer_id', $customer->id)->count());
     }
 
+    public function test_customer_discount_appears_in_bill_statement_and_updates_balance(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-DISC-001',
+            'name' => 'Customer Discount',
+            'city' => 'Malang',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-DISC-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-22',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 200000,
+            'total' => 200000,
+            'total_paid' => 0,
+            'balance' => 200000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('receivables.customer-discount', $customer), [
+                'amount' => 50000,
+                'payment_date' => '2026-02-23',
+                'customer_id' => $customer->id,
+            ])
+            ->assertRedirect(route('receivables.index', [
+                'search' => null,
+                'semester' => null,
+                'customer_id' => $customer->id,
+            ]));
+
+        $invoice->refresh();
+        $this->assertSame(150000.0, (float) $invoice->balance);
+        $this->assertSame(50000.0, (float) $invoice->total_paid);
+
+        $this->assertDatabaseHas('invoice_payments', [
+            'sales_invoice_id' => $invoice->id,
+            'method' => 'discount',
+            'amount' => 50000,
+        ]);
+        $this->assertDatabaseHas('receivable_ledgers', [
+            'sales_invoice_id' => $invoice->id,
+            'credit' => 50000,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+        ]));
+        $response->assertOk();
+        $response->assertSee('INV-DISC-001 - ' . __('receivable.method_discount'));
+    }
+
     public function test_admin_can_cancel_sales_invoice_and_stock_is_reverted(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -428,6 +482,99 @@ class ReceivableFlowsTest extends TestCase
         $this->assertSame('Jl Legacy No 1', (string) $invoice->ship_to_address);
         $this->assertSame(10000.0, (float) $invoice->total);
         $this->assertSame(10000.0, (float) $invoice->balance);
+    }
+
+    public function test_admin_update_sales_invoice_can_switch_payment_method_between_cash_and_credit(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-INV-PM-001',
+            'name' => 'Customer Metode Bayar',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-INV-PM-001',
+            'name' => 'Kategori Metode Bayar',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-INV-PM-001',
+            'name' => 'Produk Metode Bayar',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 100000,
+            'is_active' => true,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-PM-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 100000,
+            'total' => 100000,
+            'total_paid' => 0,
+            'balance' => 100000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'quantity' => 1,
+            'unit_price' => 100000,
+            'discount' => 0,
+            'line_total' => 100000,
+        ]);
+
+        $this->actingAs($admin)->put(route('sales-invoices.admin-update', $invoice), [
+            'invoice_date' => '2026-02-28',
+            'due_date' => null,
+            'semester_period' => 'S2-2526',
+            'payment_method' => 'tunai',
+            'notes' => 'ubah jadi tunai',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                    'unit_price' => 100000,
+                    'discount' => 0,
+                ],
+            ],
+        ])->assertRedirect(route('sales-invoices.show', $invoice));
+
+        $invoice->refresh();
+        $this->assertSame(0, (int) round((float) $invoice->balance));
+        $this->assertSame('paid', (string) $invoice->payment_status);
+        $this->assertSame(100000, (int) round((float) $invoice->total_paid));
+        $this->assertDatabaseHas('invoice_payments', [
+            'sales_invoice_id' => $invoice->id,
+            'method' => 'cash',
+            'amount' => 100000,
+        ]);
+
+        $this->actingAs($admin)->put(route('sales-invoices.admin-update', $invoice), [
+            'invoice_date' => '2026-02-28',
+            'due_date' => null,
+            'semester_period' => 'S2-2526',
+            'payment_method' => 'kredit',
+            'notes' => 'ubah jadi kredit',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                    'unit_price' => 100000,
+                    'discount' => 0,
+                ],
+            ],
+        ])->assertRedirect(route('sales-invoices.show', $invoice));
+
+        $invoice->refresh();
+        $this->assertSame(100000, (int) round((float) $invoice->balance));
+        $this->assertSame('unpaid', (string) $invoice->payment_status);
+        $this->assertSame(0, (int) round((float) $invoice->total_paid));
     }
 
     public function test_admin_can_edit_sales_return_items_and_stock_is_rebalanced(): void

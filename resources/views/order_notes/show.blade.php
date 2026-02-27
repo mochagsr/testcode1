@@ -13,15 +13,69 @@
             -moz-appearance: textfield;
             appearance: textfield;
         }
+        .txn-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+        .txn-modal.open {
+            display: flex;
+        }
+        .txn-modal-card {
+            width: min(1180px, 100%);
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+            border-radius: 12px;
+        }
+        .txn-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        #admin-order-items-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        #admin-order-items-table .product-col {
+            width: 58%;
+        }
+        #admin-order-items-table .qty-col {
+            width: 10%;
+        }
+        #admin-order-items-table .notes-col {
+            width: 22%;
+        }
+        #admin-order-items-table .action-col {
+            width: 10%;
+        }
+        #admin-order-items-table .admin-order-item-search {
+            width: 100%;
+            min-width: 460px;
+            max-width: none;
+        }
+        #admin-order-items-table .admin-order-item-qty {
+            width: 100%;
+            min-width: 80px;
+            max-width: 110px;
+        }
+        #admin-order-items-table .admin-order-item-notes {
+            width: 100%;
+            min-width: 210px;
+            max-width: none;
+        }
     </style>
 
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }} {{ $note->note_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.back') }}</a>
-            @if((auth()->user()?->role ?? '') === 'admin')
-                <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
-            @endif
+            <button type="button" class="btn secondary" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('order-notes.print', $note) }}">{{ __('txn.print') }}</option>
@@ -39,10 +93,20 @@
                 <div class="col-4"><strong>{{ __('txn.date') }}</strong><div>{{ $note->note_date->format('d-m-Y') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $note->customer_name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $note->customer_phone ?: '-' }}</div></div>
+                <div class="col-12"><strong>{{ __('txn.address') }}</strong><div>{{ $note->address ?: $note->customer?->address ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $note->city ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.created_by') }}</strong><div>{{ $note->created_by_name ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.linked_customer') }}</strong><div>{{ $note->customer?->name ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.status') }}</strong><div>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</div></div>
+                @php
+                    $progressLabel = rtrim(rtrim(number_format((float) ($noteProgress['progress_percent'] ?? 0), 2, '.', ''), '0'), '.');
+                    $progressStatusLabel = ($noteProgress['status'] ?? 'open') === 'finished' ? __('txn.order_note_status_finished') : __('txn.order_note_status_open');
+                @endphp
+                <div class="col-4"><strong>{{ __('txn.order_note_progress') }}</strong><div>{{ $progressLabel }}%</div></div>
+                <div class="col-4"><strong>{{ __('txn.order_note_qty_ordered') }}</strong><div>{{ number_format((int) ($noteProgress['ordered_total'] ?? 0), 0, ',', '.') }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.order_note_qty_fulfilled') }}</strong><div>{{ number_format((int) ($noteProgress['fulfilled_total'] ?? 0), 0, ',', '.') }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.order_note_qty_remaining') }}</strong><div>{{ number_format((int) ($noteProgress['remaining_total'] ?? 0), 0, ',', '.') }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.order_note_status_open') }}/{{ __('txn.order_note_status_finished') }}</strong><div>{{ $progressStatusLabel }}</div></div>
                 <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $note->notes ?: '-' }}</div></div>
                 @if($note->is_canceled)
                     <div class="col-12"><strong>{{ __('txn.cancel_reason') }}</strong><div>{{ $note->cancel_reason ?: '-' }}</div></div>
@@ -76,10 +140,13 @@
         </div>
     </div>
 
-    @if((auth()->user()?->role ?? '') === 'admin')
-        <div id="admin-edit-transaction" class="card">
+    <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
+        <div id="admin-edit-transaction" class="card txn-modal-card">
             <div class="form-section">
-                <h3 class="form-section-title">{{ __('txn.admin_actions') }}</h3>
+                <div class="txn-modal-header">
+                    <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
+                    <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
+                </div>
                 <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
                 <form id="admin-order-edit-form" method="post" action="{{ route('order-notes.admin-update', $note) }}" class="row" style="margin-bottom: 12px;">
                     @csrf
@@ -101,6 +168,10 @@
                         <input type="text" name="city" value="{{ old('city', $note->city) }}">
                     </div>
                     <div class="col-12">
+                        <label>{{ __('txn.address') }}</label>
+                        <textarea name="address" rows="2">{{ old('address', $note->address ?: $note->customer?->address) }}</textarea>
+                    </div>
+                    <div class="col-12">
                         <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
                             <strong>{{ __('txn.items') }}</strong>
                             <button type="button" id="admin-add-order-item" class="btn secondary">{{ __('txn.add_row') }}</button>
@@ -108,21 +179,21 @@
                         <table id="admin-order-items-table">
                             <thead>
                             <tr>
-                                <th>{{ __('txn.product') }}</th>
-                                <th>{{ __('txn.qty') }}</th>
-                                <th>{{ __('txn.notes') }}</th>
-                                <th>{{ __('txn.action') }}</th>
+                                <th class="product-col">{{ __('txn.product') }}</th>
+                                <th class="qty-col">{{ __('txn.qty') }}</th>
+                                <th class="notes-col">{{ __('txn.notes') }}</th>
+                                <th class="action-col">{{ __('txn.action') }}</th>
                             </tr>
                             </thead>
                             <tbody>
                             @foreach($note->items as $index => $item)
                                 <tr>
                                     <td>
-                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="{{ $item->product_name }}" style="max-width: 140px;" required>
+                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="{{ $item->product_name }}" required>
                                         <input type="hidden" class="admin-order-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
                                     </td>
-                                    <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" style="max-width: 90px;" required></td>
-                                    <td><input type="text" name="items[{{ $index }}][notes]" class="admin-order-item-notes" value="{{ $item->notes }}" style="max-width: 180px;"></td>
+                                    <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" required></td>
+                                    <td><input type="text" name="items[{{ $index }}][notes]" class="admin-order-item-notes" value="{{ $item->notes }}"></td>
                                     <td><button type="button" class="btn secondary admin-remove-order-item">{{ __('txn.remove') }}</button></td>
                                 </tr>
                             @endforeach
@@ -142,7 +213,7 @@
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if(!$note->is_canceled)
+                @if((auth()->user()?->role ?? '') === 'admin' && !$note->is_canceled)
                     <form method="post" action="{{ route('order-notes.cancel', $note) }}" class="row">
                         @csrf
                         <div class="col-12">
@@ -156,9 +227,42 @@
                 @endif
             </div>
         </div>
+    </div>
 
-        <script>
-            (function () {
+    <script>
+        (function () {
+            const openModalBtn = document.getElementById('open-admin-edit-modal');
+            const closeModalBtn = document.getElementById('close-admin-edit-modal');
+            const modal = document.getElementById('admin-edit-modal');
+            const modalCard = document.getElementById('admin-edit-transaction');
+            if (openModalBtn && closeModalBtn && modal && modalCard) {
+                const openModal = () => {
+                    modal.classList.add('open');
+                    modal.setAttribute('aria-hidden', 'false');
+                };
+                openModalBtn.addEventListener('click', () => {
+                    openModal();
+                });
+                const closeModal = () => {
+                    modal.classList.remove('open');
+                    modal.setAttribute('aria-hidden', 'true');
+                };
+                window.__openOrderEditModal = openModal;
+                closeModalBtn.addEventListener('click', closeModal);
+                modal.addEventListener('click', (event) => {
+                    if (!modalCard.contains(event.target)) {
+                        closeModal();
+                    }
+                });
+                @if($errors->any())
+                openModal();
+                @endif
+            }
+        })();
+    </script>
+
+    <script>
+        (function () {
                 const table = document.getElementById('admin-order-items-table');
                 const tbody = table?.querySelector('tbody');
                 const addButton = document.getElementById('admin-add-order-item');
@@ -333,8 +437,8 @@
                         productIdInput.value = '';
                     });
                     searchInput?.addEventListener('input', onSearchInput);
-                    searchInput?.addEventListener('focus', (event) => {
-                        renderProductSuggestions(event.currentTarget);
+                    searchInput?.addEventListener('focus', async (event) => {
+                        await fetchProductSuggestions(event.currentTarget);
                     });
                     searchInput?.addEventListener('change', (event) => {
                         const selected = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
@@ -359,11 +463,11 @@
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>
-                            <input type="text" name="items[${index}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="" style="max-width: 140px;" required>
+                            <input type="text" name="items[${index}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="" required>
                             <input type="hidden" class="admin-order-item-product-id" name="items[${index}][product_id]" value="">
                         </td>
-                        <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="1" style="max-width: 90px;" required></td>
-                        <td><input type="text" name="items[${index}][notes]" class="admin-order-item-notes" value="" style="max-width: 180px;"></td>
+                        <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="1" required></td>
+                        <td><input type="text" name="items[${index}][notes]" class="admin-order-item-notes" value=""></td>
                         <td><button type="button" class="btn secondary admin-remove-order-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
@@ -394,7 +498,6 @@
                         alert(@js(__('txn.select_product')));
                     }
                 });
-            })();
-        </script>
-    @endif
+        })();
+    </script>
 @endsection

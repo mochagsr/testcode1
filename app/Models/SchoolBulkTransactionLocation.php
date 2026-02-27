@@ -60,4 +60,14 @@ class SchoolBulkTransactionLocation extends Model
     {
         return $this->hasMany(SalesInvoice::class, 'school_bulk_location_id');
     }
+
+    /**
+     * @return HasMany<SchoolBulkTransactionItem, $this>
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(SchoolBulkTransactionItem::class, 'school_bulk_transaction_location_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
 }

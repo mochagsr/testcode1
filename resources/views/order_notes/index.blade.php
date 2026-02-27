@@ -29,16 +29,11 @@
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
                 @endforeach
             </select>
-            <select id="order-notes-status-input" name="status" style="max-width: 180px;">
-                <option value="">{{ __('txn.all_statuses') }}</option>
-                <option value="active" @selected($selectedStatus === 'active')>{{ __('txn.status_active') }}</option>
-                <option value="canceled" @selected($selectedStatus === 'canceled')>{{ __('txn.status_canceled') }}</option>
-            </select>
             <button type="submit">{{ __('txn.search') }}</button>
             <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
-                <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'status' => $selectedStatus, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.all') }}</a>
-                <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'semester' => $currentSemester, 'status' => $selectedStatus, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
-                <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'semester' => $previousSemester, 'status' => $selectedStatus, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
+                <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.all') }}</a>
+                <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'semester' => $currentSemester, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
+                <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'semester' => $previousSemester, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
             </div>
         </form>
         @if(!empty($isDefaultRecentMode))
@@ -75,20 +70,48 @@
                 <th>{{ __('txn.date') }}</th>
                 <th>{{ __('txn.customer') }}</th>
                 <th>{{ __('txn.city') }}</th>
-                <th>{{ __('txn.created_by') }}</th>
+                <th>{{ __('txn.order_note_progress') }}</th>
+                <th>{{ __('txn.balance') }}</th>
                 <th>{{ __('txn.status') }}</th>
+                <th>{{ __('txn.created_by') }}</th>
                 <th>{{ __('txn.action') }}</th>
             </tr>
             </thead>
             <tbody>
             @forelse($notes as $note)
+                @php
+                    $progress = $noteProgressMap[(int) $note->id] ?? [
+                        'ordered_total' => 0,
+                        'fulfilled_total' => 0,
+                        'remaining_total' => 0,
+                        'progress_percent' => 0,
+                        'status' => 'open',
+                    ];
+                    $progressLabel = rtrim(rtrim(number_format((float) ($progress['progress_percent'] ?? 0), 2, '.', ''), '0'), '.');
+                    $statusLabel = ($progress['status'] ?? 'open') === 'finished' ? __('txn.order_note_status_finished') : __('txn.order_note_status_open');
+                @endphp
                 <tr>
-                    <td><a href="{{ route('order-notes.show', $note) }}">{{ $note->note_number }}</a></td>
+                    <td>
+                        <a href="{{ route('order-notes.show', $note) }}">{{ $note->note_number }}</a>
+                        @if($note->is_canceled)
+                            <span class="badge danger" style="margin-left:6px;">{{ __('txn.status_canceled') }}</span>
+                        @endif
+                    </td>
                     <td>{{ $note->note_date->format('d-m-Y') }}</td>
                     <td>{{ $note->customer_name }}</td>
                     <td>{{ $note->city ?: '-' }}</td>
+                    <td>{{ $progressLabel }}%</td>
+                    <td>{{ number_format((int) ($progress['remaining_total'] ?? 0), 0, ',', '.') }}</td>
+                    <td>
+                        @if($note->is_canceled)
+                            <span class="badge danger">{{ __('txn.status_canceled') }}</span>
+                        @elseif(($progress['status'] ?? 'open') === 'finished')
+                            <span class="badge success">{{ $statusLabel }}</span>
+                        @else
+                            <span class="badge warning">{{ $statusLabel }}</span>
+                        @endif
+                    </td>
                     <td>{{ $note->created_by_name ?: '-' }}</td>
-                    <td>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
                     <td>
                         <div class="flex">
                             <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
@@ -101,7 +124,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">{{ __('txn.no_order_notes_found') }}</td></tr>
+                <tr><td colspan="9" class="muted">{{ __('txn.no_order_notes_found') }}</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -117,9 +140,8 @@
             const searchInput = document.getElementById('order-notes-search-input');
             const dateInput = document.getElementById('order-notes-date-input');
             const semesterInput = document.getElementById('order-notes-semester-input');
-            const statusInput = document.getElementById('order-notes-status-input');
 
-            if (!form || !searchInput || !dateInput || !semesterInput || !statusInput) {
+            if (!form || !searchInput || !dateInput || !semesterInput) {
                 return;
             }
 
@@ -142,7 +164,6 @@
 
             dateInput.addEventListener('change', () => form.requestSubmit());
             semesterInput.addEventListener('change', () => form.requestSubmit());
-            statusInput.addEventListener('change', () => form.requestSubmit());
         })();
     </script>
 @endsection

@@ -34,11 +34,11 @@
                             </div>
                             <div class="col-6">
                                 <label>{{ __('txn.date') }} <span class="label-required">*</span></label>
-                                <input type="date" id="transaction-date" name="transaction_date" value="{{ old('transaction_date', now()->format('Y-m-d')) }}" required>
+                                <input type="date" id="transaction-date" name="transaction_date" value="{{ old('transaction_date', now()->format('Y-m-d')) }}" required style="max-width: 150px;">
                             </div>
                             <div class="col-6">
                                 <label>{{ __('txn.semester_period') }}</label>
-                                <select id="semester-period" name="semester_period">
+                                <select id="semester-period" name="semester_period" style="max-width: 150px;">
                                     @foreach($semesterOptions as $semester)
                                         <option value="{{ $semester }}" @selected(old('semester_period', $defaultSemesterPeriod) === $semester)>{{ $semester }}</option>
                                     @endforeach
@@ -94,12 +94,14 @@
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
                 <tr>
-                    <th style="width: 42%">{{ __('txn.product') }} *</th>
-                    <th style="width: 9%">{{ __('txn.unit') }}</th>
-                    <th style="width: 9%">{{ __('txn.qty') }} *</th>
-                    <th style="width: 14%">{{ __('txn.price') }}</th>
-                    <th style="width: 14%">{{ __('txn.subtotal') }}</th>
-                    <th style="width: 20%">{{ __('txn.notes') }}</th>
+                    <th style="width: 22%">{{ __('txn.product') }} *</th>
+                    <th style="width: 16%">{{ __('ui.category') }}</th>
+                    <th style="width: 8%">{{ __('txn.unit') }}</th>
+                    <th style="width: 8%">{{ __('txn.qty') }} *</th>
+                    <th style="width: 10%">{{ __('txn.weight') }}</th>
+                    <th style="width: 12%">{{ __('txn.price') }}</th>
+                    <th style="width: 12%">{{ __('txn.subtotal') }}</th>
+                    <th style="width: 18%">{{ __('txn.notes') }}</th>
                     <th></th>
                 </tr>
                 </thead>
@@ -107,6 +109,8 @@
             </table>
             <div style="margin-top: 10px; text-align: right;">
                 <strong>{{ __('txn.total') }}: Rp <span id="grand-total">0</span></strong>
+                <br>
+                <strong>{{ __('txn.total_weight') }}: <span id="total-weight">0</span></strong>
             </div>
         </div>
 
@@ -114,10 +118,30 @@
         <a class="btn secondary" href="{{ route('outgoing-transactions.index') }}">{{ __('txn.cancel') }}</a>
     </form>
 
+    <div id="outgoing-category-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1200;"></div>
+    <div id="outgoing-category-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:1201;">
+        <div class="flex" style="justify-content:space-between; margin-bottom:10px;">
+            <strong>{{ __('txn.create_category_title') }}</strong>
+            <button type="button" id="outgoing-category-modal-close" class="btn secondary" style="min-height:30px; padding:4px 10px;">&times;</button>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <label>{{ __('txn.category_name') }}</label>
+                <input type="text" id="outgoing-category-name" maxlength="50" placeholder="{{ __('txn.category_name') }}">
+            </div>
+            <div class="col-12">
+                <label>{{ __('ui.description') }}</label>
+                <textarea id="outgoing-category-description" rows="2" placeholder="{{ __('ui.description') }}"></textarea>
+            </div>
+        </div>
+        <div class="muted" id="outgoing-category-status" style="margin-top:6px;">{{ __('txn.category_modal_hint') }}</div>
+    </div>
+
     <script>
         (function () {
             let suppliers = @json($suppliers);
             let products = @json($products);
+            let itemCategories = @json($itemCategories);
             let supplierById = new Map((suppliers || []).map((supplier) => [String(supplier.id), supplier]));
             let supplierByLabel = new Map();
             let supplierByName = new Map();
@@ -127,10 +151,13 @@
             const outgoingUnits = @json($outgoingUnitOptions);
             const SUPPLIER_LOOKUP_URL = @json(route('suppliers.lookup'));
             const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
+            const CATEGORY_API_URL = @json(route('api.item-categories.store'));
+            const NEW_CATEGORY_VALUE = '__new__';
             const LOOKUP_LIMIT = 20;
             const tableBody = document.querySelector('#items-table tbody');
             const addButton = document.getElementById('add-item');
             const grandTotal = document.getElementById('grand-total');
+            const totalWeightNode = document.getElementById('total-weight');
             const supplierSearch = document.getElementById('supplier-search');
             const suppliersList = document.getElementById('suppliers-list');
             const supplierIdField = document.getElementById('supplier-id');
@@ -138,6 +165,13 @@
             const semesterPeriodSelect = document.getElementById('semester-period');
             const form = document.querySelector('form');
             const productsList = document.getElementById('outgoing-products-list');
+            const csrfToken = form?.querySelector('input[name="_token"]')?.value || '';
+            const categoryModal = document.getElementById('outgoing-category-modal');
+            const categoryModalOverlay = document.getElementById('outgoing-category-modal-overlay');
+            const categoryModalClose = document.getElementById('outgoing-category-modal-close');
+            const categoryNameInput = document.getElementById('outgoing-category-name');
+            const categoryDescriptionInput = document.getElementById('outgoing-category-description');
+            const categoryStatus = document.getElementById('outgoing-category-status');
 
             if (!tableBody || !addButton || !grandTotal || !supplierSearch || !supplierIdField || !form) {
                 return;
@@ -147,6 +181,7 @@
             let lastSupplierLookupQuery = '';
             let lastProductLookupQuery = '';
             const SEARCH_DEBOUNCE_MS = 100;
+            const oldItems = @json(old('items', []));
 
             const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
                 ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
@@ -186,7 +221,9 @@
                     .replace(/>/g, '&gt;');
 
             const idNumberFormatter = new Intl.NumberFormat('id-ID');
+            const idWeightFormatter = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
             const numberFormat = (value) => idNumberFormatter.format(Math.max(0, Math.round(Number(value || 0))));
+            const weightFormat = (value) => idWeightFormatter.format(Math.max(0, Number(value || 0)));
             const normalizeLookup = (value) => String(value || '').trim().toLowerCase();
 
             function productLabel(product) {
@@ -230,6 +267,61 @@
                     if (byName !== '' && !productByName.has(byName)) {
                         productByName.set(byName, product);
                     }
+                });
+            }
+
+            function categoryLabel(category) {
+                const code = String(category.code || '').trim();
+                const name = String(category.name || '').trim();
+                if (code !== '' && name !== '' && code.toLowerCase() !== name.toLowerCase()) {
+                    return `${code} - ${name}`;
+                }
+                return code !== '' ? code : name;
+            }
+
+            function buildCategoryOptions(selectedId = '') {
+                const selected = String(selectedId || '').trim();
+                const rows = (itemCategories || []).slice().sort((a, b) => {
+                    const left = String(a.code || a.name || '').toLowerCase();
+                    const right = String(b.code || b.name || '').toLowerCase();
+                    return left.localeCompare(right);
+                });
+                const options = [
+                    `<option value="">${escapeAttribute(@json(__('ui.select_category')))}</option>`,
+                    ...rows.map((category) => {
+                        const value = String(category.id);
+                        const selectedAttr = selected === value ? ' selected' : '';
+                        return `<option value="${escapeAttribute(value)}"${selectedAttr}>${escapeAttribute(categoryLabel(category))}</option>`;
+                    }),
+                ];
+                const isNewSelected = selected === NEW_CATEGORY_VALUE ? ' selected' : '';
+                options.push(`<option value="${NEW_CATEGORY_VALUE}"${isNewSelected}>+ ${escapeAttribute(@json(__('txn.new_category_option')))}</option>`);
+                return options.join('');
+            }
+
+            function renderCategorySelect(select, selectedId = '') {
+                if (!select) {
+                    return;
+                }
+                select.innerHTML = buildCategoryOptions(selectedId);
+                if (selectedId !== '' && selectedId !== NEW_CATEGORY_VALUE) {
+                    select.value = String(selectedId);
+                }
+            }
+
+            function upsertCategory(row) {
+                if (!row || !row.id) {
+                    return;
+                }
+                const map = new Map((itemCategories || []).map((category) => [String(category.id), category]));
+                map.set(String(row.id), row);
+                itemCategories = Array.from(map.values());
+            }
+
+            function refreshAllCategorySelects(overrideSelect = null, overrideValue = '') {
+                tableBody.querySelectorAll('.item-category').forEach((select) => {
+                    const currentValue = select === overrideSelect ? String(overrideValue) : String(select.value || '');
+                    renderCategorySelect(select, currentValue);
                 });
             }
 
@@ -373,17 +465,114 @@
 
             function recalc() {
                 let total = 0;
+                let totalWeight = 0;
                 tableBody.querySelectorAll('tr').forEach((row) => {
                     const qty = Math.max(0, Number(row.querySelector('.qty')?.value || 0));
+                    const weight = Math.max(0, Number(row.querySelector('.weight')?.value || 0));
                     const unitCost = Math.max(0, Number(row.querySelector('.unit-cost')?.value || 0));
                     const lineTotal = qty * unitCost;
                     total += lineTotal;
+                    totalWeight += weight;
                     const lineNode = row.querySelector('.line-total');
                     if (lineNode) {
                         lineNode.textContent = numberFormat(lineTotal);
                     }
                 });
                 grandTotal.textContent = numberFormat(total);
+                if (totalWeightNode) {
+                    totalWeightNode.textContent = weightFormat(totalWeight);
+                }
+            }
+
+            let activeCategorySelect = null;
+            let isCategorySaving = false;
+
+            function openCategoryModal(targetSelect) {
+                if (!categoryModal || !categoryModalOverlay || !categoryNameInput || !categoryDescriptionInput || !categoryStatus) {
+                    return;
+                }
+                activeCategorySelect = targetSelect;
+                categoryNameInput.value = '';
+                categoryDescriptionInput.value = '';
+                categoryStatus.textContent = @json(__('txn.category_modal_hint'));
+                categoryModal.style.display = 'block';
+                categoryModalOverlay.style.display = 'block';
+                setTimeout(() => categoryNameInput.focus(), 50);
+            }
+
+            function hideCategoryModal() {
+                if (!categoryModal || !categoryModalOverlay) {
+                    return;
+                }
+                categoryModal.style.display = 'none';
+                categoryModalOverlay.style.display = 'none';
+            }
+
+            async function saveCategoryFromModalIfNeeded() {
+                if (!activeCategorySelect || !categoryNameInput || !categoryDescriptionInput || !categoryStatus) {
+                    return true;
+                }
+                const categoryName = String(categoryNameInput.value || '').trim();
+                const categoryDescription = String(categoryDescriptionInput.value || '').trim();
+                if (categoryName === '') {
+                    activeCategorySelect.value = '';
+                    return true;
+                }
+                if (isCategorySaving) {
+                    return false;
+                }
+                isCategorySaving = true;
+                categoryStatus.textContent = @json(__('ui.saving'));
+                try {
+                    const response = await fetch(CATEGORY_API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify({
+                            code: categoryName,
+                            description: categoryDescription !== '' ? categoryDescription : null,
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 422) {
+                            const payload = await response.json().catch(() => ({}));
+                            const errors = payload.errors || {};
+                            const firstError = (errors.code && errors.code[0]) || (errors.description && errors.description[0]) || @json(__('txn.category_create_failed'));
+                            categoryStatus.textContent = firstError;
+                            return false;
+                        }
+                        categoryStatus.textContent = @json(__('txn.category_create_failed'));
+                        return false;
+                    }
+
+                    const payload = await response.json();
+                    upsertCategory(payload);
+                    refreshAllCategorySelects(activeCategorySelect, String(payload.id));
+                    categoryStatus.textContent = @json(__('txn.category_created_success_hint'));
+                    return true;
+                } catch (error) {
+                    categoryStatus.textContent = @json(__('txn.category_create_failed'));
+                    return false;
+                } finally {
+                    isCategorySaving = false;
+                }
+            }
+
+            async function requestCloseCategoryModal() {
+                if (!categoryModal || !categoryModalOverlay) {
+                    return;
+                }
+                const saved = await saveCategoryFromModalIfNeeded();
+                if (!saved) {
+                    return;
+                }
+                hideCategoryModal();
+                activeCategorySelect = null;
             }
 
             function reindexRows() {
@@ -391,8 +580,10 @@
                     const mapping = [
                         ['.product-id', `items[${index}][product_id]`],
                         ['.product-name', `items[${index}][product_name]`],
+                        ['.item-category', `items[${index}][item_category_id]`],
                         ['.unit', `items[${index}][unit]`],
                         ['.qty', `items[${index}][quantity]`],
+                        ['.weight', `items[${index}][weight]`],
                         ['.unit-cost', `items[${index}][unit_cost]`],
                         ['.item-notes', `items[${index}][notes]`],
                     ];
@@ -440,17 +631,37 @@
                 semesterPeriodSelect.value = derived;
             }
 
-            function addRow(prefillProduct = null) {
+            function addRow(prefillProduct = null, rowPrefill = null) {
                 const index = tableBody.querySelectorAll('tr').length;
-                const unitValue = prefillProduct?.unit || (outgoingUnits[0]?.code || 'exp');
-                const qtyValue = 1;
-                const unitCostValue = Number(prefillProduct?.price_general || 0);
+                const unitValue = String(rowPrefill?.unit || prefillProduct?.unit || (outgoingUnits[0]?.code || 'exp'));
+                const categoryValue = rowPrefill?.item_category_id
+                    ? String(rowPrefill.item_category_id)
+                    : (prefillProduct?.item_category_id ? String(prefillProduct.item_category_id) : '');
+                const qtyCandidate = Number(rowPrefill?.quantity ?? 1);
+                const qtyValue = Number.isFinite(qtyCandidate) && qtyCandidate > 0 ? Math.round(qtyCandidate) : 1;
+                const weightRaw = rowPrefill?.weight;
+                const weightValue = weightRaw === null || weightRaw === undefined || String(weightRaw).trim() === ''
+                    ? ''
+                    : String(weightRaw);
+                const unitCostCandidate = Number(rowPrefill?.unit_cost ?? prefillProduct?.price_general ?? 0);
+                const unitCostValue = Number.isFinite(unitCostCandidate) && unitCostCandidate >= 0
+                    ? Math.round(unitCostCandidate)
+                    : 0;
+                const notesValue = String(rowPrefill?.notes ?? '');
+                const prefillProductId = rowPrefill?.product_id ? String(rowPrefill.product_id) : '';
+                const prefillProductName = String(rowPrefill?.product_name || prefillProduct?.name || '').trim();
+                const productSearchValue = prefillProduct ? productLabel(prefillProduct) : prefillProductName;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <input type="text" class="product-search" list="outgoing-products-list" placeholder="{{ __('txn.select_product') }}">
-                        <input type="hidden" class="product-id" name="items[${index}][product_id]" value="">
-                        <input type="hidden" class="product-name" name="items[${index}][product_name]" value="">
+                        <input type="text" class="product-search" list="outgoing-products-list" value="${escapeAttribute(productSearchValue)}" placeholder="{{ __('txn.select_product') }}">
+                        <input type="hidden" class="product-id" name="items[${index}][product_id]" value="${escapeAttribute(prefillProductId)}">
+                        <input type="hidden" class="product-name" name="items[${index}][product_name]" value="${escapeAttribute(prefillProductName)}">
+                    </td>
+                    <td>
+                        <select class="item-category w-sm" name="items[${index}][item_category_id]">
+                            ${buildCategoryOptions(categoryValue)}
+                        </select>
                     </td>
                     <td>
                         <select class="unit w-xs" name="items[${index}][unit]">${buildUnitOptions(unitValue)}</select>
@@ -459,10 +670,13 @@
                         <input type="number" min="1" class="qty w-xs" name="items[${index}][quantity]" value="${qtyValue}" required>
                     </td>
                     <td>
+                        <input type="number" min="0" step="0.001" class="weight w-xs" name="items[${index}][weight]" value="${escapeAttribute(weightValue)}">
+                    </td>
+                    <td>
                         <input type="number" min="0" step="1" class="unit-cost w-xs" name="items[${index}][unit_cost]" value="${unitCostValue}">
                     </td>
                     <td style="white-space: nowrap;">Rp <span class="line-total">0</span></td>
-                    <td><input type="text" class="item-notes" name="items[${index}][notes]" placeholder="{{ __('txn.optional') }}"></td>
+                    <td><input type="text" class="item-notes" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
                     <td><button type="button" class="btn secondary remove">{{ __('txn.remove') }}</button></td>
                 `;
                 tableBody.appendChild(tr);
@@ -470,13 +684,14 @@
                 const productSearch = tr.querySelector('.product-search');
                 const productId = tr.querySelector('.product-id');
                 const productName = tr.querySelector('.product-name');
+                const categoryField = tr.querySelector('.item-category');
                 const unitField = tr.querySelector('.unit');
                 const unitCostField = tr.querySelector('.unit-cost');
 
-                if (prefillProduct) {
-                    productSearch.value = productLabel(prefillProduct);
-                    productId.value = prefillProduct.id;
-                    productName.value = prefillProduct.name;
+                if (prefillProduct && !rowPrefill?.product_name) {
+                    if (prefillProduct.item_category_id) {
+                        categoryField.value = String(prefillProduct.item_category_id);
+                    }
                     unitField.value = prefillProduct.unit || unitValue;
                 }
 
@@ -491,6 +706,9 @@
                     }
                     productId.value = product.id;
                     productName.value = product.name;
+                    if (product.item_category_id) {
+                        categoryField.value = String(product.item_category_id);
+                    }
                     unitField.value = product.unit || unitField.value;
                     if (Number(unitCostField.value || 0) <= 0) {
                         unitCostField.value = Number(product.price_general || 0);
@@ -513,6 +731,9 @@
                     productSearch.value = productLabel(product);
                     productId.value = product.id;
                     productName.value = product.name;
+                    if (product.item_category_id) {
+                        categoryField.value = String(product.item_category_id);
+                    }
                     unitField.value = product.unit || unitField.value;
                     if (Number(unitCostField.value || 0) <= 0) {
                         unitCostField.value = Number(product.price_general || 0);
@@ -521,6 +742,11 @@
                 });
 
                 tr.querySelectorAll('.qty,.unit-cost').forEach((field) => field.addEventListener('input', recalc));
+                categoryField?.addEventListener('change', () => {
+                    if (categoryField.value === NEW_CATEGORY_VALUE) {
+                        openCategoryModal(categoryField);
+                    }
+                });
                 tr.querySelector('.remove').addEventListener('click', () => {
                     tr.remove();
                     if (!tableBody.querySelector('tr')) {
@@ -554,15 +780,33 @@
                 updateSupplierPreview(supplier);
             });
 
+            categoryModalClose?.addEventListener('click', () => {
+                requestCloseCategoryModal();
+            });
+            categoryModalOverlay?.addEventListener('click', () => {
+                requestCloseCategoryModal();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && categoryModal && categoryModal.style.display !== 'none') {
+                    requestCloseCategoryModal();
+                }
+            });
+
             form.addEventListener('submit', (event) => {
                 const hasSupplier = supplierIdField.value !== '';
                 const rows = Array.from(tableBody.querySelectorAll('tr'));
                 const hasRows = rows.length > 0;
                 const invalidRows = rows.some((row) => {
+                    const productId = String(row.querySelector('.product-id')?.value || '').trim();
                     const productName = String(row.querySelector('.product-name')?.value || '').trim();
+                    const categoryId = String(row.querySelector('.item-category')?.value || '').trim();
                     const qty = Number(row.querySelector('.qty')?.value || 0);
                     const cost = Number(row.querySelector('.unit-cost')?.value || 0);
-                    return productName === '' || qty < 1 || cost < 0;
+                    return productName === ''
+                        || categoryId === NEW_CATEGORY_VALUE
+                        || (productId === '' && categoryId === '')
+                        || qty < 1
+                        || cost < 0;
                 });
                 if (!hasSupplier || !hasRows || invalidRows) {
                     event.preventDefault();
@@ -579,7 +823,17 @@
             renderProductSuggestions('');
             updateSupplierPreview(initialSupplier);
             addButton.addEventListener('click', () => addRow());
-            addRow();
+            if (Array.isArray(oldItems) && oldItems.length > 0) {
+                oldItems.forEach((item) => {
+                    const productId = Number(item?.product_id || 0);
+                    const prefillProduct = productId > 0
+                        ? products.find((product) => Number(product.id) === productId) || null
+                        : null;
+                    addRow(prefillProduct, item || null);
+                });
+            } else {
+                addRow();
+            }
             autoSelectSemesterByDate();
             transactionDateInput?.addEventListener('change', autoSelectSemesterByDate);
         })();

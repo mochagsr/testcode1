@@ -14,7 +14,7 @@ return [
     'delivery_notes' => 'Surat Jalan',
     'order_notes' => 'Surat Pesanan',
     'delivery_trip_logs' => 'Catatan Perjalanan',
-    'outgoing_transactions' => 'Surat Tanda Terima Barang',
+    'outgoing_transactions' => 'Tanda Terima Barang',
     'receivables' => 'Piutang',
     'receivable_ledger' => 'Piutang',
     'receivable_payments' => 'Bayar Piutang',
@@ -29,3 +29,4 @@ return [
     'login' => 'Login',
     'settings_saved' => 'Pengaturan berhasil disimpan.',
 ];
+

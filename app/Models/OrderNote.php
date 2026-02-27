@@ -23,6 +23,7 @@ class OrderNote extends Model
         'customer_id',
         'customer_name',
         'customer_phone',
+        'address',
         'city',
         'created_by_name',
         'notes',
@@ -58,6 +59,14 @@ class OrderNote extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderNoteItem::class);
+    }
+
+    /**
+     * @return HasMany<SalesInvoice, $this>
+     */
+    public function salesInvoices(): HasMany
+    {
+        return $this->hasMany(SalesInvoice::class, 'order_note_id');
     }
 
     /**

@@ -38,6 +38,82 @@ class ProductCodeGenerationTest extends TestCase
         ]);
     }
 
+    public function test_web_store_adds_category_prefix_for_cerdas_and_pintar(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $cerdas = ItemCategory::query()->create([
+            'code' => 'CAT-CERDAS',
+            'name' => 'cerdas',
+        ]);
+        $pintar = ItemCategory::query()->create([
+            'code' => 'CAT-PINTAR',
+            'name' => 'pintar',
+        ]);
+
+        $this->actingAs($admin)->post(route('products.store'), [
+            'item_category_id' => $cerdas->id,
+            'code' => '',
+            'name' => 'matematika 1 ed 5 smt 1 2526',
+            'unit' => 'exp',
+            'stock' => 10,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+        ])->assertRedirect(route('products.index'));
+
+        $this->actingAs($admin)->post(route('products.store'), [
+            'item_category_id' => $pintar->id,
+            'code' => '',
+            'name' => 'matematika 1 ed 5 smt 1 2526',
+            'unit' => 'exp',
+            'stock' => 10,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+        ])->assertRedirect(route('products.index'));
+
+        $this->assertDatabaseHas('products', [
+            'item_category_id' => $cerdas->id,
+            'code' => 'cmt1e5s156',
+        ]);
+        $this->assertDatabaseHas('products', [
+            'item_category_id' => $pintar->id,
+            'code' => 'pmt1e5s156',
+        ]);
+    }
+
+    public function test_web_store_adds_category_prefix_for_paket_levels(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $paketSd = ItemCategory::query()->create(['code' => 'PK-SD', 'name' => 'paket sd']);
+        $paketSmp = ItemCategory::query()->create(['code' => 'PK-SMP', 'name' => 'paket smp']);
+        $paketSma = ItemCategory::query()->create(['code' => 'PK-SMA', 'name' => 'paket sma']);
+        $paketMi = ItemCategory::query()->create(['code' => 'PK-MI', 'name' => 'paket mi']);
+        $paketMts = ItemCategory::query()->create(['code' => 'PK-MTS', 'name' => 'paket mts']);
+
+        $payloadBase = [
+            'code' => '',
+            'name' => 'matematika 1 ed 5 smt 1 2526',
+            'unit' => 'exp',
+            'stock' => 10,
+            'price_agent' => 10000,
+            'price_sales' => 12000,
+            'price_general' => 15000,
+        ];
+
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + ['item_category_id' => $paketSd->id])->assertRedirect(route('products.index'));
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + ['item_category_id' => $paketSmp->id])->assertRedirect(route('products.index'));
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + ['item_category_id' => $paketSma->id])->assertRedirect(route('products.index'));
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + ['item_category_id' => $paketMi->id])->assertRedirect(route('products.index'));
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + ['item_category_id' => $paketMts->id])->assertRedirect(route('products.index'));
+
+        $this->assertDatabaseHas('products', ['item_category_id' => $paketSd->id, 'code' => 'psmt1e5s156']);
+        $this->assertDatabaseHas('products', ['item_category_id' => $paketSmp->id, 'code' => 'ppmt1e5s156']);
+        $this->assertDatabaseHas('products', ['item_category_id' => $paketSma->id, 'code' => 'pamt1e5s156']);
+        $this->assertDatabaseHas('products', ['item_category_id' => $paketMi->id, 'code' => 'pimt1e5s156']);
+        $this->assertDatabaseHas('products', ['item_category_id' => $paketMts->id, 'code' => 'ptmt1e5s156']);
+    }
+
     public function test_web_store_appends_sequence_when_generated_code_conflicts(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

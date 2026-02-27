@@ -166,7 +166,7 @@ class Customer extends Model
      */
     public function scopeOnlyOrderFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'name', 'city', 'phone']);
+        return $query->select(['id', 'name', 'city', 'phone', 'address']);
     }
 
     /**

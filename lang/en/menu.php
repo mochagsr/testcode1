@@ -14,7 +14,7 @@ return [
     'delivery_notes' => 'Delivery Notes',
     'order_notes' => 'Order Notes',
     'delivery_trip_logs' => 'Delivery Trip Logs',
-    'outgoing_transactions' => 'Goods Receipt Letter',
+    'outgoing_transactions' => 'Goods Receipt',
     'receivables' => 'Receivables',
     'receivable_ledger' => 'Receivables',
     'receivable_payments' => 'Receivable Payments',
@@ -29,3 +29,4 @@ return [
     'login' => 'Login',
     'settings_saved' => 'Settings updated successfully.',
 ];
+

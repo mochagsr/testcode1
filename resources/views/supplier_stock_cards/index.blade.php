@@ -3,6 +3,56 @@
 @section('title', __('supplier_stock.title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .supplier-stock-scroll-wrap {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 460px;
+            border: 1px solid color-mix(in srgb, var(--border) 75%, var(--text) 25%);
+            border-radius: 8px;
+            scrollbar-gutter: stable both-edges;
+        }
+        .supplier-stock-scroll-wrap thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--card);
+        }
+        .supplier-stock-summary-table,
+        .supplier-stock-mutation-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .supplier-stock-summary-table {
+            min-width: 860px;
+        }
+        .supplier-stock-mutation-table {
+            min-width: 960px;
+        }
+        .supplier-stock-summary-table td,
+        .supplier-stock-summary-table th,
+        .supplier-stock-mutation-table td,
+        .supplier-stock-mutation-table th {
+            border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--text) 30%);
+            vertical-align: middle;
+            padding: 10px 8px;
+        }
+        .supplier-stock-summary-table td.num,
+        .supplier-stock-summary-table th.num,
+        .supplier-stock-mutation-table td.num,
+        .supplier-stock-mutation-table th.num {
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .supplier-stock-summary-table td.action,
+        .supplier-stock-summary-table th.action {
+            width: 1%;
+            white-space: nowrap;
+        }
+    </style>
+
     <h1 class="page-title">{{ __('supplier_stock.title') }}</h1>
 
     <div class="card">
@@ -34,13 +84,22 @@
     @if(!$selectedSupplier)
         <div class="card">
             <h3 style="margin-top:0;">{{ __('supplier_stock.product_summary') }}</h3>
-            <table>
+            <div class="supplier-stock-scroll-wrap">
+            <table class="supplier-stock-summary-table">
+                <colgroup>
+                    <col style="width: 22%;">
+                    <col style="width: 16%;">
+                    <col style="width: 30%;">
+                    <col style="width: 16%;">
+                    <col style="width: 16%;">
+                </colgroup>
                 <thead>
                 <tr>
                     <th>{{ __('txn.supplier') }}</th>
+                    <th>{{ __('ui.category') }}</th>
                     <th>{{ __('txn.name') }}</th>
-                    <th>{{ __('ui.stock') }}</th>
-                    <th>{{ __('txn.action') }}</th>
+                    <th class="num">{{ __('ui.stock') }}</th>
+                    <th class="action">{{ __('txn.action') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -59,8 +118,9 @@
                                 @php($lastSupplierId = $supplierId)
                             @endif
                         </td>
+                        <td>{{ $row['category_name'] ?? '-' }}</td>
                         <td>{{ $row['product_name'] }}</td>
-                        <td>
+                        <td class="num">
                             <strong
                                 class="js-stock-value"
                                 data-row-key="{{ $rowKey }}"
@@ -69,11 +129,11 @@
                                 {{ number_format($stockBalance, 0, ',', '.') }}
                             </strong>
                         </td>
-                        <td>
+                        <td class="action">
                             <button
                                 type="button"
                                 class="btn secondary js-open-stock-modal"
-                                style="min-height:32px; padding:6px 10px; margin-left:12px; position:relative; z-index:1;"
+                                style="min-height:30px; padding:5px 9px; margin-left:4px; font-size:11px; position:relative; z-index:1;"
                                 data-row-key="{{ $rowKey }}"
                                 data-product-id="{{ $editableProductId }}"
                                 data-product-code="{{ $row['product_code'] ?? '' }}"
@@ -87,10 +147,11 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="muted">{{ __('supplier_stock.no_data') }}</td></tr>
+                    <tr><td colspan="5" class="muted">{{ __('supplier_stock.no_data') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
+            </div>
             <div style="margin-top:12px;">{{ $summaryPaginator->links() }}</div>
         </div>
     @endif
@@ -98,15 +159,24 @@
     @if($selectedSupplier)
         <div class="card">
             <h3 style="margin-top:0;">{{ __('supplier_stock.mutation_title') }} ({{ $selectedSupplier->name }})</h3>
-            <table>
+            <div class="supplier-stock-scroll-wrap">
+            <table class="supplier-stock-mutation-table">
+                <colgroup>
+                    <col style="width: 11%;">
+                    <col style="width: 24%;">
+                    <col style="width: 33%;">
+                    <col style="width: 10%;">
+                    <col style="width: 10%;">
+                    <col style="width: 12%;">
+                </colgroup>
                 <thead>
                 <tr>
                     <th>{{ __('txn.date') }}</th>
                     <th>{{ __('txn.product') }}</th>
                     <th>{{ __('supplier_stock.description') }}</th>
-                    <th>{{ __('supplier_stock.in') }}</th>
-                    <th>{{ __('supplier_stock.out') }}</th>
-                    <th>{{ __('supplier_stock.balance') }}</th>
+                    <th class="num">{{ __('supplier_stock.in') }}</th>
+                    <th class="num">{{ __('supplier_stock.out') }}</th>
+                    <th class="num">{{ __('supplier_stock.balance') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -114,6 +184,7 @@
                     <tr>
                         <td>{{ \Illuminate\Support\Carbon::parse($row['event_date'])->format('d-m-Y') }}</td>
                         <td>
+                            <div class="muted">{{ $row['category_name'] ?? '-' }}</div>
                             <div>{{ $row['product_name'] }}</div>
                             <div class="muted">{{ $row['product_code'] !== '' ? $row['product_code'] : '-' }}</div>
                         </td>
@@ -125,15 +196,16 @@
                                 </div>
                             @endif
                         </td>
-                        <td style="color:#1f6b3d;">{{ (int) $row['qty_in'] > 0 ? number_format((int) $row['qty_in'], 0, ',', '.') : '-' }}</td>
-                        <td style="color:#8d1f1f;">{{ (int) $row['qty_out'] > 0 ? number_format((int) $row['qty_out'], 0, ',', '.') : '-' }}</td>
-                        <td><strong>{{ number_format((int) $row['balance_after'], 0, ',', '.') }}</strong></td>
+                        <td class="num" style="color:#1f6b3d;">{{ (int) $row['qty_in'] > 0 ? number_format((int) $row['qty_in'], 0, ',', '.') : '-' }}</td>
+                        <td class="num" style="color:#8d1f1f;">{{ (int) $row['qty_out'] > 0 ? number_format((int) $row['qty_out'], 0, ',', '.') : '-' }}</td>
+                        <td class="num"><strong>{{ number_format((int) $row['balance_after'], 0, ',', '.') }}</strong></td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="muted">{{ __('supplier_stock.no_mutation') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
+            </div>
             <div style="margin-top:12px;">{{ $movementPaginator->links() }}</div>
         </div>
     @endif

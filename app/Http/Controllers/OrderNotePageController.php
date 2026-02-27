@@ -17,6 +17,7 @@ use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -110,9 +111,16 @@ class OrderNotePageController extends Controller
                 ];
             }
         );
+        $noteIds = collect($notes->items())
+            ->map(fn(OrderNote $note): int => (int) $note->id)
+            ->filter(fn(int $id): bool => $id > 0)
+            ->values()
+            ->all();
+        $noteProgressMap = $this->buildOrderNoteProgressMap($noteIds);
 
         return view('order_notes.index', [
             'notes' => $notes,
+            'noteProgressMap' => $noteProgressMap,
             'search' => $search,
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
@@ -130,12 +138,12 @@ class OrderNotePageController extends Controller
         $now = now();
         $oldCustomerId = (int) old('customer_id', 0);
         $customers = Cache::remember(
-            AppCache::lookupCacheKey('forms.order_notes.customers', ['limit' => 20]),
+            AppCache::lookupCacheKey('forms.order_notes.customers', ['limit' => 100]),
             $now->copy()->addSeconds(60),
             fn() => Customer::query()
                 ->onlyOrderFormColumns()
                 ->orderBy('name')
-                ->limit(20)
+                ->limit(100)
                 ->get()
         );
         if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
@@ -155,13 +163,13 @@ class OrderNotePageController extends Controller
             ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
-            AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 20, 'active_only' => 1]),
+            AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 100, 'active_only' => 1]),
             $now->copy()->addSeconds(60),
             fn() => Product::query()
                 ->onlyOrderFormColumns()
                 ->active()
                 ->orderBy('name')
-                ->limit(20)
+                ->limit(100)
                 ->get()
         );
         if ($oldProductIds->isNotEmpty()) {
@@ -178,6 +186,207 @@ class OrderNotePageController extends Controller
         ]);
     }
 
+    public function lookup(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $customerId = (int) $data['customer_id'];
+        $search = trim((string) ($data['search'] ?? ''));
+        $limit = (int) ($data['per_page'] ?? 20);
+
+        $notes = OrderNote::query()
+            ->select(['id', 'note_number', 'note_date', 'customer_name', 'city'])
+            ->where('customer_id', $customerId)
+            ->active()
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where('note_number', 'like', "%{$search}%");
+            })
+            ->orderByDesc('note_date')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        if ($notes->isEmpty()) {
+            return response()->json([
+                'data' => [],
+                'meta' => ['total' => 0],
+            ]);
+        }
+
+        $noteIds = $notes->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $noteItems = OrderNoteItem::query()
+            ->whereIn('order_note_id', $noteIds)
+            ->orderBy('order_note_id')
+            ->orderBy('id')
+            ->get([
+                'id',
+                'order_note_id',
+                'product_id',
+                'product_code',
+                'product_name',
+                'quantity',
+                'notes',
+            ]);
+
+        $itemIds = $noteItems->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $productIds = $noteItems
+            ->pluck('product_id')
+            ->map(fn($id): int => (int) $id)
+            ->filter(fn(int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $productMap = Product::query()
+            ->whereIn('id', $productIds)
+            ->get(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+            ->keyBy('id');
+
+        $fulfilledByItem = [];
+        if ($itemIds !== []) {
+            $fulfilledByItem = DB::table('sales_invoice_items as sii')
+                ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+                ->whereNull('si.deleted_at')
+                ->where('si.is_canceled', false)
+                ->whereIn('sii.order_note_item_id', $itemIds)
+                ->groupBy('sii.order_note_item_id')
+                ->pluck(DB::raw('COALESCE(SUM(sii.quantity), 0)'), 'sii.order_note_item_id')
+                ->map(fn($qty): int => (int) round((float) $qty))
+                ->all();
+        }
+
+        $fallbackByNoteProduct = [];
+        $fallbackRows = DB::table('sales_invoice_items as sii')
+            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+            ->whereNull('si.deleted_at')
+            ->where('si.is_canceled', false)
+            ->whereIn('si.order_note_id', $noteIds)
+            ->whereNull('sii.order_note_item_id')
+            ->selectRaw('si.order_note_id as note_id, sii.product_id, COALESCE(SUM(sii.quantity), 0) as fulfilled_qty')
+            ->groupBy('si.order_note_id', 'sii.product_id')
+            ->get();
+        foreach ($fallbackRows as $row) {
+            $noteId = (int) ($row->note_id ?? 0);
+            $productId = (int) ($row->product_id ?? 0);
+            if ($noteId <= 0 || $productId <= 0) {
+                continue;
+            }
+            $fallbackByNoteProduct[$noteId] = $fallbackByNoteProduct[$noteId] ?? [];
+            $fallbackByNoteProduct[$noteId][$productId] = (int) round((float) ($row->fulfilled_qty ?? 0));
+        }
+
+        $itemsByNote = $noteItems
+            ->groupBy('order_note_id')
+            ->map(function ($rows) use ($fulfilledByItem, $fallbackByNoteProduct): array {
+                $noteId = (int) (($rows->first()->order_note_id ?? 0));
+                $fallbackMap = $fallbackByNoteProduct[$noteId] ?? [];
+                $prepared = [];
+                $orderedTotal = 0;
+                $fulfilledTotal = 0;
+
+                foreach ($rows as $item) {
+                    $productId = (int) ($item->product_id ?? 0);
+                    $orderedQty = max(0, (int) ($item->quantity ?? 0));
+                    $fulfilledQty = max(0, (int) ($fulfilledByItem[(int) $item->id] ?? 0));
+
+                    if ($productId > 0 && $orderedQty > $fulfilledQty && isset($fallbackMap[$productId])) {
+                        $remainFromItem = $orderedQty - $fulfilledQty;
+                        $alloc = min($remainFromItem, max(0, (int) $fallbackMap[$productId]));
+                        if ($alloc > 0) {
+                            $fulfilledQty += $alloc;
+                            $fallbackMap[$productId] = max(0, (int) $fallbackMap[$productId] - $alloc);
+                        }
+                    }
+
+                    $remainingQty = max(0, $orderedQty - $fulfilledQty);
+                    $orderedTotal += $orderedQty;
+                    $fulfilledTotal += $fulfilledQty;
+                    $prepared[] = [
+                        'id' => (int) $item->id,
+                        'product_id' => $productId > 0 ? $productId : null,
+                        'product_code' => (string) ($item->product_code ?? ''),
+                        'product_name' => (string) ($item->product_name ?? ''),
+                        'ordered_qty' => $orderedQty,
+                        'fulfilled_qty' => $fulfilledQty,
+                        'remaining_qty' => $remainingQty,
+                        'notes' => (string) ($item->notes ?? ''),
+                    ];
+                }
+
+                return [
+                    'ordered_total' => $orderedTotal,
+                    'fulfilled_total' => $fulfilledTotal,
+                    'remaining_total' => max(0, $orderedTotal - $fulfilledTotal),
+                    'items' => $prepared,
+                ];
+            });
+
+        $result = $notes
+            ->map(function (OrderNote $note) use ($itemsByNote, $productMap): array {
+                $summary = $itemsByNote->get((int) $note->id, [
+                    'ordered_total' => 0,
+                    'fulfilled_total' => 0,
+                    'remaining_total' => 0,
+                    'items' => [],
+                ]);
+
+                $orderedTotal = max(0, (int) ($summary['ordered_total'] ?? 0));
+                $fulfilledTotal = max(0, (int) ($summary['fulfilled_total'] ?? 0));
+                $remainingTotal = max(0, (int) ($summary['remaining_total'] ?? 0));
+                $progressPercent = $orderedTotal > 0
+                    ? min(100, round(($fulfilledTotal / $orderedTotal) * 100, 2))
+                    : 0;
+
+                $items = collect((array) ($summary['items'] ?? []))
+                    ->map(function (array $row) use ($productMap): array {
+                        $productId = (int) ($row['product_id'] ?? 0);
+                        $product = $productId > 0 ? $productMap->get($productId) : null;
+                        if ($product !== null) {
+                            $row['product_code'] = (string) ($product->code ?? $row['product_code'] ?? '');
+                            $row['product_name'] = (string) ($product->name ?? $row['product_name'] ?? '');
+                            $row['stock'] = (int) round((float) ($product->stock ?? 0));
+                            $row['price_agent'] = (int) round((float) ($product->price_agent ?? 0));
+                            $row['price_sales'] = (int) round((float) ($product->price_sales ?? 0));
+                            $row['price_general'] = (int) round((float) ($product->price_general ?? 0));
+                        } else {
+                            $row['stock'] = 0;
+                            $row['price_agent'] = 0;
+                            $row['price_sales'] = 0;
+                            $row['price_general'] = 0;
+                        }
+
+                        return $row;
+                    })
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => (int) $note->id,
+                    'note_number' => (string) $note->note_number,
+                    'note_date' => $note->note_date?->format('d-m-Y'),
+                    'customer_name' => (string) $note->customer_name,
+                    'city' => (string) ($note->city ?? ''),
+                    'ordered_total' => $orderedTotal,
+                    'fulfilled_total' => $fulfilledTotal,
+                    'remaining_total' => $remainingTotal,
+                    'progress_percent' => $progressPercent,
+                    'status' => $remainingTotal <= 0 ? 'finished' : 'open',
+                    'items' => $items,
+                ];
+            })
+            ->filter(fn(array $row): bool => (int) ($row['remaining_total'] ?? 0) > 0)
+            ->values();
+
+        return response()->json([
+            'data' => $result,
+            'meta' => ['total' => $result->count()],
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -185,6 +394,7 @@ class OrderNotePageController extends Controller
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -205,6 +415,7 @@ class OrderNotePageController extends Controller
                 'customer_id' => $data['customer_id'] ?? null,
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
+                'address' => $data['address'] ?? null,
                 'city' => $data['city'] ?? null,
                 'created_by_name' => auth()->user()?->name ?? __('txn.system_user'),
                 'notes' => $data['notes'] ?? null,
@@ -252,20 +463,28 @@ class OrderNotePageController extends Controller
     public function show(OrderNote $orderNote): View
     {
         $now = now();
-        $orderNote->load(['customer:id,name,city,phone', 'items']);
+        $orderNote->load(['customer:id,name,city,phone,address', 'items']);
+        $progressMap = $this->buildOrderNoteProgressMap([(int) $orderNote->id]);
+        $noteProgress = $progressMap[(int) $orderNote->id] ?? [
+            'ordered_total' => 0,
+            'fulfilled_total' => 0,
+            'remaining_total' => 0,
+            'progress_percent' => 0.0,
+            'status' => 'open',
+        ];
         $itemProductIds = $orderNote->items
             ->pluck('product_id')
             ->map(fn($id): int => (int) $id)
             ->filter(fn(int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
-            AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 20, 'active_only' => 1]),
+            AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 100, 'active_only' => 1]),
             $now->copy()->addSeconds(60),
             fn() => Product::query()
                 ->onlyOrderFormColumns()
                 ->active()
                 ->orderBy('name')
-                ->limit(20)
+                ->limit(100)
                 ->get()
         );
         if ($itemProductIds->isNotEmpty()) {
@@ -279,6 +498,7 @@ class OrderNotePageController extends Controller
         return view('order_notes.show', [
             'note' => $orderNote,
             'products' => $products,
+            'noteProgress' => $noteProgress,
         ]);
     }
 
@@ -288,6 +508,7 @@ class OrderNotePageController extends Controller
             'note_date' => ['required', 'date'],
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -308,6 +529,7 @@ class OrderNotePageController extends Controller
                 'note_date' => $data['note_date'],
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
+                'address' => $data['address'] ?? null,
                 'city' => $data['city'] ?? null,
                 'notes' => $data['notes'] ?? null,
             ]);
@@ -379,7 +601,7 @@ class OrderNotePageController extends Controller
 
     public function print(OrderNote $orderNote): View
     {
-        $orderNote->load(['customer:id,name,city,phone', 'items']);
+        $orderNote->load(['customer:id,name,city,phone,address', 'items']);
 
         return view('order_notes.print', [
             'note' => $orderNote,
@@ -388,7 +610,7 @@ class OrderNotePageController extends Controller
 
     public function exportPdf(OrderNote $orderNote)
     {
-        $orderNote->load(['customer:id,name,city,phone', 'items']);
+        $orderNote->load(['customer:id,name,city,phone,address', 'items']);
 
         $filename = $orderNote->note_number . '.pdf';
         $pdf = Pdf::loadView('order_notes.print', [
@@ -401,7 +623,7 @@ class OrderNotePageController extends Controller
 
     public function exportExcel(OrderNote $orderNote): StreamedResponse
     {
-        $orderNote->load(['customer:id,name,city,phone', 'items']);
+        $orderNote->load(['customer:id,name,city,phone,address', 'items']);
         $filename = $orderNote->note_number . '.xlsx';
 
         return response()->streamDownload(function () use ($orderNote): void {
@@ -413,6 +635,7 @@ class OrderNotePageController extends Controller
             $rows[] = [__('txn.date'), $orderNote->note_date?->format('d-m-Y')];
             $rows[] = [__('txn.customer'), $orderNote->customer_name];
             $rows[] = [__('txn.phone'), $orderNote->customer_phone];
+            $rows[] = [__('txn.address'), $orderNote->address ?: $orderNote->customer?->address];
             $rows[] = [__('txn.city'), $orderNote->city];
             $rows[] = [__('txn.created_by'), $orderNote->created_by_name];
             $rows[] = [__('txn.notes'), $orderNote->notes];
@@ -441,6 +664,50 @@ class OrderNotePageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    /**
+     * @param  list<int>  $noteIds
+     * @return array<int, array{ordered_total:int, fulfilled_total:int, remaining_total:int, progress_percent:float, status:string}>
+     */
+    private function buildOrderNoteProgressMap(array $noteIds): array
+    {
+        $cleanIds = array_values(array_filter(array_map(static fn($id): int => (int) $id, $noteIds), static fn(int $id): bool => $id > 0));
+        if ($cleanIds === []) {
+            return [];
+        }
+
+        $orderedByNote = OrderNoteItem::query()
+            ->whereIn('order_note_id', $cleanIds)
+            ->selectRaw('order_note_id, COALESCE(SUM(quantity), 0) as ordered_total')
+            ->groupBy('order_note_id')
+            ->pluck('ordered_total', 'order_note_id');
+
+        $fulfilledByNote = DB::table('sales_invoice_items as sii')
+            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+            ->whereNull('si.deleted_at')
+            ->where('si.is_canceled', false)
+            ->whereIn('si.order_note_id', $cleanIds)
+            ->selectRaw('si.order_note_id, COALESCE(SUM(sii.quantity), 0) as fulfilled_total')
+            ->groupBy('si.order_note_id')
+            ->pluck('fulfilled_total', 'si.order_note_id');
+
+        $result = [];
+        foreach ($cleanIds as $noteId) {
+            $orderedTotal = max(0, (int) round((float) ($orderedByNote[$noteId] ?? 0)));
+            $fulfilledTotal = max(0, (int) round((float) ($fulfilledByNote[$noteId] ?? 0)));
+            $remainingTotal = max(0, $orderedTotal - $fulfilledTotal);
+            $progressPercent = $orderedTotal > 0 ? min(100, round(($fulfilledTotal / $orderedTotal) * 100, 2)) : 0.0;
+            $result[$noteId] = [
+                'ordered_total' => $orderedTotal,
+                'fulfilled_total' => $fulfilledTotal,
+                'remaining_total' => $remainingTotal,
+                'progress_percent' => $progressPercent,
+                'status' => $remainingTotal > 0 ? 'open' : 'finished',
+            ];
+        }
+
+        return $result;
     }
 
     private function generateNoteNumber(string $date): string

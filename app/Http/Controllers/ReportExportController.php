@@ -230,9 +230,12 @@ class ReportExportController extends Controller
 
             if (! empty($report['summary'])) {
                 foreach ($report['summary'] as $item) {
-                    $value = ($item['type'] ?? 'number') === 'currency'
-                        ? 'Rp ' . number_format((int) round((float) ($item['value'] ?? 0)), 0, ',', '.')
-                        : (int) round((float) ($item['value'] ?? 0));
+                    $summaryType = (string) ($item['type'] ?? 'number');
+                    $value = match ($summaryType) {
+                        'currency' => 'Rp ' . number_format((int) round((float) ($item['value'] ?? 0)), 0, ',', '.'),
+                        'decimal' => number_format((float) ($item['value'] ?? 0), 3, ',', '.'),
+                        default => (int) round((float) ($item['value'] ?? 0)),
+                    };
                     $sheet->setCellValue('A' . $rowCursor, (string) ($item['label'] ?? ''));
                     $sheet->setCellValue('B' . $rowCursor, (string) $value);
                     $rowCursor++;
@@ -258,6 +261,8 @@ class ReportExportController extends Controller
 
                     if ($text !== '' && is_numeric($text) && $isReceivableRecap && $index >= 4) {
                         $text = number_format((int) round((float) $text), 0, ',', '.');
+                    } elseif ($text !== '' && is_numeric($text) && $this->isDecimalReportHeader($headerKey)) {
+                        $text = number_format((float) $text, 3, ',', '.');
                     } elseif ($text !== '' && is_numeric($text) && $this->isNumericReportHeader($headerKey)) {
                         $text = number_format((int) round((float) $text), 0, ',', '.');
                     }
@@ -435,6 +440,24 @@ class ReportExportController extends Controller
         return $headers;
     }
 
+    /**
+     * @return array<int, string>
+     */
+    private function decimalReportHeaders(): array
+    {
+        static $headers = null;
+
+        if (is_array($headers)) {
+            return $headers;
+        }
+
+        $headers = [
+            strtolower(__('report.columns.total_weight')),
+        ];
+
+        return $headers;
+    }
+
     private function isNumericReportHeader(string $header): bool
     {
         static $numericHeaderMap = null;
@@ -444,6 +467,17 @@ class ReportExportController extends Controller
         }
 
         return isset($numericHeaderMap[$header]);
+    }
+
+    private function isDecimalReportHeader(string $header): bool
+    {
+        static $decimalHeaderMap = null;
+
+        if (! is_array($decimalHeaderMap)) {
+            $decimalHeaderMap = array_fill_keys($this->decimalReportHeaders(), true);
+        }
+
+        return isset($decimalHeaderMap[$header]);
     }
 
     /**
@@ -821,8 +855,8 @@ class ReportExportController extends Controller
                     __('delivery_trip.trip_number'),
                     __('report.columns.date'),
                     __('delivery_trip.driver_name'),
+                    __('delivery_trip.assistant_name'),
                     __('delivery_trip.vehicle_plate'),
-                    __('delivery_trip.member_count'),
                     __('delivery_trip.total_cost'),
                     __('report.columns.created_by'),
                 ],
@@ -839,8 +873,8 @@ class ReportExportController extends Controller
                             $row->trip_number,
                             $row->trip_date?->format('d-m-Y'),
                             $row->driver_name,
+                            $row->assistant_name ?: '-',
                             $row->vehicle_plate ?: '-',
-                            (int) $row->member_count,
                             (int) $row->total_cost,
                             $row->creator?->name ?: '-',
                         ])
@@ -885,6 +919,7 @@ class ReportExportController extends Controller
                     __('report.columns.supplier'),
                     __('report.columns.phone'),
                     __('report.columns.total'),
+                    __('report.columns.total_weight'),
                     __('report.columns.semester'),
                     __('report.columns.created_by'),
                 ],
@@ -893,6 +928,7 @@ class ReportExportController extends Controller
                         ->onlyListColumns()
                         ->withSupplierInfo()
                         ->withCreator()
+                        ->withSum('items as total_weight', 'weight')
                         ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                             $query->forSemester($selectedSemester);
                         })
@@ -908,6 +944,7 @@ class ReportExportController extends Controller
                             $row->supplier?->name,
                             $row->supplier?->phone,
                             (int) round((float) $row->total),
+                            (float) ($row->total_weight ?? 0),
                             $row->semester_period,
                             $row->creator?->name,
                         ])
@@ -1421,6 +1458,16 @@ class ReportExportController extends Controller
             })
             ->selectRaw('COUNT(*) as transaction_count, COALESCE(SUM(total), 0) as grand_total')
             ->first();
+        $weightAggregate = DB::table('outgoing_transactions as ot')
+            ->leftJoin('outgoing_transaction_items as oti', 'oti.outgoing_transaction_id', '=', 'ot.id')
+            ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
+                $query->where('ot.semester_period', $selectedSemester);
+            })
+            ->when($selectedOutgoingSupplierId !== null, function ($query) use ($selectedOutgoingSupplierId): void {
+                $query->where('ot.supplier_id', $selectedOutgoingSupplierId);
+            })
+            ->selectRaw('COALESCE(SUM(oti.weight), 0) as grand_total_weight')
+            ->first();
 
         return [
             [
@@ -1432,6 +1479,11 @@ class ReportExportController extends Controller
                 'label' => __('report.outgoing_summary.grand_total'),
                 'value' => (float) ($aggregate?->grand_total ?? 0),
                 'type' => 'currency',
+            ],
+            [
+                'label' => __('report.outgoing_summary.grand_total_weight'),
+                'value' => (float) ($weightAggregate?->grand_total_weight ?? 0),
+                'type' => 'decimal',
             ],
         ];
     }

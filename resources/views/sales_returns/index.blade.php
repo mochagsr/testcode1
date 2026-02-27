@@ -29,16 +29,11 @@
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
                 @endforeach
             </select>
-            <select id="sales-returns-status-input" name="status" style="max-width: 180px;">
-                <option value="">{{ __('txn.all_statuses') }}</option>
-                <option value="active" @selected($selectedStatus === 'active')>{{ __('txn.status_active') }}</option>
-                <option value="canceled" @selected($selectedStatus === 'canceled')>{{ __('txn.status_canceled') }}</option>
-            </select>
             <button type="submit">{{ __('txn.search') }}</button>
             <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
-                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.all') }}</a>
-                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $currentSemester, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
-                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $previousSemester, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
+                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.all') }}</a>
+                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $currentSemester, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
+                <a class="btn secondary" href="{{ route('sales-returns.index', ['search' => $search, 'semester' => $previousSemester, 'return_date' => $selectedReturnDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
             </div>
         </form>
         @if(!empty($isDefaultRecentMode))
@@ -74,7 +69,6 @@
                 <th>{{ __('txn.date') }}</th>
                 <th>{{ __('txn.customer') }}</th>
                 <th>{{ __('txn.total_return') }}</th>
-                <th>{{ __('txn.status') }}</th>
                 <th>{{ __('txn.action') }}</th>
             </tr>
             </thead>
@@ -106,7 +100,6 @@
                         {{ $row->customer->name }} <span class="muted">({{ $row->customer->city }})</span>
                     </td>
                     <td>Rp {{ number_format((int) round($row->total), 0, ',', '.') }}</td>
-                    <td>{{ $row->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
                     <td>
                         <div class="flex">
                             <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
@@ -119,7 +112,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="muted">{{ __('txn.no_returns_found') }}</td></tr>
+                <tr><td colspan="5" class="muted">{{ __('txn.no_returns_found') }}</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -135,9 +128,8 @@
             const searchInput = document.getElementById('sales-returns-search-input');
             const dateInput = document.getElementById('sales-returns-date-input');
             const semesterInput = document.getElementById('sales-returns-semester-input');
-            const statusInput = document.getElementById('sales-returns-status-input');
 
-            if (!form || !searchInput || !dateInput || !semesterInput || !statusInput) {
+            if (!form || !searchInput || !dateInput || !semesterInput) {
                 return;
             }
 
@@ -160,7 +152,6 @@
 
             dateInput.addEventListener('change', () => form.requestSubmit());
             semesterInput.addEventListener('change', () => form.requestSubmit());
-            statusInput.addEventListener('change', () => form.requestSubmit());
         })();
     </script>
 @endsection

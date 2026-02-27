@@ -18,10 +18,12 @@ class OutgoingTransactionItem extends Model
     protected $fillable = [
         'outgoing_transaction_id',
         'product_id',
+        'item_category_id',
         'product_code',
         'product_name',
         'unit',
         'quantity',
+        'weight',
         'unit_cost',
         'line_total',
         'notes',
@@ -34,6 +36,7 @@ class OutgoingTransactionItem extends Model
     {
         return [
             'quantity' => 'integer',
+            'weight' => 'decimal:3',
             'unit_cost' => 'integer',
             'line_total' => 'integer',
         ];
@@ -53,5 +56,13 @@ class OutgoingTransactionItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * @return BelongsTo<ItemCategory, $this>
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ItemCategory::class, 'item_category_id');
     }
 }

@@ -23,6 +23,7 @@ class DeliveryTrip extends Model
         'trip_number',
         'trip_date',
         'driver_name',
+        'assistant_name',
         'vehicle_plate',
         'member_count',
         'fuel_cost',
@@ -83,6 +84,7 @@ class DeliveryTrip extends Model
             'trip_number',
             'trip_date',
             'driver_name',
+            'assistant_name',
             'vehicle_plate',
             'member_count',
             'fuel_cost',
@@ -103,10 +105,8 @@ class DeliveryTrip extends Model
         return $query->where(function (Builder $subQuery) use ($search): void {
             $subQuery->where('trip_number', 'like', "%{$search}%")
                 ->orWhere('driver_name', 'like', "%{$search}%")
-                ->orWhere('vehicle_plate', 'like', "%{$search}%")
-                ->orWhereHas('members', function (Builder $memberQuery) use ($search): void {
-                    $memberQuery->where('member_name', 'like', "%{$search}%");
-                });
+                ->orWhere('assistant_name', 'like', "%{$search}%")
+                ->orWhere('vehicle_plate', 'like', "%{$search}%");
         });
     }
 }

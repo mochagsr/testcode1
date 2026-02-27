@@ -3,13 +3,38 @@
 @section('title', __('txn.return').' '.__('txn.detail').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .txn-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+        .txn-modal.open {
+            display: flex;
+        }
+        .txn-modal-card {
+            width: min(1100px, 100%);
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+            border-radius: 12px;
+        }
+        .txn-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+    </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.return') }} {{ $salesReturn->return_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('sales-returns.index') }}">{{ __('txn.back') }}</a>
-            @if((auth()->user()?->role ?? '') === 'admin')
-                <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
-            @endif
+            <button type="button" class="btn secondary" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('sales-returns.print', $salesReturn) }}">{{ __('txn.print') }}</option>
@@ -29,7 +54,6 @@
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $salesReturn->customer->phone ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.return_date') }}</strong><div>{{ $salesReturn->return_date->format('d-m-Y') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.semester_period') }}</strong><div>{{ $salesReturn->semester_period ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.status') }}</strong><div>{{ $salesReturn->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</div></div>
                 <div class="col-4">
                     <strong>{{ __('receivable.customer_semester_status') }}</strong>
                     <div>
@@ -84,10 +108,13 @@
         </div>
     </div>
 
-    @if((auth()->user()?->role ?? '') === 'admin')
-        <div id="admin-edit-transaction" class="card">
+    <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
+        <div id="admin-edit-transaction" class="card txn-modal-card">
             <div class="form-section">
-                <h3 class="form-section-title">{{ __('txn.admin_actions') }}</h3>
+                <div class="txn-modal-header">
+                    <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
+                    <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
+                </div>
                 <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
                 <form id="admin-return-edit-form" method="post" action="{{ route('sales-returns.admin-update', $salesReturn) }}" class="row" style="margin-bottom: 12px;">
                     @csrf
@@ -150,11 +177,11 @@
                         <label>{{ __('txn.reason') }}</label>
                         <textarea name="reason" rows="2">{{ old('reason', $salesReturn->reason) }}</textarea>
                     </div>
-                    <div class="col-12">
+                <div class="col-12">
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if(!$salesReturn->is_canceled)
+                @if((auth()->user()?->role ?? '') === 'admin' && !$salesReturn->is_canceled)
                     <form method="post" action="{{ route('sales-returns.cancel', $salesReturn) }}" class="row">
                         @csrf
                         <div class="col-12">
@@ -168,9 +195,45 @@
                 @endif
             </div>
         </div>
+    </div>
 
-        <script>
-            (function () {
+    <script>
+        (function () {
+            const modal = document.getElementById('admin-edit-modal');
+            const openBtn = document.getElementById('open-admin-edit-modal');
+            const closeBtn = document.getElementById('close-admin-edit-modal');
+            const modalCard = modal?.querySelector('.txn-modal-card');
+            if (modal && openBtn && closeBtn) {
+                const closeModal = () => {
+                    modal.classList.remove('open');
+                    modal.setAttribute('aria-hidden', 'true');
+                };
+                const openModal = () => {
+                    modal.classList.add('open');
+                    modal.setAttribute('aria-hidden', 'false');
+                };
+                openBtn.addEventListener('click', openModal);
+                closeBtn.addEventListener('click', closeModal);
+                modal.addEventListener('click', (event) => {
+                    if (!modalCard || modalCard.contains(event.target)) {
+                        return;
+                    }
+                    closeModal();
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        closeModal();
+                    }
+                });
+                @if($errors->any())
+                openModal();
+                @endif
+            }
+        })();
+    </script>
+
+    <script>
+        (function () {
                 const table = document.getElementById('admin-return-items-table');
                 const tbody = table?.querySelector('tbody');
                 const addButton = document.getElementById('admin-add-return-item');
@@ -437,7 +500,6 @@
                         alert(@js(__('txn.select_product')));
                     }
                 });
-            })();
-        </script>
-    @endif
+        })();
+    </script>
 @endsection

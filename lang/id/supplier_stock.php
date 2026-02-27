@@ -15,7 +15,7 @@ return [
     'in' => 'Masuk',
     'out' => 'Keluar',
     'balance' => 'Saldo',
-    'incoming_label' => 'Stok masuk dari surat tanda terima barang',
+    'incoming_label' => 'Stok masuk dari tanda terima barang',
     'outgoing_label' => 'Stok dipakai di faktur penjualan',
     'return_label' => 'Stok kembali dari retur penjualan',
     'manual_adjust_in_label' => 'Edit stok manual (+)',

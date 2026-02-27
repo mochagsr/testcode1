@@ -9,6 +9,8 @@ use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\Customer;
 use App\Models\AuditLog;
 use App\Models\InvoicePayment;
+use App\Models\OrderNote;
+use App\Models\OrderNoteItem;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
@@ -239,10 +241,15 @@ class SalesInvoicePageController extends Controller
                 ->get();
             $initialProducts = $oldProducts->concat($initialProducts)->unique('id')->values();
         }
+        $initialOrderNotes = collect();
+        if ($oldCustomerId > 0) {
+            $initialOrderNotes = $this->openOrderNotesForCustomer($oldCustomerId, 20);
+        }
 
         return view('sales_invoices.create', [
             'customers' => $initialCustomers,
             'products' => $initialProducts,
+            'orderNotes' => $initialOrderNotes,
             'defaultSemesterPeriod' => $defaultSemester,
             'semesterOptions' => $semesterOptions,
         ]);
@@ -252,6 +259,7 @@ class SalesInvoicePageController extends Controller
     {
         $data = $request->validate([
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'order_note_id' => ['nullable', 'integer', 'exists:order_notes,id'],
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
@@ -259,6 +267,7 @@ class SalesInvoicePageController extends Controller
             'payment_method' => ['required', 'in:tunai,kredit'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.order_note_item_id' => ['nullable', 'integer', 'exists:order_note_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -272,6 +281,36 @@ class SalesInvoicePageController extends Controller
             $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
             $rows = collect($data['items']);
             $customerId = (int) $data['customer_id'];
+            $selectedOrderNoteId = max(0, (int) ($data['order_note_id'] ?? 0));
+            $selectedOrderNote = null;
+            $orderNoteItemsById = collect();
+            $orderNoteItemsByProductId = [];
+            $orderNoteItemProductOffset = [];
+
+            if ($selectedOrderNoteId > 0) {
+                $selectedOrderNote = OrderNote::query()
+                    ->with(['items:id,order_note_id,product_id,product_name,quantity'])
+                    ->whereKey($selectedOrderNoteId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ((int) ($selectedOrderNote->customer_id ?? 0) !== $customerId) {
+                    throw ValidationException::withMessages([
+                        'order_note_id' => __('txn.order_note_customer_mismatch'),
+                    ]);
+                }
+                if ((bool) ($selectedOrderNote->is_canceled ?? false)) {
+                    throw ValidationException::withMessages([
+                        'order_note_id' => __('txn.order_note_unavailable'),
+                    ]);
+                }
+
+                $orderNoteItemsById = $selectedOrderNote->items->keyBy('id');
+                $orderNoteItemsByProductId = $selectedOrderNote->items
+                    ->filter(fn(OrderNoteItem $item): bool => (int) ($item->product_id ?? 0) > 0)
+                    ->groupBy(fn(OrderNoteItem $item): int => (int) $item->product_id)
+                    ->all();
+            }
 
             $products = Product::query()
                 ->whereIn('id', $rows->pluck('product_id')->all())
@@ -303,9 +342,33 @@ class SalesInvoicePageController extends Controller
                 $discount = (float) round($gross * ($discountPercent / 100));
                 $lineTotal = max(0, $gross - $discount);
                 $subtotal += $lineTotal;
+                $orderNoteItemId = max(0, (int) ($row['order_note_item_id'] ?? 0));
+
+                if ($selectedOrderNote !== null) {
+                    if ($orderNoteItemId > 0) {
+                        $linkedItem = $orderNoteItemsById->get($orderNoteItemId);
+                        if (! $linkedItem || (int) ($linkedItem->order_note_id ?? 0) !== (int) $selectedOrderNote->id) {
+                            throw ValidationException::withMessages([
+                                "items.{$index}.order_note_item_id" => __('txn.order_note_item_invalid'),
+                            ]);
+                        }
+                    } else {
+                        $productId = (int) $product->id;
+                        $candidates = $orderNoteItemsByProductId[$productId] ?? collect();
+                        if ($candidates instanceof \Illuminate\Support\Collection && $candidates->isNotEmpty()) {
+                            $offset = (int) ($orderNoteItemProductOffset[$productId] ?? 0);
+                            $candidate = $candidates->get($offset) ?? $candidates->last();
+                            if ($candidate instanceof OrderNoteItem) {
+                                $orderNoteItemId = (int) $candidate->id;
+                                $orderNoteItemProductOffset[$productId] = $offset + 1;
+                            }
+                        }
+                    }
+                }
 
                 $computedRows[] = [
                     'product' => $product,
+                    'order_note_item_id' => $orderNoteItemId > 0 ? $orderNoteItemId : null,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount' => $discount,
@@ -317,6 +380,7 @@ class SalesInvoicePageController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'customer_id' => $customerId,
                 'customer_ship_location_id' => null,
+                'order_note_id' => $selectedOrderNote?->id,
                 'invoice_date' => $invoiceDate->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $selectedSemester,
@@ -338,6 +402,7 @@ class SalesInvoicePageController extends Controller
 
                 SalesInvoiceItem::create([
                     'sales_invoice_id' => $invoice->id,
+                    'order_note_item_id' => $row['order_note_item_id'] ?? null,
                     'product_id' => $product->id,
                     'product_code' => $product->code,
                     'product_name' => $product->name,
@@ -467,7 +532,30 @@ class SalesInvoicePageController extends Controller
             'customer:id,name,city,phone,address',
             'items.product:id,code,name',
             'payments',
+            'orderNote:id,note_number,note_date',
         ]);
+        $orderNoteProgress = null;
+        if ((int) ($salesInvoice->order_note_id ?? 0) > 0) {
+            $orderNoteId = (int) $salesInvoice->order_note_id;
+            $orderedTotal = max(0, (int) OrderNoteItem::query()
+                ->where('order_note_id', $orderNoteId)
+                ->sum('quantity'));
+            $fulfilledTotal = max(0, (int) round((float) DB::table('sales_invoice_items as sii')
+                ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+                ->whereNull('si.deleted_at')
+                ->where('si.is_canceled', false)
+                ->where('si.order_note_id', $orderNoteId)
+                ->sum('sii.quantity')));
+            $remainingTotal = max(0, $orderedTotal - $fulfilledTotal);
+            $progressPercent = $orderedTotal > 0 ? min(100, round(($fulfilledTotal / $orderedTotal) * 100, 2)) : 0;
+            $orderNoteProgress = [
+                'ordered_total' => $orderedTotal,
+                'fulfilled_total' => $fulfilledTotal,
+                'remaining_total' => $remainingTotal,
+                'progress_percent' => $progressPercent,
+                'status' => $remainingTotal > 0 ? 'open' : 'finished',
+            ];
+        }
         $currentSemester = $this->defaultSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
         $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
@@ -511,6 +599,7 @@ class SalesInvoicePageController extends Controller
 
         return view('sales_invoices.show', [
             'invoice' => $salesInvoice,
+            'orderNoteProgress' => $orderNoteProgress,
             'customerSemesterLockState' => $customerSemesterLockState,
             'semesterOptions' => $semesterOptions,
             'products' => $products,
@@ -523,9 +612,11 @@ class SalesInvoicePageController extends Controller
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
+            'payment_method' => ['nullable', 'in:tunai,kredit'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.order_note_item_id' => ['nullable', 'integer', 'exists:order_note_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -548,7 +639,36 @@ class SalesInvoicePageController extends Controller
             }
 
             $rows = collect($data['items'] ?? []);
+            $invoiceDateValue = Carbon::parse((string) $data['invoice_date'])->toDateString();
+            $linkedOrderNote = null;
+            $orderNoteItemsById = collect();
+            $orderNoteItemsByProductId = [];
+            $orderNoteItemProductOffset = [];
+            if ((int) ($invoice->order_note_id ?? 0) > 0) {
+                $linkedOrderNote = OrderNote::query()
+                    ->with(['items:id,order_note_id,product_id,product_name,quantity'])
+                    ->whereKey((int) $invoice->order_note_id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($linkedOrderNote !== null) {
+                    $orderNoteItemsById = $linkedOrderNote->items->keyBy('id');
+                    $orderNoteItemsByProductId = $linkedOrderNote->items
+                        ->filter(fn(OrderNoteItem $item): bool => (int) ($item->product_id ?? 0) > 0)
+                        ->groupBy(fn(OrderNoteItem $item): int => (int) $item->product_id)
+                        ->all();
+                }
+            }
             $oldTotal = (float) $invoice->total;
+            $oldBalance = (float) $invoice->balance;
+            $selectedPaymentMethod = in_array((string) ($data['payment_method'] ?? ''), ['tunai', 'kredit'], true)
+                ? (string) $data['payment_method']
+                : (
+                    $invoice->payments->contains(function (InvoicePayment $payment) use ($invoice): bool {
+                        return strtolower((string) $payment->method) === 'cash'
+                            && optional($payment->payment_date)->format('Y-m-d') === optional($invoice->invoice_date)->format('Y-m-d')
+                            && (float) $payment->amount >= (float) $invoice->total;
+                    }) ? 'tunai' : 'kredit'
+                );
             $auditBefore = $invoice->items
                 ->map(fn(SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
                 ->implode(' | ');
@@ -661,9 +781,33 @@ class SalesInvoicePageController extends Controller
                 $discount = (float) round($gross * ($discountPercent / 100));
                 $lineTotal = max(0, $gross - $discount);
                 $subtotal += $lineTotal;
+                $orderNoteItemId = max(0, (int) ($row['order_note_item_id'] ?? 0));
+
+                if ($linkedOrderNote !== null) {
+                    if ($orderNoteItemId > 0) {
+                        $linkedItem = $orderNoteItemsById->get($orderNoteItemId);
+                        if (! $linkedItem || (int) ($linkedItem->order_note_id ?? 0) !== (int) $linkedOrderNote->id) {
+                            throw ValidationException::withMessages([
+                                "items.{$index}.order_note_item_id" => __('txn.order_note_item_invalid'),
+                            ]);
+                        }
+                    } else {
+                        $productId = (int) $product->id;
+                        $candidates = $orderNoteItemsByProductId[$productId] ?? collect();
+                        if ($candidates instanceof \Illuminate\Support\Collection && $candidates->isNotEmpty()) {
+                            $offset = (int) ($orderNoteItemProductOffset[$productId] ?? 0);
+                            $candidate = $candidates->get($offset) ?? $candidates->last();
+                            if ($candidate instanceof OrderNoteItem) {
+                                $orderNoteItemId = (int) $candidate->id;
+                                $orderNoteItemProductOffset[$productId] = $offset + 1;
+                            }
+                        }
+                    }
+                }
 
                 SalesInvoiceItem::create([
                     'sales_invoice_id' => $invoice->id,
+                    'order_note_item_id' => $orderNoteItemId > 0 ? $orderNoteItemId : null,
                     'product_id' => $product->id,
                     'product_code' => $product->code,
                     'product_name' => $product->name,
@@ -685,7 +829,64 @@ class SalesInvoicePageController extends Controller
                 })
                 ->implode(' | ');
 
-            $paymentsTotal = (float) $invoice->payments->sum('amount');
+            $paymentNotesForFull = array_unique(array_filter([
+                __('txn.full_payment_on_create'),
+                'Full payment on invoice creation',
+                'Pelunasan penuh saat membuat faktur',
+            ]));
+            $fullCashOnCreatePayments = $invoice->payments->filter(function (InvoicePayment $payment) use ($invoiceDateValue, $paymentNotesForFull, $invoice): bool {
+                $paymentDate = optional($payment->payment_date)->format('Y-m-d');
+                $isCash = strtolower((string) $payment->method) === 'cash';
+                $hasMarkerNote = in_array((string) ($payment->notes ?? ''), $paymentNotesForFull, true);
+
+                return $isCash && (
+                    $hasMarkerNote
+                    || ($paymentDate === $invoiceDateValue && (float) $payment->amount >= (float) $invoice->total)
+                );
+            })->values();
+            $fullCashIds = $fullCashOnCreatePayments->pluck('id')->map(fn($id): int => (int) $id)->all();
+            $nonSyntheticPaid = (float) $invoice->payments
+                ->filter(fn(InvoicePayment $payment): bool => ! in_array((int) $payment->id, $fullCashIds, true))
+                ->sum('amount');
+
+            $syntheticAmount = 0.0;
+            if ($selectedPaymentMethod === 'tunai') {
+                $syntheticAmount = max(0, $subtotal - $nonSyntheticPaid);
+                if ($syntheticAmount > 0) {
+                    /** @var InvoicePayment|null $primarySynthetic */
+                    $primarySynthetic = $fullCashOnCreatePayments->first();
+                    if ($primarySynthetic !== null) {
+                        $primarySynthetic->update([
+                            'payment_date' => $invoiceDateValue,
+                            'amount' => $syntheticAmount,
+                            'method' => 'cash',
+                            'notes' => __('txn.full_payment_on_create'),
+                        ]);
+                        $extraSyntheticIds = $fullCashOnCreatePayments
+                            ->skip(1)
+                            ->pluck('id')
+                            ->map(fn($id): int => (int) $id)
+                            ->all();
+                        if ($extraSyntheticIds !== []) {
+                            InvoicePayment::query()->whereIn('id', $extraSyntheticIds)->delete();
+                        }
+                    } else {
+                        InvoicePayment::create([
+                            'sales_invoice_id' => $invoice->id,
+                            'payment_date' => $invoiceDateValue,
+                            'amount' => $syntheticAmount,
+                            'method' => 'cash',
+                            'notes' => __('txn.full_payment_on_create'),
+                        ]);
+                    }
+                } elseif ($fullCashIds !== []) {
+                    InvoicePayment::query()->whereIn('id', $fullCashIds)->delete();
+                }
+            } elseif ($fullCashIds !== []) {
+                InvoicePayment::query()->whereIn('id', $fullCashIds)->delete();
+            }
+
+            $paymentsTotal = max(0, $nonSyntheticPaid + $syntheticAmount);
             $newBalance = max(0, $subtotal - $paymentsTotal);
 
             $invoice->update([
@@ -716,6 +917,27 @@ class SalesInvoicePageController extends Controller
                     invoiceId: (int) $invoice->id,
                     entryDate: Carbon::parse((string) $data['invoice_date']),
                     amount: abs($difference),
+                    periodCode: $invoice->semester_period,
+                    description: __('txn.admin_invoice_edit_ledger_decrease', ['invoice' => $invoice->invoice_number]),
+                );
+            }
+
+            $balanceDifference = (float) round($newBalance - $oldBalance);
+            if ($balanceDifference > 0) {
+                $this->receivableLedgerService->addDebit(
+                    customerId: (int) $invoice->customer_id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: Carbon::parse((string) $data['invoice_date']),
+                    amount: $balanceDifference,
+                    periodCode: $invoice->semester_period,
+                    description: __('txn.admin_invoice_edit_ledger_increase', ['invoice' => $invoice->invoice_number]),
+                );
+            } elseif ($balanceDifference < 0) {
+                $this->receivableLedgerService->addCredit(
+                    customerId: (int) $invoice->customer_id,
+                    invoiceId: (int) $invoice->id,
+                    entryDate: Carbon::parse((string) $data['invoice_date']),
+                    amount: abs($balanceDifference),
                     periodCode: $invoice->semester_period,
                     description: __('txn.admin_invoice_edit_ledger_decrease', ['invoice' => $invoice->invoice_number]),
                 );
@@ -929,6 +1151,62 @@ class SalesInvoicePageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function openOrderNotesForCustomer(int $customerId, int $limit = 20): \Illuminate\Support\Collection
+    {
+        $notes = OrderNote::query()
+            ->select(['id', 'note_number', 'note_date'])
+            ->where('customer_id', $customerId)
+            ->active()
+            ->orderByDesc('note_date')
+            ->orderByDesc('id')
+            ->limit(max(1, $limit * 3))
+            ->get();
+
+        if ($notes->isEmpty()) {
+            return collect();
+        }
+
+        $noteIds = $notes->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $orderedByNote = DB::table('order_note_items')
+            ->whereIn('order_note_id', $noteIds)
+            ->selectRaw('order_note_id, COALESCE(SUM(quantity), 0) as ordered_qty')
+            ->groupBy('order_note_id')
+            ->pluck('ordered_qty', 'order_note_id');
+        $fulfilledByNote = DB::table('sales_invoice_items as sii')
+            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+            ->whereNull('si.deleted_at')
+            ->where('si.is_canceled', false)
+            ->whereIn('si.order_note_id', $noteIds)
+            ->selectRaw('si.order_note_id, COALESCE(SUM(sii.quantity), 0) as fulfilled_qty')
+            ->groupBy('si.order_note_id')
+            ->pluck('fulfilled_qty', 'si.order_note_id');
+
+        return $notes
+            ->map(function (OrderNote $note) use ($orderedByNote, $fulfilledByNote): array {
+                $orderedQty = max(0, (int) round((float) ($orderedByNote[(int) $note->id] ?? 0)));
+                $fulfilledQty = max(0, (int) round((float) ($fulfilledByNote[(int) $note->id] ?? 0)));
+                $remainingQty = max(0, $orderedQty - $fulfilledQty);
+                $progress = $orderedQty > 0 ? min(100, round(($fulfilledQty / $orderedQty) * 100, 2)) : 0;
+
+                return [
+                    'id' => (int) $note->id,
+                    'note_number' => (string) $note->note_number,
+                    'note_date' => $note->note_date?->format('d-m-Y'),
+                    'ordered_total' => $orderedQty,
+                    'fulfilled_total' => $fulfilledQty,
+                    'remaining_total' => $remainingQty,
+                    'progress_percent' => $progress,
+                ];
+            })
+            ->filter(fn(array $row): bool => (int) ($row['remaining_total'] ?? 0) > 0)
+            ->values()
+            ->take(max(1, $limit))
+            ->values();
     }
 
     private function generateInvoiceNumber(string $date): string

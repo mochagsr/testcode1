@@ -63,6 +63,7 @@ class SupplierStockCardPageController extends Controller
             })
             ->values();
         $summaryRows = $this->attachEditableProductIds($summaryRows);
+        [$summaryRows, $movements] = $this->attachCategoryLabels($summaryRows, $movements);
 
         $totals = [
             'qty_in' => $summaryRows->sum('qty_in'),
@@ -177,6 +178,64 @@ class SupplierStockCardPageController extends Controller
 
             return $row;
         });
+    }
+
+    /**
+     * @param Collection<int, array<string, mixed>> $summaryRows
+     * @param Collection<int, array<string, mixed>> $movements
+     * @return array{0: Collection<int, array<string, mixed>>, 1: Collection<int, array<string, mixed>>}
+     */
+    private function attachCategoryLabels(Collection $summaryRows, Collection $movements): array
+    {
+        $summaryProductIds = $summaryRows
+            ->map(function (array $row): int {
+                $editableProductId = (int) ($row['editable_product_id'] ?? 0);
+                if ($editableProductId > 0) {
+                    return $editableProductId;
+                }
+
+                return (int) ($row['product_id'] ?? 0);
+            });
+        $movementProductIds = $movements
+            ->map(fn(array $row): int => (int) ($row['product_id'] ?? 0));
+        $productIds = $summaryProductIds
+            ->merge($movementProductIds)
+            ->filter(fn(int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $categoryLabelMap = [];
+        if ($productIds->isNotEmpty()) {
+            $products = Product::query()
+                ->with('category:id,code,name')
+                ->whereIn('id', $productIds->all())
+                ->get(['id', 'item_category_id']);
+            foreach ($products as $product) {
+                $categoryLabelMap[(int) $product->id] = $this->productCategoryLabel($product);
+            }
+        }
+
+        $summaryRows = $summaryRows
+            ->map(function (array $row) use ($categoryLabelMap): array {
+                $productId = (int) ($row['editable_product_id'] ?? 0);
+                if ($productId <= 0) {
+                    $productId = (int) ($row['product_id'] ?? 0);
+                }
+                $row['category_name'] = (string) ($categoryLabelMap[$productId] ?? '-');
+
+                return $row;
+            })
+            ->values();
+        $movements = $movements
+            ->map(function (array $row) use ($categoryLabelMap): array {
+                $productId = (int) ($row['product_id'] ?? 0);
+                $row['category_name'] = (string) ($categoryLabelMap[$productId] ?? '-');
+
+                return $row;
+            })
+            ->values();
+
+        return [$summaryRows, $movements];
     }
 
     public function updateStock(Request $request): RedirectResponse|JsonResponse
@@ -379,6 +438,9 @@ class SupplierStockCardPageController extends Controller
         $code = trim((string) ($category->code ?? ''));
         $name = trim((string) ($category->name ?? ''));
         if ($code !== '' && $name !== '') {
+            if (strcasecmp($code, $name) === 0) {
+                return $name;
+            }
             return "{$code} - {$name}";
         }
         if ($name !== '') {
@@ -483,9 +545,14 @@ class SupplierStockCardPageController extends Controller
         }
 
         $requestedCode = trim((string) ($data['product_code'] ?? ''));
+        $fallbackCategoryName = ItemCategory::query()
+            ->whereKey($fallbackCategoryId)
+            ->value('name');
         $resolvedCode = $this->productCodeGenerator->resolve(
             $requestedCode !== '' ? $requestedCode : null,
-            $productName
+            $productName,
+            null,
+            $fallbackCategoryName ? (string) $fallbackCategoryName : null
         );
 
         $created = Product::query()->create([

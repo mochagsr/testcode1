@@ -90,6 +90,7 @@ class OutgoingTransactionFlowsTest extends TestCase
                     'product_name' => $product->name,
                     'unit' => 'exp',
                     'quantity' => 5,
+                    'weight' => 12.5,
                     'unit_cost' => 15000,
                     'notes' => 'Baris 1',
                 ],
@@ -112,6 +113,12 @@ class OutgoingTransactionFlowsTest extends TestCase
             'product_id' => $product->id,
             'mutation_type' => 'in',
             'quantity' => 5,
+        ]);
+        $transactionId = (int) OutgoingTransaction::query()->where('note_number', 'NOTA-001')->value('id');
+        $this->assertDatabaseHas('outgoing_transaction_items', [
+            'outgoing_transaction_id' => $transactionId,
+            'product_id' => $product->id,
+            'weight' => 12.5,
         ]);
     }
 
@@ -167,6 +174,58 @@ class OutgoingTransactionFlowsTest extends TestCase
 
         $product->refresh();
         $this->assertSame(5.0, (float) $product->stock);
+    }
+
+    public function test_outgoing_transaction_store_auto_creates_master_product_for_manual_item(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'finance_locked' => false,
+        ]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Manual',
+            'company_name' => 'PT Manual',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-MANUAL-OT',
+            'name' => 'Kategori Manual OT',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('outgoing-transactions.store'), [
+            'supplier_id' => $supplier->id,
+            'transaction_date' => '2026-02-27',
+            'semester_period' => 'S2-2526',
+            'note_number' => 'NOTA-MANUAL-001',
+            'items' => [
+                [
+                    'product_id' => null,
+                    'product_name' => 'Kertas Web 68gr Manual',
+                    'item_category_id' => $category->id,
+                    'unit' => 'roll',
+                    'quantity' => 4,
+                    'unit_cost' => 16500,
+                    'notes' => '',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+
+        $product = Product::query()
+            ->where('name', 'Kertas Web 68gr Manual')
+            ->first();
+        $this->assertNotNull($product);
+        $this->assertSame((int) $category->id, (int) $product->item_category_id);
+        $this->assertSame(4.0, (float) $product->stock);
+
+        $transaction = OutgoingTransaction::query()
+            ->where('note_number', 'NOTA-MANUAL-001')
+            ->firstOrFail();
+        $this->assertDatabaseHas('outgoing_transaction_items', [
+            'outgoing_transaction_id' => $transaction->id,
+            'product_id' => $product->id,
+            'product_name' => 'Kertas Web 68gr Manual',
+        ]);
     }
 
     public function test_outgoing_transaction_store_fails_if_supplier_semester_closed(): void
@@ -410,6 +469,42 @@ class OutgoingTransactionFlowsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee(__('txn.admin_badge_edit'));
+    }
+
+    public function test_outgoing_index_shows_total_weight_column_and_value(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Weight',
+            'company_name' => 'PT Weight',
+        ]);
+        $transaction = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-WEIGHT-0001',
+            'transaction_date' => '2026-02-20',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'total' => 16500,
+            'created_by_user_id' => $user->id,
+        ]);
+        OutgoingTransactionItem::query()->create([
+            'outgoing_transaction_id' => $transaction->id,
+            'product_id' => null,
+            'item_category_id' => null,
+            'product_code' => null,
+            'product_name' => 'Kertas Uji Berat',
+            'unit' => 'roll',
+            'quantity' => 1,
+            'weight' => 12.5,
+            'unit_cost' => 16500,
+            'line_total' => 16500,
+            'notes' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('outgoing-transactions.index'));
+
+        $response->assertOk();
+        $response->assertSee(__('txn.total_weight'));
+        $response->assertSee('12,500');
     }
 
     public function test_supplier_payable_mutation_shows_admin_edit_badges(): void

@@ -141,18 +141,20 @@ class SchoolBulkTransactionPageController extends Controller
             'semester_period' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string'],
             'locations' => ['required', 'array', 'min:1'],
+            'locations.*.uid' => ['required', 'string', 'max:50'],
             'locations.*.customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
             'locations.*.school_name' => ['required', 'string', 'max:150'],
             'locations.*.recipient_phone' => ['nullable', 'string', 'max:30'],
             'locations.*.city' => ['nullable', 'string', 'max:100'],
             'locations.*.address' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'items.*.product_name' => ['required', 'string', 'max:200'],
-            'items.*.unit' => ['nullable', 'string', 'max:30'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
-            'items.*.notes' => ['nullable', 'string'],
+            'location_items' => ['required', 'array', 'min:1'],
+            'location_items.*' => ['required', 'array', 'min:1'],
+            'location_items.*.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'location_items.*.*.product_name' => ['required', 'string', 'max:200'],
+            'location_items.*.*.unit' => ['nullable', 'string', 'max:30'],
+            'location_items.*.*.quantity' => ['required', 'integer', 'min:1'],
+            'location_items.*.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'location_items.*.*.notes' => ['nullable', 'string'],
         ]);
 
         $transaction = DB::transaction(function () use ($data): SchoolBulkTransaction {
@@ -162,7 +164,12 @@ class SchoolBulkTransactionPageController extends Controller
                 ?? $this->semesterBookService->currentSemester();
             $transactionNumber = $this->generateTransactionNumber($transactionDate);
             $locationRows = collect($data['locations'])->values();
-            $itemRows = collect($data['items'])->values();
+            $locationItemsMap = collect((array) ($data['location_items'] ?? []));
+            $allItemRows = $locationItemsMap
+                ->flatMap(function ($rows): Collection {
+                    return collect((array) $rows)->values();
+                })
+                ->values();
             $customerId = (int) $data['customer_id'];
 
             $shipLocationIds = $locationRows
@@ -182,7 +189,7 @@ class SchoolBulkTransactionPageController extends Controller
                 ]);
             }
 
-            $productIds = $itemRows
+            $productIds = $allItemRows
                 ->pluck('product_id')
                 ->map(fn($id): int => (int) $id)
                 ->filter(fn(int $id): bool => $id > 0)
@@ -200,16 +207,24 @@ class SchoolBulkTransactionPageController extends Controller
                 'customer_id' => $customerId,
                 'semester_period' => $semesterPeriod,
                 'total_locations' => (int) $locationRows->count(),
-                'total_items' => (int) $itemRows->count(),
+                'total_items' => 0,
                 'notes' => $data['notes'] ?? null,
                 'created_by_user_id' => auth()->id(),
             ]);
 
-            $locationRows->each(function (array $row, int $index) use ($transaction, $shipLocations): void {
+            $totalItems = 0;
+            $locationRows->each(function (array $row, int $index) use ($transaction, $shipLocations, $locationItemsMap, $products, &$totalItems): void {
                 $shipLocation = null;
                 $shipLocationId = (int) ($row['customer_ship_location_id'] ?? 0);
                 if ($shipLocationId > 0) {
                     $shipLocation = $shipLocations->get($shipLocationId);
+                }
+                $uid = trim((string) ($row['uid'] ?? ''));
+                $locationItemRows = collect((array) $locationItemsMap->get($uid, []))->values();
+                if ($locationItemRows->isEmpty()) {
+                    throw ValidationException::withMessages([
+                        'location_items' => __('school_bulk.fill_items'),
+                    ]);
                 }
 
                 $schoolName = trim((string) ($row['school_name'] ?? ''));
@@ -217,7 +232,7 @@ class SchoolBulkTransactionPageController extends Controller
                 $city = trim((string) ($row['city'] ?? ''));
                 $address = trim((string) ($row['address'] ?? ''));
 
-                SchoolBulkTransactionLocation::create([
+                $createdLocation = SchoolBulkTransactionLocation::create([
                     'school_bulk_transaction_id' => $transaction->id,
                     'customer_ship_location_id' => $shipLocation?->id,
                     'school_name' => $schoolName !== '' ? $schoolName : (string) ($shipLocation?->school_name ?: '-'),
@@ -227,33 +242,39 @@ class SchoolBulkTransactionPageController extends Controller
                     'address' => $address !== '' ? $address : ($shipLocation?->address ?: null),
                     'sort_order' => $index,
                 ]);
+
+                $locationItemRows->each(function (array $itemRow, int $itemIndex) use ($transaction, $products, $createdLocation, &$totalItems): void {
+                    $productId = (int) ($itemRow['product_id'] ?? 0);
+                    $product = $productId > 0 ? $products->get($productId) : null;
+                    $productName = trim((string) ($itemRow['product_name'] ?? ''));
+                    $unit = trim((string) ($itemRow['unit'] ?? ''));
+                    $unitPriceInput = $itemRow['unit_price'] ?? null;
+                    $unitPrice = $unitPriceInput === null || $unitPriceInput === ''
+                        ? null
+                        : (int) round((float) $unitPriceInput);
+                    if ($unitPrice === null && $product !== null) {
+                        $unitPrice = (int) round((float) ($product->price_general ?? 0));
+                    }
+
+                    SchoolBulkTransactionItem::create([
+                        'school_bulk_transaction_id' => $transaction->id,
+                        'school_bulk_transaction_location_id' => $createdLocation->id,
+                        'product_id' => $product?->id,
+                        'product_code' => $product?->code,
+                        'product_name' => $productName !== '' ? $productName : (string) ($product?->name ?: '-'),
+                        'unit' => $unit !== '' ? $unit : ($product?->unit ?: null),
+                        'quantity' => max(1, (int) ($itemRow['quantity'] ?? 1)),
+                        'unit_price' => $unitPrice,
+                        'notes' => $itemRow['notes'] ?? null,
+                        'sort_order' => $itemIndex,
+                    ]);
+                    $totalItems++;
+                });
             });
 
-            $itemRows->each(function (array $row, int $index) use ($transaction, $products): void {
-                $productId = (int) ($row['product_id'] ?? 0);
-                $product = $productId > 0 ? $products->get($productId) : null;
-                $productName = trim((string) ($row['product_name'] ?? ''));
-                $unit = trim((string) ($row['unit'] ?? ''));
-                $unitPriceInput = $row['unit_price'] ?? null;
-                $unitPrice = $unitPriceInput === null || $unitPriceInput === ''
-                    ? null
-                    : (int) round((float) $unitPriceInput);
-                if ($unitPrice === null && $product !== null) {
-                    $unitPrice = (int) round((float) ($product->price_general ?? 0));
-                }
-
-                SchoolBulkTransactionItem::create([
-                    'school_bulk_transaction_id' => $transaction->id,
-                    'product_id' => $product?->id,
-                    'product_code' => $product?->code,
-                    'product_name' => $productName !== '' ? $productName : (string) ($product?->name ?: '-'),
-                    'unit' => $unit !== '' ? $unit : ($product?->unit ?: null),
-                    'quantity' => max(1, (int) ($row['quantity'] ?? 1)),
-                    'unit_price' => $unitPrice,
-                    'notes' => $row['notes'] ?? null,
-                    'sort_order' => $index,
-                ]);
-            });
+            $transaction->update([
+                'total_items' => $totalItems,
+            ]);
 
             return $transaction;
         });
@@ -328,15 +349,6 @@ class SchoolBulkTransactionPageController extends Controller
                 ]);
             }
 
-            $itemsWithProduct = $transaction->items
-                ->filter(fn(SchoolBulkTransactionItem $item): bool => (int) ($item->product_id ?? 0) > 0)
-                ->values();
-            if ($itemsWithProduct->count() !== $transaction->items->count()) {
-                throw ValidationException::withMessages([
-                    'invoice_date' => __('school_bulk.bulk_items_require_master_products'),
-                ]);
-            }
-
             $existingLocationIds = SalesInvoice::query()
                 ->withTrashed()
                 ->where('school_bulk_transaction_id', $transaction->id)
@@ -359,9 +371,51 @@ class SchoolBulkTransactionPageController extends Controller
                 ];
             }
 
-            $productIds = $itemsWithProduct
+            $itemsByLocation = $transaction->items
+                ->groupBy(fn(SchoolBulkTransactionItem $item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
+            /** @var Collection<int, SchoolBulkTransactionItem> $globalItems */
+            $globalItems = $itemsByLocation->get(0, collect());
+
+            $resolveItemsForLocation = function (SchoolBulkTransactionLocation $location) use ($itemsByLocation, $globalItems): Collection {
+                /** @var Collection<int, SchoolBulkTransactionItem> $specific */
+                $specific = $itemsByLocation->get((int) $location->id, collect());
+                if ($specific->isNotEmpty()) {
+                    return $specific->values();
+                }
+                if ($globalItems->isNotEmpty()) {
+                    return $globalItems->values();
+                }
+
+                return collect();
+            };
+
+            $requiredByProduct = [];
+            $allLocationItems = collect();
+            foreach ($targetLocations as $location) {
+                $locationItems = $resolveItemsForLocation($location)
+                    ->filter(fn(SchoolBulkTransactionItem $item): bool => max(1, (int) $item->quantity) > 0)
+                    ->values();
+                if ($locationItems->isEmpty()) {
+                    throw ValidationException::withMessages([
+                        'invoice_date' => __('school_bulk.no_items_to_generate'),
+                    ]);
+                }
+                if ($locationItems->contains(fn(SchoolBulkTransactionItem $item): bool => (int) ($item->product_id ?? 0) <= 0)) {
+                    throw ValidationException::withMessages([
+                        'invoice_date' => __('school_bulk.bulk_items_require_master_products'),
+                    ]);
+                }
+
+                $allLocationItems = $allLocationItems->merge($locationItems);
+                foreach ($locationItems as $item) {
+                    $productId = (int) $item->product_id;
+                    $requiredByProduct[$productId] = (int) ($requiredByProduct[$productId] ?? 0) + max(1, (int) $item->quantity);
+                }
+            }
+            $productIds = $allLocationItems
                 ->pluck('product_id')
                 ->map(fn($id): int => (int) $id)
+                ->filter(fn(int $id): bool => $id > 0)
                 ->unique()
                 ->values();
             $products = Product::query()
@@ -373,13 +427,6 @@ class SchoolBulkTransactionPageController extends Controller
                 throw ValidationException::withMessages([
                     'invoice_date' => __('txn.product_not_found'),
                 ]);
-            }
-
-            $requiredByProduct = [];
-            foreach ($itemsWithProduct as $item) {
-                $productId = (int) $item->product_id;
-                $requiredByProduct[$productId] = (int) ($requiredByProduct[$productId] ?? 0)
-                    + ((int) $item->quantity * (int) $targetLocations->count());
             }
             foreach ($requiredByProduct as $productId => $requiredQty) {
                 $product = $products->get($productId);
@@ -402,8 +449,9 @@ class SchoolBulkTransactionPageController extends Controller
                 $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
                 $subtotal = 0;
                 $computedRows = [];
+                $locationItems = $resolveItemsForLocation($location);
 
-                foreach ($itemsWithProduct as $item) {
+                foreach ($locationItems as $item) {
                     $product = $products->get((int) $item->product_id);
                     if (! $product) {
                         continue;
@@ -568,29 +616,43 @@ class SchoolBulkTransactionPageController extends Controller
             $rows[] = [__('txn.customer'), $schoolBulkTransaction->customer?->name ?: '-'];
             $rows[] = [__('txn.semester_period'), $schoolBulkTransaction->semester_period ?: '-'];
             $rows[] = [__('school_bulk.total_schools'), (int) $schoolBulkTransaction->locations->count()];
+            $itemsByLocation = $schoolBulkTransaction->items
+                ->groupBy(fn($item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
             $rows[] = [];
             $rows[] = [__('school_bulk.school_breakdown_title')];
-            $rows[] = [__('school_bulk.school_name'), __('txn.city'), __('txn.address')];
+            $rows[] = [__('school_bulk.school_name'), __('txn.city'), __('txn.address'), __('school_bulk.total_per_school')];
             foreach ($schoolBulkTransaction->locations as $location) {
+                $locationItems = collect($itemsByLocation->get((int) $location->id, []))->values();
+                if ($locationItems->isEmpty()) {
+                    $locationItems = collect($itemsByLocation->get(0, []))->values();
+                }
+                $locationTotal = (int) $locationItems->sum(function ($item): int {
+                    return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
+                });
                 $rows[] = [
                     $location->school_name,
                     $location->city ?: '-',
                     $location->address ?: '-',
+                    number_format($locationTotal, 0, ',', '.'),
                 ];
-            }
 
-            $rows[] = [];
-            $rows[] = [__('txn.items')];
-            $rows[] = [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.subtotal')];
-            foreach ($schoolBulkTransaction->items as $item) {
-                $lineTotal = (int) $item->quantity * (int) ($item->unit_price ?? 0);
+                $rows[] = [];
                 $rows[] = [
-                    $item->product_name,
-                    $item->unit ?: '-',
-                    (int) $item->quantity,
-                    (int) ($item->unit_price ?? 0),
-                    $lineTotal,
+                    __('txn.items') . ' - ' . ($location->school_name ?: '-'),
                 ];
+                $rows[] = [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.subtotal')];
+                foreach ($locationItems as $item) {
+                    $lineTotal = (int) ($item->quantity ?? 0) * (int) ($item->unit_price ?? 0);
+                    $rows[] = [
+                        (string) ($item->product_name ?? '-'),
+                        (string) (($item->unit ?? '') !== '' ? $item->unit : '-'),
+                        (int) ($item->quantity ?? 0),
+                        (int) ($item->unit_price ?? 0),
+                        $lineTotal,
+                    ];
+                }
+                $rows[] = [__('school_bulk.total_per_school'), '', '', '', number_format($locationTotal, 0, ',', '.')];
+                $rows[] = [];
             }
 
             $sheet->fromArray($rows, null, 'A1');

@@ -2,6 +2,7 @@
     $editing = $trip !== null;
     $tripDateValue = old('trip_date', $prefillDate ?? now()->format('Y-m-d'));
     $driverNameValue = old('driver_name', $trip?->driver_name);
+    $assistantNameValue = old('assistant_name', $trip?->assistant_name);
     $vehiclePlateValue = old('vehicle_plate', $trip?->vehicle_plate);
     $fuelCostValue = (int) old('fuel_cost', (int) ($trip?->fuel_cost ?? 0));
     $tollCostValue = (int) old('toll_cost', (int) ($trip?->toll_cost ?? 0));
@@ -15,46 +16,21 @@
         <h3 class="form-section-title">{{ __('delivery_trip.trip_header') }}</h3>
         <p class="form-section-note">{{ __('delivery_trip.trip_header_note') }}</p>
         <div class="row inline">
-            <div class="col-4">
+            <div class="col-3">
                 <label>{{ __('txn.date') }} <span class="label-required">*</span></label>
                 <input type="date" name="trip_date" value="{{ $tripDateValue }}" required>
             </div>
-            <div class="col-4">
+            <div class="col-3">
                 <label>{{ __('delivery_trip.driver_name') }} <span class="label-required">*</span></label>
                 <input type="text" name="driver_name" value="{{ $driverNameValue }}" maxlength="120" required>
             </div>
-            <div class="col-4">
+            <div class="col-3">
+                <label>{{ __('delivery_trip.assistant_name') }}</label>
+                <input type="text" name="assistant_name" value="{{ $assistantNameValue }}" maxlength="120">
+            </div>
+            <div class="col-3">
                 <label>{{ __('delivery_trip.vehicle_plate') }}</label>
                 <input type="text" name="vehicle_plate" value="{{ $vehiclePlateValue }}" maxlength="40">
-            </div>
-        </div>
-    </div>
-
-    <div class="form-section">
-        <h3 class="form-section-title">{{ __('delivery_trip.members') }}</h3>
-        <p class="form-section-note">{{ __('delivery_trip.members_note') }}</p>
-        <div class="row inline">
-            <div class="col-6">
-                <label>{{ __('delivery_trip.select_members') }}</label>
-                <input id="member-filter-input" type="text" placeholder="{{ __('delivery_trip.search_member_placeholder') }}" style="max-width: 260px; margin-bottom: 8px;">
-                <div id="member-options" style="max-width: 360px; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px;">
-                    @forelse($users as $user)
-                        <label class="member-option" data-name="{{ strtolower($user->name) }}" style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:13px;">
-                            <input class="member-checkbox" type="checkbox" name="member_user_ids[]" value="{{ $user->id }}" @checked($selectedUserIds->contains((int) $user->id))>
-                            <span>{{ $user->name }} <span class="muted">({{ strtoupper((string) $user->role) }})</span></span>
-                        </label>
-                    @empty
-                        <div class="muted">{{ __('delivery_trip.no_user_option') }}</div>
-                    @endforelse
-                </div>
-                <div class="muted" style="margin-top: 6px;">
-                    {{ __('delivery_trip.member_count') }}: <strong id="selected-member-count">0</strong>
-                </div>
-            </div>
-            <div class="col-6">
-                <label>{{ __('delivery_trip.extra_members') }}</label>
-                <textarea name="extra_member_names" rows="7" placeholder="{{ __('delivery_trip.extra_members_placeholder') }}">{{ $extraMemberNames }}</textarea>
-                <div class="muted" style="margin-top: 4px;">{{ __('delivery_trip.extra_members_help') }}</div>
             </div>
         </div>
     </div>
@@ -96,32 +72,6 @@
 
 <script>
     (function () {
-        const memberFilterInput = document.getElementById('member-filter-input');
-        const memberOptions = Array.from(document.querySelectorAll('.member-option'));
-        const memberCheckboxes = Array.from(document.querySelectorAll('.member-checkbox'));
-        const selectedMemberCount = document.getElementById('selected-member-count');
-
-        const syncMemberCount = () => {
-            if (!selectedMemberCount) {
-                return;
-            }
-            const checkedCount = memberCheckboxes.filter((input) => input.checked).length;
-            selectedMemberCount.textContent = String(checkedCount);
-        };
-
-        memberCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', syncMemberCount));
-        syncMemberCount();
-
-        if (memberFilterInput) {
-            memberFilterInput.addEventListener('input', () => {
-                const term = String(memberFilterInput.value || '').trim().toLowerCase();
-                memberOptions.forEach((option) => {
-                    const haystack = String(option.getAttribute('data-name') || '');
-                    option.style.display = term === '' || haystack.includes(term) ? 'flex' : 'none';
-                });
-            });
-        }
-
         const costInputs = Array.from(document.querySelectorAll('.trip-cost'));
         const totalPreview = document.getElementById('trip-total-cost-preview');
         const formatRupiah = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;

@@ -88,7 +88,7 @@
     @if((auth()->user()?->role ?? '') === 'admin')
         <div id="admin-edit-transaction" class="card">
             <div class="form-section">
-                <h3 class="form-section-title">{{ __('txn.admin_actions') }}</h3>
+                <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
                 <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
                 <form id="admin-delivery-edit-form" method="post" action="{{ route('delivery-notes.admin-update', $note) }}" class="row" style="margin-bottom: 12px;">
                     @csrf

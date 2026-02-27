@@ -116,7 +116,9 @@ class MassImportController extends Controller
 
                 $code = $this->productCodeGenerator->resolve(
                     $this->productCodeGenerator->normalizeInput((string) ($data['code'] ?? '')),
-                    (string) $data['name']
+                    (string) $data['name'],
+                    null,
+                    (string) $data['category']
                 );
 
                 $payload = [

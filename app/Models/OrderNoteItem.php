@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrderNoteItem extends Model
 {
@@ -48,5 +49,13 @@ class OrderNoteItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * @return HasMany<SalesInvoiceItem, $this>
+     */
+    public function salesInvoiceItems(): HasMany
+    {
+        return $this->hasMany(SalesInvoiceItem::class, 'order_note_item_id');
     }
 }

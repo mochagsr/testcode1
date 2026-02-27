@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesProductUnits;
+use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
@@ -104,7 +105,15 @@ class ProductController extends Controller
             'code.unique' => __('ui.product_code_unique_error'),
         ]);
 
-        $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name']);
+        $categoryName = ItemCategory::query()
+            ->whereKey((int) ($data['item_category_id'] ?? 0))
+            ->value('name');
+        $data['code'] = $this->productCodeGenerator->resolve(
+            $data['code'] ?? null,
+            (string) $data['name'],
+            null,
+            $categoryName ? (string) $categoryName : null
+        );
         $data['is_active'] = true;
         $product = Product::create($data);
         AppCache::bumpLookupVersion();
@@ -155,7 +164,15 @@ class ProductController extends Controller
             'code.unique' => __('ui.product_code_unique_error'),
         ]);
 
-        $data['code'] = $this->productCodeGenerator->resolve($data['code'] ?? null, (string) $data['name'], $product->id);
+        $categoryName = ItemCategory::query()
+            ->whereKey((int) ($data['item_category_id'] ?? 0))
+            ->value('name');
+        $data['code'] = $this->productCodeGenerator->resolve(
+            $data['code'] ?? null,
+            (string) $data['name'],
+            $product->id,
+            $categoryName ? (string) $categoryName : null
+        );
         $data['is_active'] = true;
         $product->update($data);
         AppCache::bumpLookupVersion();

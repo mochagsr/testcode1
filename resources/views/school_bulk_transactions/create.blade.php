@@ -51,8 +51,6 @@
             <div class="flex" style="justify-content: space-between;">
                 <h3 style="margin: 0;">{{ __('school_bulk.bulk_locations_title') }}</h3>
                 <div class="flex">
-                    <input type="number" id="school-count" min="1" max="100" value="1" style="max-width: 110px;">
-                    <button type="button" class="btn secondary" id="generate-locations">{{ __('school_bulk.generate_school_rows') }}</button>
                     <button type="button" class="btn secondary" id="fill-from-master">{{ __('school_bulk.fill_from_master') }}</button>
                     <button type="button" class="btn secondary" id="add-location">{{ __('txn.add_row') }}</button>
                 </div>
@@ -73,24 +71,10 @@
         </div>
 
         <div class="card">
-            <div class="flex" style="justify-content: space-between;">
-                <h3 style="margin: 0;">{{ __('txn.items') }}</h3>
-                <button type="button" class="btn secondary" id="add-item">{{ __('txn.add_row') }}</button>
-            </div>
+            <h3 style="margin: 0;">{{ __('txn.items') }}</h3>
             <p class="muted" style="margin-top: 8px;">{{ __('school_bulk.bulk_items_note') }}</p>
-            <table id="items-table" style="margin-top: 10px;">
-                <thead>
-                <tr>
-                    <th>{{ __('txn.product') }} *</th>
-                    <th>{{ __('txn.qty') }} *</th>
-                    <th>{{ __('txn.unit') }}</th>
-                    <th>{{ __('txn.price') }}</th>
-                    <th>{{ __('txn.notes') }}</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div id="school-item-cards" style="margin-top: 10px;"></div>
+            <p class="muted" id="school-item-empty-hint" style="margin-top: 10px;">{{ __('school_bulk.fill_school_locations') }}</p>
         </div>
 
         <button class="btn" type="submit">{{ __('school_bulk.save_bulk_transaction') }}</button>
@@ -126,22 +110,23 @@
             const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
             const LOOKUP_LIMIT = 20;
             const SEARCH_DEBOUNCE_MS = 100;
-            const schoolCountInput = document.getElementById('school-count');
-            const generateLocationsBtn = document.getElementById('generate-locations');
             const fillFromMasterBtn = document.getElementById('fill-from-master');
             const addLocationBtn = document.getElementById('add-location');
-            const addItemBtn = document.getElementById('add-item');
             const customerSearch = document.getElementById('customer-search');
             const customerIdField = document.getElementById('customer-id');
             const customersList = document.getElementById('customers-list');
             const schoolLocationsList = document.getElementById('school-locations-list');
             const locationsTbody = document.querySelector('#locations-table tbody');
-            const itemsTbody = document.querySelector('#items-table tbody');
+            const schoolItemCards = document.getElementById('school-item-cards');
+            const schoolItemEmptyHint = document.getElementById('school-item-empty-hint');
             const transactionDateInput = document.getElementById('transaction-date');
             const semesterPeriodInput = document.getElementById('semester-period');
             const form = document.querySelector('form');
             const oldLocations = @json(old('locations', []));
-            const oldItems = @json(old('items', []));
+            const oldLocationItems = @json(old('location_items', []));
+            let locationItemsByUid = (oldLocationItems && typeof oldLocationItems === 'object')
+                ? JSON.parse(JSON.stringify(oldLocationItems))
+                : {};
             let customerLookupAbort = null;
             let lastCustomerLookupQuery = '';
             let shipLookupAbort = null;
@@ -530,6 +515,7 @@
             function reindexLocationRows() {
                 Array.from(locationsTbody.querySelectorAll('tr')).forEach((row, index) => {
                     row.querySelector('.school-location-id').name = `locations[${index}][customer_ship_location_id]`;
+                    row.querySelector('.school-uid').name = `locations[${index}][uid]`;
                     row.querySelector('.school-name').name = `locations[${index}][school_name]`;
                     row.querySelector('.school-phone').name = `locations[${index}][recipient_phone]`;
                     row.querySelector('.school-city').name = `locations[${index}][city]`;
@@ -537,72 +523,82 @@
                 });
             }
 
-            function reindexItemRows() {
-                Array.from(itemsTbody.querySelectorAll('tr')).forEach((row, index) => {
-                    row.querySelector('.product-id').name = `items[${index}][product_id]`;
-                    row.querySelector('.product-name').name = `items[${index}][product_name]`;
-                    row.querySelector('.product-qty').name = `items[${index}][quantity]`;
-                    row.querySelector('.product-unit').name = `items[${index}][unit]`;
-                    row.querySelector('.product-price').name = `items[${index}][unit_price]`;
-                    row.querySelector('.product-notes').name = `items[${index}][notes]`;
+            function generateUid() {
+                return `loc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            }
+
+            function ensureLocationItems(uid) {
+                if (!Array.isArray(locationItemsByUid[uid])) {
+                    locationItemsByUid[uid] = [];
+                }
+                return locationItemsByUid[uid];
+            }
+
+            function collectLocationItemsFromDom() {
+                if (!schoolItemCards) {
+                    return;
+                }
+                const cardEls = Array.from(schoolItemCards.querySelectorAll('.school-item-card'));
+                cardEls.forEach((cardEl) => {
+                    const uid = String(cardEl.getAttribute('data-location-uid') || '');
+                    if (uid === '') {
+                        return;
+                    }
+                    const rows = Array.from(cardEl.querySelectorAll('tbody tr'));
+                    locationItemsByUid[uid] = rows.map((row) => ({
+                        product_id: row.querySelector('.product-id')?.value || '',
+                        product_name: row.querySelector('.product-name')?.value || '',
+                        quantity: row.querySelector('.product-qty')?.value || 1,
+                        unit: row.querySelector('.product-unit')?.value || '',
+                        unit_price: row.querySelector('.product-price')?.value || '',
+                        notes: row.querySelector('.product-notes')?.value || '',
+                    }));
                 });
             }
 
-            function addLocationRow(initial = {}) {
-                const index = locationsTbody.querySelectorAll('tr').length;
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>
-                        <input type="text" class="school-name" list="school-locations-list" name="locations[${index}][school_name]" value="${initial.school_name || ''}" required>
-                        <input type="hidden" class="school-location-id" name="locations[${index}][customer_ship_location_id]" value="${initial.customer_ship_location_id || ''}">
-                    </td>
-                    <td><input type="text" class="school-phone" name="locations[${index}][recipient_phone]" value="${initial.recipient_phone || ''}" style="max-width: 130px;"></td>
-                    <td><input type="text" class="school-city" name="locations[${index}][city]" value="${initial.city || ''}" style="max-width: 130px;"></td>
-                    <td><input type="text" class="school-address" name="locations[${index}][address]" value="${initial.address || ''}" style="max-width: 320px;"></td>
-                    <td><button type="button" class="btn secondary remove-location">{{ __('txn.remove') }}</button></td>
-                `;
-                const schoolNameInput = tr.querySelector('.school-name');
-                const onSchoolInput = debounce(async (event) => {
-                    await fetchShipLocationSuggestions(event.currentTarget.value);
-                    const location = findShipLocationByLabel(event.currentTarget.value);
-                    applyLocationFromMaster(tr, location);
-                });
-                schoolNameInput?.addEventListener('input', onSchoolInput);
-                schoolNameInput?.addEventListener('focus', (event) => {
-                    renderShipLocationSuggestions(event.currentTarget.value);
-                });
-                schoolNameInput?.addEventListener('change', (event) => {
-                    const location = findShipLocationByLabel(event.currentTarget.value) || findShipLocationLoose(event.currentTarget.value);
-                    applyLocationFromMaster(tr, location);
-                    if (location) {
-                        schoolNameInput.value = shipLocationLabel(location);
+            function cleanupOrphanLocationItems() {
+                const validUids = new Set(
+                    Array.from(locationsTbody.querySelectorAll('.school-uid'))
+                        .map((input) => String(input.value || '').trim())
+                        .filter((value) => value !== '')
+                );
+                Object.keys(locationItemsByUid).forEach((uid) => {
+                    if (!validUids.has(uid)) {
+                        delete locationItemsByUid[uid];
                     }
                 });
-                tr.querySelector('.remove-location').addEventListener('click', () => {
-                    tr.remove();
-                    if (locationsTbody.querySelectorAll('tr').length === 0) {
-                        addLocationRow();
-                    }
-                    reindexLocationRows();
-                });
-                locationsTbody.appendChild(tr);
-                reindexLocationRows();
             }
 
-            function addItemRow(initial = {}) {
-                const index = itemsTbody.querySelectorAll('tr').length;
+            function reindexSchoolItemRows(cardEl, uid) {
+                const rows = Array.from(cardEl.querySelectorAll('tbody tr'));
+                rows.forEach((row, index) => {
+                    row.querySelector('.product-id').name = `location_items[${uid}][${index}][product_id]`;
+                    row.querySelector('.product-name').name = `location_items[${uid}][${index}][product_name]`;
+                    row.querySelector('.product-qty').name = `location_items[${uid}][${index}][quantity]`;
+                    row.querySelector('.product-unit').name = `location_items[${uid}][${index}][unit]`;
+                    row.querySelector('.product-price').name = `location_items[${uid}][${index}][unit_price]`;
+                    row.querySelector('.product-notes').name = `location_items[${uid}][${index}][notes]`;
+                });
+            }
+
+            function addSchoolItemRow(cardEl, uid, initial = {}) {
+                const tbody = cardEl.querySelector('tbody');
+                if (!tbody) {
+                    return;
+                }
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <input type="text" list="products-list" class="product-name" name="items[${index}][product_name]" value="${initial.product_name || ''}" required>
-                        <input type="hidden" class="product-id" name="items[${index}][product_id]" value="${initial.product_id || ''}">
+                        <input type="text" list="products-list" class="product-name" value="${initial.product_name || ''}" required>
+                        <input type="hidden" class="product-id" value="${initial.product_id || ''}">
                     </td>
-                    <td><input type="number" min="1" class="product-qty" name="items[${index}][quantity]" value="${initial.quantity || 1}" required style="max-width: 92px;"></td>
-                    <td><input type="text" class="product-unit" name="items[${index}][unit]" value="${initial.unit || ''}" style="max-width: 92px;"></td>
-                    <td><input type="number" min="0" step="1" class="product-price" name="items[${index}][unit_price]" value="${initial.unit_price || ''}" style="max-width: 110px;"></td>
-                    <td><input type="text" class="product-notes" name="items[${index}][notes]" value="${initial.notes || ''}" style="max-width: 220px;"></td>
+                    <td><input type="number" min="1" class="product-qty" value="${initial.quantity || 1}" required style="max-width: 92px;"></td>
+                    <td><input type="text" class="product-unit" value="${initial.unit || ''}" style="max-width: 92px;"></td>
+                    <td><input type="number" min="0" step="1" class="product-price" value="${initial.unit_price || ''}" style="max-width: 110px;"></td>
+                    <td><input type="text" class="product-notes" value="${initial.notes || ''}" style="max-width: 220px;"></td>
                     <td><button type="button" class="btn secondary remove-item">{{ __('txn.remove') }}</button></td>
                 `;
+
                 const productNameInput = tr.querySelector('.product-name');
                 const productIdInput = tr.querySelector('.product-id');
                 const productUnitInput = tr.querySelector('.product-unit');
@@ -633,13 +629,130 @@
                 });
                 tr.querySelector('.remove-item').addEventListener('click', () => {
                     tr.remove();
-                    if (itemsTbody.querySelectorAll('tr').length === 0) {
-                        addItemRow();
+                    if (tbody.querySelectorAll('tr').length === 0) {
+                        addSchoolItemRow(cardEl, uid);
                     }
-                    reindexItemRows();
+                    reindexSchoolItemRows(cardEl, uid);
                 });
-                itemsTbody.appendChild(tr);
-                reindexItemRows();
+                tbody.appendChild(tr);
+                reindexSchoolItemRows(cardEl, uid);
+            }
+
+            function renderSchoolItemCards() {
+                if (!schoolItemCards) {
+                    return;
+                }
+                collectLocationItemsFromDom();
+                cleanupOrphanLocationItems();
+                schoolItemCards.innerHTML = '';
+
+                const locationRows = Array.from(locationsTbody.querySelectorAll('tr'));
+                let activeCardCount = 0;
+                locationRows.forEach((row, locationIndex) => {
+                    const uidInput = row.querySelector('.school-uid');
+                    const schoolNameInput = row.querySelector('.school-name');
+                    const uid = String(uidInput?.value || '').trim();
+                    const schoolName = String(schoolNameInput?.value || '').trim();
+                    if (uid === '') {
+                        return;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = 'card school-item-card';
+                    card.setAttribute('data-location-uid', uid);
+                    card.style.marginTop = '10px';
+
+                    const title = schoolName !== ''
+                        ? `{{ __('txn.items') }} - ${schoolName}`
+                        : `{{ __('txn.items') }} - {{ __('school_bulk.school_name') }} ${locationIndex + 1}`;
+                    const items = ensureLocationItems(uid);
+
+                    card.innerHTML = `
+                        <div class="flex" style="justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0;">${escapeAttribute(title)}</h4>
+                            <button type="button" class="btn secondary school-add-item" ${schoolName === '' ? 'disabled' : ''}>{{ __('txn.add_row') }}</button>
+                        </div>
+                        ${schoolName === '' ? `<p class="muted" style="margin-top:8px;">{{ __('school_bulk.fill_school_locations') }}</p>` : ''}
+                        <table style="margin-top: 10px; ${schoolName === '' ? 'opacity:0.6;' : ''}">
+                            <thead>
+                            <tr>
+                                <th>{{ __('txn.product') }} *</th>
+                                <th>{{ __('txn.qty') }} *</th>
+                                <th>{{ __('txn.unit') }}</th>
+                                <th>{{ __('txn.price') }}</th>
+                                <th>{{ __('txn.notes') }}</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    `;
+
+                    schoolItemCards.appendChild(card);
+                    const addBtn = card.querySelector('.school-add-item');
+                    addBtn?.addEventListener('click', () => addSchoolItemRow(card, uid));
+
+                    if (schoolName !== '') {
+                        activeCardCount += 1;
+                        if (!Array.isArray(items) || items.length === 0) {
+                            addSchoolItemRow(card, uid);
+                        } else {
+                            items.forEach((item) => addSchoolItemRow(card, uid, item || {}));
+                        }
+                    }
+                });
+
+                if (schoolItemEmptyHint) {
+                    schoolItemEmptyHint.style.display = activeCardCount > 0 ? 'none' : 'block';
+                }
+            }
+
+            function addLocationRow(initial = {}) {
+                const index = locationsTbody.querySelectorAll('tr').length;
+                const uid = String(initial.uid || generateUid());
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <input type="text" class="school-name" list="school-locations-list" name="locations[${index}][school_name]" value="${initial.school_name || ''}" required>
+                        <input type="hidden" class="school-location-id" name="locations[${index}][customer_ship_location_id]" value="${initial.customer_ship_location_id || ''}">
+                        <input type="hidden" class="school-uid" name="locations[${index}][uid]" value="${uid}">
+                    </td>
+                    <td><input type="text" class="school-phone" name="locations[${index}][recipient_phone]" value="${initial.recipient_phone || ''}" style="max-width: 130px;"></td>
+                    <td><input type="text" class="school-city" name="locations[${index}][city]" value="${initial.city || ''}" style="max-width: 130px;"></td>
+                    <td><input type="text" class="school-address" name="locations[${index}][address]" value="${initial.address || ''}" style="max-width: 320px;"></td>
+                    <td><button type="button" class="btn secondary remove-location">{{ __('txn.remove') }}</button></td>
+                `;
+                const schoolNameInput = tr.querySelector('.school-name');
+                const onSchoolInput = debounce(async (event) => {
+                    await fetchShipLocationSuggestions(event.currentTarget.value);
+                    const location = findShipLocationByLabel(event.currentTarget.value);
+                    applyLocationFromMaster(tr, location);
+                });
+                schoolNameInput?.addEventListener('input', onSchoolInput);
+                schoolNameInput?.addEventListener('focus', (event) => {
+                    renderShipLocationSuggestions(event.currentTarget.value);
+                });
+                schoolNameInput?.addEventListener('change', (event) => {
+                    const location = findShipLocationByLabel(event.currentTarget.value) || findShipLocationLoose(event.currentTarget.value);
+                    applyLocationFromMaster(tr, location);
+                    if (location) {
+                        schoolNameInput.value = shipLocationLabel(location);
+                    }
+                    renderSchoolItemCards();
+                });
+                schoolNameInput?.addEventListener('input', () => renderSchoolItemCards());
+                tr.querySelector('.remove-location').addEventListener('click', () => {
+                    tr.remove();
+                    if (locationsTbody.querySelectorAll('tr').length === 0) {
+                        addLocationRow();
+                    }
+                    reindexLocationRows();
+                    renderSchoolItemCards();
+                });
+                locationsTbody.appendChild(tr);
+                reindexLocationRows();
+                ensureLocationItems(uid);
+                renderSchoolItemCards();
             }
 
             function syncSemesterFromDate() {
@@ -655,15 +768,7 @@
                 }
             }
 
-            generateLocationsBtn?.addEventListener('click', () => {
-                const count = Math.max(1, Math.min(100, Number(schoolCountInput?.value || 1)));
-                locationsTbody.innerHTML = '';
-                for (let i = 0; i < count; i += 1) {
-                    addLocationRow();
-                }
-            });
             addLocationBtn?.addEventListener('click', () => addLocationRow());
-            addItemBtn?.addEventListener('click', () => addItemRow());
             const resetMasterShipLocations = () => {
                 shipLocations = [];
                 lastShipLookupQuery = '';
@@ -675,6 +780,7 @@
                         hiddenLocationId.value = '';
                     }
                 });
+                renderSchoolItemCards();
             };
             if (customerSearch) {
                 const bootCustomer = customerIdField.value
@@ -706,13 +812,14 @@
                     alert(@json(__('school_bulk.select_customer_first')));
                     return;
                 }
-                const count = Math.max(1, Math.min(100, Number(schoolCountInput?.value || 1)));
+                const count = Math.max(1, Number(locationsTbody.querySelectorAll('tr').length || 1));
                 await ensureMasterShipLocations(customerId, count);
                 if (shipLocations.length === 0) {
                     alert(@json(__('school_bulk.no_master_locations')));
                     return;
                 }
                 const picked = shipLocations.slice(0, count);
+                collectLocationItemsFromDom();
                 locationsTbody.innerHTML = '';
                 picked.forEach((location) => {
                     addLocationRow({
@@ -728,6 +835,7 @@
                         addLocationRow();
                     }
                 }
+                renderSchoolItemCards();
             });
 
             form?.addEventListener('submit', (event) => {
@@ -737,8 +845,20 @@
                     alert(@json(__('school_bulk.fill_school_locations')));
                     return;
                 }
-                const itemRows = Array.from(itemsTbody.querySelectorAll('tr'));
-                if (itemRows.length === 0 || itemRows.some((row) => !(row.querySelector('.product-name')?.value || '').trim())) {
+                collectLocationItemsFromDom();
+                const hasInvalidItemRows = locationRows.some((row) => {
+                    const uid = String(row.querySelector('.school-uid')?.value || '').trim();
+                    const schoolName = String(row.querySelector('.school-name')?.value || '').trim();
+                    if (uid === '' || schoolName === '') {
+                        return true;
+                    }
+                    const items = Array.isArray(locationItemsByUid[uid]) ? locationItemsByUid[uid] : [];
+                    if (items.length === 0) {
+                        return true;
+                    }
+                    return items.some((item) => !String(item.product_name || '').trim());
+                });
+                if (hasInvalidItemRows) {
                     event.preventDefault();
                     alert(@json(__('school_bulk.fill_items')));
                 }
@@ -749,11 +869,7 @@
             } else {
                 addLocationRow();
             }
-            if (Array.isArray(oldItems) && oldItems.length > 0) {
-                oldItems.forEach((row) => addItemRow(row || {}));
-            } else {
-                addItemRow();
-            }
+            renderSchoolItemCards();
             rebuildCustomerIndexes();
             rebuildShipIndexes();
             rebuildProductIndexes();

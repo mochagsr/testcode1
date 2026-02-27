@@ -61,6 +61,10 @@
                         <input id="city" type="text" name="city" value="{{ old('city') }}">
                     </div>
                     <div class="col-12">
+                        <label>{{ __('txn.address') }}</label>
+                        <textarea id="address" name="address" rows="2">{{ old('address') }}</textarea>
+                    </div>
+                    <div class="col-12">
                         <label>{{ __('txn.notes') }}</label>
                         <textarea name="notes" rows="2">{{ old('notes') }}</textarea>
                     </div>
@@ -110,6 +114,7 @@
         const customerIdField = document.getElementById('customer_id');
         const customerPhoneField = document.getElementById('customer_phone');
         const cityField = document.getElementById('city');
+        const addressField = document.getElementById('address');
         const SEARCH_DEBOUNCE_MS = 100;
         let customerLookupAbort = null;
         let productLookupAbort = null;
@@ -246,10 +251,14 @@
         function applyCustomerFields(customer) {
             customerIdField.value = customer ? customer.id : '';
             if (!customer) {
+                if (customerPhoneField) customerPhoneField.value = '';
+                if (cityField) cityField.value = '';
+                if (addressField) addressField.value = '';
                 return;
             }
             if (customerPhoneField) customerPhoneField.value = customer.phone || '';
             if (cityField) cityField.value = customer.city || '';
+            if (addressField) addressField.value = customer.address || '';
         }
 
         function productLabel(product) {
@@ -358,8 +367,8 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
             });
             tr.querySelector('.product-search').addEventListener('input', onProductInput);
-            tr.querySelector('.product-search').addEventListener('focus', (event) => {
-                renderProductSuggestions(event.currentTarget.value);
+            tr.querySelector('.product-search').addEventListener('focus', async (event) => {
+                await fetchProductSuggestions(event.currentTarget.value);
             });
             tr.querySelector('.product-search').addEventListener('change', (event) => {
                 const product = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);

@@ -20,6 +20,7 @@
                                 @php
                                     $customerMap = $customers->keyBy('id');
                                     $oldCustomerId = old('customer_id');
+                                    $oldOrderNoteId = (int) old('order_note_id', 0);
                                     $oldCustomerLabel = $oldCustomerId && $customerMap->has($oldCustomerId)
                                         ? $customerMap[$oldCustomerId]->name.' ('.($customerMap[$oldCustomerId]->city ?: '-').')'
                                         : '';
@@ -36,6 +37,33 @@
                                         <option value="{{ $customer->name }} ({{ $customer->city ?: '-' }})"></option>
                                     @endforeach
                                 </datalist>
+                            </div>
+                            <div class="col-12">
+                                <label>{{ __('txn.order_notes_title') }}</label>
+                                <select id="order-note-id" name="order_note_id" @disabled($oldCustomerId <= 0)>
+                                    <option value="">{{ __('txn.select_order_note') }}</option>
+                                    @foreach(($orderNotes ?? []) as $note)
+                                        @php
+                                            $orderedTotal = (int) round((float) ($note['ordered_total'] ?? 0));
+                                            $fulfilledTotal = (int) round((float) ($note['fulfilled_total'] ?? 0));
+                                            $remainingTotal = max(0, (int) round((float) ($note['remaining_total'] ?? 0)));
+                                            $progressPercent = (float) ($note['progress_percent'] ?? ($orderedTotal > 0 ? ($fulfilledTotal / $orderedTotal) * 100 : 0));
+                                            $progressLabel = rtrim(rtrim(number_format($progressPercent, 2, '.', ''), '0'), '.');
+                                        @endphp
+                                        <option value="{{ (int) ($note['id'] ?? 0) }}" @selected($oldOrderNoteId === (int) ($note['id'] ?? 0))>
+                                            {{ (string) ($note['note_number'] ?? '-') }} | {{ (string) ($note['note_date'] ?? '-') }} | {{ $progressLabel }}% | {{ number_format($remainingTotal, 0, ',', '.') }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div id="order-note-info" class="muted" style="margin-top: 4px;">
+                                    @if($oldCustomerId <= 0)
+                                        {{ __('txn.order_note_pick_customer_first') }}
+                                    @elseif(($orderNotes ?? collect())->isEmpty())
+                                        {{ __('txn.no_order_note_available') }}
+                                    @else
+                                        {{ __('txn.order_note_auto_fill_hint') }}
+                                    @endif
+                                </div>
                             </div>
                             <div class="col-6">
                                 <label>{{ __('txn.invoice_date') }} <span class="label-required">*</span></label>
@@ -109,8 +137,12 @@
     <script>
         let products = @json($products);
         let customers = @json($customers);
+        let orderNotes = @json($orderNotes ?? []);
+        const bootOrderNoteId = @json((string) old('order_note_id', ''));
+        const bootItems = @json(old('items', []));
         let productById = new Map((products || []).map((product) => [String(product.id), product]));
         let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
+        let orderNoteById = new Map((orderNotes || []).map((note) => [String(note.id), note]));
         let customerByLabel = new Map();
         let customerByName = new Map();
         let productByLabel = new Map();
@@ -118,13 +150,17 @@
         let productByName = new Map();
         const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
         const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
+        const ORDER_NOTE_LOOKUP_URL = @json(route('api.order-notes.lookup'));
         const LOOKUP_LIMIT = 20;
         const selectProductLabel = @json(__('txn.select_product'));
+        const selectOrderNoteLabel = @json(__('txn.select_order_note'));
         const tbody = document.querySelector('#items-table tbody');
         const productsList = document.getElementById('products-list');
         const customersList = document.getElementById('customers-list');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer-id');
+        const orderNoteField = document.getElementById('order-note-id');
+        const orderNoteInfo = document.getElementById('order-note-info');
         const grandTotal = document.getElementById('grand-total');
         const addBtn = document.getElementById('add-item');
         const invoiceDateInput = document.getElementById('invoice-date');
@@ -132,10 +168,12 @@
         const form = document.querySelector('form');
         const SEARCH_DEBOUNCE_MS = 100;
         let currentCustomer = null;
+        let orderNoteLookupAbort = null;
         let customerLookupAbort = null;
         let productLookupAbort = null;
         let lastCustomerLookupQuery = '';
         let lastProductLookupQuery = '';
+        let orderNotesCustomerId = '';
 
         function normalizeLookup(value) {
             return String(value || '').trim().toLowerCase();
@@ -159,6 +197,11 @@
             products = Array.from(byId.values());
             productById = new Map(products.map((product) => [String(product.id), product]));
             rebuildProductIndexes();
+        }
+
+        function setOrderNotes(rows) {
+            orderNotes = Array.isArray(rows) ? rows : [];
+            orderNoteById = new Map(orderNotes.map((note) => [String(note.id), note]));
         }
 
         function getProductById(id) {
@@ -290,12 +333,164 @@
                 || null;
         }
 
-        function setCurrentCustomer(customer) {
+        function setCurrentCustomer(customer, resetOrderNote = true) {
             currentCustomer = customer;
             if (customer) {
                 customerIdField.value = customer.id;
             } else {
                 customerIdField.value = '';
+            }
+            if (resetOrderNote && orderNoteField) {
+                orderNoteField.value = '';
+            }
+        }
+
+        function orderNoteLabel(note) {
+            const progress = Number(note.progress_percent || 0).toFixed(2).replace(/\.00$/, '');
+            const remaining = Number(note.remaining_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            const dateLabel = note.note_date || '-';
+            return `${note.note_number} | ${dateLabel} | ${progress}% | ${remaining}`;
+        }
+
+        function renderOrderNoteOptions(selectedId = '') {
+            if (!orderNoteField) {
+                return;
+            }
+
+            const currentValue = selectedId || orderNoteField.value || '';
+            const options = [`<option value="">${selectOrderNoteLabel}</option>`];
+            orderNotes
+                .filter((note) => Number(note.remaining_total || 0) > 0)
+                .sort((a, b) => String(b.note_number || '').localeCompare(String(a.note_number || '')))
+                .forEach((note) => {
+                    const selected = String(note.id) === String(currentValue) ? ' selected' : '';
+                    options.push(`<option value="${note.id}"${selected}>${escapeAttribute(orderNoteLabel(note))}</option>`);
+                });
+            orderNoteField.innerHTML = options.join('');
+            orderNoteField.disabled = !currentCustomer || options.length <= 1;
+            if (!currentCustomer) {
+                orderNoteInfo.textContent = @json(__('txn.order_note_pick_customer_first'));
+            } else if (options.length <= 1) {
+                orderNoteInfo.textContent = @json(__('txn.no_order_note_available'));
+            } else {
+                orderNoteInfo.textContent = @json(__('txn.order_note_auto_fill_hint'));
+            }
+        }
+
+        function updateOrderNoteInfoSelection(note) {
+            if (!orderNoteInfo) {
+                return;
+            }
+            if (!note) {
+                return;
+            }
+            const progress = Number(note.progress_percent || 0).toFixed(2).replace(/\.00$/, '');
+            const orderedTotal = Number(note.ordered_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            const fulfilledTotal = Number(note.fulfilled_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            const remainingTotal = Number(note.remaining_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            orderNoteInfo.textContent = `${note.note_number} | ${progress}% | ${fulfilledTotal}/${orderedTotal} | ${remainingTotal}`;
+        }
+
+        function clearItemsAndReindex() {
+            tbody.innerHTML = '';
+            recalc();
+        }
+
+        function applyOrderNoteItems(note) {
+            if (!note || !Array.isArray(note.items)) {
+                return;
+            }
+            clearItemsAndReindex();
+            const openItems = note.items.filter((item) => Number(item.remaining_qty || 0) > 0);
+            if (openItems.length === 0) {
+                addRow();
+                return;
+            }
+            openItems.forEach((item) => {
+                addRow({
+                    product_id: item.product_id,
+                    product_code: item.product_code || '',
+                    product_name: item.product_name || '',
+                    quantity: Number(item.remaining_qty || item.ordered_qty || 1),
+                    order_note_item_id: item.id || '',
+                    stock: Number(item.stock || 0),
+                    price_agent: Number(item.price_agent || 0),
+                    price_sales: Number(item.price_sales || 0),
+                    price_general: Number(item.price_general || 0),
+                });
+            });
+            recalc();
+        }
+
+        async function fetchOrderNotesForCustomer(customerId, selectedId = '') {
+            if (!orderNoteField) {
+                return;
+            }
+            if (!customerId) {
+                orderNotesCustomerId = '';
+                setOrderNotes([]);
+                renderOrderNoteOptions('');
+                return;
+            }
+            if (String(orderNotesCustomerId) === String(customerId) && selectedId === '') {
+                renderOrderNoteOptions(orderNoteField.value || '');
+                return;
+            }
+            setOrderNotes([]);
+            renderOrderNoteOptions('');
+            try {
+                if (orderNoteLookupAbort) {
+                    orderNoteLookupAbort.abort();
+                }
+                orderNoteLookupAbort = new AbortController();
+                const url = `${ORDER_NOTE_LOOKUP_URL}?customer_id=${encodeURIComponent(customerId)}&per_page=20`;
+                const response = await fetch(url, {
+                    signal: orderNoteLookupAbort.signal,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!response.ok) {
+                    renderOrderNoteOptions('');
+                    return;
+                }
+                const payload = await response.json();
+                const rows = Array.isArray(payload.data) ? payload.data : [];
+                orderNotesCustomerId = String(customerId);
+                setOrderNotes(rows);
+
+                const noteProducts = rows
+                    .flatMap((note) => Array.isArray(note.items) ? note.items : [])
+                    .filter((item) => Number(item.product_id || 0) > 0)
+                    .map((item) => ({
+                        id: Number(item.product_id || 0),
+                        code: String(item.product_code || ''),
+                        name: String(item.product_name || ''),
+                        stock: Number(item.stock || 0),
+                        price_agent: Number(item.price_agent || 0),
+                        price_sales: Number(item.price_sales || 0),
+                        price_general: Number(item.price_general || 0),
+                    }));
+                if (noteProducts.length > 0) {
+                    upsertProducts(noteProducts);
+                }
+                renderOrderNoteOptions(selectedId || '');
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+                orderNotesCustomerId = '';
+                setOrderNotes([]);
+                renderOrderNoteOptions('');
+            }
+        }
+
+        async function handleResolvedCustomer(customer, shouldResetOrderNote = true) {
+            const previousCustomerId = currentCustomer ? String(currentCustomer.id) : '';
+            const nextCustomerId = customer ? String(customer.id) : '';
+            const mustResetOrderNote = shouldResetOrderNote && previousCustomerId !== nextCustomerId;
+            setCurrentCustomer(customer, mustResetOrderNote);
+            applyCustomerPricing();
+            if (previousCustomerId !== nextCustomerId) {
+                await fetchOrderNotesForCustomer(nextCustomerId);
             }
         }
 
@@ -435,16 +630,22 @@
             recalc();
         }
 
-        function addRow() {
+        function addRow(prefill = null) {
             const index = tbody.children.length;
+            const prefillQuantity = Number(prefill?.quantity || 1);
+            const initialQty = Number.isFinite(prefillQuantity) && prefillQuantity > 0 ? Math.round(prefillQuantity) : 1;
+            const prefillProductName = String(prefill?.product_name || '');
+            const prefillProductCode = String(prefill?.product_code || '');
+            const productText = prefillProductCode !== '' ? `${prefillProductCode} - ${prefillProductName}` : prefillProductName;
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" list="products-list" placeholder="${selectProductLabel}" required>
+                    <input type="text" class="product-search" list="products-list" placeholder="${selectProductLabel}" required value="${escapeAttribute(productText)}">
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
+                    <input type="hidden" name="items[${index}][order_note_item_id]" class="order-note-item-id" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
                 </td>
                 <td class="stock">-</td>
-                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required style="max-width: 88px;"></td>
+                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="${initialQty}" required style="max-width: 88px;"></td>
                 <td><input class="price" type="number" min="0" step="1" name="items[${index}][unit_price]" value="0" required style="max-width: 88px;"></td>
                 <td>
                     <div style="display:flex; align-items:center; gap:4px;">
@@ -461,6 +662,9 @@
                 await fetchProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
+                if (!product) {
+                    tr.querySelector('.order-note-item-id').value = '';
+                }
                 updateRowMeta(tr, product);
             });
             tr.querySelector('.product-search').addEventListener('input', onProductInput);
@@ -472,6 +676,8 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.product-search').value = productLabel(product);
+                } else {
+                    tr.querySelector('.order-note-item-id').value = '';
                 }
                 updateRowMeta(tr, product);
             });
@@ -496,6 +702,30 @@
                 tr.remove();
                 recalc();
             });
+
+            if (prefill && Number(prefill.product_id || 0) > 0) {
+                const productId = Number(prefill.product_id);
+                tr.querySelector('.product-id').value = productId;
+                const existing = getProductById(productId) || null;
+                if (!existing) {
+                    upsertProducts([{
+                        id: productId,
+                        code: prefill.product_code || '',
+                        name: prefill.product_name || '',
+                        stock: Number(prefill.stock || 0),
+                        price_agent: Number(prefill.price_agent || 0),
+                        price_sales: Number(prefill.price_sales || 0),
+                        price_general: Number(prefill.price_general || 0),
+                    }]);
+                }
+                const resolved = getProductById(productId);
+                if (resolved) {
+                    tr.querySelector('.product-search').value = productLabel(resolved);
+                    updateRowMeta(tr, resolved);
+                } else {
+                    tr.querySelector('.stock').textContent = Number(prefill.stock || 0);
+                }
+            }
         }
 
         function autoSelectSemesterByDate() {
@@ -521,30 +751,102 @@
             semesterPeriodSelect.value = derived;
         }
 
-        rebuildCustomerIndexes();
-        rebuildProductIndexes();
-        addBtn.addEventListener('click', addRow);
-        renderCustomerSuggestions('');
-        renderProductSuggestions('');
-        if (customerSearch) {
+        function applyBootItems() {
+            clearItemsAndReindex();
+            if (!Array.isArray(bootItems) || bootItems.length === 0) {
+                addRow();
+                return;
+            }
+
+            bootItems.forEach((row) => {
+                const rowData = {
+                    product_id: Number(row.product_id || 0) > 0 ? Number(row.product_id) : null,
+                    quantity: Number(row.quantity || 1),
+                    order_note_item_id: Number(row.order_note_item_id || 0) > 0 ? Number(row.order_note_item_id) : '',
+                };
+                addRow(rowData);
+                const tableRow = tbody.lastElementChild;
+                if (!tableRow) {
+                    return;
+                }
+
+                const priceInput = tableRow.querySelector('.price');
+                const discountInput = tableRow.querySelector('.discount');
+                if (priceInput) {
+                    priceInput.value = Number(row.unit_price || 0);
+                    priceInput.dataset.manual = '1';
+                }
+                if (discountInput) {
+                    discountInput.value = Number(row.discount || 0);
+                }
+            });
+            recalc();
+        }
+
+        async function initializeInvoiceForm() {
+            rebuildCustomerIndexes();
+            rebuildProductIndexes();
+            renderCustomerSuggestions('');
+            renderProductSuggestions('');
+
             const bootCustomer = customerIdField.value
                 ? (customerById.get(String(customerIdField.value)) || null)
-                : findCustomerByLabel(customerSearch.value);
-            setCurrentCustomer(bootCustomer);
+                : findCustomerByLabel(customerSearch?.value || '');
+
+            setCurrentCustomer(bootCustomer, false);
+
+            if (bootCustomer) {
+                await fetchOrderNotesForCustomer(String(bootCustomer.id), bootOrderNoteId || '');
+            } else {
+                setOrderNotes([]);
+                renderOrderNoteOptions('');
+            }
+
+            if (Array.isArray(bootItems) && bootItems.length > 0) {
+                applyBootItems();
+            } else if (bootOrderNoteId !== '' && orderNoteById.has(String(bootOrderNoteId))) {
+                if (orderNoteField) {
+                    orderNoteField.value = String(bootOrderNoteId);
+                }
+                const selectedNote = orderNoteById.get(String(bootOrderNoteId));
+                if (selectedNote) {
+                    applyOrderNoteItems(selectedNote);
+                    updateOrderNoteInfoSelection(selectedNote);
+                } else {
+                    addRow();
+                }
+            } else {
+                addRow();
+            }
+
+            applyCustomerPricing();
+        }
+
+        addBtn.addEventListener('click', addRow);
+        if (customerSearch) {
             const onCustomerInput = debounce(async (event) => {
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
-                setCurrentCustomer(customer);
-                applyCustomerPricing();
+                await handleResolvedCustomer(customer, true);
             });
             customerSearch.addEventListener('input', onCustomerInput);
-            customerSearch.addEventListener('change', (event) => {
+            customerSearch.addEventListener('change', async (event) => {
                 const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
-                setCurrentCustomer(customer);
+                await handleResolvedCustomer(customer, true);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
                 }
-                applyCustomerPricing();
+            });
+        }
+        if (orderNoteField) {
+            orderNoteField.addEventListener('change', () => {
+                const note = orderNoteById.get(String(orderNoteField.value || '')) || null;
+                if (!note) {
+                    renderOrderNoteOptions('');
+                    return;
+                }
+                updateOrderNoteInfoSelection(note);
+                applyOrderNoteItems(note);
             });
         }
         if (form) {
@@ -557,7 +859,7 @@
                 }
             });
         }
-        addRow();
+        initializeInvoiceForm();
         autoSelectSemesterByDate();
         invoiceDateInput?.addEventListener('change', autoSelectSemesterByDate);
     </script>

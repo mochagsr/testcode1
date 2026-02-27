@@ -46,10 +46,9 @@
             <thead>
             <tr>
                 <th>{{ __('ui.code') }}</th>
-                <th>{{ __('ui.name') }}</th>
                 <th>{{ __('ui.category') }}</th>
+                <th>{{ __('ui.name') }}</th>
                 <th>{{ __('ui.stock') }}</th>
-                <th>{{ __('ui.stock_alert') }}</th>
                 <th>{{ __('ui.price_agent') }}</th>
                 <th>{{ __('ui.price_sales') }}</th>
                 <th>{{ __('ui.price_general') }}</th>
@@ -66,19 +65,12 @@
                             -
                         @endif
                     </td>
-                    <td>{{ $product->name }}</td>
                     <td>{{ $product->category?->name ?: '-' }}</td>
+                    <td>{{ $product->name }}</td>
                     <td>
                         <strong class="js-product-stock-value" data-product-id="{{ (int) $product->id }}">
                             {{ number_format((int) round($product->stock), 0, ',', '.') }}
                         </strong>
-                    </td>
-                    <td>
-                        @if((int) round($product->stock) <= 0)
-                            <span class="badge danger js-product-stock-alert" data-product-id="{{ (int) $product->id }}">{{ __('ui.stock_alert_low') }}</span>
-                        @else
-                            <span class="badge success js-product-stock-alert" data-product-id="{{ (int) $product->id }}">{{ __('ui.stock_alert_ok') }}</span>
-                        @endif
                     </td>
                     <td>Rp {{ number_format((int) round($product->price_agent), 0, ',', '.') }}</td>
                     <td>Rp {{ number_format((int) round($product->price_sales), 0, ',', '.') }}</td>
@@ -107,7 +99,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="muted">{{ __('ui.no_products') }}</td></tr>
+                <tr><td colspan="8" class="muted">{{ __('ui.no_products') }}</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -199,14 +191,6 @@
                 const stockEl = document.querySelector('.js-product-stock-value[data-product-id="' + String(productId) + '"]');
                 if (stockEl) {
                     stockEl.textContent = stockValue.toLocaleString('id-ID', { maximumFractionDigits: 0 });
-                }
-
-                const alertEl = document.querySelector('.js-product-stock-alert[data-product-id="' + String(productId) + '"]');
-                if (alertEl) {
-                    const isLow = stockValue <= 0;
-                    alertEl.textContent = isLow ? @json(__('ui.stock_alert_low')) : @json(__('ui.stock_alert_ok'));
-                    alertEl.classList.toggle('danger', isLow);
-                    alertEl.classList.toggle('success', !isLow);
                 }
 
                 const editBtn = document.querySelector('.js-open-product-stock-modal[data-product-id="' + String(productId) + '"]');

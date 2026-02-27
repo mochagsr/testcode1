@@ -51,6 +51,9 @@ Route::prefix('api')->name('api.')->group(function (): void {
 Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/', [DashboardController::class, 'index']);
     Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('perm:dashboard.view')->name('dashboard');
+    Route::get('/api/order-notes/lookup', [OrderNotePageController::class, 'lookup'])
+        ->middleware('perm:transactions.create')
+        ->name('api.order-notes.lookup');
 
     Route::get('/sales-invoices', [SalesInvoicePageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-invoices.index');
     Route::get('/sales-invoices/create', [SalesInvoicePageController::class, 'create'])->middleware('perm:transactions.create')->name('sales-invoices.create');
@@ -74,7 +77,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/sales-returns/{salesReturn}/pdf', [SalesReturnPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('sales-returns.export.pdf');
     Route::get('/sales-returns/{salesReturn}/excel', [SalesReturnPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('sales-returns.export.excel');
     Route::put('/sales-returns/{salesReturn}/admin-update', [SalesReturnPageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->middleware(['semester.open'])
         ->name('sales-returns.admin-update');
     Route::post('/sales-returns/{salesReturn}/cancel', [SalesReturnPageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
@@ -102,7 +105,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/order-notes/{orderNote}/pdf', [OrderNotePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('order-notes.export.pdf');
     Route::get('/order-notes/{orderNote}/excel', [OrderNotePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('order-notes.export.excel');
     Route::put('/order-notes/{orderNote}/admin-update', [OrderNotePageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->middleware(['semester.open'])
         ->name('order-notes.admin-update');
     Route::post('/order-notes/{orderNote}/cancel', [OrderNotePageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])

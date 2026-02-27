@@ -8,10 +8,7 @@
         @csrf
         @include('delivery_trips.partials.form', [
             'trip' => null,
-            'users' => $users,
             'prefillDate' => $prefillDate,
-            'selectedUserIds' => collect(old('member_user_ids', []))->map(fn ($id) => (int) $id),
-            'extraMemberNames' => old('extra_member_names', ''),
         ])
     </form>
 @endsection

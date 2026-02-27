@@ -12,6 +12,9 @@
         <form id="item-categories-search-form" method="get" class="flex">
             <input id="item-categories-search-input" type="text" name="search" placeholder="{{ __('ui.search_item_categories_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <button type="submit">{{ __('ui.search') }}</button>
+            @if($search !== '')
+                <a class="btn secondary" href="{{ route('item-categories.index') }}">{{ __('ui.reset') }}</a>
+            @endif
         </form>
     </div>
 

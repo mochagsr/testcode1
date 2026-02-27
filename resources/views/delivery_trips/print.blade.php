@@ -78,36 +78,13 @@
     <div class="doc-right">
 {{ __('txn.date') }} : {{ optional($trip->trip_date)->format('d-m-Y') }}
 {{ __('delivery_trip.driver_name') }} : {{ $trip->driver_name }}
+{{ __('delivery_trip.assistant_name') }} : {{ $trip->assistant_name ?: '-' }}
 {{ __('delivery_trip.vehicle_plate') }} : {{ $trip->vehicle_plate ?: '-' }}
-{{ __('delivery_trip.member_count') }} : {{ (int) $trip->member_count }}
     </div>
 </div>
 
 <div class="meta">
     <table>
-        <thead>
-            <tr>
-                <th style="width:50px;">{{ __('txn.no') }}</th>
-                <th>{{ __('ui.name') }}</th>
-                <th style="width:120px;">{{ __('ui.role') }}</th>
-            </tr>
-        </thead>
-        <tbody>
-        @forelse($trip->members as $member)
-            <tr>
-                <td>{{ $loop->iteration }}</td>
-                <td>{{ $member->member_name }}</td>
-                <td>{{ $member->user?->role ? strtoupper((string) $member->user->role) : '-' }}</td>
-            </tr>
-        @empty
-            <tr>
-                <td colspan="3" class="muted">{{ __('delivery_trip.no_member') }}</td>
-            </tr>
-        @endforelse
-        </tbody>
-    </table>
-
-    <table style="margin-top: 10px;">
         <tbody>
             <tr><th>{{ __('delivery_trip.fuel_cost') }}</th><td class="text-right">Rp {{ number_format((int) $trip->fuel_cost, 0, ',', '.') }}</td></tr>
             <tr><th>{{ __('delivery_trip.toll_cost') }}</th><td class="text-right">Rp {{ number_format((int) $trip->toll_cost, 0, ',', '.') }}</td></tr>

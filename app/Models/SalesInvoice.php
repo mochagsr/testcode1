@@ -25,6 +25,7 @@ class SalesInvoice extends Model
         'customer_ship_location_id',
         'school_bulk_transaction_id',
         'school_bulk_location_id',
+        'order_note_id',
         'invoice_date',
         'due_date',
         'semester_period',
@@ -95,6 +96,14 @@ class SalesInvoice extends Model
     }
 
     /**
+     * @return BelongsTo<OrderNote, $this>
+     */
+    public function orderNote(): BelongsTo
+    {
+        return $this->belongsTo(OrderNote::class, 'order_note_id');
+    }
+
+    /**
      * @return HasMany<SalesInvoiceItem, $this>
      */
     public function items(): HasMany
@@ -122,6 +131,7 @@ class SalesInvoice extends Model
             'id',
             'invoice_number',
             'customer_id',
+            'order_note_id',
             'invoice_date',
             'semester_period',
             'total',
@@ -140,7 +150,10 @@ class SalesInvoice extends Model
      */
     public function scopeWithCustomerInfo(Builder $query): Builder
     {
-        return $query->with('customer:id,code,name,phone,city');
+        return $query->with([
+            'customer:id,code,name,phone,city',
+            'orderNote:id,note_number',
+        ]);
     }
 
     /**

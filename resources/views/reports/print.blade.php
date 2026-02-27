@@ -65,6 +65,8 @@
                                 <td class="num">
                                     @if(($item['type'] ?? 'number') === 'currency')
                                         Rp {{ number_format((int) round((float) ($item['value'] ?? 0)), 0, ',', '.') }}
+                                    @elseif(($item['type'] ?? 'number') === 'decimal')
+                                        {{ number_format((float) ($item['value'] ?? 0), 3, ',', '.') }}
                                     @else
                                         {{ (int) round((float) ($item['value'] ?? 0)) }}
                                     @endif
@@ -193,6 +195,7 @@
             strtolower(__('report.columns.price_agent')) => '10%',
             strtolower(__('report.columns.price_sales')) => '10%',
             strtolower(__('report.columns.price_general')) => '10%',
+            strtolower(__('report.columns.total_weight')) => '10%',
         ];
         $numericHeaders = [
             strtolower(__('report.columns.stock')),
@@ -207,6 +210,9 @@
             strtolower(__('report.columns.price_agent')),
             strtolower(__('report.columns.price_sales')),
             strtolower(__('report.columns.price_general')),
+        ];
+        $decimalHeaders = [
+            strtolower(__('report.columns.total_weight')),
         ];
     @endphp
     <table class="report-table">
@@ -233,9 +239,12 @@
                     @php
                         $headerKey = strtolower(trim((string) ($headers[$idx] ?? '')));
                         $isNumericCell = in_array($headerKey, $numericHeaders, true);
+                        $isDecimalCell = in_array($headerKey, $decimalHeaders, true);
                     @endphp
-                    <td class="{{ $isNumericCell ? 'num' : '' }}">
-                        @if($isNumericCell && is_numeric($value))
+                    <td class="{{ ($isNumericCell || $isDecimalCell) ? 'num' : '' }}">
+                        @if($isDecimalCell && is_numeric($value))
+                            {{ number_format((float) $value, 3, ',', '.') }}
+                        @elseif($isNumericCell && is_numeric($value))
                             {{ number_format((int) round((float) $value), 0, ',', '.') }}
                         @else
                             {{ $value }}

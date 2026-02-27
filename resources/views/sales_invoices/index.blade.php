@@ -97,6 +97,12 @@
                 <tr>
                     <td>
                         <a href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a>
+                        @if($invoice->orderNote)
+                            <div class="muted" style="margin-top: 2px;">
+                                {{ __('txn.linked_order_note') }}:
+                                <a href="{{ route('order-notes.show', $invoice->orderNote) }}">{{ $invoice->orderNote->note_number }}</a>
+                            </div>
+                        @endif
                         @if((bool) ($lockState['auto'] ?? false))
                             <span class="badge danger" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_auto') }}</span>
                         @endif

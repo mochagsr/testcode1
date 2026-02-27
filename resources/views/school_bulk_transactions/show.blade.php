@@ -71,6 +71,20 @@
 
     <div class="card">
         <h3 style="margin-top: 0;">{{ __('school_bulk.bulk_locations_title') }}</h3>
+        @php
+            $itemsByLocation = $transaction->items
+                ->groupBy(fn($item) => (int) ($item->school_bulk_transaction_location_id ?? 0));
+            $allSchoolsTotal = (int) $transaction->locations->sum(function ($location) use ($itemsByLocation): int {
+                $locationItems = collect($itemsByLocation->get((int) $location->id, []))->values();
+                if ($locationItems->isEmpty()) {
+                    $locationItems = collect($itemsByLocation->get(0, []))->values();
+                }
+
+                return (int) $locationItems->sum(function ($item): int {
+                    return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
+                });
+            });
+        @endphp
         <table>
             <thead>
             <tr>
@@ -78,57 +92,79 @@
                 <th>{{ __('txn.phone') }}</th>
                 <th>{{ __('txn.city') }}</th>
                 <th>{{ __('txn.address') }}</th>
+                <th>{{ __('school_bulk.total_per_school') }}</th>
             </tr>
             </thead>
             <tbody>
             @foreach($transaction->locations as $location)
+                @php
+                    $locationItems = collect($itemsByLocation->get((int) $location->id, []))->values();
+                    if ($locationItems->isEmpty()) {
+                        $locationItems = collect($itemsByLocation->get(0, []))->values();
+                    }
+                    $locationTotal = (int) $locationItems->sum(function ($item): int {
+                        return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
+                    });
+                @endphp
                 <tr>
                     <td>{{ $location->school_name }}</td>
                     <td>{{ $location->recipient_phone ?: '-' }}</td>
                     <td>{{ $location->city ?: '-' }}</td>
                     <td>{{ $location->address ?: '-' }}</td>
-                </tr>
-            @endforeach
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card">
-        <h3 style="margin-top: 0;">{{ __('txn.items') }}</h3>
-        <table>
-            <thead>
-            <tr>
-                <th>{{ __('txn.name') }}</th>
-                <th>{{ __('txn.qty') }}</th>
-                <th>{{ __('txn.unit') }}</th>
-                <th>{{ __('txn.price') }}</th>
-                <th>{{ __('txn.subtotal') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @php
-                $perSchoolTotal = 0;
-            @endphp
-            @foreach($transaction->items as $item)
-                @php
-                    $lineTotal = ((int) $item->quantity) * ((int) ($item->unit_price ?? 0));
-                    $perSchoolTotal += $lineTotal;
-                @endphp
-                <tr>
-                    <td>{{ $item->product_name }}</td>
-                    <td>{{ (int) $item->quantity }}</td>
-                    <td>{{ $item->unit ?: '-' }}</td>
-                    <td>Rp {{ number_format((int) ($item->unit_price ?? 0), 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format($lineTotal, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($locationTotal, 0, ',', '.') }}</td>
                 </tr>
             @endforeach
             </tbody>
         </table>
         <div style="margin-top: 12px; text-align: right;">
-            <strong>{{ __('school_bulk.total_per_school') }}: Rp {{ number_format($perSchoolTotal, 0, ',', '.') }}</strong><br>
-            <strong>{{ __('school_bulk.grand_total_all_schools') }}: Rp {{ number_format($perSchoolTotal * (int) $transaction->locations->count(), 0, ',', '.') }}</strong>
+            <strong>{{ __('school_bulk.grand_total_all_schools') }}: Rp {{ number_format($allSchoolsTotal ?? 0, 0, ',', '.') }}</strong>
         </div>
     </div>
+
+    @foreach($transaction->locations as $location)
+        @php
+            $locationItems = collect($itemsByLocation->get((int) $location->id, []))->values();
+            if ($locationItems->isEmpty()) {
+                $locationItems = collect($itemsByLocation->get(0, []))->values();
+            }
+            $locationTotal = (int) $locationItems->sum(function ($item): int {
+                return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
+            });
+        @endphp
+        <div class="card">
+            <h3 style="margin-top: 0;">{{ __('txn.items') }} - {{ $location->school_name }}</h3>
+            <table>
+                <thead>
+                <tr>
+                    <th>{{ __('txn.name') }}</th>
+                    <th>{{ __('txn.qty') }}</th>
+                    <th>{{ __('txn.unit') }}</th>
+                    <th>{{ __('txn.price') }}</th>
+                    <th>{{ __('txn.subtotal') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                @forelse($locationItems as $item)
+                    @php
+                        $lineTotal = ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
+                    @endphp
+                    <tr>
+                        <td>{{ $item->product_name }}</td>
+                        <td>{{ (int) ($item->quantity ?? 0) }}</td>
+                        <td>{{ $item->unit ?: '-' }}</td>
+                        <td>Rp {{ number_format((int) ($item->unit_price ?? 0), 0, ',', '.') }}</td>
+                        <td>Rp {{ number_format($lineTotal, 0, ',', '.') }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="5" class="muted">{{ __('school_bulk.no_items_to_generate') }}</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+            <div style="margin-top: 10px; text-align: right;">
+                <strong>{{ __('school_bulk.total_per_school') }}: Rp {{ number_format($locationTotal, 0, ',', '.') }}</strong>
+            </div>
+        </div>
+    @endforeach
 
     <div class="card">
         <h3 style="margin-top: 0;">{{ __('school_bulk.generated_invoices_title') }}</h3>

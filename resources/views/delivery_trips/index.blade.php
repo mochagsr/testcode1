@@ -24,8 +24,8 @@
                     <th>{{ __('delivery_trip.trip_number') }}</th>
                     <th>{{ __('txn.date') }}</th>
                     <th>{{ __('delivery_trip.driver_name') }}</th>
+                    <th>{{ __('delivery_trip.assistant_name') }}</th>
                     <th>{{ __('delivery_trip.vehicle_plate') }}</th>
-                    <th>{{ __('delivery_trip.member_count') }}</th>
                     <th>{{ __('delivery_trip.total_cost') }}</th>
                     <th>{{ __('txn.action') }}</th>
                 </tr>
@@ -36,8 +36,8 @@
                     <td><a href="{{ route('delivery-trips.show', $trip) }}">{{ $trip->trip_number }}</a></td>
                     <td>{{ optional($trip->trip_date)->format('d-m-Y') }}</td>
                     <td>{{ $trip->driver_name }}</td>
+                    <td>{{ $trip->assistant_name ?: '-' }}</td>
                     <td>{{ $trip->vehicle_plate ?: '-' }}</td>
-                    <td>{{ (int) $trip->member_count }}</td>
                     <td>Rp {{ number_format((int) $trip->total_cost, 0, ',', '.') }}</td>
                     <td>
                         <select class="action-menu action-menu-sm" onchange="if(this.value){window.location.href=this.value; this.selectedIndex=0;}">

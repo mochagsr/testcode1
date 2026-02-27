@@ -172,7 +172,50 @@
                 .trim();
         }
 
-        function generateCode(name) {
+        function categoryPrefix(categoryName) {
+            const normalized = normalize(categoryName || '').replace(/\s+/g, ' ').trim();
+            if (/\bpaket\s+sd\b/.test(normalized)) {
+                return 'ps';
+            }
+            if (/\bpaket\s+smp\b/.test(normalized)) {
+                return 'pp';
+            }
+            if (/\bpaket\s+sma\b/.test(normalized)) {
+                return 'pa';
+            }
+            if (/\bpaket\s+mi\b/.test(normalized)) {
+                return 'pi';
+            }
+            if (/\bpaket\s+mts\b/.test(normalized)) {
+                return 'pt';
+            }
+            if (normalized === 'cerdas') {
+                return 'c';
+            }
+            if (normalized === 'pintar') {
+                return 'p';
+            }
+            return '';
+        }
+
+        function activeCategoryName() {
+            const selectedId = Number(categoryInput.value || 0);
+            if (selectedId > 0) {
+                const selected = categories.find((category) => Number(category.id) === selectedId);
+                if (selected && selected.name) {
+                    return String(selected.name);
+                }
+            }
+
+            const byLabel = findCategoryByLabel(categorySearchInput.value);
+            if (byLabel && byLabel.name) {
+                return String(byLabel.name);
+            }
+
+            return '';
+        }
+
+        function generateCode(name, categoryName) {
             const rawNormalized = (name || '')
                 .toString()
                 .normalize('NFD')
@@ -209,9 +252,21 @@
             const yearMatch = rawNormalized.match(/\b(\d{2}|\d{4})\s*[-/]\s*(\d{2}|\d{4})\b/);
             if (yearMatch) {
                 yearSuffix = `${yearMatch[1].slice(-1)}${yearMatch[2].slice(-1)}`;
+            } else {
+                const shortYearMatches = Array.from(rawNormalized.matchAll(/\b(\d{2})(\d{2})\b/g));
+                for (const shortYearMatch of shortYearMatches) {
+                    const start = Number(shortYearMatch[1] || 0);
+                    const end = Number(shortYearMatch[2] || 0);
+                    if (((start + 1) % 100) !== end) {
+                        continue;
+                    }
+                    yearSuffix = `${String(start).slice(-1)}${String(end).slice(-1)}`;
+                    break;
+                }
             }
 
-            return `${subject}${level}${edition}${semester}${yearSuffix}`.slice(0, 60);
+            const prefix = categoryPrefix(categoryName);
+            return `${prefix}${subject}${level}${edition}${semester}${yearSuffix}`.slice(0, 60);
         }
 
         function categoryLabel(category) {
@@ -238,7 +293,7 @@
         }
 
         function syncCode() {
-            const generated = generateCode(nameInput.value);
+            const generated = generateCode(nameInput.value, activeCategoryName());
             previewNode.textContent = (manualOverride ? manualPreviewTemplate : autoPreviewTemplate)
                 .replace('__CODE__', generated);
             resetButton.style.display = manualOverride ? 'inline-flex' : 'none';

@@ -40,7 +40,7 @@
     @if((auth()->user()?->role ?? '') === 'admin')
         <div class="card">
             <div class="form-section">
-                <h3 class="form-section-title">{{ __('txn.admin_actions') }}</h3>
+                <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
                 <form method="post" action="{{ route('receivable-payments.admin-update', $payment) }}" class="row" style="margin-bottom: 12px;">
                     @csrf
                     @method('PUT')
@@ -84,7 +84,6 @@
         </div>
     @endif
 @endsection
-
 
 
 

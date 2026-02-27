@@ -19,8 +19,8 @@
             <div class="col-3"><strong>{{ __('delivery_trip.trip_number') }}</strong><div>{{ $trip->trip_number }}</div></div>
             <div class="col-3"><strong>{{ __('txn.date') }}</strong><div>{{ optional($trip->trip_date)->format('d-m-Y') }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.driver_name') }}</strong><div>{{ $trip->driver_name }}</div></div>
+            <div class="col-3"><strong>{{ __('delivery_trip.assistant_name') }}</strong><div>{{ $trip->assistant_name ?: '-' }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.vehicle_plate') }}</strong><div>{{ $trip->vehicle_plate ?: '-' }}</div></div>
-            <div class="col-3"><strong>{{ __('delivery_trip.member_count') }}</strong><div>{{ (int) $trip->member_count }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.fuel_cost') }}</strong><div>Rp {{ number_format((int) $trip->fuel_cost, 0, ',', '.') }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.toll_cost') }}</strong><div>Rp {{ number_format((int) $trip->toll_cost, 0, ',', '.') }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.meal_cost') }}</strong><div>Rp {{ number_format((int) $trip->meal_cost, 0, ',', '.') }}</div></div>
@@ -30,29 +30,5 @@
             <div class="col-3"><strong>{{ __('delivery_trip.updated_by') }}</strong><div>{{ $trip->updater?->name ?: '-' }}</div></div>
             <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $trip->notes ?: '-' }}</div></div>
         </div>
-    </div>
-
-    <div class="card">
-        <strong>{{ __('delivery_trip.members') }}</strong>
-        <table style="margin-top: 10px;">
-            <thead>
-                <tr>
-                    <th>{{ __('txn.no') }}</th>
-                    <th>{{ __('ui.name') }}</th>
-                    <th>{{ __('ui.role') }}</th>
-                </tr>
-            </thead>
-            <tbody>
-            @forelse($trip->members as $member)
-                <tr>
-                    <td>{{ $loop->iteration }}</td>
-                    <td>{{ $member->member_name }}</td>
-                    <td>{{ $member->user?->role ? strtoupper((string) $member->user->role) : '-' }}</td>
-                </tr>
-            @empty
-                <tr><td colspan="3" class="muted">{{ __('delivery_trip.no_member') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
     </div>
 @endsection

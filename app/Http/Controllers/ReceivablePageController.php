@@ -15,6 +15,7 @@ use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -273,7 +274,7 @@ class ReceivablePageController extends Controller
             ]));
     }
 
-    public function customerWriteoff(Request $request, Customer $customer): RedirectResponse
+    public function customerWriteoff(Request $request, Customer $customer): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
@@ -286,16 +287,27 @@ class ReceivablePageController extends Controller
         $this->processCustomerAdjustment($customer, $data, 'writeoff');
         AppCache::forgetAfterFinancialMutation([(string) ($data['payment_date'] ?? now()->toDateString())]);
 
-        return redirect()
+        $redirect = redirect()
             ->route('receivables.index', [
                 'search' => $data['search'] ?? null,
                 'semester' => $data['semester'] ?? null,
                 'customer_id' => $customer->id,
             ])
             ->with('success', __('receivable.payment_saved'));
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'ok' => true,
+                'message' => __('receivable.payment_saved'),
+                'method' => 'writeoff',
+                'customer_id' => (int) $customer->id,
+            ]);
+        }
+
+        return $redirect;
     }
 
-    public function customerDiscount(Request $request, Customer $customer): RedirectResponse
+    public function customerDiscount(Request $request, Customer $customer): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
@@ -308,13 +320,24 @@ class ReceivablePageController extends Controller
         $this->processCustomerAdjustment($customer, $data, 'discount');
         AppCache::forgetAfterFinancialMutation([(string) ($data['payment_date'] ?? now()->toDateString())]);
 
-        return redirect()
+        $redirect = redirect()
             ->route('receivables.index', [
                 'search' => $data['search'] ?? null,
                 'semester' => $data['semester'] ?? null,
                 'customer_id' => $customer->id,
             ])
             ->with('success', __('receivable.payment_saved'));
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'ok' => true,
+                'message' => __('receivable.payment_saved'),
+                'method' => 'discount',
+                'customer_id' => (int) $customer->id,
+            ]);
+        }
+
+        return $redirect;
     }
 
     public function printCustomerBill(Request $request, Customer $customer): View
@@ -692,14 +715,34 @@ class ReceivablePageController extends Controller
             $credit = (int) round((float) $ledgerRow->credit);
             $description = strtolower((string) ($ledgerRow->description ?? ''));
             $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
+            $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
+            $isDiscount = str_contains($description, 'diskon') || str_contains($description, 'discount');
             $salesReturn = $isReturn ? $credit : 0;
             $installment = $isReturn ? 0 : $credit;
-            $proofNumber = $ledgerRow->invoice?->invoice_number ?: (trim((string) ($ledgerRow->description ?? '')) ?: '-');
+            $baseProofNumber = $ledgerRow->invoice?->invoice_number ?: (trim((string) ($ledgerRow->description ?? '')) ?: '-');
+            $entryType = 'payment';
+            if ($debit > 0) {
+                $entryType = 'debit';
+            } elseif ($salesReturn > 0) {
+                $entryType = 'return';
+            } elseif ($isWriteoff) {
+                $entryType = 'writeoff';
+            } elseif ($isDiscount) {
+                $entryType = 'discount';
+            }
+
+            $proofNumber = match ($entryType) {
+                'writeoff' => $baseProofNumber . ' - ' . __('receivable.method_writeoff'),
+                'discount' => $baseProofNumber . ' - ' . __('receivable.method_discount'),
+                default => $baseProofNumber,
+            };
             $invoiceId = $ledgerRow->invoice?->id;
             $groupKey = $invoiceId !== null
-                ? 'invoice:' . $invoiceId
-                : 'text:' . $proofNumber;
-            $dateValue = $ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date;
+                ? 'invoice:' . $invoiceId . ':' . $entryType
+                : 'text:' . $baseProofNumber . ':' . $entryType;
+            $dateValue = $debit > 0
+                ? ($ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date)
+                : $ledgerRow->entry_date;
 
             if (!isset($groupedRows[$groupKey])) {
                 $groupedRows[$groupKey] = [

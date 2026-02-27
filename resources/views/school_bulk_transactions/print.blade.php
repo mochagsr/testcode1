@@ -82,10 +82,17 @@
         </div>
     @endif
 
+    @php
+        $itemsByLocation = $transaction->items->groupBy(fn($item) => (int) ($item->school_bulk_transaction_location_id ?? 0));
+    @endphp
     @forelse($transaction->locations as $location)
         @php
-            $perSchoolSubtotal = (int) $transaction->items->sum(function ($item): int {
-                return ((int) $item->quantity) * ((int) ($item->unit_price ?? 0));
+            $locationItems = collect($itemsByLocation->get((int) $location->id, []))->values();
+            if ($locationItems->isEmpty()) {
+                $locationItems = collect($itemsByLocation->get(0, []))->values();
+            }
+            $perSchoolSubtotal = (int) $locationItems->sum(function ($item): int {
+                return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
             });
             $noteNumber = $transaction->transaction_number . '-' . str_pad((string) $loop->iteration, 3, '0', STR_PAD_LEFT);
         @endphp
@@ -133,14 +140,15 @@
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($transaction->items as $item)
+                @foreach($locationItems as $item)
                     @php
-                        $lineTotal = ((int) $item->quantity) * ((int) ($item->unit_price ?? 0));
+                        $adjustedQuantity = (int) ($item->quantity ?? 0);
+                        $lineTotal = $adjustedQuantity * ((int) ($item->unit_price ?? 0));
                     @endphp
                     <tr>
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $item->product_name }}</td>
-                        <td>{{ (int) $item->quantity }}</td>
+                        <td>{{ $adjustedQuantity }}</td>
                         <td>{{ $item->unit ?: '-' }}</td>
                         <td>Rp {{ number_format((int) ($item->unit_price ?? 0), 0, ',', '.') }}</td>
                         <td>Rp {{ number_format($lineTotal, 0, ',', '.') }}</td>

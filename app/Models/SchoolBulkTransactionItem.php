@@ -17,6 +17,7 @@ class SchoolBulkTransactionItem extends Model
      */
     protected $fillable = [
         'school_bulk_transaction_id',
+        'school_bulk_transaction_location_id',
         'product_id',
         'product_code',
         'product_name',
@@ -48,6 +49,14 @@ class SchoolBulkTransactionItem extends Model
     }
 
     /**
+     * @return BelongsTo<SchoolBulkTransactionLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(SchoolBulkTransactionLocation::class, 'school_bulk_transaction_location_id');
+    }
+
+    /**
      * @return BelongsTo<Product, $this>
      */
     public function product(): BelongsTo
@@ -55,4 +64,3 @@ class SchoolBulkTransactionItem extends Model
         return $this->belongsTo(Product::class);
     }
 }
-

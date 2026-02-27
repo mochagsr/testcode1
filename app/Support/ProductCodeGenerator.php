@@ -12,17 +12,17 @@ class ProductCodeGenerator
         return $this->normalizeRequestedCode((string) $value);
     }
 
-    public function resolve(?string $requestedCode, string $name, ?int $ignoreId = null): string
+    public function resolve(?string $requestedCode, string $name, ?int $ignoreId = null, ?string $categoryName = null): string
     {
         $requestedCode = $this->normalizeRequestedCode((string) $requestedCode);
         if ($requestedCode !== '') {
             return $requestedCode;
         }
 
-        return $this->generateUniqueFromName($name, $ignoreId);
+        return $this->generateUniqueFromName($name, $ignoreId, $categoryName);
     }
 
-    public function generateBase(string $name): string
+    public function generateBase(string $name, ?string $categoryName = null): string
     {
         $rawNormalized = Str::of($name)
             ->ascii()
@@ -56,17 +56,42 @@ class ProductCodeGenerator
         preg_match('/\b(?:semester|smt)\s*(\d+)\b/i', $normalized, $semesterMatch);
         $semester = isset($semesterMatch[1]) ? 's'.$semesterMatch[1] : '';
 
-        $yearSuffix = '';
-        if (preg_match('/\b(\d{2}|\d{4})\s*[-\/]\s*(\d{2}|\d{4})\b/', $rawNormalized, $yearMatch) === 1) {
-            $yearSuffix = substr($yearMatch[1], -1).substr($yearMatch[2], -1);
-        }
+        $yearSuffix = $this->extractYearSuffix($rawNormalized);
 
-        return substr($subject.$level.$edition.$semester.$yearSuffix, 0, 60);
+        $categoryPrefix = $this->categoryPrefix($categoryName);
+        return substr($categoryPrefix.$subject.$level.$edition.$semester.$yearSuffix, 0, 60);
     }
 
-    private function generateUniqueFromName(string $name, ?int $ignoreId = null): string
+    private function extractYearSuffix(string $rawNormalized): string
     {
-        $base = $this->generateBase($name);
+        if (preg_match('/\b(\d{2}|\d{4})\s*[-\/]\s*(\d{2}|\d{4})\b/', $rawNormalized, $yearMatch) === 1) {
+            return substr($yearMatch[1], -1).substr($yearMatch[2], -1);
+        }
+
+        // Support compact academic year format like "2526".
+        if (preg_match_all('/\b(\d{2})(\d{2})\b/', $rawNormalized, $shortYearMatches, PREG_SET_ORDER) === false) {
+            return '';
+        }
+
+        foreach ($shortYearMatches as $match) {
+            $start = (int) ($match[1] ?? -1);
+            $end = (int) ($match[2] ?? -1);
+            if ($start < 0 || $end < 0) {
+                continue;
+            }
+            if ((($start + 1) % 100) !== $end) {
+                continue;
+            }
+
+            return substr((string) $start, -1).substr((string) $end, -1);
+        }
+
+        return '';
+    }
+
+    private function generateUniqueFromName(string $name, ?int $ignoreId = null, ?string $categoryName = null): string
+    {
+        $base = $this->generateBase($name, $categoryName);
         $candidate = $base;
         $sequence = 1;
 
@@ -76,6 +101,39 @@ class ProductCodeGenerator
         }
 
         return $candidate;
+    }
+
+    private function categoryPrefix(?string $categoryName): string
+    {
+        $normalized = Str::of((string) $categoryName)
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', ' ')
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->value();
+
+        if (preg_match('/\bpaket\s+sd\b/', $normalized) === 1) {
+            return 'ps';
+        }
+        if (preg_match('/\bpaket\s+smp\b/', $normalized) === 1) {
+            return 'pp';
+        }
+        if (preg_match('/\bpaket\s+sma\b/', $normalized) === 1) {
+            return 'pa';
+        }
+        if (preg_match('/\bpaket\s+mi\b/', $normalized) === 1) {
+            return 'pi';
+        }
+        if (preg_match('/\bpaket\s+mts\b/', $normalized) === 1) {
+            return 'pt';
+        }
+
+        return match ($normalized) {
+            'cerdas' => 'c',
+            'pintar' => 'p',
+            default => '',
+        };
     }
 
     private function compactSubjectToken(string $subjectRaw): string

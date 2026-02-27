@@ -14,6 +14,7 @@
             ->sum('amount');
         $paidCash = max(0, (float) $invoice->total_paid - $paidFromCustomerBalance);
         $displayPaymentMethod = $hasCashOnCreate ? __('txn.cash') : __('txn.credit');
+        $currentPaymentMethod = $hasCashOnCreate ? 'tunai' : 'kredit';
         $paymentStatusLabel = match ($invoice->payment_status) {
             'paid' => __('txn.status_paid'),
             default => __('txn.status_unpaid'),
@@ -93,6 +94,29 @@
                 <div class="col-4"><strong>{{ __('txn.invoice_date') }}</strong><div>{{ $invoice->invoice_date->format('d-m-Y') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.semester_period') }}</strong><div>{{ $invoice->semester_period ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.status') }}</strong><div>{{ $transactionStatusLabel }}</div></div>
+                <div class="col-4">
+                    <strong>{{ __('txn.linked_order_note') }}</strong>
+                    <div>
+                        @if($invoice->orderNote)
+                            <a href="{{ route('order-notes.show', $invoice->orderNote) }}">{{ $invoice->orderNote->note_number }}</a>
+                        @else
+                            -
+                        @endif
+                    </div>
+                </div>
+                <div class="col-4">
+                    <strong>{{ __('txn.order_note_progress') }}</strong>
+                    <div>
+                        @if($orderNoteProgress !== null)
+                            @php
+                                $progressLabel = rtrim(rtrim(number_format((float) ($orderNoteProgress['progress_percent'] ?? 0), 2, '.', ''), '0'), '.');
+                            @endphp
+                            {{ $progressLabel }}% ({{ number_format((int) ($orderNoteProgress['fulfilled_total'] ?? 0), 0, ',', '.') }}/{{ number_format((int) ($orderNoteProgress['ordered_total'] ?? 0), 0, ',', '.') }}) - {{ ($orderNoteProgress['status'] ?? 'open') === 'finished' ? __('txn.order_note_status_finished') : __('txn.order_note_status_open') }}
+                        @else
+                            -
+                        @endif
+                    </div>
+                </div>
                 <div class="col-4">
                     <strong>{{ __('receivable.customer_semester_status') }}</strong>
                     <div>
@@ -202,7 +226,7 @@
             <div class="card txn-modal-card" id="admin-edit-transaction">
                 <div class="form-section">
                     <div class="txn-modal-header">
-                        <h3 class="form-section-title" style="margin: 0;">{{ __('txn.admin_actions') }}</h3>
+                        <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
                         <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
                     </div>
                     <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
@@ -226,6 +250,13 @@
                                 @foreach($semesterOptions as $semester)
                                     <option value="{{ $semester }}" @selected(old('semester_period', $invoice->semester_period) === $semester)>{{ $semester }}</option>
                                 @endforeach
+                            </select>
+                        </div>
+                        <div class="col-3">
+                            <label>{{ __('txn.payment_method') }}</label>
+                            <select name="payment_method">
+                                <option value="tunai" @selected(old('payment_method', $currentPaymentMethod) === 'tunai')>{{ __('txn.cash') }}</option>
+                                <option value="kredit" @selected(old('payment_method', $currentPaymentMethod) === 'kredit')>{{ __('txn.credit') }}</option>
                             </select>
                         </div>
                         <div class="col-12">

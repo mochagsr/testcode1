@@ -162,7 +162,7 @@ class Product extends Model
      */
     public function scopeOnlyOutgoingFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'code', 'name', 'unit', 'stock', 'price_general']);
+        return $query->select(['id', 'item_category_id', 'code', 'name', 'unit', 'stock', 'price_general']);
     }
 
     /**
