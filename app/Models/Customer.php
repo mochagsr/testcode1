@@ -226,14 +226,37 @@ class Customer extends Model
             return $query;
         }
 
-        return $query->where(function (Builder $subQuery) use ($search): void {
-            $subQuery->where('name', 'like', "%{$search}%")
-                ->orWhere('city', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%")
-                ->orWhereHas('level', function (Builder $levelQuery) use ($search): void {
-                    $levelQuery->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%");
+        $tokens = collect(preg_split('/\s+/u', mb_strtolower($search)) ?: [])
+            ->map(static fn($token): string => preg_replace('/[^\pL\pN]/u', '', (string) $token) ?? '')
+            ->filter(static fn(string $token): bool => $token !== '')
+            ->values();
+
+        return $query->where(function (Builder $subQuery) use ($search, $tokens): void {
+            $subQuery->where(function (Builder $fullQuery) use ($search): void {
+                $fullQuery->where('name', 'like', "%{$search}%")
+                    ->orWhere('city', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhereHas('level', function (Builder $levelQuery) use ($search): void {
+                        $levelQuery->where('code', 'like', "%{$search}%")
+                            ->orWhere('name', 'like', "%{$search}%");
+                    });
+            });
+
+            if ($tokens->isNotEmpty()) {
+                $subQuery->orWhere(function (Builder $tokenQuery) use ($tokens): void {
+                    foreach ($tokens as $token) {
+                        $tokenQuery->where(function (Builder $perTokenQuery) use ($token): void {
+                            $perTokenQuery->where('name', 'like', "%{$token}%")
+                                ->orWhere('city', 'like', "%{$token}%")
+                                ->orWhere('phone', 'like', "%{$token}%")
+                                ->orWhereHas('level', function (Builder $levelQuery) use ($token): void {
+                                    $levelQuery->where('code', 'like', "%{$token}%")
+                                        ->orWhere('name', 'like', "%{$token}%");
+                                });
+                        });
+                    }
                 });
+            }
         });
     }
 

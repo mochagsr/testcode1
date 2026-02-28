@@ -36,6 +36,22 @@ class SearchLookupApiTest extends TestCase
         $response->assertJsonPath('data.0.name', 'Mawar Jaya');
     }
 
+    public function test_customer_lookup_supports_label_like_name_city_format(): void
+    {
+        \App\Models\Customer::query()->create([
+            'code' => 'CUST-LOOK-002',
+            'name' => 'Angga',
+            'city' => 'Sidoarjo',
+        ]);
+
+        $response = $this->getJson('/api/customers?search=angga%20(sidoarjo)');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.name', 'Angga');
+        $response->assertJsonPath('data.0.city', 'Sidoarjo');
+    }
+
     public function test_product_lookup_respects_minimum_token_and_active_only_filter(): void
     {
         $category = ItemCategory::query()->create([

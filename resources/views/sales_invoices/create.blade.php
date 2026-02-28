@@ -908,7 +908,12 @@
                 applyOrderNoteItems(note);
             });
             orderNoteField.addEventListener('focus', async () => {
-                const customerId = String(customerIdField.value || '');
+                let customerId = String(customerIdField.value || '');
+                if (customerId === '') {
+                    const resolvedCustomer = await resolveCustomerFromInput(customerSearch?.value || '');
+                    await handleResolvedCustomer(resolvedCustomer, false);
+                    customerId = String(customerIdField.value || '');
+                }
                 if (customerId === '') {
                     return;
                 }

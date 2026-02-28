@@ -263,8 +263,10 @@ class OrderNotePageController extends Controller
                 ->whereNull('si.deleted_at')
                 ->where('si.is_canceled', false)
                 ->whereIn('sii.order_note_item_id', $itemIds)
+                ->selectRaw('sii.order_note_item_id, COALESCE(SUM(sii.quantity), 0) as fulfilled_qty')
                 ->groupBy('sii.order_note_item_id')
-                ->pluck(DB::raw('COALESCE(SUM(sii.quantity), 0)'), 'sii.order_note_item_id')
+                ->get()
+                ->pluck('fulfilled_qty', 'order_note_item_id')
                 ->map(fn($qty): int => (int) round((float) $qty))
                 ->all();
         }
