@@ -111,22 +111,25 @@
         .receivable-customer-table th.customer-col {
             white-space: normal;
             max-width: 0;
+            min-width: 180px;
         }
         .receivable-customer-table td.city-col,
         .receivable-customer-table th.city-col {
             white-space: nowrap;
             max-width: 0;
+            min-width: 110px;
         }
         .receivable-customer-table td.outstanding-col,
         .receivable-customer-table th.outstanding-col {
             white-space: nowrap;
             max-width: 0;
+            min-width: 140px;
         }
         .receivable-customer-table td.action-cell,
         .receivable-customer-table th.action-cell {
             white-space: nowrap;
             width: 30%;
-            min-width: 220px;
+            min-width: 240px;
             padding-right: 4px;
         }
         .receivable-customer-actions {
@@ -193,7 +196,7 @@
             scrollbar-gutter: auto;
         }
         .receivable-scroll-wrap.customer table {
-            min-width: 640px;
+            min-width: 760px;
             width: 100%;
             table-layout: fixed;
         }
@@ -317,6 +320,25 @@
             }
         }
         @media (max-width: 1280px) {
+            .receivable-scroll-wrap.customer table {
+                min-width: 700px;
+            }
+            .receivable-customer-table td.customer-col,
+            .receivable-customer-table th.customer-col {
+                min-width: 170px;
+            }
+            .receivable-customer-table td.city-col,
+            .receivable-customer-table th.city-col {
+                min-width: 95px;
+            }
+            .receivable-customer-table td.outstanding-col,
+            .receivable-customer-table th.outstanding-col {
+                min-width: 130px;
+            }
+            .receivable-customer-table td.action-cell,
+            .receivable-customer-table th.action-cell {
+                min-width: 220px;
+            }
             .receivable-customer-actions .btn {
                 min-width: 98px;
                 font-size: 10px;

@@ -164,4 +164,108 @@ class OrderNoteProgressTest extends TestCase
         $response->assertSee('100%');
         $response->assertSee(__('txn.order_note_status_finished'));
     }
+
+    public function test_order_note_lookup_returns_open_note_with_remaining_items(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-ON-003',
+            'name' => 'Angga',
+            'city' => 'Sidoarjo',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-ON-003',
+            'name' => 'Kategori ON 3',
+        ]);
+        $productA = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-ON-003-A',
+            'name' => 'Produk C',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 10000,
+            'is_active' => true,
+        ]);
+        $productB = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-ON-003-B',
+            'name' => 'Produk D',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+
+        $note = OrderNote::query()->create([
+            'note_number' => 'PO-20260228-0003',
+            'note_date' => '2026-02-28',
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'city' => $customer->city,
+            'created_by_name' => 'Tester',
+        ]);
+
+        $itemA = OrderNoteItem::query()->create([
+            'order_note_id' => $note->id,
+            'product_id' => $productA->id,
+            'product_code' => $productA->code,
+            'product_name' => $productA->name,
+            'quantity' => 15,
+        ]);
+        $itemB = OrderNoteItem::query()->create([
+            'order_note_id' => $note->id,
+            'product_id' => $productB->id,
+            'product_code' => $productB->code,
+            'product_name' => $productB->name,
+            'quantity' => 10,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-ON-003',
+            'customer_id' => $customer->id,
+            'order_note_id' => $note->id,
+            'invoice_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 160000,
+            'total' => 160000,
+            'total_paid' => 0,
+            'balance' => 160000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'order_note_item_id' => $itemA->id,
+            'product_id' => $productA->id,
+            'product_code' => $productA->code,
+            'product_name' => $productA->name,
+            'quantity' => 10,
+            'unit_price' => 10000,
+            'line_total' => 100000,
+            'discount' => 0,
+        ]);
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'order_note_item_id' => $itemB->id,
+            'product_id' => $productB->id,
+            'product_code' => $productB->code,
+            'product_name' => $productB->name,
+            'quantity' => 5,
+            'unit_price' => 12000,
+            'line_total' => 60000,
+            'discount' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('api.order-notes.lookup', [
+            'customer_id' => $customer->id,
+            'per_page' => 200,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.note_number', 'PO-20260228-0003');
+        $response->assertJsonPath('data.0.remaining_total', 10);
+        $response->assertJsonPath('data.0.fulfilled_total', 15);
+        $response->assertJsonPath('data.0.ordered_total', 25);
+    }
 }

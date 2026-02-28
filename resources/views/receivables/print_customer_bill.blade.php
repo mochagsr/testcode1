@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -10,7 +10,7 @@
         .container { max-width: 900px; margin: 0 auto; }
         .head { display: grid; grid-template-columns: minmax(0, 1.7fr) auto minmax(0, 1fr); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
         .company-left { display: flex; gap: 8px; min-width: 0; }
-        .logo { width: 62px; height: 62px; object-fit: contain; border: 1px solid #111; padding: 2px; background: #fff; }
+        .logo { width: 40px; height: 60px; object-fit: contain; border: none; padding: 0; background: transparent; }
         .company-name { font-size: 17px; font-weight: 700; text-transform: uppercase; line-height: 1.1; }
         .company-meta { margin-top: 2px; white-space: pre-line; }
         .doc-center { min-width: 220px; text-align: center; align-self: center; justify-self: center; margin-left: -36px; }
@@ -251,3 +251,4 @@
 </div>
 </body>
 </html>
+

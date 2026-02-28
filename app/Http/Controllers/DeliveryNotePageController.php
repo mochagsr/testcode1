@@ -11,6 +11,7 @@ use App\Models\CustomerShipLocation;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\Product;
+use App\Models\StockMutation;
 use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
@@ -268,34 +269,73 @@ class DeliveryNotePageController extends Controller
                 'created_by_name' => auth()->user()?->name ?? __('txn.system_user'),
             ]);
 
+            $stockUsageByProduct = [];
             foreach ($data['items'] as $row) {
-                $productId = $row['product_id'] ?? null;
+                $productId = isset($row['product_id']) ? (int) $row['product_id'] : 0;
                 $productCode = $row['product_code'] ?? null;
                 $productName = $row['product_name'];
                 $unit = $row['unit'] ?? null;
                 $unitPrice = $row['unit_price'] ?? null;
+                $quantity = (int) ($row['quantity'] ?? 0);
 
-                if ($productId) {
-                    $product = Product::query()->find($productId);
+                $product = $this->resolveProductFromInput($productId, $productName);
+                if ($product) {
+                    $product = Product::query()
+                        ->whereKey((int) $product->id)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($product && (int) $product->stock < $quantity) {
+                        throw ValidationException::withMessages([
+                            'items' => __('txn.insufficient_stock_for', ['product' => $product->name]),
+                        ]);
+                    }
                     if ($product) {
+                        $productId = (int) $product->id;
                         $productCode = $productCode ?: $product->code;
-                        $productName = $productName ?: $product->name;
+                        $productName = trim((string) ($product->name ?: $productName));
                         $unit = $unit ?: $product->unit;
                         $unitPrice = $unitPrice !== null && $unitPrice !== ''
                             ? $unitPrice
                             : $this->resolvePriceByCustomerLevel($product, $customer);
+                        $stockUsageByProduct[$product->id] = ($stockUsageByProduct[$product->id] ?? 0) + $quantity;
                     }
                 }
 
                 DeliveryNoteItem::create([
                     'delivery_note_id' => $note->id,
-                    'product_id' => $productId,
+                    'product_id' => $productId > 0 ? $productId : null,
                     'product_code' => $productCode,
                     'product_name' => $productName,
                     'unit' => $unit,
-                    'quantity' => $row['quantity'],
+                    'quantity' => $quantity,
                     'unit_price' => $unitPrice !== null && $unitPrice !== '' ? $unitPrice : null,
                     'notes' => $row['notes'] ?? null,
+                ]);
+            }
+
+            foreach ($stockUsageByProduct as $productId => $quantity) {
+                $product = Product::query()
+                    ->whereKey((int) $productId)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $product || $quantity <= 0) {
+                    continue;
+                }
+                if ((int) $product->stock < (int) $quantity) {
+                    throw ValidationException::withMessages([
+                        'items' => __('txn.insufficient_stock_for', ['product' => $product->name]),
+                    ]);
+                }
+
+                $product->decrement('stock', (int) $quantity);
+                StockMutation::query()->create([
+                    'product_id' => (int) $product->id,
+                    'reference_type' => DeliveryNote::class,
+                    'reference_id' => (int) $note->id,
+                    'mutation_type' => 'out',
+                    'quantity' => (int) $quantity,
+                    'notes' => 'Delivery note ' . $note->note_number,
+                    'created_by_user_id' => auth()->id(),
                 ]);
             }
 
@@ -382,6 +422,109 @@ class DeliveryNotePageController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            if ($note->is_canceled) {
+                throw ValidationException::withMessages([
+                    'items' => __('txn.canceled_info'),
+                ]);
+            }
+
+            $oldQtyByProduct = [];
+            foreach ($note->items as $existingItem) {
+                $productId = (int) ($existingItem->product_id ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                $oldQtyByProduct[$productId] = ($oldQtyByProduct[$productId] ?? 0) + (int) $existingItem->quantity;
+            }
+
+            $newQtyByProduct = [];
+            $resolvedRows = [];
+            foreach (($data['items'] ?? []) as $row) {
+                $productId = isset($row['product_id']) ? (int) $row['product_id'] : 0;
+                $productName = trim((string) ($row['product_name'] ?? ''));
+                $resolvedProduct = $this->resolveProductFromInput($productId, $productName);
+                $resolvedProductId = (int) ($resolvedProduct?->id ?? 0);
+
+                if ($resolvedProductId > 0) {
+                    $row['product_id'] = $resolvedProductId;
+                }
+                $resolvedRows[] = $row;
+
+                $productId = $resolvedProductId > 0 ? $resolvedProductId : $productId;
+                if ($productId <= 0) {
+                    continue;
+                }
+                $newQtyByProduct[$productId] = ($newQtyByProduct[$productId] ?? 0) + (int) ($row['quantity'] ?? 0);
+            }
+
+            $affectedProductIds = collect(array_merge(array_keys($oldQtyByProduct), array_keys($newQtyByProduct)))
+                ->unique()
+                ->values()
+                ->all();
+
+            $products = Product::query()
+                ->whereIn('id', $affectedProductIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($affectedProductIds as $productId) {
+                $product = $products->get((int) $productId);
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'items' => __('txn.product_not_found'),
+                    ]);
+                }
+
+                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
+                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
+                $delta = $oldQty - $newQty;
+                if ($delta < 0 && (int) $product->stock < abs($delta)) {
+                    throw ValidationException::withMessages([
+                        'items' => __('txn.insufficient_stock_for', ['product' => $product->name]),
+                    ]);
+                }
+            }
+
+            foreach ($affectedProductIds as $productId) {
+                $product = $products->get((int) $productId);
+                if (! $product) {
+                    continue;
+                }
+
+                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
+                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
+                $delta = $oldQty - $newQty;
+                if ($delta === 0) {
+                    continue;
+                }
+
+                if ($delta > 0) {
+                    $product->increment('stock', $delta);
+                    StockMutation::query()->create([
+                        'product_id' => (int) $product->id,
+                        'reference_type' => DeliveryNote::class,
+                        'reference_id' => (int) $note->id,
+                        'mutation_type' => 'in',
+                        'quantity' => (int) $delta,
+                        'notes' => 'Admin edit delivery note ' . $note->note_number,
+                        'created_by_user_id' => auth()->id(),
+                    ]);
+                } else {
+                    $outQty = abs($delta);
+                    $product->decrement('stock', $outQty);
+                    StockMutation::query()->create([
+                        'product_id' => (int) $product->id,
+                        'reference_type' => DeliveryNote::class,
+                        'reference_id' => (int) $note->id,
+                        'mutation_type' => 'out',
+                        'quantity' => (int) $outQty,
+                        'notes' => 'Admin edit delivery note ' . $note->note_number,
+                        'created_by_user_id' => auth()->id(),
+                    ]);
+                }
+            }
+
             $note->update([
                 'note_date' => $data['note_date'],
                 'recipient_name' => $data['recipient_name'],
@@ -394,28 +537,30 @@ class DeliveryNotePageController extends Controller
             $note->items()->delete();
             $customer = $note->customer;
 
-            foreach ($data['items'] as $row) {
-                $productId = $row['product_id'] ?? null;
+            foreach ($resolvedRows as $row) {
+                $productId = isset($row['product_id']) ? (int) $row['product_id'] : 0;
                 $productCode = null;
                 $productName = $row['product_name'];
                 $unit = $row['unit'] ?? null;
                 $unitPrice = $row['unit_price'] ?? null;
 
-                if ($productId) {
-                    $product = Product::query()->find($productId);
-                    if ($product) {
-                        $productCode = $product->code;
-                        $productName = $product->name;
-                        $unit = $unit ?: $product->unit;
-                        $unitPrice = $unitPrice !== null && $unitPrice !== ''
-                            ? $unitPrice
-                            : $this->resolvePriceByCustomerLevel($product, $customer);
-                    }
+                $product = $productId > 0
+                    ? $products->get($productId)
+                    : $this->resolveProductFromInput(0, $productName);
+
+                if ($product) {
+                    $productId = (int) $product->id;
+                    $productCode = $product->code;
+                    $productName = $product->name;
+                    $unit = $unit ?: $product->unit;
+                    $unitPrice = $unitPrice !== null && $unitPrice !== ''
+                        ? $unitPrice
+                        : $this->resolvePriceByCustomerLevel($product, $customer);
                 }
 
                 DeliveryNoteItem::create([
                     'delivery_note_id' => $note->id,
-                    'product_id' => $productId,
+                    'product_id' => $productId > 0 ? $productId : null,
                     'product_code' => $productCode,
                     'product_name' => $productName,
                     'unit' => $unit,
@@ -446,12 +591,54 @@ class DeliveryNotePageController extends Controller
             'cancel_reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $deliveryNote->update([
-            'is_canceled' => true,
-            'canceled_at' => now(),
-            'canceled_by_user_id' => auth()->id(),
-            'cancel_reason' => $data['cancel_reason'],
-        ]);
+        DB::transaction(function () use ($deliveryNote, $data): void {
+            $note = DeliveryNote::query()
+                ->with('items')
+                ->whereKey($deliveryNote->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($note->is_canceled) {
+                return;
+            }
+
+            $restoreQtyByProduct = [];
+            foreach ($note->items as $item) {
+                $productId = (int) ($item->product_id ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                $restoreQtyByProduct[$productId] = ($restoreQtyByProduct[$productId] ?? 0) + (int) $item->quantity;
+            }
+
+            foreach ($restoreQtyByProduct as $productId => $quantity) {
+                $product = Product::query()
+                    ->whereKey((int) $productId)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $product || $quantity <= 0) {
+                    continue;
+                }
+
+                $product->increment('stock', (int) $quantity);
+                StockMutation::query()->create([
+                    'product_id' => (int) $product->id,
+                    'reference_type' => DeliveryNote::class,
+                    'reference_id' => (int) $note->id,
+                    'mutation_type' => 'in',
+                    'quantity' => (int) $quantity,
+                    'notes' => 'Cancel delivery note ' . $note->note_number,
+                    'created_by_user_id' => auth()->id(),
+                ]);
+            }
+
+            $note->update([
+                'is_canceled' => true,
+                'canceled_at' => now(),
+                'canceled_by_user_id' => auth()->id(),
+                'cancel_reason' => $data['cancel_reason'],
+            ]);
+        });
 
         $this->auditLogService->log(
             'delivery.note.cancel',
@@ -582,5 +769,45 @@ class DeliveryNotePageController extends Controller
         }
 
         return (float) round((float) ($product->price_general ?? 0));
+    }
+
+    private function resolveProductFromInput(int $productId, ?string $productName): ?Product
+    {
+        if ($productId > 0) {
+            return Product::query()->find($productId);
+        }
+
+        $rawName = trim((string) $productName);
+        if ($rawName === '') {
+            return null;
+        }
+
+        $codeCandidate = $rawName;
+        $nameCandidate = '';
+        $separatorPos = mb_strpos($rawName, ' - ');
+        if ($separatorPos !== false) {
+            $codeCandidate = trim((string) mb_substr($rawName, 0, $separatorPos));
+            $nameCandidate = trim((string) mb_substr($rawName, $separatorPos + 3));
+        }
+
+        if ($codeCandidate !== '') {
+            $byCode = Product::query()->where('code', $codeCandidate)->first();
+            if ($byCode) {
+                return $byCode;
+            }
+        }
+
+        if ($nameCandidate !== '') {
+            $byName = Product::query()
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($nameCandidate)])
+                ->first();
+            if ($byName) {
+                return $byName;
+            }
+        }
+
+        return Product::query()
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($rawName)])
+            ->first();
     }
 }

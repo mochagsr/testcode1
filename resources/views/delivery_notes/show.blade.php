@@ -4,6 +4,31 @@
 
 @section('content')
     <style>
+        .txn-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+        .txn-modal.open {
+            display: flex;
+        }
+        .txn-modal-card {
+            width: min(1100px, 100%);
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+            border-radius: 12px;
+        }
+        .txn-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
         #admin-delivery-items-table input[type=number].qty-input::-webkit-outer-spin-button,
         #admin-delivery-items-table input[type=number].qty-input::-webkit-inner-spin-button,
         #admin-delivery-items-table input[type=number].price-input::-webkit-outer-spin-button,
@@ -23,7 +48,7 @@
         <div class="flex">
             <a class="btn secondary" href="{{ route('delivery-notes.index') }}">{{ __('txn.back') }}</a>
             @if((auth()->user()?->role ?? '') === 'admin')
-                <a class="btn secondary" href="#admin-edit-transaction">{{ __('txn.edit_transaction') }}</a>
+                <button type="button" class="btn secondary" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
@@ -86,10 +111,14 @@
     </div>
 
     @if((auth()->user()?->role ?? '') === 'admin')
-        <div id="admin-edit-transaction" class="card">
-            <div class="form-section">
-                <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
-                <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
+        <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
+            <div id="admin-edit-transaction" class="card txn-modal-card">
+                <div class="form-section">
+                    <div class="txn-modal-header">
+                        <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
+                        <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
+                    </div>
+                    <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
                 <form id="admin-delivery-edit-form" method="post" action="{{ route('delivery-notes.admin-update', $note) }}" class="row" style="margin-bottom: 12px;">
                     @csrf
                     @method('PUT')
@@ -117,19 +146,19 @@
                         <table id="admin-delivery-items-table">
                             <thead>
                             <tr>
-                                <th>{{ __('txn.product') }}</th>
-                                <th>{{ __('txn.qty') }}</th>
-                                <th>{{ __('txn.unit') }}</th>
-                                <th>{{ __('txn.price') }}</th>
-                                <th>{{ __('txn.notes') }}</th>
-                                <th>{{ __('txn.action') }}</th>
+                                <th style="width: 34%;">{{ __('txn.product') }}</th>
+                                <th style="width: 10%;">{{ __('txn.qty') }}</th>
+                                <th style="width: 9%;">{{ __('txn.unit') }}</th>
+                                <th style="width: 12%;">{{ __('txn.price') }}</th>
+                                <th style="width: 20%;">{{ __('txn.notes') }}</th>
+                                <th style="width: 15%;">{{ __('txn.action') }}</th>
                             </tr>
                             </thead>
                             <tbody>
                             @foreach($note->items as $index => $item)
                                 <tr>
                                     <td>
-                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="{{ $item->product_name }}" style="max-width: 140px;" required>
+                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="{{ $item->product_name }}" style="min-width: 280px; width: 100%;" required>
                                         <input type="hidden" class="admin-delivery-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
                                     </td>
                                     <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-delivery-item-qty qty-input" value="{{ (int) round($item->quantity) }}" style="max-width: 104px;" required></td>
@@ -171,11 +200,40 @@
                         </div>
                     </form>
                 @endif
+                </div>
             </div>
         </div>
 
         <script>
             (function () {
+                const modal = document.getElementById('admin-edit-modal');
+                const openBtn = document.getElementById('open-admin-edit-modal');
+                const closeBtn = document.getElementById('close-admin-edit-modal');
+                const modalCard = modal?.querySelector('.txn-modal-card');
+                if (modal && openBtn && closeBtn) {
+                    const closeModal = () => {
+                        modal.classList.remove('open');
+                        modal.setAttribute('aria-hidden', 'true');
+                    };
+                    const openModal = () => {
+                        modal.classList.add('open');
+                        modal.setAttribute('aria-hidden', 'false');
+                    };
+                    openBtn.addEventListener('click', openModal);
+                    closeBtn.addEventListener('click', closeModal);
+                    modal.addEventListener('click', (event) => {
+                        if (!modalCard || modalCard.contains(event.target)) {
+                            return;
+                        }
+                        closeModal();
+                    });
+                    document.addEventListener('keydown', (event) => {
+                        if (event.key === 'Escape') {
+                            closeModal();
+                        }
+                    });
+                }
+
                 const table = document.getElementById('admin-delivery-items-table');
                 const tbody = table?.querySelector('tbody');
                 const addButton = document.getElementById('admin-add-delivery-item');
@@ -418,7 +476,7 @@
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>
-                            <input type="text" name="items[${index}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="" style="max-width: 140px;" required>
+                            <input type="text" name="items[${index}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="" style="min-width: 280px; width: 100%;" required>
                             <input type="hidden" class="admin-delivery-item-product-id" name="items[${index}][product_id]" value="">
                         </td>
                         <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-delivery-item-qty qty-input" value="1" style="max-width: 104px;" required></td>
