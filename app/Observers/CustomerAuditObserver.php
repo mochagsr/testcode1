@@ -15,7 +15,10 @@ final class CustomerAuditObserver extends BaseModelAuditObserver
     {
         $this->logCreated(
             $customer,
-            "Customer '{$customer->name}' created with code '{$customer->code}'"
+            __('ui.audit_desc_customer_created', [
+                'name' => (string) $customer->name,
+                'code' => (string) ($customer->code ?? '-'),
+            ])
         );
     }
 
@@ -26,6 +29,8 @@ final class CustomerAuditObserver extends BaseModelAuditObserver
 
     public function deleted(Customer $customer): void
     {
-        $this->logDeleted($customer, "Customer '{$customer->name}' deleted");
+        $this->logDeleted($customer, __('ui.audit_desc_customer_deleted', [
+            'name' => (string) $customer->name,
+        ]));
     }
 }

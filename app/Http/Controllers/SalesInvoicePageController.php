@@ -243,7 +243,7 @@ class SalesInvoicePageController extends Controller
         }
         $initialOrderNotes = collect();
         if ($oldCustomerId > 0) {
-            $initialOrderNotes = $this->openOrderNotesForCustomer($oldCustomerId, 20);
+            $initialOrderNotes = $this->openOrderNotesForCustomer($oldCustomerId, 50);
         }
 
         return view('sales_invoices.create', [
@@ -281,6 +281,7 @@ class SalesInvoicePageController extends Controller
             $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
             $rows = collect($data['items']);
             $customerId = (int) $data['customer_id'];
+            $selectedCustomerName = trim((string) (Customer::query()->whereKey($customerId)->value('name') ?? ''));
             $selectedOrderNoteId = max(0, (int) ($data['order_note_id'] ?? 0));
             $selectedOrderNote = null;
             $orderNoteItemsById = collect();
@@ -294,9 +295,23 @@ class SalesInvoicePageController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if ((int) ($selectedOrderNote->customer_id ?? 0) !== $customerId) {
+                $orderNoteCustomerId = (int) ($selectedOrderNote->customer_id ?? 0);
+                if ($orderNoteCustomerId > 0 && $orderNoteCustomerId !== $customerId) {
                     throw ValidationException::withMessages([
                         'order_note_id' => __('txn.order_note_customer_mismatch'),
+                    ]);
+                }
+                if ($orderNoteCustomerId <= 0) {
+                    $normalizedOrderNoteCustomer = mb_strtolower(trim((string) ($selectedOrderNote->customer_name ?? '')));
+                    $normalizedSelectedCustomer = mb_strtolower($selectedCustomerName);
+                    if ($normalizedSelectedCustomer === '' || $normalizedOrderNoteCustomer !== $normalizedSelectedCustomer) {
+                        throw ValidationException::withMessages([
+                            'order_note_id' => __('txn.order_note_customer_mismatch'),
+                        ]);
+                    }
+
+                    $selectedOrderNote->update([
+                        'customer_id' => $customerId,
                     ]);
                 }
                 if ((bool) ($selectedOrderNote->is_canceled ?? false)) {
@@ -1134,11 +1149,22 @@ class SalesInvoicePageController extends Controller
     /**
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
-    private function openOrderNotesForCustomer(int $customerId, int $limit = 20): \Illuminate\Support\Collection
+    private function openOrderNotesForCustomer(int $customerId, int $limit = 50): \Illuminate\Support\Collection
     {
+        $customerName = trim((string) (Customer::query()->whereKey($customerId)->value('name') ?? ''));
+        $normalizedCustomerName = mb_strtolower($customerName);
+
         $notes = OrderNote::query()
             ->select(['id', 'note_number', 'note_date'])
-            ->where('customer_id', $customerId)
+            ->where(function ($query) use ($customerId, $normalizedCustomerName): void {
+                $query->where('customer_id', $customerId);
+                if ($normalizedCustomerName !== '') {
+                    $query->orWhere(function ($fallbackQuery) use ($normalizedCustomerName): void {
+                        $fallbackQuery->whereNull('customer_id')
+                            ->whereRaw('LOWER(TRIM(customer_name)) = ?', [$normalizedCustomerName]);
+                    });
+                }
+            })
             ->active()
             ->orderByDesc('note_date')
             ->orderByDesc('id')

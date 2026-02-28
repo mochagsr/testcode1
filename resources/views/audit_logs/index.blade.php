@@ -72,7 +72,8 @@
                     <td>{{ $log->user?->name ?? '-' }}</td>
                     <td>
                         @php
-                            $actionLabel = match ((string) $log->action) {
+                            $actionRaw = (string) $log->action;
+                            $actionMap = [
                                 'sales.invoice.create' => __('ui.audit_action_sales_invoice_create'),
                                 'sales.invoice.admin_update' => __('ui.audit_action_sales_invoice_admin_update'),
                                 'sales.invoice.cancel' => __('ui.audit_action_sales_invoice_cancel'),
@@ -85,8 +86,10 @@
                                 'order.note.create' => __('ui.audit_action_order_note_create'),
                                 'order.note.admin_update' => __('ui.audit_action_order_note_admin_update'),
                                 'order.note.cancel' => __('ui.audit_action_order_note_cancel'),
-                                default => (string) $log->action,
-                            };
+                            ];
+                            $fallbackTranslationKey = 'ui.audit_action_' . str_replace(['.', '-'], '_', $actionRaw);
+                            $actionLabel = $actionMap[$actionRaw]
+                                ?? (lang()->has($fallbackTranslationKey) ? __($fallbackTranslationKey) : $actionRaw);
                         @endphp
                         {{ $actionLabel }}
                     </td>

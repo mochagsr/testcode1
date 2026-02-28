@@ -74,8 +74,8 @@ class DeliveryTripPageController extends Controller
                 'member_count' => 0,
                 'fuel_cost' => (int) $data['fuel_cost'],
                 'toll_cost' => (int) $data['toll_cost'],
-                'meal_cost' => (int) $data['meal_cost'],
-                'other_cost' => (int) $data['other_cost'],
+                'meal_cost' => (int) ($data['meal_cost'] ?? 0),
+                'other_cost' => (int) ($data['other_cost'] ?? 0),
                 'total_cost' => $totalCost,
                 'notes' => $this->nullIfEmpty((string) ($data['notes'] ?? '')),
                 'created_by_user_id' => (int) ($request->user()?->id ?? 0) ?: null,
@@ -142,7 +142,6 @@ class DeliveryTripPageController extends Controller
                 'driver_name' => $trip->driver_name,
                 'assistant_name' => $trip->assistant_name,
                 'vehicle_plate' => $trip->vehicle_plate,
-                'member_count' => $trip->member_count,
                 'fuel_cost' => (int) $trip->fuel_cost,
                 'toll_cost' => (int) $trip->toll_cost,
                 'meal_cost' => (int) $trip->meal_cost,
@@ -162,8 +161,8 @@ class DeliveryTripPageController extends Controller
                 'member_count' => 0,
                 'fuel_cost' => (int) $data['fuel_cost'],
                 'toll_cost' => (int) $data['toll_cost'],
-                'meal_cost' => (int) $data['meal_cost'],
-                'other_cost' => (int) $data['other_cost'],
+                'meal_cost' => (int) ($data['meal_cost'] ?? 0),
+                'other_cost' => (int) ($data['other_cost'] ?? 0),
                 'total_cost' => $totalCost,
                 'notes' => $this->nullIfEmpty((string) ($data['notes'] ?? '')),
                 'updated_by_user_id' => (int) ($request->user()?->id ?? 0) ?: null,
@@ -187,7 +186,6 @@ class DeliveryTripPageController extends Controller
                     'driver_name' => $trip->driver_name,
                     'assistant_name' => $trip->assistant_name,
                     'vehicle_plate' => $trip->vehicle_plate,
-                    'member_count' => $trip->member_count,
                     'fuel_cost' => (int) $trip->fuel_cost,
                     'toll_cost' => (int) $trip->toll_cost,
                     'meal_cost' => (int) $trip->meal_cost,
@@ -283,10 +281,10 @@ class DeliveryTripPageController extends Controller
             'driver_name' => ['required', 'string', 'max:120'],
             'assistant_name' => ['nullable', 'string', 'max:120'],
             'vehicle_plate' => ['nullable', 'string', 'max:40'],
-            'fuel_cost' => ['required', 'integer', 'min:0'],
-            'toll_cost' => ['required', 'integer', 'min:0'],
-            'meal_cost' => ['required', 'integer', 'min:0'],
-            'other_cost' => ['required', 'integer', 'min:0'],
+            'fuel_cost' => ['nullable', 'integer', 'min:0'],
+            'toll_cost' => ['nullable', 'integer', 'min:0'],
+            'meal_cost' => ['nullable', 'integer', 'min:0'],
+            'other_cost' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
     }
@@ -296,10 +294,10 @@ class DeliveryTripPageController extends Controller
      */
     private function totalCostFromData(array $data): int
     {
-        return (int) $data['fuel_cost']
-            + (int) $data['toll_cost']
-            + (int) $data['meal_cost']
-            + (int) $data['other_cost'];
+        return (int) ($data['fuel_cost'] ?? 0)
+            + (int) ($data['toll_cost'] ?? 0)
+            + (int) ($data['meal_cost'] ?? 0)
+            + (int) ($data['other_cost'] ?? 0);
     }
 
     private function nullIfEmpty(string $value): ?string

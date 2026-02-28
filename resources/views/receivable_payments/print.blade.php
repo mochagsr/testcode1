@@ -6,19 +6,20 @@
     <title>{{ __('txn.print') }} {{ $payment->payment_number }}</title>
     <style>
         @page { margin: 8mm 8mm 10mm 8mm; }
-        body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.3; color: #111; }
-        .container { max-width: 760px; margin: 0 auto; }
+        body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.25; color: #111; }
+        .container { max-width: 900px; margin: 0 auto; }
         .receipt { border: 1px solid #111; padding: 12px; }
-        .top { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
-        .company-left { display: flex; gap: 8px; max-width: 66%; }
+        .company-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
+        .company-left { display: flex; gap: 8px; }
         .company-logo { width: 37px; height: 50px; border: 1px solid #111; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
-        .company-name { font-size: 14px; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
+        .company-name { font-size: 16px; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
         .company-detail { white-space: pre-line; }
-        .kwitansi-box { text-align: right; min-width: 220px; }
-        .kwitansi-title { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+        .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; }
+        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; text-align: left; }
+        .kwitansi-title { font-size: 18px; font-weight: 700; letter-spacing: 0.6px; text-align: center; }
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
-        .meta { margin-top: 2px; }
+        .doc-number { text-align: center; margin-bottom: 4px; }
         .line { display: flex; margin-bottom: 4px; }
         .line-label { width: 150px; flex-shrink: 0; }
         .line-sep { width: 12px; text-align: center; flex-shrink: 0; }
@@ -36,7 +37,14 @@
         .pdf-mode { font-size: 10px; }
         .pdf-mode .container { max-width: 100%; }
         .pdf-mode .receipt { padding: 10px; }
-        .pdf-mode .company-name { font-size: 13px; }
+        .pdf-mode .company-head { display: table; width: 100%; table-layout: fixed; border-collapse: collapse; }
+        .pdf-mode .company-left,
+        .pdf-mode .doc-title-center,
+        .pdf-mode .doc-meta-right { display: table-cell; vertical-align: top; }
+        .pdf-mode .company-left { width: 44%; padding-right: 8px; }
+        .pdf-mode .doc-title-center { width: 22%; padding: 0 6px; text-align: center; }
+        .pdf-mode .doc-meta-right { width: 34%; padding-left: 8px; min-width: 0; }
+        .pdf-mode .company-name { font-size: 14px; }
         .pdf-mode .kwitansi-title { font-size: 16px; }
         @media print {
             .no-print { display: none; }
@@ -63,10 +71,24 @@
         $companyLogoSrc = null;
 
         if ($companyLogoPath) {
-            $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
-            if (is_file($absoluteLogoPath)) {
-                $mimeType = mime_content_type($absoluteLogoPath) ?: 'image/png';
-                $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
+            $normalized = ltrim((string) $companyLogoPath, '/\\');
+            $storageRelative = str_starts_with($normalized, 'storage/')
+                ? substr($normalized, strlen('storage/'))
+                : $normalized;
+            $candidatePaths = array_values(array_unique([
+                public_path('storage/' . $storageRelative),
+                public_path($normalized),
+                storage_path('app/public/' . $storageRelative),
+            ]));
+
+            foreach ($candidatePaths as $candidatePath) {
+                if (is_file($candidatePath)) {
+                    $mimeType = function_exists('mime_content_type')
+                        ? (mime_content_type($candidatePath) ?: 'image/png')
+                        : 'image/png';
+                    $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode((string) file_get_contents($candidatePath));
+                    break;
+                }
             }
         }
     @endphp
@@ -77,7 +99,7 @@
     @endif
 
     <div class="receipt">
-        <div class="top">
+        <div class="company-head">
             <div class="company-left">
                 <div class="company-logo">
                     @if($companyLogoSrc)
@@ -93,10 +115,16 @@
                     @endif
                 </div>
             </div>
-            <div class="kwitansi-box">
+            <div class="doc-title-center">
                 <div class="kwitansi-title">{{ $reportHeaderText !== '' ? $reportHeaderText : 'KWITANSI' }}</div>
-                <div class="meta">{{ __('txn.no') }}: {{ $payment->payment_number }}</div>
-                <div class="meta">{{ __('txn.date') }}: {{ $payment->payment_date?->format('d-m-Y') }}</div>
+                <div class="doc-number">{{ __('txn.no') }}: {{ $payment->payment_number }}</div>
+            </div>
+            <div class="doc-meta-right">
+                <div><strong>{{ __('txn.date') }}</strong> : {{ $payment->payment_date?->format('d-m-Y') }}</div>
+                <div><strong>{{ __('receivable.customer') }}</strong> : {{ $payment->customer?->name ?: '-' }}</div>
+                <div><strong>{{ __('txn.phone') }}</strong> : {{ $payment->customer?->phone ?: '-' }}</div>
+                <div><strong>{{ __('txn.address') }}</strong> : {{ $payment->customer_address ?: '-' }}</div>
+                <div><strong>{{ __('txn.city') }}</strong> : {{ $payment->customer?->city ?: '-' }}</div>
             </div>
         </div>
         @if($payment->is_canceled)

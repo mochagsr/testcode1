@@ -191,16 +191,26 @@ class OrderNotePageController extends Controller
         $data = $request->validate([
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'search' => ['nullable', 'string', 'max:100'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
         $customerId = (int) $data['customer_id'];
+        $customerName = trim((string) (Customer::query()->whereKey($customerId)->value('name') ?? ''));
+        $normalizedCustomerName = mb_strtolower($customerName);
         $search = trim((string) ($data['search'] ?? ''));
         $limit = (int) ($data['per_page'] ?? 20);
 
         $notes = OrderNote::query()
             ->select(['id', 'note_number', 'note_date', 'customer_name', 'city'])
-            ->where('customer_id', $customerId)
+            ->where(function ($query) use ($customerId, $normalizedCustomerName): void {
+                $query->where('customer_id', $customerId);
+                if ($normalizedCustomerName !== '') {
+                    $query->orWhere(function ($fallbackQuery) use ($normalizedCustomerName): void {
+                        $fallbackQuery->whereNull('customer_id')
+                            ->whereRaw('LOWER(TRIM(customer_name)) = ?', [$normalizedCustomerName]);
+                    });
+                }
+            })
             ->active()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where('note_number', 'like', "%{$search}%");

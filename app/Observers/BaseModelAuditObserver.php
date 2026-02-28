@@ -29,7 +29,9 @@ abstract class BaseModelAuditObserver
             $this->auditLogService->log(
                 'updated',
                 $model,
-                'Updated: ' . implode(', ', array_keys($changes))
+                __('ui.audit_desc_updated_fields', [
+                    'fields' => implode(', ', array_keys($changes)),
+                ])
             );
         }
     }

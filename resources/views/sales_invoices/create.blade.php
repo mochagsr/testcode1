@@ -152,6 +152,7 @@
         const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
         const ORDER_NOTE_LOOKUP_URL = @json(route('api.order-notes.lookup'));
         const LOOKUP_LIMIT = 20;
+        const ORDER_NOTE_LOOKUP_LIMIT = 200;
         const selectProductLabel = @json(__('txn.select_product'));
         const selectOrderNoteLabel = @json(__('txn.select_order_note'));
         const tbody = document.querySelector('#items-table tbody');
@@ -281,9 +282,11 @@
                 .join('');
         }
 
-        async function fetchCustomerSuggestions(query) {
+        async function fetchCustomerSuggestions(query, options = {}) {
+            const force = options.force === true;
+            const perPage = Number(options.perPage || LOOKUP_LIMIT);
             const normalizedQuery = normalizeLookup(query);
-            if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
+            if (!force && !(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
                 lastCustomerLookupQuery = '';
                 renderCustomerSuggestions(query);
                 return;
@@ -297,7 +300,7 @@
                     customerLookupAbort.abort();
                 }
                 customerLookupAbort = new AbortController();
-                const url = `${CUSTOMER_LOOKUP_URL}?search=${encodeURIComponent(query)}&per_page=${LOOKUP_LIMIT}`;
+                const url = `${CUSTOMER_LOOKUP_URL}?search=${encodeURIComponent(query)}&per_page=${Math.max(1, perPage)}`;
                 const response = await fetch(url, { signal: customerLookupAbort.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!response.ok) {
                     return;
@@ -331,6 +334,55 @@
             return customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
                 || customers.find((customer) => customer.name.toLowerCase().includes(normalized))
                 || null;
+        }
+
+        function customerSearchVariants(rawValue) {
+            const input = String(rawValue || '').trim();
+            if (input === '') {
+                return [];
+            }
+
+            const variants = [input];
+            const match = input.match(/^(.+?)\s*\((.+)\)\s*$/);
+            if (match) {
+                const namePart = String(match[1] || '').trim();
+                const cityPart = String(match[2] || '').trim();
+                if (namePart !== '') {
+                    variants.push(namePart);
+                }
+                if (cityPart !== '') {
+                    variants.push(cityPart);
+                }
+                if (namePart !== '' && cityPart !== '') {
+                    variants.push(`${namePart} ${cityPart}`);
+                }
+            }
+
+            return Array.from(new Set(variants));
+        }
+
+        async function resolveCustomerFromInput(rawValue) {
+            const variants = customerSearchVariants(rawValue);
+            if (variants.length === 0) {
+                return null;
+            }
+
+            for (const variant of variants) {
+                const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                if (customer) {
+                    return customer;
+                }
+            }
+
+            for (const variant of variants) {
+                await fetchCustomerSuggestions(variant, { force: true, perPage: 50 });
+                const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                if (customer) {
+                    return customer;
+                }
+            }
+
+            return null;
         }
 
         function setCurrentCustomer(customer, resetOrderNote = true) {
@@ -443,7 +495,7 @@
                     orderNoteLookupAbort.abort();
                 }
                 orderNoteLookupAbort = new AbortController();
-                const url = `${ORDER_NOTE_LOOKUP_URL}?customer_id=${encodeURIComponent(customerId)}&per_page=20`;
+                const url = `${ORDER_NOTE_LOOKUP_URL}?customer_id=${encodeURIComponent(customerId)}&per_page=${ORDER_NOTE_LOOKUP_LIMIT}`;
                 const response = await fetch(url, {
                     signal: orderNoteLookupAbort.signal,
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -489,8 +541,15 @@
             const mustResetOrderNote = shouldResetOrderNote && previousCustomerId !== nextCustomerId;
             setCurrentCustomer(customer, mustResetOrderNote);
             applyCustomerPricing();
-            if (previousCustomerId !== nextCustomerId) {
-                await fetchOrderNotesForCustomer(nextCustomerId);
+            const shouldFetchOrderNotes = nextCustomerId !== ''
+                && (
+                    previousCustomerId !== nextCustomerId
+                    || String(orderNotesCustomerId || '') !== nextCustomerId
+                    || !Array.isArray(orderNotes)
+                    || orderNotes.length === 0
+                );
+            if (shouldFetchOrderNotes) {
+                await fetchOrderNotesForCustomer(nextCustomerId, orderNoteField?.value || '');
             }
         }
 
@@ -831,7 +890,7 @@
             });
             customerSearch.addEventListener('input', onCustomerInput);
             customerSearch.addEventListener('change', async (event) => {
-                const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
+                const customer = await resolveCustomerFromInput(event.currentTarget.value);
                 await handleResolvedCustomer(customer, true);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
@@ -847,6 +906,18 @@
                 }
                 updateOrderNoteInfoSelection(note);
                 applyOrderNoteItems(note);
+            });
+            orderNoteField.addEventListener('focus', async () => {
+                const customerId = String(customerIdField.value || '');
+                if (customerId === '') {
+                    return;
+                }
+                const needsReload = String(orderNotesCustomerId || '') !== customerId
+                    || !Array.isArray(orderNotes)
+                    || orderNotes.length === 0;
+                if (needsReload) {
+                    await fetchOrderNotesForCustomer(customerId, orderNoteField.value || '');
+                }
             });
         }
         if (form) {

@@ -190,11 +190,15 @@
                             'code' => (string) ($product->code ?? ''),
                             'name' => (string) $product->name,
                             'unit' => (string) ($product->unit ?? ''),
+                            'price_agent' => (int) round((float) ($product->price_agent ?? 0)),
+                            'price_sales' => (int) round((float) ($product->price_sales ?? 0)),
                             'price_general' => (int) round((float) ($product->price_general ?? 0)),
                         ];
                     })->values()->all();
                 @endphp
                 let products = @json($adminProducts);
+                const customerLevelCode = @json(strtolower(trim((string) ($note->customer?->level?->code ?? ''))));
+                const customerLevelName = @json(strtolower(trim((string) ($note->customer?->level?->name ?? ''))));
                 let productByLabel = new Map();
                 let productByCode = new Map();
                 let productByName = new Map();
@@ -222,6 +226,28 @@
 
                 function normalizeLookup(value) {
                     return String(value || '').trim().toLowerCase();
+                }
+
+                function getPriceKeyForCustomer() {
+                    const combined = `${customerLevelCode} ${customerLevelName}`.trim();
+                    if (combined.includes('agent') || combined.includes('agen')) {
+                        return 'price_agent';
+                    }
+                    if (combined.includes('sales')) {
+                        return 'price_sales';
+                    }
+                    return 'price_general';
+                }
+
+                function getProductPriceByCustomerLevel(product) {
+                    const key = getPriceKeyForCustomer();
+                    if (key === 'price_agent') {
+                        return Number(product.price_agent ?? product.price_general ?? 0);
+                    }
+                    if (key === 'price_sales') {
+                        return Number(product.price_sales ?? product.price_general ?? 0);
+                    }
+                    return Number(product.price_general ?? 0);
                 }
 
                 function productLabel(product) {
@@ -356,7 +382,7 @@
                             row.querySelector('.admin-delivery-item-unit').value = selected.unit || '';
                         }
                         if (!row.querySelector('.admin-delivery-item-price').value) {
-                            row.querySelector('.admin-delivery-item-price').value = selected.price_general || 0;
+                            row.querySelector('.admin-delivery-item-price').value = Math.round(getProductPriceByCustomerLevel(selected));
                         }
                     });
                     searchInput?.addEventListener('input', onSearchInput);
@@ -375,7 +401,7 @@
                             row.querySelector('.admin-delivery-item-unit').value = selected.unit || '';
                         }
                         if (!row.querySelector('.admin-delivery-item-price').value) {
-                            row.querySelector('.admin-delivery-item-price').value = selected.price_general || 0;
+                            row.querySelector('.admin-delivery-item-price').value = Math.round(getProductPriceByCustomerLevel(selected));
                         }
                     });
                     row.querySelector('.admin-remove-delivery-item')?.addEventListener('click', () => {

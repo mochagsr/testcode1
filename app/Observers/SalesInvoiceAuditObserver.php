@@ -15,7 +15,10 @@ final class SalesInvoiceAuditObserver extends BaseModelAuditObserver
     {
         $this->logCreated(
             $invoice,
-            "Invoice '{$invoice->invoice_number}' created with total {$invoice->total}"
+            __('ui.audit_desc_invoice_created', [
+                'number' => (string) ($invoice->invoice_number ?? '-'),
+                'total' => number_format((int) round((float) ($invoice->total ?? 0)), 0, ',', '.'),
+            ])
         );
     }
 
@@ -26,6 +29,8 @@ final class SalesInvoiceAuditObserver extends BaseModelAuditObserver
 
     public function deleted(SalesInvoice $invoice): void
     {
-        $this->logDeleted($invoice, "Invoice '{$invoice->invoice_number}' deleted");
+        $this->logDeleted($invoice, __('ui.audit_desc_invoice_deleted', [
+            'number' => (string) ($invoice->invoice_number ?? '-'),
+        ]));
     }
 }

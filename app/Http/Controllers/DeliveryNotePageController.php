@@ -136,6 +136,7 @@ class DeliveryNotePageController extends Controller
             $now->copy()->addSeconds(60),
             fn() => Customer::query()
                 ->onlyDeliveryFormColumns()
+                ->with('level:id,code,name')
                 ->orderBy('name')
                 ->limit(20)
                 ->get()
@@ -143,6 +144,7 @@ class DeliveryNotePageController extends Controller
         if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
                 ->onlyDeliveryFormColumns()
+                ->with('level:id,code,name')
                 ->whereKey($oldCustomerId)
                 ->first();
             if ($oldCustomer !== null) {
@@ -232,6 +234,10 @@ class DeliveryNotePageController extends Controller
                 }
             }
 
+            $customer = $customerId !== null
+                ? Customer::query()->with('level:id,code,name')->find($customerId)
+                : null;
+
             $recipientName = trim((string) ($data['recipient_name'] ?? ''));
             $recipientPhone = trim((string) ($data['recipient_phone'] ?? ''));
             $city = trim((string) ($data['city'] ?? ''));
@@ -275,6 +281,9 @@ class DeliveryNotePageController extends Controller
                         $productCode = $productCode ?: $product->code;
                         $productName = $productName ?: $product->name;
                         $unit = $unit ?: $product->unit;
+                        $unitPrice = $unitPrice !== null && $unitPrice !== ''
+                            ? $unitPrice
+                            : $this->resolvePriceByCustomerLevel($product, $customer);
                     }
                 }
 
@@ -309,7 +318,12 @@ class DeliveryNotePageController extends Controller
     public function show(DeliveryNote $deliveryNote): View
     {
         $now = now();
-        $deliveryNote->load(['customer:id,name,city,phone,address', 'shipLocation:id,school_name,recipient_name,recipient_phone,city,address', 'items']);
+        $deliveryNote->load([
+            'customer:id,name,city,phone,address,customer_level_id',
+            'customer.level:id,code,name',
+            'shipLocation:id,school_name,recipient_name,recipient_phone,city,address',
+            'items',
+        ]);
         $itemProductIds = $deliveryNote->items
             ->pluck('product_id')
             ->map(fn($id): int => (int) $id)
@@ -359,7 +373,11 @@ class DeliveryNotePageController extends Controller
 
         DB::transaction(function () use ($deliveryNote, $data): void {
             $note = DeliveryNote::query()
-                ->with('items')
+                ->with([
+                    'items',
+                    'customer:id,name,customer_level_id',
+                    'customer.level:id,code,name',
+                ])
                 ->whereKey($deliveryNote->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -374,6 +392,7 @@ class DeliveryNotePageController extends Controller
             ]);
 
             $note->items()->delete();
+            $customer = $note->customer;
 
             foreach ($data['items'] as $row) {
                 $productId = $row['product_id'] ?? null;
@@ -388,7 +407,9 @@ class DeliveryNotePageController extends Controller
                         $productCode = $product->code;
                         $productName = $product->name;
                         $unit = $unit ?: $product->unit;
-                        $unitPrice = $unitPrice !== null && $unitPrice !== '' ? $unitPrice : $product->price_general;
+                        $unitPrice = $unitPrice !== null && $unitPrice !== ''
+                            ? $unitPrice
+                            : $this->resolvePriceByCustomerLevel($product, $customer);
                     }
                 }
 
@@ -544,5 +565,22 @@ class DeliveryNotePageController extends Controller
     {
         $rawDate = $date instanceof Carbon ? $date->format('Y-m-d') : (string) $date;
         return $this->semesterBookService->semesterFromDate($rawDate) ?? $this->currentSemesterPeriod();
+    }
+
+    private function resolvePriceByCustomerLevel(Product $product, ?Customer $customer): float
+    {
+        $levelCode = strtolower(trim((string) ($customer?->level?->code ?? '')));
+        $levelName = strtolower(trim((string) ($customer?->level?->name ?? '')));
+        $combined = trim($levelCode . ' ' . $levelName);
+
+        if (str_contains($combined, 'agent') || str_contains($combined, 'agen')) {
+            return (float) round((float) ($product->price_agent ?? $product->price_general ?? 0));
+        }
+
+        if (str_contains($combined, 'sales')) {
+            return (float) round((float) ($product->price_sales ?? $product->price_general ?? 0));
+        }
+
+        return (float) round((float) ($product->price_general ?? 0));
     }
 }

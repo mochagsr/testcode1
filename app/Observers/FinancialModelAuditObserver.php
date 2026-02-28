@@ -18,7 +18,9 @@ class FinancialModelAuditObserver
         $this->auditLogService->log(
             'financial.created',
             $model,
-            class_basename($model) . ' created',
+            __('ui.audit_desc_financial_created', [
+                'model' => class_basename($model),
+            ]),
             null,
             null,
             $model->getAttributes()
@@ -36,7 +38,9 @@ class FinancialModelAuditObserver
         $this->auditLogService->log(
             'financial.updated',
             $model,
-            class_basename($model) . ' updated',
+            __('ui.audit_desc_financial_updated', [
+                'model' => class_basename($model),
+            ]),
             null,
             $before,
             $after
@@ -48,7 +52,9 @@ class FinancialModelAuditObserver
         $this->auditLogService->log(
             'financial.deleted',
             $model,
-            class_basename($model) . ' deleted',
+            __('ui.audit_desc_financial_deleted', [
+                'model' => class_basename($model),
+            ]),
             null,
             $model->getOriginal(),
             null

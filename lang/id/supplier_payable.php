@@ -23,6 +23,6 @@ return [
     'amount_in_words' => 'Terbilang',
     'supplier_signature' => 'Tanda Tangan Supplier',
     'user_signature' => 'Tanda Tangan User',
-    'receipt_title' => 'Kwitansi Pembayaran Hutang Supplier',
+    'receipt_title' => 'Kwitansi Pembayaran',
     'receipt_number' => 'No. Kwitansi',
 ];

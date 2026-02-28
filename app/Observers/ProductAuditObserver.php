@@ -15,7 +15,10 @@ final class ProductAuditObserver extends BaseModelAuditObserver
     {
         $this->logCreated(
             $product,
-            "Product '{$product->name}' created with code '{$product->code}'"
+            __('ui.audit_desc_product_created', [
+                'name' => (string) $product->name,
+                'code' => (string) ($product->code ?? '-'),
+            ])
         );
     }
 
@@ -26,6 +29,8 @@ final class ProductAuditObserver extends BaseModelAuditObserver
 
     public function deleted(Product $product): void
     {
-        $this->logDeleted($product, "Product '{$product->name}' deleted");
+        $this->logDeleted($product, __('ui.audit_desc_product_deleted', [
+            'name' => (string) $product->name,
+        ]));
     }
 }

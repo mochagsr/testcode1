@@ -89,7 +89,7 @@ class SupplierPageController extends Controller
         $this->auditLogService->log(
             'master.supplier.create',
             $supplier,
-            "Supplier created: {$supplier->name}",
+            __('ui.audit_desc_supplier_created', ['name' => (string) $supplier->name]),
             $request
         );
         AppCache::forgetAfterFinancialMutation();
@@ -115,7 +115,7 @@ class SupplierPageController extends Controller
         $this->auditLogService->log(
             'master.supplier.update',
             $supplier,
-            "Supplier updated: {$supplier->name}",
+            __('ui.audit_desc_supplier_updated', ['name' => (string) $supplier->name]),
             $request
         );
         AppCache::forgetAfterFinancialMutation();
@@ -133,7 +133,7 @@ class SupplierPageController extends Controller
         $this->auditLogService->log(
             'master.supplier.delete',
             null,
-            "Supplier deleted: {$name}",
+            __('ui.audit_desc_supplier_deleted', ['name' => (string) $name]),
             $request
         );
         AppCache::forgetAfterFinancialMutation();

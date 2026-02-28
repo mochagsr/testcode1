@@ -24,6 +24,10 @@ class DashboardController extends Controller
         $now = now();
         $currentPath = request()->url();
         $currentQuery = request()->query();
+        $uncollectedPerPage = 20;
+        $pendingOrderNotesPerPage = 20;
+        $uncollectedPageName = 'uncollected_customers_page';
+        $pendingOrderNotesPageName = 'pending_order_notes_page';
 
         if (! $this->hasRequiredDashboardTables()) {
             return view('dashboard', [
@@ -34,9 +38,9 @@ class DashboardController extends Controller
                     'invoice_this_month' => 0,
                     'outgoing_this_month' => 0,
                 ],
-                'uncollectedCustomers' => $this->emptyPaginator(20, $currentPath, $currentQuery),
-                'pendingOrderNotes' => $this->emptyPaginator(10, $currentPath, $currentQuery),
-                'supplierExpenseRecap' => $this->emptyPaginator(20, $currentPath, $currentQuery),
+                'uncollectedCustomers' => $this->emptyPaginator($uncollectedPerPage, $currentPath, $currentQuery, $uncollectedPageName),
+                'pendingOrderNotes' => $this->emptyPaginator($pendingOrderNotesPerPage, $currentPath, $currentQuery, $pendingOrderNotesPageName),
+                'supplierExpenseRecap' => $this->emptyPaginator(20, $currentPath, $currentQuery, 'supplier_expense_page'),
             ]);
         }
 
@@ -70,13 +74,13 @@ class DashboardController extends Controller
             ->onlyOutstandingColumns()
             ->withOutstanding()
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate($uncollectedPerPage, ['*'], $uncollectedPageName)
             ->withQueryString();
 
-        $supplierExpenseRecap = $this->emptyPaginator(20, $currentPath, $currentQuery);
+        $supplierExpenseRecap = $this->emptyPaginator(20, $currentPath, $currentQuery, 'supplier_expense_page');
         $pendingOrderNotes = $hasOrderNoteTable
-            ? $this->pendingOrderNotesPaginator(10)
-            : $this->emptyPaginator(10, $currentPath, $currentQuery);
+            ? $this->pendingOrderNotesPaginator($pendingOrderNotesPerPage, $pendingOrderNotesPageName)
+            : $this->emptyPaginator($pendingOrderNotesPerPage, $currentPath, $currentQuery, $pendingOrderNotesPageName);
 
         return view('dashboard', [
             'summary' => $summary,
@@ -86,7 +90,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function pendingOrderNotesPaginator(int $perPage): LengthAwarePaginator
+    private function pendingOrderNotesPaginator(int $perPage, string $pageName): LengthAwarePaginator
     {
         $orderedSub = DB::table('order_note_items')
             ->selectRaw('order_note_id, COALESCE(SUM(quantity), 0) as ordered_total')
@@ -122,7 +126,7 @@ class DashboardController extends Controller
             ->whereRaw('(COALESCE(ordered_items.ordered_total, 0) - COALESCE(fulfilled_items.fulfilled_total, 0)) > 0')
             ->orderByDesc('order_notes.note_date')
             ->orderByDesc('order_notes.id')
-            ->paginate($perPage, ['*'], 'pending_order_notes_page')
+            ->paginate($perPage, ['*'], $pageName)
             ->withQueryString();
     }
 
@@ -155,16 +159,17 @@ class DashboardController extends Controller
     /**
      * @param array<string, mixed> $query
      */
-    private function emptyPaginator(int $perPage, string $path, array $query): LengthAwarePaginator
+    private function emptyPaginator(int $perPage, string $path, array $query, string $pageName = 'page'): LengthAwarePaginator
     {
         return new LengthAwarePaginator(
             items: [],
             total: 0,
             perPage: $perPage,
-            currentPage: Paginator::resolveCurrentPage(),
+            currentPage: Paginator::resolveCurrentPage($pageName),
             options: [
                 'path' => $path,
                 'query' => $query,
+                'pageName' => $pageName,
             ]
         );
     }

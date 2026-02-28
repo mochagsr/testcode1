@@ -153,7 +153,12 @@ class ProductPageController extends Controller
                 'created_by_user_id' => $request->user()?->id,
             ]);
         }
-        $this->auditLogService->log('master.product.create', $product, "Product created: {$product->code}", $request);
+        $this->auditLogService->log(
+            'master.product.create',
+            $product,
+            __('ui.audit_desc_product_created_short', ['code' => (string) ($product->code ?? '-')]),
+            $request
+        );
         AppCache::forgetAfterFinancialMutation();
 
         return redirect()
@@ -248,7 +253,12 @@ class ProductPageController extends Controller
             $flashMeta = $this->buildProductChangeFlashMeta($lockedProduct, $oldSnapshot, $oldStock, $newStock);
             $product = $lockedProduct;
         });
-        $this->auditLogService->log('master.product.update', $product, "Product updated: {$product->code}", $request);
+        $this->auditLogService->log(
+            'master.product.update',
+            $product,
+            __('ui.audit_desc_product_updated_short', ['code' => (string) ($product->code ?? '-')]),
+            $request
+        );
         AppCache::forgetAfterFinancialMutation();
 
         return redirect()
@@ -301,7 +311,11 @@ class ProductPageController extends Controller
             $this->auditLogService->log(
                 'master.product.quick_stock_update',
                 $lockedProduct,
-                "Quick stock update: {$lockedProduct->code} ({$oldStock} -> {$newStock})",
+                __('ui.audit_desc_product_quick_stock_update', [
+                    'code' => (string) ($lockedProduct->code ?? '-'),
+                    'from' => (int) $oldStock,
+                    'to' => (int) $newStock,
+                ]),
                 $request,
                 ['stock' => $oldStock],
                 ['stock' => $newStock]
@@ -340,7 +354,12 @@ class ProductPageController extends Controller
     {
         $code = $product->code;
         $product->delete();
-        $this->auditLogService->log('master.product.delete', null, "Product deleted: {$code}", $request);
+        $this->auditLogService->log(
+            'master.product.delete',
+            null,
+            __('ui.audit_desc_product_deleted_short', ['code' => (string) ($code ?? '-')]),
+            $request
+        );
         AppCache::forgetAfterFinancialMutation();
 
         return redirect()

@@ -140,7 +140,15 @@ class Product extends Model
      */
     public function scopeOnlyDeliveryFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'code', 'name', 'unit', 'price_general']);
+        return $query->select([
+            'id',
+            'code',
+            'name',
+            'unit',
+            'price_agent',
+            'price_sales',
+            'price_general',
+        ]);
     }
 
     /**

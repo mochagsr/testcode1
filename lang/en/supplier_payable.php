@@ -23,6 +23,6 @@ return [
     'amount_in_words' => 'Amount in Words',
     'supplier_signature' => 'Supplier Signature',
     'user_signature' => 'User Signature',
-    'receipt_title' => 'Supplier Debt Payment Receipt',
+    'receipt_title' => 'Payment Receipt',
     'receipt_number' => 'Receipt No.',
 ];

@@ -39,7 +39,12 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
-        $this->auditLogService->log('auth.login', null, "User logged in: {$request->input('email')}", $request);
+        $this->auditLogService->log(
+            'auth.login',
+            null,
+            __('ui.audit_desc_user_logged_in', ['email' => (string) $request->input('email')]),
+            $request
+        );
 
         $intended = (string) $request->session()->pull('url.intended', '');
         $intendedPath = parse_url($intended, PHP_URL_PATH) ?: '';
@@ -52,7 +57,7 @@ class AuthController extends Controller
 
     public function logout(Request $request): RedirectResponse
     {
-        $this->auditLogService->log('auth.logout', null, 'User logged out.', $request);
+        $this->auditLogService->log('auth.logout', null, __('ui.audit_desc_user_logged_out'), $request);
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

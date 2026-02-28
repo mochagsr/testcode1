@@ -143,6 +143,7 @@
         const cityField = document.getElementById('city');
         const addressField = document.getElementById('address');
         const SEARCH_DEBOUNCE_MS = 100;
+        let currentCustomer = null;
         let customerLookupAbort = null;
         let shipLookupAbort = null;
         let productLookupAbort = null;
@@ -152,6 +153,38 @@
 
         function normalizeLookup(value) {
             return String(value || '').trim().toLowerCase();
+        }
+
+        function normalizeLevelLabel(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function getPriceKeyForCustomer() {
+            if (!currentCustomer) {
+                return 'price_general';
+            }
+            const code = normalizeLevelLabel(currentCustomer.level?.code);
+            const name = normalizeLevelLabel(currentCustomer.level?.name);
+            const combined = `${code} ${name}`.trim();
+
+            if (combined.includes('agent') || combined.includes('agen')) {
+                return 'price_agent';
+            }
+            if (combined.includes('sales')) {
+                return 'price_sales';
+            }
+            return 'price_general';
+        }
+
+        function getProductPriceByCustomerLevel(product) {
+            const key = getPriceKeyForCustomer();
+            if (key === 'price_agent') {
+                return Number(product.price_agent ?? product.price_general ?? 0);
+            }
+            if (key === 'price_sales') {
+                return Number(product.price_sales ?? product.price_general ?? 0);
+            }
+            return Number(product.price_general ?? 0);
         }
 
         const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
@@ -374,6 +407,7 @@
         }
 
         function applyCustomerFields(customer) {
+            currentCustomer = customer || null;
             customerIdField.value = customer ? customer.id : '';
             if (recipientNameField) {
                 recipientNameField.value = customer ? (customer.name || '') : '';
@@ -503,6 +537,24 @@
                 || null;
         }
 
+        function syncItemPricesForCurrentCustomer() {
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.forEach((row) => {
+                const productId = row.querySelector('.product-id')?.value || '';
+                if (productId === '') {
+                    return;
+                }
+                const product = products.find((entry) => String(entry.id) === String(productId));
+                if (!product) {
+                    return;
+                }
+                const priceField = row.querySelector('.price-input');
+                if (priceField) {
+                    priceField.value = Math.round(getProductPriceByCustomerLevel(product));
+                }
+            });
+        }
+
         function addRow() {
             const index = tbody.children.length;
             const tr = document.createElement('tr');
@@ -525,7 +577,7 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.unit').value = product.unit || '';
-                    tr.querySelector('[name="items[' + index + '][unit_price]"]').value = product.price_general || '';
+                    tr.querySelector('[name="items[' + index + '][unit_price]"]').value = Math.round(getProductPriceByCustomerLevel(product));
                 }
             });
             tr.querySelector('.product-search').addEventListener('input', onProductInput);
@@ -540,7 +592,7 @@
                 }
                 tr.querySelector('.product-search').value = productLabel(product);
                 tr.querySelector('.unit').value = product.unit || '';
-                tr.querySelector('[name="items[' + index + '][unit_price]"]').value = product.price_general || '';
+                tr.querySelector('[name="items[' + index + '][unit_price]"]').value = Math.round(getProductPriceByCustomerLevel(product));
             });
             tr.querySelector('.remove').addEventListener('click', () => tr.remove());
         }
@@ -555,6 +607,7 @@
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 applyCustomerFields(customer);
+                syncItemPricesForCurrentCustomer();
                 if (String(customerIdField.value || '') !== previousCustomerId) {
                     shipLocations = [];
                     rebuildShipIndexes();
@@ -567,6 +620,7 @@
                 const previousCustomerId = String(customerIdField.value || '');
                 const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
                 applyCustomerFields(customer);
+                syncItemPricesForCurrentCustomer();
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
                 }

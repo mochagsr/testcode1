@@ -155,7 +155,7 @@ class Customer extends Model
      */
     public function scopeOnlyDeliveryFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'name', 'city', 'phone', 'address']);
+        return $query->select(['id', 'customer_level_id', 'name', 'city', 'phone', 'address']);
     }
 
     /**
