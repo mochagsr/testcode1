@@ -43,6 +43,7 @@ class AuditLogPageController extends Controller
             'descriptionMap' => $viewMaps['descriptionMap'],
             'beforeAfterMap' => $viewMaps['beforeAfterMap'],
             'codeLinkMap' => $viewMaps['codeLinkMap'],
+            'actionLabelMap' => $this->actionLabelMap($logs->getCollection()),
         ]);
     }
 
@@ -404,9 +405,10 @@ class AuditLogPageController extends Controller
                 $subjectCodeMap[$logId] = (string) ($supplierPaymentMap[$subjectId]->payment_number ?? '');
             }
 
+            $normalizedDescription = $this->normalizeAuditDescription($descriptionMap[$logId]);
             $shortDesc = $this->shortAuditDescription(
                 (string) $log->action,
-                $descriptionMap[$logId],
+                $normalizedDescription,
                 $subjectCodeMap[$logId]
             );
             $descriptionMap[$logId] = $shortDesc;
@@ -489,17 +491,7 @@ class AuditLogPageController extends Controller
     {
         $normalized = trim($description);
         $code = trim($subjectCode);
-        $actionLabel = match ($action) {
-            'sales.invoice.admin_update' => __('ui.audit_action_sales_invoice_admin_update'),
-            'sales.invoice.cancel' => __('ui.audit_action_sales_invoice_cancel'),
-            'sales.return.admin_update' => __('ui.audit_action_sales_return_admin_update'),
-            'sales.return.cancel' => __('ui.audit_action_sales_return_cancel'),
-            'delivery.note.admin_update' => __('ui.audit_action_delivery_note_admin_update'),
-            'delivery.note.cancel' => __('ui.audit_action_delivery_note_cancel'),
-            'order.note.admin_update' => __('ui.audit_action_order_note_admin_update'),
-            'order.note.cancel' => __('ui.audit_action_order_note_cancel'),
-            default => '',
-        };
+        $actionLabel = $this->actionLabelFor($action);
 
         if ($actionLabel !== '') {
             if ($code !== '') {
@@ -512,6 +504,59 @@ class AuditLogPageController extends Controller
         }
 
         return $normalized !== '' ? $normalized : '-';
+    }
+
+    private function normalizeAuditDescription(string $description): string
+    {
+        $normalized = trim($description);
+        if ($normalized === '') {
+            return '-';
+        }
+
+        // Remove technical suffixes from legacy descriptions to keep UI consistent.
+        $patterns = [
+            '/\s*\|\s*before=.*$/iu',
+            '/\s*\|\s*after=.*$/iu',
+            '/\s*\|\s*member[_\s-]*count\s*[:=]\s*\d+\s*$/iu',
+            '/\s*member[_\s-]*count\s*[:=]\s*\d+\s*$/iu',
+        ];
+        $cleaned = preg_replace($patterns, '', $normalized) ?: $normalized;
+        $cleaned = preg_replace('/\s{2,}/', ' ', trim($cleaned)) ?: trim($cleaned);
+
+        return $cleaned !== '' ? $cleaned : '-';
+    }
+
+    /**
+     * @param Collection<int, AuditLog> $logs
+     * @return array<string, string>
+     */
+    private function actionLabelMap(Collection $logs): array
+    {
+        $map = [];
+        foreach ($logs as $log) {
+            $action = (string) $log->action;
+            if ($action === '') {
+                continue;
+            }
+            $map[$action] = $this->actionLabelFor($action);
+        }
+
+        return $map;
+    }
+
+    private function actionLabelFor(string $action): string
+    {
+        $normalized = strtolower(trim($action));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $translationKey = 'ui.audit_action_'.str_replace(['.', '-'], '_', $normalized);
+        if (lang()->has($translationKey)) {
+            return (string) __($translationKey);
+        }
+
+        return $normalized;
     }
 
     /**

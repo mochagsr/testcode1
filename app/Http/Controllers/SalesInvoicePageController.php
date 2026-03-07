@@ -57,8 +57,6 @@ class SalesInvoicePageController extends Controller
         $selectedSemester = $this->normalizedSemesterInput($semester);
         $selectedInvoiceDate = $this->selectedDateFilter($invoiceDate);
         $selectedInvoiceDateRange = $this->selectedDateRange($selectedInvoiceDate);
-        $isDefaultRecentMode = $selectedInvoiceDateRange === null && $selectedSemester === null && $search === '';
-        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
         $todayRange = [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
 
         $currentSemester = $this->defaultSemesterPeriod();
@@ -82,9 +80,6 @@ class SalesInvoicePageController extends Controller
             })
             ->when($selectedInvoiceDateRange !== null, function ($query) use ($selectedInvoiceDateRange): void {
                 $query->whereBetween('invoice_date', $selectedInvoiceDateRange);
-            })
-            ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
-                $query->where('invoice_date', '>=', $recentRangeStart);
             })
             ->orderByDate()
             ->paginate((int) config('pagination.default_per_page', 20))
@@ -174,7 +169,6 @@ class SalesInvoicePageController extends Controller
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedInvoiceDate' => $selectedInvoiceDate,
-            'isDefaultRecentMode' => $isDefaultRecentMode,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
@@ -1079,25 +1073,30 @@ class SalesInvoicePageController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Invoice');
 
+            $hasCashOnCreate = $salesInvoice->payments->contains(function ($payment) use ($salesInvoice): bool {
+                return strtolower((string) $payment->method) === 'cash'
+                    && optional($payment->payment_date)->format('Y-m-d') === optional($salesInvoice->invoice_date)->format('Y-m-d')
+                    && (float) $payment->amount >= (float) $salesInvoice->total;
+            });
+            $paymentMethodLabel = $hasCashOnCreate ? __('txn.cash') : __('txn.credit');
+            $discountTotal = (float) $salesInvoice->items->sum('discount');
+            $totalQty = (int) round((float) $salesInvoice->items->sum('quantity'), 0);
+            $address = \App\Support\PrintTextFormatter::wrapWords((string) ($salesInvoice->customer?->address ?: ''), 5);
+            $notes = \App\Support\PrintTextFormatter::wrapWords(
+                trim((string) ($salesInvoice->notes ?: \App\Models\AppSetting::getValue('company_invoice_notes', ''))),
+                4
+            );
+
             $rows = [];
             $rows[] = [__('txn.note_number'), $salesInvoice->invoice_number];
-            $rows[] = [__('txn.invoice_date'), $salesInvoice->invoice_date?->format('d-m-Y')];
-            $rows[] = [__('txn.customer'), $salesInvoice->customer?->name];
+            $rows[] = [__('txn.date'), $salesInvoice->invoice_date?->format('d-m-Y')];
+            $rows[] = [__('txn.due_date'), $salesInvoice->due_date?->format('d-m-Y') ?: '-'];
+            $rows[] = ['Pembayaran', $paymentMethodLabel];
+            $rows[] = ['Semester', $salesInvoice->semester_period ?: '-'];
+            $rows[] = [__('txn.customer'), $salesInvoice->customer?->name ?: '-'];
+            $rows[] = [__('txn.phone'), $salesInvoice->customer?->phone ?: '-'];
             $rows[] = [__('txn.city'), $salesInvoice->customer?->city];
-            $paymentStatusLabel = match ((string) $salesInvoice->payment_status) {
-                'paid' => __('txn.status_paid'),
-                default => __('txn.status_unpaid'),
-            };
-            $rows[] = [__('txn.status'), $paymentStatusLabel];
-            $paidFromCustomerBalance = (float) $salesInvoice->payments
-                ->where('method', 'customer_balance')
-                ->sum('amount');
-            $paidCash = max(0, (float) $salesInvoice->total_paid - $paidFromCustomerBalance);
-            $rows[] = [__('txn.total'), number_format((int) round((float) $salesInvoice->total), 0, ',', '.')];
-            $rows[] = [__('txn.paid'), number_format((int) round((float) $salesInvoice->total_paid), 0, ',', '.')];
-            $rows[] = [__('txn.paid_cash'), number_format((int) round($paidCash), 0, ',', '.')];
-            $rows[] = [__('txn.paid_customer_balance'), number_format((int) round($paidFromCustomerBalance), 0, ',', '.')];
-            $rows[] = [__('txn.balance'), number_format((int) round((float) $salesInvoice->balance), 0, ',', '.')];
+            $rows[] = [__('txn.address'), $address !== '' ? $address : '-'];
             $rows[] = [];
             $rows[] = [__('txn.items')];
             $rows[] = [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount') . ' (%)', __('txn.line_total')];
@@ -1115,27 +1114,19 @@ class SalesInvoicePageController extends Controller
             }
 
             $rows[] = [];
-            $rows[] = [__('txn.record_payment')];
-            $rows[] = [__('txn.date'), __('txn.method'), __('txn.amount'), __('txn.notes')];
-            foreach ($salesInvoice->payments as $payment) {
-                $rows[] = [
-                    $payment->payment_date?->format('d-m-Y'),
-                    $this->paymentMethodLabel((string) $payment->method),
-                    number_format((int) round((float) $payment->amount), 0, ',', '.'),
-                    $payment->notes,
-                ];
-            }
+            $rows[] = [__('txn.notes'), $notes !== '' ? $notes : '-'];
+            $rows[] = [__('txn.summary_total_qty'), $totalQty];
+            $rows[] = [__('txn.sub_total'), (int) round((float) $salesInvoice->subtotal)];
+            $rows[] = [__('txn.discount'), (int) round($discountTotal)];
+            $rows[] = [__('txn.grand_total'), (int) round((float) $salesInvoice->total)];
 
             $sheet->fromArray($rows, null, 'A1');
             $itemsCount = $salesInvoice->items->count();
-            $paymentsCount = $salesInvoice->payments->count();
-            $itemsHeaderRow = 13;
-            $paymentHeaderRow = 16 + $itemsCount;
+            $itemsHeaderRow = 11;
 
             ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 5, $itemsCount, true);
             ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [2, 3, 4, 5], '#,##0');
-            ExcelExportStyler::styleTable($sheet, $paymentHeaderRow, 4, $paymentsCount, false);
-            ExcelExportStyler::formatNumberColumns($sheet, $paymentHeaderRow + 1, $paymentHeaderRow + $paymentsCount, [3], '#,##0');
+            $sheet->getStyle('B1:B'.(16 + $itemsCount))->getAlignment()->setWrapText(true);
 
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -1215,7 +1206,7 @@ class SalesInvoicePageController extends Controller
 
     private function generateInvoiceNumber(string $date): string
     {
-        $prefix = 'INV-' . date('Ymd', strtotime($date));
+        $prefix = 'INV-' . date('dmY', strtotime($date));
         $count = SalesInvoice::query()
             ->whereDate('invoice_date', $date)
             ->lockForUpdate()

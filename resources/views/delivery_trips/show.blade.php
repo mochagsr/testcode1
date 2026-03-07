@@ -7,7 +7,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('delivery_trip.detail_title', ['number' => $trip->trip_number]) }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('delivery-trips.index') }}">{{ __('txn.back') }}</a>
-            <a class="btn secondary" href="{{ route('delivery-trips.edit', $trip) }}">{{ __('ui.edit') }}</a>
+            <a class="btn edit-btn" href="{{ route('delivery-trips.edit', $trip) }}">{{ __('ui.edit') }}</a>
             <a class="btn secondary" href="{{ route('delivery-trips.print', $trip) }}" target="_blank">{{ __('txn.print') }}</a>
             <a class="btn secondary" href="{{ route('delivery-trips.export.pdf', $trip) }}">{{ __('txn.pdf') }}</a>
             <a class="btn secondary" href="{{ route('delivery-trips.export.excel', $trip) }}">{{ __('txn.excel') }}</a>

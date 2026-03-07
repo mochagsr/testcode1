@@ -603,7 +603,7 @@ class MassImportController extends Controller
 
     private function generateInvoiceNumber(string $date): string
     {
-        $prefix = 'INV-' . date('Ymd', strtotime($date));
+        $prefix = 'INV-' . date('dmY', strtotime($date));
         $count = SalesInvoice::query()
             ->whereDate('invoice_date', $date)
             ->lockForUpdate()

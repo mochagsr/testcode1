@@ -34,7 +34,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.return') }} {{ $salesReturn->return_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('sales-returns.index') }}">{{ __('txn.back') }}</a>
-            <button type="button" class="btn secondary" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+            <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('sales-returns.print', $salesReturn) }}">{{ __('txn.print') }}</option>
@@ -134,7 +134,7 @@
                     <div class="col-12">
                         <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
                             <strong>{{ __('txn.items') }}</strong>
-                            <button type="button" id="admin-add-return-item" class="btn secondary">{{ __('txn.add_row') }}</button>
+                            <button type="button" id="admin-add-return-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
                         </div>
                         <table id="admin-return-items-table">
                             <thead>
@@ -162,7 +162,7 @@
                                     <td><input type="number" min="1" class="admin-return-item-qty" name="items[{{ $index }}][quantity]" value="{{ (int) round($item->quantity) }}" style="max-width: 90px;" required></td>
                                     <td><input type="number" min="0" step="1" class="admin-return-item-price" name="items[{{ $index }}][unit_price]" value="{{ (int) round($item->unit_price) }}" style="max-width: 120px;" required></td>
                                     <td>Rp <span class="admin-return-item-line-total">{{ number_format((int) round($item->line_total), 0, ',', '.') }}</span></td>
-                                    <td><button type="button" class="btn secondary admin-remove-return-item">{{ __('txn.remove') }}</button></td>
+                                    <td><button type="button" class="btn danger-btn admin-remove-return-item">{{ __('txn.remove') }}</button></td>
                                 </tr>
                             @endforeach
                             </tbody>
@@ -189,7 +189,7 @@
                             <textarea name="cancel_reason" rows="2" required></textarea>
                         </div>
                         <div class="col-12">
-                            <button class="btn secondary" type="submit">{{ __('txn.cancel_transaction') }}</button>
+                            <button class="btn danger-btn" type="submit">{{ __('txn.cancel_transaction') }}</button>
                         </div>
                     </form>
                 @endif

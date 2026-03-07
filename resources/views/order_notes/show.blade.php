@@ -75,7 +75,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }} {{ $note->note_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.back') }}</a>
-            <button type="button" class="btn secondary" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+            <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('order-notes.print', $note) }}">{{ __('txn.print') }}</option>
@@ -174,7 +174,7 @@
                     <div class="col-12">
                         <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
                             <strong>{{ __('txn.items') }}</strong>
-                            <button type="button" id="admin-add-order-item" class="btn secondary">{{ __('txn.add_row') }}</button>
+                            <button type="button" id="admin-add-order-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
                         </div>
                         <table id="admin-order-items-table">
                             <thead>
@@ -194,7 +194,7 @@
                                     </td>
                                     <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" required></td>
                                     <td><input type="text" name="items[{{ $index }}][notes]" class="admin-order-item-notes" value="{{ $item->notes }}"></td>
-                                    <td><button type="button" class="btn secondary admin-remove-order-item">{{ __('txn.remove') }}</button></td>
+                                    <td><button type="button" class="btn danger-btn admin-remove-order-item">{{ __('txn.remove') }}</button></td>
                                 </tr>
                             @endforeach
                             </tbody>
@@ -221,7 +221,7 @@
                             <textarea name="cancel_reason" rows="2" required></textarea>
                         </div>
                         <div class="col-12">
-                            <button class="btn secondary" type="submit">{{ __('txn.cancel_transaction') }}</button>
+                            <button class="btn danger-btn" type="submit">{{ __('txn.cancel_transaction') }}</button>
                         </div>
                     </form>
                 @endif

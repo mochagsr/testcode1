@@ -17,6 +17,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Jobs\GenerateReportExportTaskJob;
 use App\Support\AppCache;
+use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -214,10 +215,23 @@ class ReportExportController extends Controller
             $sheet->setTitle('Report');
             $phoneHeaderKey = strtolower(__('report.columns.phone'));
             $rowCursor = 1;
-            $sheet->setCellValue('A' . $rowCursor, (string) ($report['title'] ?? ''));
+            $title = (string) ($report['title'] ?? '');
+            $layout = (string) ($report['layout'] ?? '');
+            $headers = (array) ($report['headers'] ?? []);
+            $rows = (array) ($report['rows'] ?? []);
+            if ($layout === 'receivable_recap' && $headers === [] && $rows !== []) {
+                $headers = (array) array_shift($rows);
+            }
+            $columnCount = max(2, count($headers));
+            $lastHeaderColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
+
+            $sheet->mergeCells('A' . $rowCursor . ':' . $lastHeaderColumn . $rowCursor);
+            $sheet->setCellValue('A' . $rowCursor, $title);
+            $sheet->getStyle('A' . $rowCursor)->getFont()->setBold(true)->setSize(14);
             $rowCursor++;
             $sheet->setCellValue('A' . $rowCursor, __('report.printed'));
             $sheet->setCellValue('B' . $rowCursor, $printedAt->format('d-m-Y H:i:s') . ' WIB');
+            $sheet->getStyle('A' . $rowCursor . ':B' . $rowCursor)->getFont()->setBold(true);
             $rowCursor++;
 
             if (! empty($report['filters'])) {
@@ -226,6 +240,7 @@ class ReportExportController extends Controller
                     $sheet->setCellValue('B' . $rowCursor, (string) ($filter['value'] ?? ''));
                     $rowCursor++;
                 }
+                $sheet->getStyle('A3:B' . max(3, $rowCursor - 1))->getAlignment()->setWrapText(true);
             }
 
             if (! empty($report['summary'])) {
@@ -240,16 +255,17 @@ class ReportExportController extends Controller
                     $sheet->setCellValue('B' . $rowCursor, (string) $value);
                     $rowCursor++;
                 }
+                $sheet->getStyle('A3:B' . max(3, $rowCursor - 1))->getAlignment()->setWrapText(true);
             }
 
             $rowCursor++;
             $headerRowIndex = $rowCursor;
-            $sheet->fromArray([$report['headers']], null, 'A' . $rowCursor);
+            $sheet->fromArray([$headers], null, 'A' . $rowCursor);
             $rowCursor++;
-            $isReceivableRecap = ($report['layout'] ?? null) === 'receivable_recap';
-            foreach ($report['rows'] as $row) {
+            $isReceivableRecap = $layout === 'receivable_recap';
+            foreach ($rows as $row) {
                 $formatted = [];
-                foreach ($report['headers'] as $index => $header) {
+                foreach ($headers as $index => $header) {
                     $value = $row[$index] ?? null;
                     $text = $value === null ? '' : (string) $value;
                     $headerKey = strtolower(trim($header));
@@ -273,47 +289,23 @@ class ReportExportController extends Controller
                 $rowCursor++;
             }
 
-            $columnCount = count($report['headers']);
             $dataRowCount = max(0, $rowCursor - $headerRowIndex - 1);
             if ($columnCount > 0) {
                 $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
                 $lastDataRow = max($headerRowIndex, $headerRowIndex + $dataRowCount);
 
-                $headerRange = 'A' . $headerRowIndex . ':' . $lastColumn . $headerRowIndex;
-                $tableRange = 'A' . $headerRowIndex . ':' . $lastColumn . $lastDataRow;
+                ExcelExportStyler::styleTable($sheet, $headerRowIndex, $columnCount, $dataRowCount, true);
+                $sheet->getStyle('A' . $headerRowIndex . ':' . $lastColumn . $lastDataRow)
+                    ->getAlignment()
+                    ->setWrapText(true);
 
-                $sheet->getStyle($headerRange)->applyFromArray([
-                    'font' => [
-                        'bold' => true,
-                        'color' => ['rgb' => 'FFFFFF'],
-                    ],
-                    'fill' => [
-                        'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => '1F2937'],
-                    ],
-                    'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
-                        'vertical' => Alignment::VERTICAL_CENTER,
-                    ],
-                ]);
-
-                $sheet->getStyle($tableRange)->applyFromArray([
-                    'borders' => [
-                        'allBorders' => [
-                            'borderStyle' => Border::BORDER_THIN,
-                            'color' => ['rgb' => 'BFC3C8'],
-                        ],
-                    ],
-                    'alignment' => [
-                        'vertical' => Alignment::VERTICAL_TOP,
-                    ],
-                ]);
-
-                $sheet->freezePane('A' . ($headerRowIndex + 1));
-
-                for ($col = 1; $col <= $columnCount; $col++) {
-                    $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
-                    $sheet->getColumnDimension($columnLetter)->setAutoSize(true);
+                if ($isReceivableRecap) {
+                    $sheet->getStyle('A' . $headerRowIndex . ':' . $lastColumn . $lastDataRow)
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle('B' . ($headerRowIndex + 1) . ':C' . $lastDataRow)
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_LEFT);
                 }
             }
 

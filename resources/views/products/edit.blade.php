@@ -11,6 +11,17 @@
         @include('products.partials.form', ['product' => $product])
     </form>
 
+    <form
+        id="delete-product-form"
+        method="post"
+        action="{{ route('products.destroy', $product) }}"
+        onsubmit="return confirm('{{ __('ui.confirm_delete_product') }}');"
+        style="display:none;"
+    >
+        @csrf
+        @method('DELETE')
+    </form>
+
     <div id="stock-mutations" class="card" style="margin-top: 12px;">
         <h3 style="margin-top: 0;">{{ __('ui.stock_mutations_title') }}</h3>
         <p class="muted" style="margin-top: 0;">{{ __('ui.stock_mutations_note') }}</p>

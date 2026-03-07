@@ -8,15 +8,17 @@
         @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
-        .head { display: grid; grid-template-columns: minmax(0, 1.7fr) auto minmax(0, 1fr); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 18%) minmax(0, 34%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
         .company-left { display: flex; gap: 8px; min-width: 0; }
         .logo { width: 40px; height: 60px; object-fit: contain; border: none; padding: 0; background: transparent; }
         .company-name { font-size: 17px; font-weight: 700; text-transform: uppercase; line-height: 1.1; }
         .company-meta { margin-top: 2px; white-space: pre-line; }
-        .doc-center { min-width: 220px; text-align: center; align-self: center; justify-self: center; margin-left: -36px; }
+        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; margin-left: -36px; }
         .doc-title { font-size: 18px; font-weight: 700; text-transform: uppercase; line-height: 1.1; }
         .doc-number { margin-top: 2px; }
-        .doc-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; }
+        .doc-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; width: 100%; }
+        .doc-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
+        .doc-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #111; padding: 4px; }
         th { text-align: center; background: #efefef; }
@@ -30,18 +32,6 @@
         .transfer-title { font-weight: 700; margin-bottom: 4px; }
         .transfer-line { white-space: pre-line; }
         .muted { color: #444; }
-        .pdf-mode { font-size: 10px; }
-        .pdf-mode .container { max-width: 100%; }
-        .pdf-mode .head { display: table; width: 100%; table-layout: fixed; }
-        .pdf-mode .company-left,
-        .pdf-mode .doc-center,
-        .pdf-mode .doc-right { display: table-cell; vertical-align: top; }
-        .pdf-mode .company-left { width: 48%; padding-right: 8px; }
-        .pdf-mode .doc-center { width: 18%; padding: 0 6px; margin-left: 0; }
-        .pdf-mode .doc-right { width: 34%; min-width: 0; padding-left: 8px; }
-        .pdf-mode .company-name { font-size: 14px; }
-        .pdf-mode .doc-title { font-size: 16px; }
-        .pdf-mode th, .pdf-mode td { padding: 3px; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
@@ -49,11 +39,11 @@
         }
     </style>
 </head>
-<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
+<body>
 <div class="container">
     @php
         $companyName = trim((string) ($companyName ?? 'CV. PUSTAKA GRAFIKA'));
-        $companyAddress = trim((string) ($companyAddress ?? ''));
+        $companyAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($companyAddress ?? '')), 5);
         $companyPhone = trim((string) ($companyPhone ?? ''));
         $companyEmail = trim((string) ($companyEmail ?? ''));
         $companyNotes = trim((string) ($companyNotes ?? ''));
@@ -65,8 +55,10 @@
         if ($notesText === '') {
             $notesText = trim((string) ($companyNotes ?? ''));
         }
+        $notesText = \App\Support\PrintTextFormatter::wrapWords($notesText, 4);
         $transferText = trim((string) ($companyTransferAccounts ?? ''));
         $maxBlankRows = 3;
+        $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($customer->address ?? ''), 5);
         $companyLogoSrc = null;
         $companyMetaLines = collect([
             $companyAddress,
@@ -107,14 +99,14 @@
             <div class="doc-number">{{ __('txn.no') }}: {{ $customer->code ?: $customer->id }}</div>
         </div>
         <div class="doc-right">
-            <div><strong>{{ __('receivable.print_date') }}</strong> : {{ now()->format('d-m-Y') }}</div>
+            <div class="meta-line"><strong>{{ __('receivable.print_date') }}</strong><span>:</span><span class="meta-value">{{ now()->format('d-m-Y') }}</span></div>
             @if($selectedSemester)
-                <div><strong>{{ __('txn.semester_period') }}</strong> : {{ $selectedSemester }}</div>
+                <div class="meta-line"><strong>Semester</strong><span>:</span><span class="meta-value">{{ $selectedSemester }}</span></div>
             @endif
-            <div><strong>{{ __('receivable.customer') }}</strong> : {{ $customer->name }}</div>
-            <div><strong>{{ __('txn.phone') }}</strong> : {{ $customer->phone ?: '-' }}</div>
-            <div><strong>{{ __('txn.address') }}</strong> : {{ $customer->address ?: '-' }}</div>
-            <div><strong>{{ __('txn.city') }}</strong> : {{ $customer->city ?: '-' }}</div>
+            <div class="meta-line"><strong>{{ __('receivable.customer') }}</strong><span>:</span><span class="meta-value">{{ $customer->name }}</span></div>
+            <div class="meta-line"><strong>{{ __('txn.phone') }}</strong><span>:</span><span class="meta-value">{{ $customer->phone ?: '-' }}</span></div>
+            <div class="meta-line"><strong>{{ __('txn.city') }}</strong><span>:</span><span class="meta-value">{{ $customer->city ?: '-' }}</span></div>
+            <div class="meta-line"><strong>{{ __('txn.address') }}</strong><span>:</span><span class="meta-value">{{ $customerAddress !== '' ? $customerAddress : '-' }}</span></div>
         </div>
     </div>
 

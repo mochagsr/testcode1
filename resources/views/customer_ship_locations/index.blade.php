@@ -52,11 +52,11 @@
                     </td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('customer-ship-locations.edit', $location) }}">{{ __('ui.edit') }}</a>
+                            <a class="btn edit-btn" href="{{ route('customer-ship-locations.edit', $location) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('customer-ship-locations.destroy', $location) }}" onsubmit="return confirm('{{ __('school_bulk.confirm_delete_ship_location') }}');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn">{{ __('ui.delete') }}</button>
+                                <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
                             </form>
                         </div>
                     </td>

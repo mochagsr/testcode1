@@ -8,6 +8,7 @@
         <div class="flex">
             <a class="btn secondary" href="{{ route('supplier-payables.print-payment', $payment) }}" target="_blank">{{ __('txn.print') }}</a>
             <a class="btn secondary" href="{{ route('supplier-payables.export-payment-pdf', $payment) }}">{{ __('txn.pdf') }}</a>
+            <a class="btn secondary" href="{{ route('supplier-payables.export-payment-excel', $payment) }}">{{ __('txn.excel') }}</a>
         </div>
     </div>
 
@@ -22,7 +23,7 @@
                 <th>{{ __('supplier_payable.payment_proof_photo') }}</th>
                 <td>
                     @if($payment->payment_proof_photo_path)
-                        <a class="btn secondary id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$payment->payment_proof_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                        <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$payment->payment_proof_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
                     @else
                         -
                     @endif

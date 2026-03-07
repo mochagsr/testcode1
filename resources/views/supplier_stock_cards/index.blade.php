@@ -132,7 +132,7 @@
                         <td class="action">
                             <button
                                 type="button"
-                                class="btn secondary js-open-stock-modal"
+                                class="btn process-soft-btn js-open-stock-modal"
                                 style="min-height:30px; padding:5px 9px; margin-left:4px; font-size:11px; position:relative; z-index:1;"
                                 data-row-key="{{ $rowKey }}"
                                 data-product-id="{{ $editableProductId }}"

@@ -37,7 +37,9 @@
     @endif
     <div class="head">
         <div class="title">{{ $title }}</div>
-        <div>{{ __('report.printed') }}: {{ $printedAt->format('d-m-Y H:i:s') }}</div>
+        <div>
+            <div>{{ __('report.printed') }}: {{ $printedAt->format('d-m-Y H:i:s') }}</div>
+        </div>
     </div>
     @if(($layout ?? null) !== 'receivable_recap' && (!empty($filters) || !empty($summary)))
         <div class="meta-grid">

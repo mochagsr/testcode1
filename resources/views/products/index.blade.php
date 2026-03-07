@@ -4,10 +4,53 @@
 
 @section('content')
     <style>
+        .products-table {
+            table-layout: fixed;
+        }
+        .products-table th,
+        .products-table td {
+            vertical-align: middle;
+        }
+        .products-table th.code-col,
+        .products-table td.code-col {
+            width: 110px;
+        }
+        .products-table th.category-col,
+        .products-table td.category-col {
+            width: 120px;
+        }
+        .products-table th.stock-col,
+        .products-table td.stock-col {
+            width: 76px;
+        }
+        .products-table th.price-col,
+        .products-table td.price-col {
+            width: 122px;
+            white-space: nowrap;
+        }
+        .products-table th.action-col,
+        .products-table td.action-col {
+            width: 360px;
+        }
+        .products-table td.name-col {
+            word-break: break-word;
+        }
+        .products-table td.stock-col,
+        .products-table td.price-col {
+            text-align: left;
+        }
+        .product-actions {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 6px;
+            align-items: center;
+        }
         .product-action-btn {
-            padding: 4px 8px;
-            font-size: 12px;
+            min-height: 30px;
+            padding: 5px 9px;
             line-height: 1.2;
+            border-radius: 7px;
+            white-space: nowrap;
         }
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -42,44 +85,44 @@
     </div>
 
     <div class="card">
-        <table>
+        <table class="products-table">
             <thead>
             <tr>
-                <th>{{ __('ui.code') }}</th>
-                <th>{{ __('ui.category') }}</th>
+                <th class="code-col">{{ __('ui.code') }}</th>
+                <th class="category-col">{{ __('ui.category') }}</th>
                 <th>{{ __('ui.name') }}</th>
-                <th>{{ __('ui.stock') }}</th>
-                <th>{{ __('ui.price_agent') }}</th>
-                <th>{{ __('ui.price_sales') }}</th>
-                <th>{{ __('ui.price_general') }}</th>
-                <th>{{ __('ui.actions') }}</th>
+                <th class="stock-col">{{ __('ui.stock') }}</th>
+                <th class="price-col">{{ __('ui.price_agent') }}</th>
+                <th class="price-col">{{ __('ui.price_sales') }}</th>
+                <th class="price-col">{{ __('ui.price_general') }}</th>
+                <th class="action-col">{{ __('ui.actions') }}</th>
             </tr>
             </thead>
             <tbody>
             @forelse($products as $product)
                 <tr>
-                    <td>
+                    <td class="code-col">
                         @if($product->code)
                             <a href="{{ route('products.mutations', ['product' => $product, 'mutation_page' => 1]) }}#stock-mutations">{{ $product->code }}</a>
                         @else
                             -
                         @endif
                     </td>
-                    <td>{{ $product->category?->name ?: '-' }}</td>
-                    <td>{{ $product->name }}</td>
-                    <td>
+                    <td class="category-col">{{ $product->category?->name ?: '-' }}</td>
+                    <td class="name-col">{{ $product->name }}</td>
+                    <td class="stock-col">
                         <strong class="js-product-stock-value" data-product-id="{{ (int) $product->id }}">
                             {{ number_format((int) round($product->stock), 0, ',', '.') }}
                         </strong>
                     </td>
-                    <td>Rp {{ number_format((int) round($product->price_agent), 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format((int) round($product->price_sales), 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
-                    <td>
-                        <div class="flex">
+                    <td class="price-col">Rp {{ number_format((int) round($product->price_agent), 0, ',', '.') }}</td>
+                    <td class="price-col">Rp {{ number_format((int) round($product->price_sales), 0, ',', '.') }}</td>
+                    <td class="price-col">Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
+                    <td class="action-col">
+                        <div class="product-actions">
                             <button
                                 type="button"
-                                class="btn secondary product-action-btn js-open-product-stock-modal"
+                                class="btn process-soft-btn product-action-btn js-open-product-stock-modal"
                                 data-product-id="{{ (int) $product->id }}"
                                 data-product-code="{{ (string) ($product->code ?? '') }}"
                                 data-product-name="{{ (string) ($product->name ?? '') }}"
@@ -88,13 +131,8 @@
                             >
                                 {{ __('ui.edit_stock') }}
                             </button>
-                            <a class="btn secondary product-action-btn" href="{{ route('products.mutations', $product) }}">{{ __('ui.stock_mutations_title') }}</a>
-                            <a class="btn secondary product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
-                            <form method="post" action="{{ route('products.destroy', $product) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_product') }}');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn product-action-btn">{{ __('ui.delete') }}</button>
-                            </form>
+                            <a class="btn process-btn product-action-btn" href="{{ route('products.mutations', $product) }}">{{ __('ui.stock_mutations_title') }}</a>
+                            <a class="btn edit-btn product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
                         </div>
                     </td>
                 </tr>

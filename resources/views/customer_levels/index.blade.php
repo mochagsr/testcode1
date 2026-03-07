@@ -31,11 +31,11 @@
                     <td>{{ $level->description ?: '-' }}</td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('customer-levels-web.edit', $level) }}">{{ __('ui.edit') }}</a>
+                            <a class="btn edit-btn" href="{{ route('customer-levels-web.edit', $level) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('customer-levels-web.destroy', $level) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_level') }}');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn">{{ __('ui.delete') }}</button>
+                                <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
                             </form>
                         </div>
                     </td>

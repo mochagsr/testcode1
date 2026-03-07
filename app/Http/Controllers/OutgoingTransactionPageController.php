@@ -65,12 +65,6 @@ class OutgoingTransactionPageController extends Controller
         $selectedSemester = $this->selectedSemesterIfAvailable($selectedSemester, $semesterOptions);
         $selectedTransactionDate = $this->selectedDateFilter($transactionDate);
         $selectedTransactionDateRange = $this->selectedDateRange($selectedTransactionDate);
-        $isDefaultRecentMode = $selectedTransactionDateRange === null && $selectedSemester === null && $search === '';
-        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
-        $hasRecentData = OutgoingTransaction::query()
-            ->whereDate('transaction_date', '>=', $recentRangeStart->toDateString())
-            ->exists();
-        $applyDefaultRecentMode = $isDefaultRecentMode && $hasRecentData;
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
 
         $baseQuery = OutgoingTransaction::query()
@@ -84,10 +78,6 @@ class OutgoingTransactionPageController extends Controller
             ->when($selectedTransactionDateRange !== null, function ($query) use ($selectedTransactionDateRange): void {
                 $query->whereBetween('transaction_date', $selectedTransactionDateRange);
             });
-
-        $baseQuery->when($applyDefaultRecentMode, function ($query) use ($recentRangeStart): void {
-            $query->whereDate('transaction_date', '>=', $recentRangeStart->toDateString());
-        });
 
         $transactions = (clone $baseQuery)
             ->onlyListColumns()
@@ -175,7 +165,6 @@ class OutgoingTransactionPageController extends Controller
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
             'selectedTransactionDate' => $selectedTransactionDate,
-            'isDefaultRecentMode' => $applyDefaultRecentMode,
             'selectedSupplierId' => $selectedSupplierId,
             'supplierOptions' => Cache::remember(
                 AppCache::lookupCacheKey('outgoing_transactions.index.supplier_options'),
@@ -858,16 +847,22 @@ class OutgoingTransactionPageController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Tanda Terima Barang');
             $totalWeight = (float) $outgoingTransaction->items->sum(fn($item) => (float) ($item->weight ?? 0));
+            $address = \App\Support\PrintTextFormatter::wrapWords((string) ($outgoingTransaction->supplier?->address ?: ''), 5);
+            $notes = \App\Support\PrintTextFormatter::wrapWords(
+                trim((string) ($outgoingTransaction->notes ?: \App\Models\AppSetting::getValue('company_invoice_notes', ''))),
+                4
+            );
+            $totalQty = (int) round((float) $outgoingTransaction->items->sum('quantity'), 0);
 
             $rowsOut = [];
             $rowsOut[] = [__('txn.outgoing_receipt_title')];
             $rowsOut[] = [__('txn.transaction_number'), $outgoingTransaction->transaction_number];
             $rowsOut[] = [__('txn.date'), optional($outgoingTransaction->transaction_date)->format('d-m-Y')];
+            $rowsOut[] = ['Semester', (string) ($outgoingTransaction->semester_period ?: '-')];
             $rowsOut[] = [__('txn.note_number'), (string) ($outgoingTransaction->note_number ?: '-')];
             $rowsOut[] = [__('txn.supplier'), (string) ($outgoingTransaction->supplier?->name ?: '-')];
-            $rowsOut[] = [__('ui.supplier_company_name'), (string) ($outgoingTransaction->supplier?->company_name ?: '-')];
             $rowsOut[] = [__('txn.phone'), (string) ($outgoingTransaction->supplier?->phone ?: '-')];
-            $rowsOut[] = [__('txn.address'), (string) ($outgoingTransaction->supplier?->address ?: '-')];
+            $rowsOut[] = [__('txn.address'), $address !== '' ? $address : '-'];
             $rowsOut[] = [];
             $rowsOut[] = [
                 __('txn.no'),
@@ -894,16 +889,18 @@ class OutgoingTransactionPageController extends Controller
             }
 
             $rowsOut[] = [];
+            $rowsOut[] = [__('txn.notes'), $notes !== '' ? $notes : '-'];
+            $rowsOut[] = [__('txn.summary_total_qty'), $totalQty];
             $rowsOut[] = [__('txn.total_weight'), $totalWeight];
             $rowsOut[] = [__('txn.grand_total'), (int) round((float) $outgoingTransaction->total)];
-            $rowsOut[] = [__('txn.notes'), (string) ($outgoingTransaction->notes ?: '-')];
 
             $sheet->fromArray($rowsOut, null, 'A1');
             $itemsCount = $outgoingTransaction->items->count();
-            $itemsHeaderRow = 10;
+            $itemsHeaderRow = 9;
             ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 8, $itemsCount, true);
             ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [1, 4, 6, 7], '#,##0');
             ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [5], '#,##0.###');
+            $sheet->getStyle('B1:B'.(15 + $itemsCount))->getAlignment()->setWrapText(true);
 
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -941,7 +938,7 @@ class OutgoingTransactionPageController extends Controller
 
     private function generateTransactionNumber(string $date): string
     {
-        $formattedDate = Carbon::parse($date)->format('Ymd');
+        $formattedDate = Carbon::parse($date)->format('dmY');
         $prefix = 'TRXK-' . $formattedDate . '-';
 
         $lastNumber = OutgoingTransaction::query()

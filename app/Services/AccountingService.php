@@ -249,7 +249,7 @@ final class AccountingService
 
     private function generateEntryNumber(string $date): string
     {
-        $prefix = 'JR-'.date('Ymd', strtotime($date)).'-';
+        $prefix = 'JR-'.date('dmY', strtotime($date)).'-';
         $last = JournalEntry::query()
             ->where('entry_number', 'like', $prefix.'%')
             ->lockForUpdate()

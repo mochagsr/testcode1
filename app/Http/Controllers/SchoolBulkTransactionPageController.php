@@ -668,7 +668,7 @@ class SchoolBulkTransactionPageController extends Controller
 
     private function generateTransactionNumber(Carbon $transactionDate): string
     {
-        $prefix = 'BLK-' . $transactionDate->format('Ymd');
+        $prefix = 'BLK-' . $transactionDate->format('dmY');
         $lastNumber = SchoolBulkTransaction::query()
             ->whereDate('transaction_date', $transactionDate->toDateString())
             ->where('transaction_number', 'like', $prefix . '-%')
@@ -686,7 +686,7 @@ class SchoolBulkTransactionPageController extends Controller
     private function generateInvoiceNumber(string $invoiceDate): string
     {
         $date = Carbon::parse($invoiceDate);
-        $prefix = 'INV-' . $date->format('Ymd');
+        $prefix = 'INV-' . $date->format('dmY');
         $lastNumber = SalesInvoice::query()
             ->whereDate('invoice_date', $date->toDateString())
             ->where('invoice_number', 'like', $prefix . '-%')

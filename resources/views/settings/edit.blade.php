@@ -109,10 +109,6 @@
                                         <label>Template Header Report</label>
                                         <textarea name="report_header_text" rows="3" placeholder="Contoh: FAKTUR RESMI - CV. PUSTAKA GRAFIKA">{{ old('report_header_text', $reportHeaderText ?? '') }}</textarea>
                                     </div>
-                                    <div class="col-12">
-                                        <label>Template Footer Report</label>
-                                        <textarea name="report_footer_text" rows="3" placeholder="Contoh: Barang yang sudah dibeli tidak dapat ditukar">{{ old('report_footer_text', $reportFooterText ?? '') }}</textarea>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -136,6 +132,32 @@
                                     {{ __('ui.settings_remove_logo') }}
                                 </label>
                             @endif
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section-title">{{ __('ui.settings_print_workflow_title') }}</h3>
+                    <p class="form-section-note">{{ __('ui.settings_print_workflow_note') }}</p>
+                    <div class="row inline">
+                        <div class="col-4">
+                            <label>{{ __('ui.settings_print_mode') }}</label>
+                            <select name="print_workflow_mode">
+                                <option value="browser" @selected(old('print_workflow_mode', $printWorkflowMode ?? 'browser') === 'browser')>Browser</option>
+                                <option value="qz" @selected(old('print_workflow_mode', $printWorkflowMode ?? 'browser') === 'qz')>QZ Tray</option>
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label>{{ __('ui.settings_print_paper_preset') }}</label>
+                            <select name="print_paper_preset">
+                                <option value="auto" @selected(old('print_paper_preset', $printPaperPreset ?? 'auto') === 'auto')>{{ __('ui.settings_print_paper_auto') }}</option>
+                                <option value="9.5x5.5" @selected(old('print_paper_preset', $printPaperPreset ?? 'auto') === '9.5x5.5')>9.5x5.5</option>
+                                <option value="9.5x11" @selected(old('print_paper_preset', $printPaperPreset ?? 'auto') === '9.5x11')>9.5x11</option>
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label>{{ __('ui.settings_print_small_rows_threshold') }}</label>
+                            <input type="number" name="print_small_rows_threshold" min="5" max="200" step="1" value="{{ old('print_small_rows_threshold', (int) ($printSmallRowsThreshold ?? 35)) }}">
                         </div>
                     </div>
                 </div>

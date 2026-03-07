@@ -54,8 +54,6 @@ class SalesReturnPageController extends Controller
         $selectedSemester = $this->normalizedSemesterInput($semester);
         $selectedReturnDate = $this->selectedDateFilter($returnDate);
         $selectedReturnDateRange = $this->selectedDateRange($selectedReturnDate);
-        $isDefaultRecentMode = $selectedReturnDateRange === null && $selectedSemester === null && $search === '';
-        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
         $todayRange = [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
 
         $currentSemester = $this->defaultSemesterPeriod();
@@ -80,9 +78,6 @@ class SalesReturnPageController extends Controller
             })
             ->when($selectedReturnDateRange !== null, function ($query) use ($selectedReturnDateRange): void {
                 $query->whereBetween('return_date', $selectedReturnDateRange);
-            })
-            ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
-                $query->where('return_date', '>=', $recentRangeStart);
             })
             ->orderByDate()
             ->paginate(20)
@@ -172,7 +167,6 @@ class SalesReturnPageController extends Controller
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedReturnDate' => $selectedReturnDate,
-            'isDefaultRecentMode' => $isDefaultRecentMode,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
@@ -758,31 +752,46 @@ class SalesReturnPageController extends Controller
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Retur');
+            $address = \App\Support\PrintTextFormatter::wrapWords((string) ($salesReturn->customer?->address ?: ''), 5);
+            $notes = \App\Support\PrintTextFormatter::wrapWords(
+                trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', '')),
+                4
+            );
             $rows = [];
             $rows[] = [__('txn.return') . ' ' . __('txn.note_number'), $salesReturn->return_number];
-            $rows[] = [__('txn.return_date'), $salesReturn->return_date?->format('d-m-Y')];
-            $rows[] = [__('txn.customer'), $salesReturn->customer?->name];
+            $rows[] = [__('txn.date'), $salesReturn->return_date?->format('d-m-Y')];
+            $rows[] = ['Semester', $salesReturn->semester_period ?: '-'];
+            $rows[] = [__('txn.name'), $salesReturn->customer?->name ?: '-'];
+            $rows[] = [__('txn.phone'), $salesReturn->customer?->phone ?: '-'];
             $rows[] = [__('txn.city'), $salesReturn->customer?->city];
-            $rows[] = [__('txn.semester_period'), $salesReturn->semester_period];
-            $rows[] = [__('txn.total'), number_format((int) round((float) $salesReturn->total), 0, ',', '.')];
-            $rows[] = [__('txn.reason'), $salesReturn->reason];
+            $rows[] = [__('txn.address'), $address !== '' ? $address : '-'];
             $rows[] = [];
             $rows[] = [__('txn.items')];
-            $rows[] = [__('txn.name'), __('txn.qty'), __('txn.line_total')];
+            $rows[] = [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.line_total')];
 
             foreach ($salesReturn->items as $item) {
                 $rows[] = [
                     $item->product_name,
                     $item->quantity,
+                    number_format((int) round((float) $item->unit_price), 0, ',', '.'),
                     number_format((int) round((float) $item->line_total), 0, ',', '.'),
                 ];
             }
 
+            $rows[] = [];
+            $rows[] = [__('txn.reason'), $salesReturn->reason ?: '-'];
+            if ($notes !== '') {
+                $rows[] = [__('txn.notes'), $notes];
+            }
+            $rows[] = [__('txn.summary_total_qty'), (int) round((float) $salesReturn->items->sum('quantity'), 0)];
+            $rows[] = [__('txn.total_return'), (int) round((float) $salesReturn->total)];
+
             $sheet->fromArray($rows, null, 'A1');
             $itemsCount = $salesReturn->items->count();
-            $itemsHeaderRow = 10;
-            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 3, $itemsCount, true);
-            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [2, 3], '#,##0');
+            $itemsHeaderRow = 9;
+            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 4, $itemsCount, true);
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [2, 3, 4], '#,##0');
+            $sheet->getStyle('B1:B'.(15 + $itemsCount))->getAlignment()->setWrapText(true);
 
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -795,7 +804,7 @@ class SalesReturnPageController extends Controller
 
     private function generateReturnNumber(string $date): string
     {
-        $prefix = 'RTR-' . date('Ymd', strtotime($date));
+        $prefix = 'RTR-' . date('dmY', strtotime($date));
         $count = SalesReturn::query()
             ->whereDate('return_date', $date)
             ->lockForUpdate()

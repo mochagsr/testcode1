@@ -8,38 +8,35 @@
         @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
-        .company-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
-        .company-left { display: flex; gap: 8px; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 44%) minmax(200px, 22%) minmax(0, 34%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
+        .company-left { display: flex; gap: 8px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 16px; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 1px; line-height: 1.2; text-transform: uppercase; }
         .company-detail { font-size: 11px; line-height: 1.3; white-space: pre-line; }
-        .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; }
-        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; }
+        .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; min-width: 0; }
+        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; width: 100%; }
+        .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
+        .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .doc-title { font-size: 18px; font-weight: 700; text-align: center; }
         .doc-number { text-align: center; margin-bottom: 4px; }
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; }
         th, td { border: 1px solid #111; padding: 4px; text-align: left; vertical-align: top; }
         th { font-size: 10px; }
-        .total-box { margin-top: 12px; width: 340px; margin-left: auto; }
+        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 140px 340px; align-items: flex-start; gap: 16px; margin-top: 12px; }
+        .summary-spacer { min-height: 1px; }
+        .qty-box { width: 100%; table-layout: fixed; }
+        .qty-box table,
+        .total-box { margin-top: 0; }
+        .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 68%; }
+        .qty-box td:last-child { width: 32%; text-align: center; font-weight: 700; white-space: nowrap; }
+        .total-box { width: 100%; }
         .total-box td { border: 1px solid #111; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
         .signature-name { font-weight: 600; }
-        .pdf-mode { font-size: 10px; }
-        .pdf-mode .container { max-width: 100%; }
-        .pdf-mode .company-head { display: table; width: 100%; table-layout: fixed; border-collapse: collapse; }
-        .pdf-mode .company-left,
-        .pdf-mode .doc-title-center,
-        .pdf-mode .doc-meta-right { display: table-cell; vertical-align: top; }
-        .pdf-mode .company-left { width: 44%; padding-right: 8px; }
-        .pdf-mode .doc-title-center { width: 20%; padding: 0 6px; text-align: center; }
-        .pdf-mode .doc-meta-right { width: 36%; padding-left: 8px; min-width: 0; }
-        .pdf-mode .company-name { font-size: 14px; }
-        .pdf-mode .doc-title { font-size: 16px; }
-        .pdf-mode th, .pdf-mode td { padding: 3px; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
@@ -47,18 +44,20 @@
         }
     </style>
 </head>
-<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
+<body>
 <div class="container">
     @php
         $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');
         $companyName = trim((string) \App\Models\AppSetting::getValue('company_name', 'CV. PUSTAKA GRAFIKA'));
-        $companyAddress = trim((string) \App\Models\AppSetting::getValue('company_address', ''));
+        $companyAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) \App\Models\AppSetting::getValue('company_address', '')), 5);
         $companyPhone = trim((string) \App\Models\AppSetting::getValue('company_phone', ''));
         $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $companyInvoiceNotes = trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
-        $reportFooterText = trim((string) \App\Models\AppSetting::getValue('report_footer_text', ''));
+        $printNotes = \App\Support\PrintTextFormatter::wrapWords($companyInvoiceNotes, 4);
+        $totalQty = (int) round((float) $salesReturn->items->sum('quantity'), 0);
+        $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($salesReturn->customer?->address ?: ''), 5);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
@@ -100,12 +99,12 @@
             <div class="doc-number">{{ __('txn.no') }}: {{ $salesReturn->return_number }}</div>
         </div>
         <div class="doc-meta-right">
-            <div><strong>{{ __('txn.date') }}</strong> : {{ $salesReturn->return_date->format('d-m-Y') }}</div>
-            <div><strong>{{ __('txn.semester_period') }}</strong> : {{ $salesReturn->semester_period ?: '-' }}</div>
-            <div><strong>{{ __('txn.customer') }}</strong> : {{ $salesReturn->customer?->name ?: '-' }}</div>
-            <div><strong>{{ __('txn.phone') }}</strong> : {{ $salesReturn->customer?->phone ?: '-' }}</div>
-            <div><strong>{{ __('txn.address') }}</strong> : {{ $salesReturn->customer?->address ?: '-' }}</div>
-            <div><strong>{{ __('txn.city') }}</strong> : {{ $salesReturn->customer?->city ?: '-' }}</div>
+            <div class="meta-line"><strong>{{ __('txn.date') }}</strong><span>:</span><span class="meta-value">{{ $salesReturn->return_date->format('d-m-Y') }}</span></div>
+            <div class="meta-line"><strong>Semester</strong><span>:</span><span class="meta-value">{{ $salesReturn->semester_period ?: '-' }}</span></div>
+            <div class="meta-line"><strong>{{ __('txn.name') }}</strong><span>:</span><span class="meta-value">{{ $salesReturn->customer?->name ?: '-' }}</span></div>
+            <div class="meta-line"><strong>{{ __('txn.phone') }}</strong><span>:</span><span class="meta-value">{{ $salesReturn->customer?->phone ?: '-' }}</span></div>
+            <div class="meta-line"><strong>{{ __('txn.city') }}</strong><span>:</span><span class="meta-value">{{ $salesReturn->customer?->city ?: '-' }}</span></div>
+            <div class="meta-line"><strong>{{ __('txn.address') }}</strong><span>:</span><span class="meta-value">{{ $customerAddress !== '' ? $customerAddress : '-' }}</span></div>
         </div>
     </div>
     @if($salesReturn->is_canceled)
@@ -135,13 +134,25 @@
         </tbody>
     </table>
 
-    <table class="total-box">
-        <tr><td><strong>{{ __('txn.total_return') }}</strong></td><td><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
-    </table>
     <div style="margin-top: 6px;"><strong>{{ __('txn.reason') }}:</strong> {{ $salesReturn->reason ?: '-' }}</div>
-    @if($companyInvoiceNotes !== '')
-        <div style="margin-top: 6px;"><strong>{{ __('txn.notes') }}:</strong> {{ $companyInvoiceNotes }}</div>
+    @if($printNotes !== '')
+        <div style="margin-top: 6px; white-space: pre-line;"><strong>{{ __('txn.notes') }}:</strong> {{ $printNotes }}</div>
     @endif
+
+    <div class="table-summary">
+        <div class="summary-spacer"></div>
+        <div class="qty-box">
+            <table>
+                <tr>
+                    <td>{{ __('txn.summary_total_qty') }}</td>
+                    <td>{{ number_format($totalQty, 0, ',', '.') }}</td>
+                </tr>
+            </table>
+        </div>
+        <table class="total-box">
+            <tr><td><strong>{{ __('txn.total_return') }}</strong></td><td><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
+        </table>
+    </div>
 
     <table class="signature-table">
         <tr>
@@ -163,11 +174,6 @@
             <td>________________</td>
         </tr>
     </table>
-    @if($reportFooterText !== '')
-        <div style="margin-top: 10px; border-top: 1px solid #111; padding-top: 6px; font-size: 10px;">
-            {{ $reportFooterText }}
-        </div>
-    @endif
 </div>
 </body>
 </html>

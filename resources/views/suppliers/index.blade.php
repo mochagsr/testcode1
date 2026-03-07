@@ -10,7 +10,7 @@
             <input id="suppliers-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('ui.search_suppliers_placeholder') }}" style="max-width:320px;">
             <button type="submit">{{ __('ui.search') }}</button>
             @if(auth()->user()->role === 'admin')
-                <a class="btn secondary" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
+                <a class="btn" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
             @endif
             <a class="btn secondary" href="{{ route('suppliers.import.template') }}">Template Import</a>
         </form>
@@ -52,12 +52,12 @@
                     <td>{{ $supplier->address ?: '-' }}</td>
                     <td>{{ $supplier->notes ?: '-' }}</td>
                     <td>
-                        <a class="btn secondary" href="{{ route('suppliers.edit', $supplier) }}">{{ __('ui.edit') }}</a>
+                        <a class="btn edit-btn" href="{{ route('suppliers.edit', $supplier) }}">{{ __('ui.edit') }}</a>
                         @if(auth()->user()->role === 'admin')
                             <form method="post" action="{{ route('suppliers.destroy', $supplier) }}" style="display:inline;" onsubmit="return confirm('{{ __('ui.confirm_delete_supplier') }}')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn secondary">{{ __('ui.delete') }}</button>
+                                <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
                             </form>
                         @endif
                     </td>

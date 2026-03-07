@@ -85,6 +85,26 @@
         .supplier-payable-ledger-table th {
             font-variant-numeric: tabular-nums;
         }
+        .supplier-payable-summary-slider {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .supplier-payable-summary-item {
+            color: #fff;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        .supplier-payable-final-summary {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            text-align: right;
+        }
         @media (max-width: 1366px) {
             .supplier-payable-main-grid .supplier-payable-col-suppliers,
             .supplier-payable-main-grid .supplier-payable-col-ledger {
@@ -111,7 +131,7 @@
                 @endforeach
             </select>
             <button type="submit">{{ __('txn.search') }}</button>
-            <a class="btn" href="{{ route('supplier-payables.create') }}">{{ __('supplier_payable.add_payment') }}</a>
+            <a class="btn payment-btn" href="{{ route('supplier-payables.create') }}">{{ __('supplier_payable.add_payment') }}</a>
         </form>
     </div>
 
@@ -139,14 +159,14 @@
                             <td class="num">Rp {{ number_format((int) ($supplier->outstanding_payable ?? 0), 0, ',', '.') }}</td>
                             <td class="action">
                                 <div class="supplier-payable-actions">
-                                    <a class="btn secondary" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'semester' => $selectedSemester]) }}">
+                                    <a class="btn orange-btn" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'semester' => $selectedSemester]) }}">
                                         {{ __('supplier_payable.mutation') }}
                                     </a>
-                                    <a class="btn secondary" href="{{ route('supplier-stock-cards.index', ['supplier_id' => $supplier->id]) }}">
+                                    <a class="btn process-btn" href="{{ route('supplier-stock-cards.index', ['supplier_id' => $supplier->id]) }}">
                                         {{ __('menu.supplier_stock_cards') }}
                                     </a>
                                     @if((int) ($supplier->outstanding_payable ?? 0) > 0)
-                                        <a class="btn" href="{{ route('supplier-payables.create', ['supplier_id' => $supplier->id]) }}">{{ __('supplier_payable.pay') }}</a>
+                                        <a class="btn payment-btn" href="{{ route('supplier-payables.create', ['supplier_id' => $supplier->id]) }}">{{ __('supplier_payable.pay') }}</a>
                                     @endif
                                 </div>
                             </td>
@@ -167,6 +187,20 @@
                     @if($selectedSupplier) ({{ $selectedSupplier->name }}) @endif
                 </h3>
                 @if($selectedSupplier)
+                    <div class="supplier-payable-summary-slider">
+                        <div class="supplier-payable-summary-item" style="background:#f15b6c;">
+                            <small>{{ __('receivable.total_debit') }}</small>
+                            <h3 style="margin:4px 0 0 0;">Rp {{ number_format((int) ($totalDebit ?? 0), 0, ',', '.') }}</h3>
+                        </div>
+                        <div class="supplier-payable-summary-item" style="background:#4ac35f;">
+                            <small>{{ __('receivable.total_credit') }}</small>
+                            <h3 style="margin:4px 0 0 0;">Rp {{ number_format((int) ($totalCredit ?? 0), 0, ',', '.') }}</h3>
+                        </div>
+                        <div class="supplier-payable-summary-item" style="background:#4f6de6;">
+                            <small>{{ __('supplier_payable.final_outstanding') }}</small>
+                            <h3 style="margin:4px 0 0 0;">Rp {{ number_format((int) ($finalOutstanding ?? 0), 0, ',', '.') }}</h3>
+                        </div>
+                    </div>
                     <div class="muted" style="margin-bottom: 10px;">
                         {{ __('supplier_payable.outstanding') }}:
                         <strong>Rp {{ number_format((int) ($selectedSupplier->outstanding_payable ?? 0), 0, ',', '.') }}</strong>
@@ -225,6 +259,16 @@
                     </tbody>
                 </table>
                 </div>
+                @if($selectedSupplier)
+                    <div class="supplier-payable-final-summary">
+                        <div>
+                            <strong>{{ __('supplier_payable.final_outstanding') }}: Rp {{ number_format((int) ($finalOutstanding ?? 0), 0, ',', '.') }}</strong>
+                        </div>
+                        <div class="muted">
+                            {{ __('supplier_payable.mutation_balance') }}: Rp {{ number_format((int) ($mutationBalance ?? 0), 0, ',', '.') }}
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>

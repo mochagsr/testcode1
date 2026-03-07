@@ -113,8 +113,19 @@
     </div>
 </div>
 
-<button class="btn" type="submit">{{ __('ui.save') }}</button>
-<a class="btn secondary" href="{{ route('products.index') }}">{{ __('ui.cancel') }}</a>
+<div class="flex" style="gap:8px; align-items:center; margin-top:12px;">
+    <button class="btn" type="submit">{{ __('ui.save') }}</button>
+    <a class="btn secondary" href="{{ route('products.index') }}">{{ __('ui.cancel') }}</a>
+    @if(($product?->exists ?? false))
+        <button
+            class="btn danger-btn"
+            type="submit"
+            form="delete-product-form"
+        >
+            {{ __('ui.delete') }}
+        </button>
+    @endif
+</div>
 
 <script>
     (function () {

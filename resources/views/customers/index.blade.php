@@ -76,18 +76,18 @@
                     <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
                     <td>
                         @if($customer->id_card_photo_path)
-                            <a class="btn secondary id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$customer->id_card_photo_path) }}">{{ __('ui.view') }}</a>
+                            <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$customer->id_card_photo_path) }}">{{ __('ui.view') }}</a>
                         @else
                             -
                         @endif
                     </td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('customers-web.edit', $customer) }}">{{ __('ui.edit') }}</a>
+                            <a class="btn edit-btn" href="{{ route('customers-web.edit', $customer) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('customers-web.destroy', $customer) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_customer') }}');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn">{{ __('ui.delete') }}</button>
+                                <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
                             </form>
                         </div>
                     </td>

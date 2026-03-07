@@ -12,6 +12,8 @@ use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
+use App\Support\ExcelExportStyler;
+use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -23,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -399,22 +402,49 @@ class ReceivablePageController extends Controller
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Tagihan');
-            $rowsOut = [];
-            $rowsOut[] = [__('receivable.customer_bill_title')];
-            $rowsOut[] = [__('receivable.customer'), $data['customer']->name ?? ''];
-            $rowsOut[] = [__('txn.address'), $data['customer']->address ?: ($data['customer']->city ?: '-')];
-            if (!empty($data['selectedSemester'])) {
-                $rowsOut[] = [__('txn.semester_period'), (string) $data['selectedSemester']];
+            $companyName = trim((string) ($data['companyName'] ?? 'CV. PUSTAKA GRAFIKA'));
+            $companyAddress = PrintTextFormatter::wrapWords(trim((string) ($data['companyAddress'] ?? '')), 5);
+            $companyPhone = trim((string) ($data['companyPhone'] ?? ''));
+            $companyEmail = trim((string) ($data['companyEmail'] ?? ''));
+            $customerAddress = PrintTextFormatter::wrapWords(trim((string) ($data['customer']->address ?? '')), 5);
+            $notesText = PrintTextFormatter::wrapWords(trim((string) ($data['companyInvoiceNotes'] ?? '')), 4);
+
+            $sheet->mergeCells('A1:F1');
+            $sheet->setCellValue('A1', __('receivable.customer_bill_title'));
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->mergeCells('A2:B2');
+            $sheet->setCellValue('A2', $companyName);
+            $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(13);
+            $sheet->mergeCells('A3:B5');
+            $sheet->setCellValue('A3', collect([$companyAddress, $companyPhone, $companyEmail])->filter()->implode("\n"));
+            $sheet->getStyle('A3:B5')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+
+            $metaRows = [
+                [__('receivable.print_date'), now()->format('d-m-Y')],
+                ['Semester', (string) ($data['selectedSemester'] ?? '-')],
+                [__('receivable.customer'), (string) ($data['customer']->name ?? '-')],
+                [__('txn.phone'), (string) ($data['customer']->phone ?? '-')],
+                [__('txn.city'), (string) ($data['customer']->city ?? '-')],
+                [__('txn.address'), $customerAddress !== '' ? $customerAddress : '-'],
+            ];
+            $metaRowIndex = 2;
+            foreach ($metaRows as [$label, $value]) {
+                $sheet->setCellValue('E' . $metaRowIndex, $label);
+                $sheet->setCellValue('F' . $metaRowIndex, $value);
+                $metaRowIndex++;
             }
-            $rowsOut[] = [];
-            $rowsOut[] = [
+            $sheet->getStyle('E2:E7')->getFont()->setBold(true);
+            $sheet->getStyle('F2:F7')->getAlignment()->setWrapText(true);
+
+            $rowsOut = [[
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
                 __('receivable.bill_credit_sales'),
                 __('receivable.bill_installment_payment'),
                 __('receivable.bill_sales_return'),
                 __('receivable.bill_running_balance'),
-            ];
+            ]];
 
             foreach ($rows as $row) {
                 $adjustmentAmount = (int) round((float) ($row['adjustment_amount'] ?? 0));
@@ -454,10 +484,20 @@ class ReceivablePageController extends Controller
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
             ];
 
+            $tableStartRow = 10;
+            $sheet->fromArray($rowsOut, null, 'A' . $tableStartRow);
+            ExcelExportStyler::styleTable($sheet, $tableStartRow, 6, count($rowsOut) - 1, true);
+            $sheet->getStyle('A' . $tableStartRow . ':F' . ($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
+            $sheet->getStyle('C' . ($tableStartRow + 1) . ':F' . ($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+            $rowCursor = $tableStartRow + count($rowsOut) + 2;
+
             if ($schoolBreakdown->isNotEmpty()) {
-                $rowsOut[] = [];
-                $rowsOut[] = [__('receivable.school_breakdown_title')];
-                $rowsOut[] = [
+                $sheet->mergeCells('A' . $rowCursor . ':G' . $rowCursor);
+                $sheet->setCellValue('A' . $rowCursor, __('receivable.school_breakdown_title'));
+                $sheet->getStyle('A' . $rowCursor)->getFont()->setBold(true);
+                $rowCursor++;
+                $schoolHeader = [
                     __('receivable.school_name'),
                     __('receivable.school_city'),
                     __('receivable.bill_date'),
@@ -466,13 +506,18 @@ class ReceivablePageController extends Controller
                     __('receivable.school_paid_total'),
                     __('receivable.school_balance_total'),
                 ];
+                $sectionStart = $rowCursor;
+                $sheet->fromArray([$schoolHeader], null, 'A' . $rowCursor);
+                $rowCursor++;
+                $schoolDataCount = 0;
+
                 foreach ($schoolBreakdown as $group) {
                     $groupRows = collect($group['rows'] ?? []);
                     if ($groupRows->isEmpty()) {
                         continue;
                     }
                     foreach ($groupRows as $groupRow) {
-                        $rowsOut[] = [
+                        $sheet->fromArray([[
                             (string) ($group['school_name'] ?? '-'),
                             (string) ($group['school_city'] ?? '-'),
                             (string) ($groupRow['date_label'] ?? ''),
@@ -480,11 +525,13 @@ class ReceivablePageController extends Controller
                             number_format((int) round((float) ($groupRow['invoice_total'] ?? 0)), 0, ',', '.'),
                             number_format((int) round((float) ($groupRow['paid_total'] ?? 0)), 0, ',', '.'),
                             number_format((int) round((float) ($groupRow['balance_total'] ?? 0)), 0, ',', '.'),
-                        ];
+                        ]], null, 'A' . $rowCursor);
+                        $rowCursor++;
+                        $schoolDataCount++;
                     }
 
                     $totalsPerSchool = (array) ($group['totals'] ?? []);
-                    $rowsOut[] = [
+                    $sheet->fromArray([[
                         '',
                         '',
                         '',
@@ -492,11 +539,31 @@ class ReceivablePageController extends Controller
                         number_format((int) round((float) ($totalsPerSchool['invoice_total'] ?? 0)), 0, ',', '.'),
                         number_format((int) round((float) ($totalsPerSchool['paid_total'] ?? 0)), 0, ',', '.'),
                         number_format((int) round((float) ($totalsPerSchool['balance_total'] ?? 0)), 0, ',', '.'),
-                    ];
+                    ]], null, 'A' . $rowCursor);
+                    $rowCursor++;
+                    $schoolDataCount++;
                 }
+
+                if ($schoolDataCount > 0) {
+                    ExcelExportStyler::styleTable($sheet, $sectionStart, 7, $schoolDataCount, false);
+                    $sheet->getStyle('A' . $sectionStart . ':G' . ($rowCursor - 1))->getAlignment()->setWrapText(true);
+                }
+                $rowCursor++;
             }
 
-            $sheet->fromArray($rowsOut, null, 'A1');
+            if ($notesText !== '') {
+                $sheet->setCellValue('A' . $rowCursor, __('receivable.note_label'));
+                $sheet->getStyle('A' . $rowCursor)->getFont()->setBold(true);
+                $sheet->mergeCells('B' . $rowCursor . ':F' . ($rowCursor + 2));
+                $sheet->setCellValue('B' . $rowCursor, $notesText);
+                $sheet->getStyle('B' . $rowCursor . ':F' . ($rowCursor + 2))->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->getStyle('A' . $rowCursor . ':F' . ($rowCursor + 2))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $rowCursor += 4;
+            }
+
+            foreach (range('A', 'G') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
             $spreadsheet->disconnectWorksheets();

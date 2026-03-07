@@ -81,9 +81,28 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
         gap: 10px;
-        max-height: 460px;
+        max-height: 520px;
         overflow: auto;
         padding-right: 4px;
+    }
+    .permission-toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
+    .permission-toolbar-left {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .permission-toolbar .btn {
+        min-height: 30px;
+        padding: 5px 10px;
+        font-size: 12px;
     }
     .permission-group {
         border: 1px solid var(--border);
@@ -138,6 +157,11 @@
         margin: 0 0 8px;
         font-size: 12px;
         color: var(--muted);
+    }
+    .permission-hit {
+        background: color-mix(in srgb, #facc15 18%, var(--card));
+        border-radius: 4px;
+        padding: 0 2px;
     }
     .permission-card {
         margin-top: 12px;
@@ -210,12 +234,27 @@
 <div class="card permission-card" id="permission-grid-wrapper" style="{{ old('role', $user?->role ?? 'user') === 'admin' ? 'display:none;' : '' }}">
     <p class="permission-detail-title">Hak Akses Detail</p>
     <p class="permission-detail-note">Pilih akses per modul. Centang judul modul untuk pilih semua di modul tersebut.</p>
+    <div class="permission-toolbar">
+        <div class="permission-toolbar-left">
+            <input
+                type="text"
+                id="permission-filter-input"
+                placeholder="Cari modul / izin..."
+                style="max-width: 280px;"
+            >
+            <span id="permission-filter-count" class="muted">0 izin terlihat</span>
+        </div>
+        <div class="permission-toolbar-left">
+            <button type="button" id="permission-check-visible" class="btn secondary">Centang Terlihat</button>
+            <button type="button" id="permission-uncheck-visible" class="btn secondary">Hapus Centang Terlihat</button>
+        </div>
+    </div>
     <div class="permission-grid">
         @foreach($permissionGroups as $group)
             @php
                 $groupKey = (string) ($group['key'] ?? 'other');
             @endphp
-            <div class="permission-group">
+            <div class="permission-group" data-group-key="{{ strtolower($groupKey) }}" data-group-label="{{ strtolower((string) $group['label']) }}">
                 <label class="permission-group-header">
                     <input type="checkbox" class="permission-group-toggle" data-group="{{ $groupKey }}">
                     <span>{{ $group['label'] }}</span>
@@ -225,9 +264,9 @@
                         $permissionLabel = $permissionLabelMap[$permission]
                             ?? \Illuminate\Support\Str::headline(str_replace('.', ' ', (string) $permission));
                     @endphp
-                    <label class="permission-item">
+                    <label class="permission-item" data-permission-label="{{ strtolower($permissionLabel) }}" data-permission-key="{{ strtolower((string) $permission) }}">
                         <input type="checkbox" class="permission-checkbox permission-group-{{ $groupKey }}" name="permissions[]" value="{{ $permission }}" @checked(in_array($permission, $selectedPermissions, true))>
-                        <span>{{ $permissionLabel }}</span>
+                        <span class="permission-item-text">{{ $permissionLabel }}</span>
                     </label>
                 @endforeach
             </div>
@@ -306,5 +345,84 @@
                 syncGroupToggleState(groupName);
             }
         });
+
+        const filterInput = document.getElementById('permission-filter-input');
+        const filterCount = document.getElementById('permission-filter-count');
+        const checkVisibleBtn = document.getElementById('permission-check-visible');
+        const uncheckVisibleBtn = document.getElementById('permission-uncheck-visible');
+        const groups = document.querySelectorAll('.permission-group');
+
+        const updateVisibleCount = () => {
+            const visibleItems = document.querySelectorAll('.permission-item[data-visible="1"]');
+            if (filterCount) {
+                filterCount.textContent = visibleItems.length + ' izin terlihat';
+            }
+        };
+
+        const clearHighlights = (textNode) => {
+            if (!textNode) return;
+            textNode.innerHTML = textNode.textContent || '';
+        };
+
+        const markHighlight = (textNode, keyword) => {
+            if (!textNode) return;
+            const plain = textNode.textContent || '';
+            if (!keyword) {
+                textNode.innerHTML = plain;
+                return;
+            }
+            const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp('(' + escaped + ')', 'ig');
+            textNode.innerHTML = plain.replace(regex, '<span class="permission-hit">$1</span>');
+        };
+
+        const applyFilter = () => {
+            const keyword = String(filterInput?.value || '').trim().toLowerCase();
+            groups.forEach((group) => {
+                const groupLabel = String(group.getAttribute('data-group-label') || '');
+                const groupKey = String(group.getAttribute('data-group-key') || '');
+                const items = group.querySelectorAll('.permission-item');
+                let hasVisible = false;
+
+                items.forEach((item) => {
+                    const itemLabel = String(item.getAttribute('data-permission-label') || '');
+                    const itemKey = String(item.getAttribute('data-permission-key') || '');
+                    const textNode = item.querySelector('.permission-item-text');
+                    const match = keyword === ''
+                        || groupLabel.includes(keyword)
+                        || groupKey.includes(keyword)
+                        || itemLabel.includes(keyword)
+                        || itemKey.includes(keyword);
+                    item.style.display = match ? '' : 'none';
+                    item.setAttribute('data-visible', match ? '1' : '0');
+                    if (match) {
+                        hasVisible = true;
+                        markHighlight(textNode, keyword);
+                    } else {
+                        clearHighlights(textNode);
+                    }
+                });
+
+                group.style.display = hasVisible ? '' : 'none';
+            });
+            updateVisibleCount();
+        };
+
+        checkVisibleBtn?.addEventListener('click', () => {
+            document.querySelectorAll('.permission-item[data-visible="1"] .permission-checkbox').forEach((checkbox) => {
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        });
+
+        uncheckVisibleBtn?.addEventListener('click', () => {
+            document.querySelectorAll('.permission-item[data-visible="1"] .permission-checkbox').forEach((checkbox) => {
+                checkbox.checked = false;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        });
+
+        filterInput?.addEventListener('input', applyFilter);
+        applyFilter();
     })();
 </script>

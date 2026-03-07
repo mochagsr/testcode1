@@ -16,7 +16,7 @@
 
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }}</h1>
-        <a class="btn" href="{{ route('order-notes.create') }}">{{ __('txn.create_order_note') }}</a>
+        <a class="btn create-transaction-btn" href="{{ route('order-notes.create') }}">{{ __('txn.create_order_note') }}</a>
     </div>
 
     <div class="card order-list-card">
@@ -36,9 +36,6 @@
                 <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'semester' => $previousSemester, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
             </div>
         </form>
-        @if(!empty($isDefaultRecentMode))
-            <p class="muted" style="margin: 8px 0 0 0;">Menampilkan data 7 hari terakhir (default). Gunakan filter tanggal/semester untuk data lebih lama.</p>
-        @endif
     </div>
 
     <div class="card">

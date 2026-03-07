@@ -20,6 +20,8 @@ return [
     'outgoing_debit_ledger_note' => 'Transaksi keluar :number',
     'no_data' => 'Belum ada supplier.',
     'no_mutation' => 'Belum ada mutasi hutang supplier.',
+    'final_outstanding' => 'Sisa Hutang Supplier',
+    'mutation_balance' => 'Saldo Mutasi (Debit - Kredit)',
     'amount_in_words' => 'Terbilang',
     'supplier_signature' => 'Tanda Tangan Supplier',
     'user_signature' => 'Tanda Tangan User',

@@ -7,15 +7,59 @@
     <style>
         :root {
             --bg: #f4f4f4;
+            --surface: #f3f4f6;
             --card: #ffffff;
             --text: #111111;
             --muted: #666666;
             --border: #dddddd;
             --accent: #111111;
-            --btn-primary-bg: #111111;
+            --sidebar-bg: #111111;
+            --sidebar-text: #ffffff;
+            --sidebar-muted: #bdbdbd;
+            --sidebar-hover: #2a2a2a;
+            --sidebar-group-hover: rgba(255, 255, 255, 0.04);
+            --sidebar-group-active: rgba(255, 255, 255, 0.08);
+            --sidebar-group-border: rgba(255, 255, 255, 0.18);
+            --sidebar-sub-text: #e6e6e6;
+            --sidebar-sub-active: #4a4a4a;
+            --sidebar-sub-active-border: #d9d9d9;
+            --sidebar-active-text: #ffffff;
+            --table-bg: #ffffff;
+            --table-header-bg: #f8f9fb;
+            --table-border: #d6d9de;
+            --table-border-soft: #e1e4e8;
+            --input-bg: #ffffff;
+            --btn-primary-bg: #2563eb;
             --btn-primary-text: #ffffff;
-            --btn-secondary-bg: #ffffff;
-            --btn-secondary-text: #111111;
+            --btn-secondary-bg: #f3f4f6;
+            --btn-secondary-text: #111827;
+            --btn-edit-bg: #2563eb;
+            --btn-edit-border: #1d4ed8;
+            --btn-edit-text: #ffffff;
+            --btn-payment-bg: #16a34a;
+            --btn-payment-border: #15803d;
+            --btn-payment-text: #ffffff;
+            --btn-warning-bg: #facc15;
+            --btn-warning-border: #eab308;
+            --btn-warning-text: #422006;
+            --btn-danger-bg: #dc2626;
+            --btn-danger-border: #b91c1c;
+            --btn-danger-text: #ffffff;
+            --btn-process-bg: #7c3aed;
+            --btn-process-border: #6d28d9;
+            --btn-process-text: #ffffff;
+            --btn-process-soft-bg: #8b5cf6;
+            --btn-process-soft-border: #7c3aed;
+            --btn-process-soft-text: #ffffff;
+            --btn-info-bg: #f3f4f6;
+            --btn-info-border: #d1d5db;
+            --btn-info-text: #111827;
+            --btn-orange-bg: #f97316;
+            --btn-orange-border: #ea580c;
+            --btn-orange-text: #ffffff;
+            --btn-create-bg: #1e3a8a;
+            --btn-create-border: #1d4ed8;
+            --btn-create-text: #ffffff;
             --alert-success-bg: #effaf0;
             --alert-success-border: #9bd3a1;
             --alert-success-text: #12301a;
@@ -53,8 +97,8 @@
             min-height: 100vh;
         }
         .sidebar {
-            background: #111111;
-            color: #ffffff;
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
             padding: 24px 16px;
         }
         .brand {
@@ -64,14 +108,15 @@
         }
         .nav a {
             display: block;
-            color: #ffffff;
+            color: var(--sidebar-text);
             text-decoration: none;
             padding: 10px 12px;
             border-radius: 8px;
             margin-bottom: 6px;
         }
         .nav a.active, .nav a:hover {
-            background: #2a2a2a;
+            background: var(--sidebar-hover);
+            color: var(--sidebar-active-text);
         }
         .nav-group {
             margin-bottom: 8px;
@@ -79,11 +124,11 @@
             padding: 2px;
         }
         .nav-group:hover {
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--sidebar-group-hover);
         }
         .nav-group.active {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: var(--sidebar-group-active);
+            border: 1px solid var(--sidebar-group-border);
             padding: 4px;
         }
         .nav-section-title {
@@ -92,36 +137,39 @@
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            color: #bdbdbd;
+            color: var(--sidebar-muted);
             font-weight: 700;
         }
         .nav-group-title {
             display: block;
-            color: #ffffff;
+            color: var(--sidebar-text);
             padding: 10px 12px 6px;
             border-radius: 8px;
             font-weight: 700;
         }
         .nav-group-title.active {
-            background: #2a2a2a;
+            background: var(--sidebar-hover);
+            color: var(--sidebar-active-text);
         }
         .nav-group.active .nav-group-title {
-            background: #3a3a3a;
+            background: var(--sidebar-hover);
+            color: var(--sidebar-active-text);
         }
         .nav-group.active .nav-sub a {
-            color: #f5f5f5;
+            color: var(--sidebar-text);
         }
         .nav-group.active .nav-sub a.active {
-            background: #4a4a4a;
-            border-left: 3px solid #d9d9d9;
+            background: var(--sidebar-sub-active);
+            border-left: 3px solid var(--sidebar-sub-active-border);
             padding-left: 9px;
+            color: var(--sidebar-active-text);
         }
         .nav-sub a {
             margin-bottom: 4px;
             margin-left: 10px;
             padding: 8px 10px;
             font-size: 13px;
-            color: #e6e6e6;
+            color: var(--sidebar-sub-text);
         }
         .main {
             padding: 24px;
@@ -169,7 +217,7 @@
             padding: 14px;
             border: 1px solid var(--border);
             border-radius: 10px;
-            background: #fff;
+            background: var(--card);
         }
         .stat-label {
             color: var(--muted);
@@ -183,17 +231,30 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            border: 1px solid var(--table-border);
+            background: var(--table-bg);
         }
         th, td {
-            text-align: left;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--table-border);
+            border-right: 1px solid var(--table-border-soft);
             padding: 10px 8px;
             vertical-align: top;
         }
+        tr > th:last-child,
+        tr > td:last-child {
+            border-right: none;
+        }
         th {
+            text-align: center;
             font-size: 12px;
             text-transform: uppercase;
             color: var(--muted);
+            background: var(--table-header-bg);
+            font-weight: 700;
+            vertical-align: middle;
+        }
+        td {
+            text-align: left;
         }
         input, select, textarea {
             width: 100%;
@@ -201,7 +262,8 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             font: inherit;
-            background: #fff;
+            background: var(--input-bg);
+            color: var(--text);
         }
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
@@ -321,6 +383,78 @@
             background: var(--btn-secondary-bg);
             color: var(--btn-secondary-text);
             border: 1px solid var(--border);
+        }
+        .btn.edit-btn,
+        button.edit-btn,
+        input[type="submit"].edit-btn,
+        input[type="button"].edit-btn {
+            background: var(--btn-edit-bg);
+            border-color: var(--btn-edit-border);
+            color: var(--btn-edit-text);
+        }
+        .btn.payment-btn,
+        button.payment-btn,
+        input[type="submit"].payment-btn,
+        input[type="button"].payment-btn {
+            background: var(--btn-payment-bg);
+            border-color: var(--btn-payment-border);
+            color: var(--btn-payment-text);
+        }
+        .btn.warning-btn,
+        button.warning-btn,
+        input[type="submit"].warning-btn,
+        input[type="button"].warning-btn {
+            background: var(--btn-warning-bg);
+            border-color: var(--btn-warning-border);
+            color: var(--btn-warning-text);
+        }
+        .btn.danger-btn,
+        button.danger-btn,
+        input[type="submit"].danger-btn,
+        input[type="button"].danger-btn {
+            background: var(--btn-danger-bg);
+            border-color: var(--btn-danger-border);
+            color: var(--btn-danger-text);
+        }
+        .btn.process-btn,
+        button.process-btn,
+        input[type="submit"].process-btn,
+        input[type="button"].process-btn {
+            background: var(--btn-process-bg);
+            border-color: var(--btn-process-border);
+            color: var(--btn-process-text);
+        }
+        .btn.process-soft-btn,
+        button.process-soft-btn,
+        input[type="submit"].process-soft-btn,
+        input[type="button"].process-soft-btn {
+            background: var(--btn-process-soft-bg);
+            border-color: var(--btn-process-soft-border);
+            color: var(--btn-process-soft-text);
+        }
+        .btn.info-btn,
+        button.info-btn,
+        input[type="submit"].info-btn,
+        input[type="button"].info-btn {
+            background: var(--btn-info-bg);
+            border-color: var(--btn-info-border);
+            color: var(--btn-info-text);
+        }
+        .btn.orange-btn,
+        button.orange-btn,
+        input[type="submit"].orange-btn,
+        input[type="button"].orange-btn {
+            background: var(--btn-orange-bg);
+            border-color: var(--btn-orange-border);
+            color: var(--btn-orange-text);
+        }
+        .btn.create-transaction-btn,
+        button.create-transaction-btn,
+        input[type="submit"].create-transaction-btn,
+        input[type="button"].create-transaction-btn {
+            background: var(--btn-create-bg);
+            border-color: var(--btn-create-border);
+            color: var(--btn-create-text);
         }
         td .flex .btn,
         td .flex button {
@@ -473,7 +607,7 @@
 @php
     $isDark = auth()->check() && auth()->user()->theme === 'dark';
 @endphp
-<body @if($isDark) style="--bg:#111;--card:#1b1b1b;--text:#f2f2f2;--muted:#b3b3b3;--border:#333;--accent:#fff;--btn-primary-bg:#f2f2f2;--btn-primary-text:#111111;--btn-secondary-bg:#1b1b1b;--btn-secondary-text:#f2f2f2;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-increase-bg:#11301f;--alert-increase-border:#4fb06e;--alert-increase-text:#d9ffe7;--alert-decrease-bg:#3a1717;--alert-decrease-border:#d86868;--alert-decrease-text:#ffd9d9;--alert-edit-bg:#3f3415;--alert-edit-border:#d3b25a;--alert-edit-text:#ffedb8;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
+<body @if($isDark) style="--bg:#111827;--surface:#111827;--card:#1F2937;--text:#F9FAFB;--muted:#9CA3AF;--border:#374151;--accent:#F9FAFB;--sidebar-bg:#1F2937;--sidebar-text:#D1D5DB;--sidebar-muted:#9CA3AF;--sidebar-hover:#2563EB;--sidebar-group-hover:rgba(37,99,235,0.12);--sidebar-group-active:rgba(37,99,235,0.18);--sidebar-group-border:rgba(37,99,235,0.35);--sidebar-sub-text:#D1D5DB;--sidebar-sub-active:#2563EB;--sidebar-sub-active-border:#2563EB;--sidebar-active-text:#FFFFFF;--table-bg:#1F2937;--table-header-bg:#111827;--table-border:#374151;--table-border-soft:#374151;--input-bg:#111827;--btn-secondary-bg:#374151;--btn-secondary-text:#F9FAFB;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-increase-bg:#11301f;--alert-increase-border:#4fb06e;--alert-increase-text:#d9ffe7;--alert-decrease-bg:#3a1717;--alert-decrease-border:#d86868;--alert-decrease-text:#ffd9d9;--alert-edit-bg:#3f3415;--alert-edit-border:#d3b25a;--alert-edit-text:#ffedb8;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
 <div class="wrap">
     <aside class="sidebar">
         <div class="brand">PgPOS ERP</div>

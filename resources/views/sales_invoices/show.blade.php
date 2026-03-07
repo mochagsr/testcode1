@@ -68,11 +68,11 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.invoice') }} {{ $invoice->invoice_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('sales-invoices.index') }}">{{ __('txn.back') }}</a>
-            <a class="btn secondary" href="{{ route('transaction-corrections.create', ['type' => 'sales_invoice', 'id' => $invoice->id]) }}">Wizard Koreksi</a>
+            <a class="btn warning-btn" href="{{ route('transaction-corrections.create', ['type' => 'sales_invoice', 'id' => $invoice->id]) }}">Wizard Koreksi</a>
             @if($isAdminUser)
-                <button type="button" class="btn secondary" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+                <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @elseif($requiresAdminToEdit)
-                <button type="button" class="btn secondary" onclick="alert(@js(__('txn.contact_admin_to_edit_locked')))">{{ __('txn.edit_transaction') }}</button>
+                <button type="button" class="btn warning-btn" onclick="alert(@js(__('txn.contact_admin_to_edit_locked')))">{{ __('txn.edit_transaction') }}</button>
             @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
@@ -262,7 +262,7 @@
                         <div class="col-12">
                             <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
                                 <strong>{{ __('txn.items') }}</strong>
-                                <button type="button" id="admin-add-item" class="btn secondary">{{ __('txn.add_row') }}</button>
+                                <button type="button" id="admin-add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
                             </div>
                             <table id="admin-items-table">
                                 <thead>
@@ -296,7 +296,7 @@
                                         <td><input type="number" min="0" step="1" class="admin-item-price" name="items[{{ $index }}][unit_price]" value="{{ (int) round($item->unit_price) }}" style="max-width: 120px;" required></td>
                                         <td><input type="number" min="0" max="100" step="1" class="admin-item-discount" name="items[{{ $index }}][discount]" value="{{ (int) round($discountPercent) }}" style="max-width: 85px;"></td>
                                         <td>Rp <span class="admin-item-line-total">{{ number_format((int) round($item->line_total), 0, ',', '.') }}</span></td>
-                                        <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>
+                                        <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -323,7 +323,7 @@
                                 <textarea name="cancel_reason" rows="2" required></textarea>
                             </div>
                             <div class="col-12">
-                                <button class="btn secondary" type="submit">{{ __('txn.cancel_transaction') }}</button>
+                                <button class="btn danger-btn" type="submit">{{ __('txn.cancel_transaction') }}</button>
                             </div>
                         </form>
                     @endif

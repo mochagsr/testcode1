@@ -523,9 +523,9 @@
                                     ]);
                                 @endphp
                                 <div class="receivable-customer-actions">
-                                    <a class="btn secondary" href="{{ $ledgerUrl }}">{{ __('receivable.ledger') }}</a>
+                                    <a class="btn process-btn" href="{{ $ledgerUrl }}">{{ __('receivable.ledger') }}</a>
                                     @if((float) $customer->outstanding_receivable > 0 && ! $rowCustomerSemesterClosed)
-                                        <a class="btn" href="{{ $paymentUrl }}">{{ __('receivable.create_payment') }}</a>
+                                        <a class="btn payment-btn" href="{{ $paymentUrl }}">{{ __('receivable.create_payment') }}</a>
                                     @endif
                                 </div>
                             </td>
@@ -840,7 +840,7 @@
                     @if((float) ($customerOutstandingTotal ?? 0) > 0 && !($selectedCustomerSemesterClosed ?? false))
                         <div style="margin-top: 8px; text-align: right;">
                             <a
-                                class="btn secondary"
+                                class="btn payment-btn"
                                 href="{{ route('receivable-payments.create', ['customer_id' => $selectedCustomerId, 'amount' => (int) round((float) ($customerOutstandingTotal ?? 0)), 'payment_date' => now()->format('Y-m-d'), 'return_to' => request()->getRequestUri()]) }}"
                             >
                                 {{ __('receivable.create_payment') }}
@@ -863,14 +863,14 @@
                             <div class="flex" style="gap:8px;">
                                 <button
                                     type="button"
-                                    class="btn secondary"
+                                    class="btn warning-btn"
                                     id="open-receivable-writeoff-modal"
                                 >
                                     {{ __('receivable.method_writeoff') }}
                                 </button>
                                 <button
                                     type="button"
-                                    class="btn"
+                                    class="btn warning-btn"
                                     id="open-receivable-discount-modal"
                                 >
                                     {{ __('receivable.method_discount') }}
@@ -917,7 +917,7 @@
                                     <td class="action">
                                         @if(!($selectedCustomerSemesterClosed ?? false))
                                             <a
-                                                class="btn secondary receivable-pay-btn"
+                                                class="btn payment-btn receivable-pay-btn"
                                                 href="{{ route('receivable-payments.create', ['customer_id' => $selectedCustomerId ?: $invoice->customer_id, 'amount' => (int) round((float) $invoice->balance), 'payment_date' => now()->format('Y-m-d'), 'preferred_invoice_id' => $invoice->id, 'return_to' => request()->getRequestUri()]) }}"
                                             >
                                                 {{ __('receivable.pay') }}
@@ -992,7 +992,7 @@
 
                             <div class="footer">
                                 <small id="receivable-adjustment-status" class="muted">{{ __('receivable.adjustment_auto_save_hint') }}</small>
-                                <button type="button" id="receivable-adjustment-save-now" class="btn">{{ __('receivable.save_payment') }}</button>
+                                <button type="button" id="receivable-adjustment-save-now" class="btn payment-btn">{{ __('receivable.save_payment') }}</button>
                             </div>
                         </div>
                     @endif

@@ -25,7 +25,7 @@
                     <button type="submit" class="btn secondary">Import</button>
                 </form>
             @endif
-            <a class="btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice') }}</a>
+            <a class="btn create-transaction-btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice') }}</a>
         </div>
     </div>
 
@@ -51,9 +51,6 @@
                 <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'semester' => $previousSemester, 'status' => $selectedStatus, 'invoice_date' => $selectedInvoiceDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
             </div>
         </form>
-        @if(!empty($isDefaultRecentMode))
-            <p class="muted" style="margin: 8px 0 0 0;">Menampilkan data 7 hari terakhir (default). Gunakan filter tanggal/semester untuk data lebih lama.</p>
-        @endif
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">

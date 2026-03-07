@@ -20,6 +20,8 @@ return [
     'outgoing_debit_ledger_note' => 'Outgoing transaction :number',
     'no_data' => 'No suppliers found.',
     'no_mutation' => 'No supplier payable mutation data.',
+    'final_outstanding' => 'Outstanding Supplier Debt',
+    'mutation_balance' => 'Mutation Balance (Debit - Credit)',
     'amount_in_words' => 'Amount in Words',
     'supplier_signature' => 'Supplier Signature',
     'user_signature' => 'User Signature',

@@ -58,18 +58,6 @@
         .signature-wrap { margin-top: 18px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
         .signature-box { text-align: center; }
         .signature-line { margin-top: 36px; border-top: 1px solid #111; }
-        .pdf-mode { font-size: 10px; }
-        .pdf-mode .container { max-width: 100%; }
-        .pdf-mode .company-head { display: table; width: 100%; table-layout: fixed; border-collapse: collapse; }
-        .pdf-mode .company-left,
-        .pdf-mode .doc-title-wrap,
-        .pdf-mode .doc-right { display: table-cell; vertical-align: top; }
-        .pdf-mode .company-left { width: 44%; padding-right: 8px; }
-        .pdf-mode .doc-title-wrap { width: 20%; padding: 0 6px; }
-        .pdf-mode .doc-right { width: 36%; padding-left: 8px; min-width: 0; }
-        .pdf-mode th, .pdf-mode td { padding: 3px; }
-        .pdf-mode .doc-meta-table th,
-        .pdf-mode .doc-meta-table td { padding: 0 0 1px 0; }
         @media (max-width: 900px) {
             .meta-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .cost-box, .notes-box { grid-column: span 2; }
@@ -81,14 +69,15 @@
         }
     </style>
 </head>
-<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
+<body>
 @php
     $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');
     $companyName = trim((string) \App\Models\AppSetting::getValue('company_name', 'CV. PUSTAKA GRAFIKA'));
-    $companyAddress = trim((string) \App\Models\AppSetting::getValue('company_address', ''));
+    $companyAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) \App\Models\AppSetting::getValue('company_address', '')), 5);
     $companyPhone = trim((string) \App\Models\AppSetting::getValue('company_phone', ''));
     $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
     $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
+    $tripNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) $trip->notes), 4);
 
     $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
         ->filter(fn ($line) => trim((string) $line) !== '');
@@ -165,7 +154,7 @@
             </div>
             <div class="notes-box">
                 <div class="notes-label">{{ __('txn.notes') }}</div>
-                <div class="notes-content">{{ trim((string) $trip->notes) !== '' ? $trip->notes : '-' }}</div>
+                <div class="notes-content">{{ $tripNotes !== '' ? $tripNotes : '-' }}</div>
             </div>
         </div>
 

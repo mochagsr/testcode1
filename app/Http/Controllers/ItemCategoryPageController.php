@@ -72,13 +72,76 @@ class ItemCategoryPageController extends Controller
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('item_categories', 'code')->ignore($ignoreId)],
+            'name' => ['required', 'string', 'max:100'],
+            'code' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string'],
         ]);
 
-        // Keep compatibility with existing schema that still has `name`.
-        $data['name'] = $data['code'];
+        $data['name'] = trim((string) $data['name']);
+        $data['code'] = $this->resolveCategoryCode(
+            (string) ($data['code'] ?? ''),
+            $data['name'],
+            $ignoreId,
+        );
 
         return $data;
+    }
+
+    private function resolveCategoryCode(string $manualCode, string $name, ?int $ignoreId = null): string
+    {
+        $baseCode = $manualCode !== ''
+            ? $this->normalizeCode($manualCode)
+            : $this->generateBaseCodeFromName($name);
+
+        if ($baseCode === '') {
+            $baseCode = 'kategori';
+        }
+
+        $candidate = $baseCode;
+        $suffix = 2;
+
+        while ($this->codeExists($candidate, $ignoreId)) {
+            $remainingLength = max(1, 50 - strlen((string) $suffix));
+            $candidate = substr($baseCode, 0, $remainingLength).$suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function codeExists(string $code, ?int $ignoreId = null): bool
+    {
+        return ItemCategory::query()
+            ->when($ignoreId !== null, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->where('code', $code)
+            ->exists();
+    }
+
+    private function normalizeCode(string $code): string
+    {
+        $normalized = preg_replace('/[^a-z0-9]+/i', '', strtolower(trim($code))) ?? '';
+
+        return substr($normalized, 0, 50);
+    }
+
+    private function generateBaseCodeFromName(string $name): string
+    {
+        $normalized = strtolower(trim((string) preg_replace('/[^a-z0-9]+/i', ' ', $name)));
+        $parts = array_values(array_filter(explode(' ', $normalized)));
+
+        if ($parts === []) {
+            return 'kategori';
+        }
+
+        if (count($parts) === 1) {
+            return substr($parts[0], 0, 6);
+        }
+
+        $code = '';
+        foreach ($parts as $part) {
+            $code .= substr($part, 0, 3);
+        }
+
+        return substr($code, 0, 12);
     }
 }

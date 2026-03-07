@@ -73,23 +73,7 @@
                     <td>
                         @php
                             $actionRaw = (string) $log->action;
-                            $actionMap = [
-                                'sales.invoice.create' => __('ui.audit_action_sales_invoice_create'),
-                                'sales.invoice.admin_update' => __('ui.audit_action_sales_invoice_admin_update'),
-                                'sales.invoice.cancel' => __('ui.audit_action_sales_invoice_cancel'),
-                                'sales.return.create' => __('ui.audit_action_sales_return_create'),
-                                'sales.return.admin_update' => __('ui.audit_action_sales_return_admin_update'),
-                                'sales.return.cancel' => __('ui.audit_action_sales_return_cancel'),
-                                'delivery.note.create' => __('ui.audit_action_delivery_note_create'),
-                                'delivery.note.admin_update' => __('ui.audit_action_delivery_note_admin_update'),
-                                'delivery.note.cancel' => __('ui.audit_action_delivery_note_cancel'),
-                                'order.note.create' => __('ui.audit_action_order_note_create'),
-                                'order.note.admin_update' => __('ui.audit_action_order_note_admin_update'),
-                                'order.note.cancel' => __('ui.audit_action_order_note_cancel'),
-                            ];
-                            $fallbackTranslationKey = 'ui.audit_action_' . str_replace(['.', '-'], '_', $actionRaw);
-                            $actionLabel = $actionMap[$actionRaw]
-                                ?? (lang()->has($fallbackTranslationKey) ? __($fallbackTranslationKey) : $actionRaw);
+                            $actionLabel = (string) (($actionLabelMap[$actionRaw] ?? $actionRaw));
                         @endphp
                         {{ $actionLabel }}
                     </td>

@@ -9,21 +9,23 @@
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.25; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
         .receipt { border: 1px solid #111; padding: 12px; }
-        .company-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
-        .company-left { display: flex; gap: 8px; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 44%) minmax(200px, 22%) minmax(0, 34%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
+        .company-left { display: flex; gap: 8px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 16px; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
         .company-detail { white-space: pre-line; }
-        .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; }
-        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; text-align: left; }
+        .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; min-width: 0; }
+        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; text-align: left; width: 100%; }
+        .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
+        .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .kwitansi-title { font-size: 18px; font-weight: 700; letter-spacing: 0.6px; text-align: center; }
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
         .doc-number { text-align: center; margin-bottom: 4px; }
         .line { display: flex; margin-bottom: 4px; }
         .line-label { width: 150px; flex-shrink: 0; }
         .line-sep { width: 12px; text-align: center; flex-shrink: 0; }
-        .line-value { border-bottom: 1px dotted #111; flex: 1; min-height: 16px; padding: 0 4px; }
+        .line-value { border-bottom: 1px dotted #111; flex: 1; min-height: 16px; padding: 0 4px; white-space: pre-line; }
         .amount-box { border: 1px solid #111; padding: 8px; margin: 10px 0; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
         .amount-label { font-weight: 700; }
         .amount-value { font-size: 16px; font-weight: 700; white-space: nowrap; }
@@ -34,18 +36,6 @@
         .sign-space { height: 30px; }
         .sign-name { border-top: 1px solid #111; padding-top: 3px; }
         .muted { color: #333; }
-        .pdf-mode { font-size: 10px; }
-        .pdf-mode .container { max-width: 100%; }
-        .pdf-mode .receipt { padding: 10px; }
-        .pdf-mode .company-head { display: table; width: 100%; table-layout: fixed; border-collapse: collapse; }
-        .pdf-mode .company-left,
-        .pdf-mode .doc-title-center,
-        .pdf-mode .doc-meta-right { display: table-cell; vertical-align: top; }
-        .pdf-mode .company-left { width: 44%; padding-right: 8px; }
-        .pdf-mode .doc-title-center { width: 22%; padding: 0 6px; text-align: center; }
-        .pdf-mode .doc-meta-right { width: 34%; padding-left: 8px; min-width: 0; }
-        .pdf-mode .company-name { font-size: 14px; }
-        .pdf-mode .kwitansi-title { font-size: 16px; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
@@ -53,18 +43,18 @@
         }
     </style>
 </head>
-<body class="{{ !empty($isPdf) ? 'pdf-mode' : '' }}">
+<body>
 <div class="container">
     @php
         $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');
         $companyName = trim((string) \App\Models\AppSetting::getValue('company_name', 'CV. PUSTAKA GRAFIKA'));
-        $companyAddress = trim((string) \App\Models\AppSetting::getValue('company_address', ''));
+        $companyAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) \App\Models\AppSetting::getValue('company_address', '')), 5);
         $companyPhone = trim((string) \App\Models\AppSetting::getValue('company_phone', ''));
         $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
-        $reportFooterText = trim((string) \App\Models\AppSetting::getValue('report_footer_text', ''));
-        $printNotes = trim((string) ($payment->notes ?? ''));
+        $printNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($payment->notes ?? '')), 4);
+        $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($payment->customer_address ?: ''), 5);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
@@ -120,11 +110,11 @@
                 <div class="doc-number">{{ __('txn.no') }}: {{ $payment->payment_number }}</div>
             </div>
             <div class="doc-meta-right">
-                <div><strong>{{ __('txn.date') }}</strong> : {{ $payment->payment_date?->format('d-m-Y') }}</div>
-                <div><strong>{{ __('receivable.customer') }}</strong> : {{ $payment->customer?->name ?: '-' }}</div>
-                <div><strong>{{ __('txn.phone') }}</strong> : {{ $payment->customer?->phone ?: '-' }}</div>
-                <div><strong>{{ __('txn.address') }}</strong> : {{ $payment->customer_address ?: '-' }}</div>
-                <div><strong>{{ __('txn.city') }}</strong> : {{ $payment->customer?->city ?: '-' }}</div>
+                <div class="meta-line"><strong>{{ __('txn.date') }}</strong><span>:</span><span class="meta-value">{{ $payment->payment_date?->format('d-m-Y') }}</span></div>
+                <div class="meta-line"><strong>{{ __('receivable.customer') }}</strong><span>:</span><span class="meta-value">{{ $payment->customer?->name ?: '-' }}</span></div>
+                <div class="meta-line"><strong>{{ __('txn.phone') }}</strong><span>:</span><span class="meta-value">{{ $payment->customer?->phone ?: '-' }}</span></div>
+                <div class="meta-line"><strong>{{ __('txn.city') }}</strong><span>:</span><span class="meta-value">{{ $payment->customer?->city ?: '-' }}</span></div>
+                <div class="meta-line"><strong>{{ __('txn.address') }}</strong><span>:</span><span class="meta-value">{{ $customerAddress !== '' ? $customerAddress : '-' }}</span></div>
             </div>
         </div>
         @if($payment->is_canceled)
@@ -137,9 +127,14 @@
             <div class="line-value">{{ $payment->customer?->name ?: '-' }}</div>
         </div>
         <div class="line">
+            <div class="line-label">{{ __('txn.city') }}</div>
+            <div class="line-sep">:</div>
+            <div class="line-value">{{ $payment->customer?->city ?: '-' }}</div>
+        </div>
+        <div class="line">
             <div class="line-label">{{ __('txn.address') }}</div>
             <div class="line-sep">:</div>
-            <div class="line-value">{{ $payment->customer_address ?: '-' }}</div>
+            <div class="line-value">{{ $customerAddress !== '' ? $customerAddress : '-' }}</div>
         </div>
         <div class="line">
             <div class="line-label">{{ __('receivable.amount_in_words') }}</div>
@@ -168,11 +163,6 @@
                 <div class="sign-name">{{ $payment->user_signature }}</div>
             </div>
         </div>
-        @if($reportFooterText !== '')
-            <div style="margin-top: 10px; border-top: 1px solid #111; padding-top: 6px; font-size: 10px;">
-                {{ $reportFooterText }}
-            </div>
-        @endif
     </div>
 </div>
 </body>

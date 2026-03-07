@@ -170,6 +170,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/receivable-payments/{receivablePayment}', [ReceivablePaymentPageController::class, 'show'])->middleware('perm:receivables.view')->name('receivable-payments.show');
     Route::get('/receivable-payments/{receivablePayment}/print', [ReceivablePaymentPageController::class, 'print'])->middleware('perm:receivables.view')->name('receivable-payments.print');
     Route::get('/receivable-payments/{receivablePayment}/pdf', [ReceivablePaymentPageController::class, 'exportPdf'])->middleware('perm:receivables.view')->name('receivable-payments.export.pdf');
+    Route::get('/receivable-payments/{receivablePayment}/excel', [ReceivablePaymentPageController::class, 'exportExcel'])->middleware('perm:receivables.view')->name('receivable-payments.export.excel');
     Route::put('/receivable-payments/{receivablePayment}/admin-update', [ReceivablePaymentPageController::class, 'adminUpdate'])
         ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
         ->name('receivable-payments.admin-update');
@@ -237,6 +238,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/supplier-payables/payment/{supplierPayment}', [SupplierPayablePageController::class, 'showPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.show-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/print', [SupplierPayablePageController::class, 'printPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/pdf', [SupplierPayablePageController::class, 'exportPaymentPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-pdf');
+    Route::get('/supplier-payables/payment/{supplierPayment}/excel', [SupplierPayablePageController::class, 'exportPaymentExcel'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-excel');
     Route::put('/supplier-payables/payment/{supplierPayment}/admin-update', [SupplierPayablePageController::class, 'adminUpdate'])
         ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
         ->name('supplier-payables.admin-update');

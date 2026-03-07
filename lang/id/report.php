@@ -69,7 +69,7 @@ return [
         'paid_customer_balance' => 'Terbayar dari Saldo Customer',
         'balance' => 'Sisa',
         'customer_balance' => 'Saldo Customer',
-        'payment_method' => 'Metode Pembayaran',
+        'payment_method' => 'Pembayaran',
         'status' => 'Status',
         'semester' => 'Semester',
         'outstanding_receivable' => 'Sisa Piutang',

@@ -37,7 +37,9 @@ class SettingsController extends Controller
             'company_billing_note' => '',
             'company_transfer_accounts' => '',
             'report_header_text' => '',
-            'report_footer_text' => '',
+            'print_workflow_mode' => 'browser',
+            'print_paper_preset' => 'auto',
+            'print_small_rows_threshold' => '35',
         ]);
 
         $rawSemesterOptions = (string) ($settings['semester_period_options'] ?? '');
@@ -104,7 +106,11 @@ class SettingsController extends Controller
             'companyBillingNote' => $settings['company_billing_note'] ?? '',
             'companyTransferAccounts' => $settings['company_transfer_accounts'] ?? '',
             'reportHeaderText' => $settings['report_header_text'] ?? '',
-            'reportFooterText' => $settings['report_footer_text'] ?? '',
+            'printWorkflowMode' => $settings['print_workflow_mode'] ?? 'browser',
+            'printPaperPreset' => $settings['print_paper_preset'] ?? 'auto',
+            'printSmallRowsThreshold' => (int) ((string) ($settings['print_small_rows_threshold'] ?? '35') !== ''
+                ? (int) $settings['print_small_rows_threshold']
+                : 35),
             'semesterPeriodOptions' => $rawSemesterOptions,
             'unitOptions' => $rawUnitOptions,
             'unitOptionRows' => $unitOptionRows,
@@ -140,7 +146,9 @@ class SettingsController extends Controller
             'company_billing_note' => ['nullable', 'string', 'max:4000'],
             'company_transfer_accounts' => ['nullable', 'string', 'max:4000'],
             'report_header_text' => ['nullable', 'string', 'max:2000'],
-            'report_footer_text' => ['nullable', 'string', 'max:2000'],
+            'print_workflow_mode' => ['nullable', 'in:browser,qz'],
+            'print_paper_preset' => ['nullable', 'in:auto,9.5x5.5,9.5x11'],
+            'print_small_rows_threshold' => ['nullable', 'integer', 'min:5', 'max:200'],
             'semester_period_options' => ['nullable', 'string', 'max:4000'],
             'semester_period_codes' => ['nullable', 'array'],
             'semester_period_codes.*' => ['nullable', 'string', 'max:30'],
@@ -258,7 +266,9 @@ class SettingsController extends Controller
                 'company_billing_note' => trim((string) ($data['company_billing_note'] ?? '')),
                 'company_transfer_accounts' => trim((string) ($data['company_transfer_accounts'] ?? '')),
                 'report_header_text' => trim((string) ($data['report_header_text'] ?? '')),
-                'report_footer_text' => trim((string) ($data['report_footer_text'] ?? '')),
+                'print_workflow_mode' => (string) ($data['print_workflow_mode'] ?? 'browser'),
+                'print_paper_preset' => (string) ($data['print_paper_preset'] ?? 'auto'),
+                'print_small_rows_threshold' => (string) max(5, (int) ($data['print_small_rows_threshold'] ?? 35)),
             ]);
             AppCache::forgetReportOptionCaches();
         }

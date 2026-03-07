@@ -91,7 +91,7 @@
 
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.outgoing_transactions_title') }}</h1>
-        <a class="btn" href="{{ route('outgoing-transactions.create') }}">{{ __('txn.create_outgoing_transaction') }}</a>
+        <a class="btn create-transaction-btn" href="{{ route('outgoing-transactions.create') }}">{{ __('txn.create_outgoing_transaction') }}</a>
     </div>
 
     <div class="card">
@@ -119,9 +119,6 @@
                 <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $previousSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
             </div>
         </form>
-        @if(!empty($isDefaultRecentMode))
-            <p class="muted" style="margin: 8px 0 0 0;">Menampilkan data 7 hari terakhir (default). Gunakan filter tanggal/semester untuk data lebih lama.</p>
-        @endif
     </div>
 
     <div class="card">

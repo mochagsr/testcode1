@@ -5,7 +5,7 @@
 @section('content')
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('receivable.payment_menu') }}</h1>
-        <a class="btn" href="{{ route('receivable-payments.create') }}">{{ __('receivable.create_payment') }}</a>
+        <a class="btn payment-btn" href="{{ route('receivable-payments.create') }}">{{ __('receivable.create_payment') }}</a>
     </div>
 
     <div class="card">
@@ -19,9 +19,6 @@
             </select>
             <button type="submit">{{ __('txn.search') }}</button>
         </form>
-        @if(!empty($isDefaultRecentMode))
-            <p class="muted" style="margin: 8px 0 0 0;">Menampilkan data 7 hari terakhir (default). Gunakan filter tanggal untuk data lebih lama.</p>
-        @endif
     </div>
 
     <div class="card">

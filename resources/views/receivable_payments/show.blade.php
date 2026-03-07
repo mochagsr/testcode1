@@ -14,6 +14,7 @@
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('receivable-payments.print', $payment) }}">{{ __('txn.print') }}</option>
                 <option value="{{ route('receivable-payments.export.pdf', $payment) }}">{{ __('txn.pdf') }}</option>
+                <option value="{{ route('receivable-payments.export.excel', $payment) }}">{{ __('txn.excel') }}</option>
             </select>
         </div>
     </div>
@@ -76,7 +77,7 @@
                             <textarea name="cancel_reason" rows="2" required></textarea>
                         </div>
                         <div class="col-12">
-                            <button class="btn secondary" type="submit">{{ __('txn.cancel_transaction') }}</button>
+                            <button class="btn danger-btn" type="submit">{{ __('txn.cancel_transaction') }}</button>
                         </div>
                     </form>
                 @endif
@@ -84,8 +85,6 @@
         </div>
     @endif
 @endsection
-
-
 
 
 

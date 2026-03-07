@@ -5,7 +5,7 @@
 @section('content')
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('school_bulk.bulk_transaction_title') }}</h1>
-        <a class="btn" href="{{ route('school-bulk-transactions.create') }}">{{ __('school_bulk.create_bulk_transaction') }}</a>
+        <a class="btn create-transaction-btn" href="{{ route('school-bulk-transactions.create') }}">{{ __('school_bulk.create_bulk_transaction') }}</a>
     </div>
 
     <div class="card">
@@ -67,4 +67,3 @@
         </div>
     </div>
 @endsection
-

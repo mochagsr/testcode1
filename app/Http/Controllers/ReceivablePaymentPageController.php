@@ -11,6 +11,9 @@ use App\Models\SalesInvoice;
 use App\Services\ReceivableLedgerService;
 use App\Services\AccountingService;
 use App\Support\AppCache;
+use App\Support\AppSetting;
+use App\Support\ExcelExportStyler;
+use App\Support\PrintTextFormatter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -18,6 +21,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivablePaymentPageController extends Controller
 {
@@ -40,8 +47,6 @@ class ReceivablePaymentPageController extends Controller
                 Carbon::parse($selectedPaymentDate)->endOfDay(),
             ]
             : null;
-        $isDefaultRecentMode = $selectedPaymentDateRange === null && $search === '';
-        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
 
         $payments = ReceivablePayment::query()
             ->onlyListColumns()
@@ -53,9 +58,6 @@ class ReceivablePaymentPageController extends Controller
                 $selectedPaymentDateRange[0],
                 $selectedPaymentDateRange[1]
             ))
-            ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
-                $query->where('payment_date', '>=', $recentRangeStart);
-            })
             ->orderByDate()
             ->paginate(20)
             ->withQueryString();
@@ -65,7 +67,6 @@ class ReceivablePaymentPageController extends Controller
             'search' => $search,
             'selectedStatus' => $selectedStatus,
             'selectedPaymentDate' => $selectedPaymentDate,
-            'isDefaultRecentMode' => $isDefaultRecentMode,
         ]);
     }
 
@@ -412,9 +413,114 @@ class ReceivablePaymentPageController extends Controller
         return $pdf->download($filename);
     }
 
+    public function exportExcel(ReceivablePayment $receivablePayment): StreamedResponse
+    {
+        $receivablePayment->load('customer:id,name,city,address,phone');
+        $filename = $receivablePayment->payment_number . '.xlsx';
+
+        return response()->streamDownload(function () use ($receivablePayment): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Kwitansi');
+
+            $settings = AppSetting::getValues([
+                'company_name' => 'CV. PUSTAKA GRAFIKA',
+                'company_address' => '',
+                'company_phone' => '',
+                'company_email' => '',
+                'company_notes' => '',
+                'report_header_text' => 'KWITANSI',
+            ]);
+
+            $companyAddress = PrintTextFormatter::wrapWords(trim((string) ($settings['company_address'] ?? '')), 5);
+            $companyDetail = collect([
+                $companyAddress,
+                trim((string) ($settings['company_phone'] ?? '')),
+                trim((string) ($settings['company_email'] ?? '')),
+                trim((string) ($settings['company_notes'] ?? '')),
+            ])->filter(fn (string $line): bool => $line !== '')->implode("\n");
+            $customerAddress = PrintTextFormatter::wrapWords(trim((string) ($receivablePayment->customer_address ?? '')), 5);
+            $printNotes = PrintTextFormatter::wrapWords(trim((string) ($receivablePayment->notes ?? '')), 4);
+
+            $sheet->mergeCells('A1:F1');
+            $sheet->setCellValue('A1', trim((string) ($settings['report_header_text'] ?? 'KWITANSI')));
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $sheet->mergeCells('A2:B2');
+            $sheet->setCellValue('A2', trim((string) ($settings['company_name'] ?? 'CV. PUSTAKA GRAFIKA')));
+            $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(13);
+            $sheet->mergeCells('A3:B5');
+            $sheet->setCellValue('A3', $companyDetail !== '' ? $companyDetail : '-');
+            $sheet->getStyle('A3:B5')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+
+            $sheet->mergeCells('C2:D2');
+            $sheet->setCellValue('C2', __('txn.no') . ': ' . $receivablePayment->payment_number);
+            $sheet->getStyle('C2')->getFont()->setBold(true);
+            $sheet->getStyle('C2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $metaRows = [
+                [__('txn.date'), $receivablePayment->payment_date?->format('d-m-Y') ?: '-'],
+                [__('receivable.customer'), (string) ($receivablePayment->customer?->name ?? '-')],
+                [__('txn.phone'), (string) ($receivablePayment->customer?->phone ?? '-')],
+                [__('txn.city'), (string) ($receivablePayment->customer?->city ?? '-')],
+                [__('txn.address'), $customerAddress !== '' ? $customerAddress : '-'],
+            ];
+            $metaRowIndex = 2;
+            foreach ($metaRows as [$label, $value]) {
+                $sheet->setCellValue('E' . $metaRowIndex, $label);
+                $sheet->setCellValue('F' . $metaRowIndex, $value);
+                $metaRowIndex++;
+            }
+            $sheet->getStyle('E2:E6')->getFont()->setBold(true);
+            $sheet->getStyle('F2:F6')->getAlignment()->setWrapText(true);
+
+            $detailHeaderRow = 8;
+            $detailRows = [
+                [__('receivable.customer'), (string) ($receivablePayment->customer?->name ?? '-')],
+                [__('txn.city'), (string) ($receivablePayment->customer?->city ?? '-')],
+                [__('txn.address'), $customerAddress !== '' ? $customerAddress : '-'],
+                [__('receivable.amount_in_words'), (string) ($receivablePayment->amount_in_words ?? '-')],
+                [__('receivable.amount_paid'), 'Rp ' . number_format((int) round((float) $receivablePayment->amount), 0, ',', '.')],
+                [__('txn.notes'), $printNotes !== '' ? $printNotes : '-'],
+            ];
+            $sheet->fromArray([['Keterangan', 'Nilai']], null, 'A' . $detailHeaderRow);
+            $sheet->fromArray($detailRows, null, 'A' . ($detailHeaderRow + 1));
+            ExcelExportStyler::styleTable($sheet, $detailHeaderRow, 2, count($detailRows), true);
+            $sheet->getStyle('A' . $detailHeaderRow . ':B' . ($detailHeaderRow + count($detailRows)))
+                ->getAlignment()
+                ->setWrapText(true);
+
+            $signatureRow = $detailHeaderRow + count($detailRows) + 3;
+            $sheet->mergeCells('A' . $signatureRow . ':B' . $signatureRow);
+            $sheet->mergeCells('E' . $signatureRow . ':F' . $signatureRow);
+            $sheet->setCellValue('A' . $signatureRow, __('receivable.customer_signature'));
+            $sheet->setCellValue('E' . $signatureRow, __('txn.signature'));
+            $sheet->getStyle('A' . $signatureRow . ':F' . $signatureRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->mergeCells('A' . ($signatureRow + 2) . ':B' . ($signatureRow + 2));
+            $sheet->mergeCells('E' . ($signatureRow + 2) . ':F' . ($signatureRow + 2));
+            $sheet->setCellValue('A' . ($signatureRow + 2), (string) ($receivablePayment->customer_signature ?? '-'));
+            $sheet->setCellValue('E' . ($signatureRow + 2), (string) ($receivablePayment->user_signature ?? '-'));
+            $sheet->getStyle('A' . ($signatureRow + 2) . ':F' . ($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A' . ($signatureRow + 1) . ':B' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('E' . ($signatureRow + 1) . ':F' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+
+            foreach (range('A', 'F') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
     private function generatePaymentNumber(string $date): string
     {
-        $prefix = 'KWT-' . date('Ymd', strtotime($date));
+        $prefix = 'KWT-' . date('dmY', strtotime($date));
         $count = ReceivablePayment::query()
             ->whereDate('payment_date', $date)
             ->lockForUpdate()

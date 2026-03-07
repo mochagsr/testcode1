@@ -6,13 +6,20 @@ use App\Models\Customer;
 use App\Models\SupplierLedger;
 use App\Models\SupplierPayment;
 use App\Models\Supplier;
+use App\Models\DeliveryNote;
+use App\Models\DeliveryTrip;
 use App\Models\OutgoingTransaction;
+use App\Models\OrderNote;
+use App\Models\SchoolBulkTransaction;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\AppSetting;
 use App\Models\ReportExportTask;
 use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
+use App\Models\IntegrityCheckLog;
+use App\Models\PerformanceProbeLog;
+use App\Support\AppCache;
 use App\Support\SemesterBookService;
 use App\Services\AccountingService;
 use Carbon\Carbon;
@@ -21,6 +28,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Schema;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -114,6 +122,145 @@ Artisan::command('app:normalize-doc-prefixes {--dry-run}', function () {
 
     $this->info('Normalization completed.');
 })->purpose('Normalize legacy document prefixes to RTR/KWT and update related text references');
+
+Artisan::command('app:renumber-doc-date-format {--dry-run}', function () {
+    $dryRun = (bool) $this->option('dry-run');
+
+    $buildNumber = function (string $prefix, ?string $date, string $currentNumber): string {
+        $trimmedCurrent = trim($currentNumber);
+        if ($trimmedCurrent === '' || $date === null || trim($date) === '') {
+            return $trimmedCurrent;
+        }
+
+        if (preg_match('/-(\d{4})$/', $trimmedCurrent, $matches) !== 1) {
+            return $trimmedCurrent;
+        }
+
+        return sprintf('%s-%s-%s', $prefix, Carbon::parse($date)->format('dmY'), $matches[1]);
+    };
+
+    $plans = [
+        ['table' => 'sales_invoices', 'model' => SalesInvoice::class, 'number_column' => 'invoice_number', 'date_column' => 'invoice_date', 'prefix' => 'INV'],
+        ['table' => 'sales_returns', 'model' => SalesReturn::class, 'number_column' => 'return_number', 'date_column' => 'return_date', 'prefix' => 'RTR'],
+        ['table' => 'delivery_notes', 'model' => DeliveryNote::class, 'number_column' => 'note_number', 'date_column' => 'note_date', 'prefix' => 'SJ'],
+        ['table' => 'order_notes', 'model' => OrderNote::class, 'number_column' => 'note_number', 'date_column' => 'note_date', 'prefix' => 'PO'],
+        ['table' => 'outgoing_transactions', 'model' => OutgoingTransaction::class, 'number_column' => 'transaction_number', 'date_column' => 'transaction_date', 'prefix' => 'TRXK'],
+        ['table' => 'delivery_trips', 'model' => DeliveryTrip::class, 'number_column' => 'trip_number', 'date_column' => 'trip_date', 'prefix' => 'TRP'],
+        ['table' => 'receivable_payments', 'model' => ReceivablePayment::class, 'number_column' => 'payment_number', 'date_column' => 'payment_date', 'prefix' => 'KWT'],
+        ['table' => 'supplier_payments', 'model' => SupplierPayment::class, 'number_column' => 'payment_number', 'date_column' => 'payment_date', 'prefix' => 'KWTS'],
+        ['table' => 'school_bulk_transactions', 'model' => SchoolBulkTransaction::class, 'number_column' => 'transaction_number', 'date_column' => 'transaction_date', 'prefix' => 'BLK'],
+        ['table' => 'journal_entries', 'model' => JournalEntry::class, 'number_column' => 'entry_number', 'date_column' => 'entry_date', 'prefix' => 'JR'],
+    ];
+
+    $replaceMap = [];
+    $counts = [];
+
+    foreach ($plans as $plan) {
+        $query = $plan['query'] ?? ($plan['model'])::query();
+        $rows = $query
+            ->select(['id', $plan['number_column'], $plan['date_column']])
+            ->whereNotNull($plan['number_column'])
+            ->orderBy('id')
+            ->get();
+
+        foreach ($rows as $row) {
+            $old = (string) ($row->{$plan['number_column']} ?? '');
+            $new = $buildNumber($plan['prefix'], (string) ($row->{$plan['date_column']} ?? ''), $old);
+            if ($new === '' || $new === $old) {
+                continue;
+            }
+            $replaceMap[$old] = $new;
+            $counts[$plan['table']] = (int) ($counts[$plan['table']] ?? 0) + 1;
+        }
+    }
+
+    if ($replaceMap === []) {
+        $this->info('Tidak ada nomor dokumen lama yang perlu diubah.');
+        return;
+    }
+
+    $this->line('Rencana perubahan nomor dokumen:');
+    foreach ($counts as $table => $count) {
+        $this->line("- {$table}: {$count}");
+    }
+    $this->line('Total mapping: '.count($replaceMap));
+
+    if ($dryRun) {
+        $this->warn('Dry run mode, tidak ada data yang diubah.');
+        return;
+    }
+
+    DB::transaction(function () use ($plans, $replaceMap, $buildNumber): void {
+        foreach ($plans as $plan) {
+            $table = (string) $plan['table'];
+            DB::table($table)
+                ->select(['id', $plan['number_column'], $plan['date_column']])
+                ->orderBy('id')
+                ->chunkById(200, function ($rows) use ($table, $plan, $buildNumber): void {
+                    foreach ($rows as $row) {
+                        $old = (string) ($row->{$plan['number_column']} ?? '');
+                        $new = $buildNumber($plan['prefix'], (string) ($row->{$plan['date_column']} ?? ''), $old);
+                        if ($new === '' || $new === $old) {
+                            continue;
+                        }
+                        DB::table($table)
+                            ->where('id', (int) $row->id)
+                            ->update([$plan['number_column'] => $new]);
+                    }
+                });
+        }
+
+        $textTargets = [
+            ['table' => 'receivable_ledgers', 'column' => 'description'],
+            ['table' => 'supplier_ledgers', 'column' => 'description'],
+            ['table' => 'stock_mutations', 'column' => 'notes'],
+            ['table' => 'invoice_payments', 'column' => 'notes'],
+            ['table' => 'audit_logs', 'column' => 'description'],
+            ['table' => 'audit_logs', 'column' => 'before_data'],
+            ['table' => 'audit_logs', 'column' => 'after_data'],
+            ['table' => 'audit_logs', 'column' => 'meta_data'],
+            ['table' => 'sales_invoices', 'column' => 'notes'],
+            ['table' => 'sales_returns', 'column' => 'reason'],
+            ['table' => 'sales_returns', 'column' => 'cancel_reason'],
+            ['table' => 'delivery_notes', 'column' => 'notes'],
+            ['table' => 'delivery_notes', 'column' => 'cancel_reason'],
+            ['table' => 'order_notes', 'column' => 'notes'],
+            ['table' => 'order_notes', 'column' => 'cancel_reason'],
+            ['table' => 'outgoing_transactions', 'column' => 'notes'],
+            ['table' => 'delivery_trips', 'column' => 'notes'],
+            ['table' => 'receivable_payments', 'column' => 'notes'],
+            ['table' => 'receivable_payments', 'column' => 'cancel_reason'],
+            ['table' => 'supplier_payments', 'column' => 'notes'],
+            ['table' => 'supplier_payments', 'column' => 'cancel_reason'],
+            ['table' => 'school_bulk_transactions', 'column' => 'notes'],
+            ['table' => 'journal_entries', 'column' => 'description'],
+        ];
+
+        foreach ($textTargets as $target) {
+            DB::table($target['table'])
+                ->select(['id', $target['column']])
+                ->orderBy('id')
+                ->chunkById(200, function ($rows) use ($target, $replaceMap): void {
+                    foreach ($rows as $row) {
+                        $oldText = (string) ($row->{$target['column']} ?? '');
+                        if ($oldText === '') {
+                            continue;
+                        }
+                        $newText = str_replace(array_keys($replaceMap), array_values($replaceMap), $oldText);
+                        if ($newText === $oldText) {
+                            continue;
+                        }
+                        DB::table($target['table'])
+                            ->where('id', (int) $row->id)
+                            ->update([$target['column'] => $newText]);
+                    }
+                });
+        }
+    });
+
+    AppCache::forgetAfterFinancialMutation();
+    $this->info('Nomor dokumen lama berhasil diubah ke format DDMMYYYY.');
+})->purpose('Rewrite stored transaction document numbers from YYYYMMDD to DDMMYYYY and update related text references');
 
 Artisan::command('app:normalize-semester-codes {--dry-run}', function () {
     $dryRun = (bool) $this->option('dry-run');
@@ -505,22 +652,109 @@ Artisan::command('app:financial-rebuild {--rebuild-journal}', function () {
     return 0;
 })->purpose('Rebuild financial aggregates (customer/supplier) and optional journal rebuild');
 
-Artisan::command('app:load-test-light {--loops=50}', function () {
+Artisan::command('app:load-test-light {--loops=50} {--search=abc}', function () {
     $loops = max(1, (int) $this->option('loops'));
+    $searchToken = trim((string) $this->option('search'));
+    if ($searchToken === '') {
+        $searchToken = 'abc';
+    }
+
     $startedAt = microtime(true);
+    $metrics = [
+        'customers_list_ms' => 0.0,
+        'customers_search_ms' => 0.0,
+        'products_list_ms' => 0.0,
+        'products_search_ms' => 0.0,
+        'sales_invoice_list_ms' => 0.0,
+        'suppliers_list_ms' => 0.0,
+        'suppliers_search_ms' => 0.0,
+    ];
+
+    $measure = static function (callable $callback): float {
+        $started = microtime(true);
+        $callback();
+        return (microtime(true) - $started) * 1000;
+    };
+
     for ($i = 0; $i < $loops; $i++) {
-        DB::table('customers')->select(['id', 'name', 'city'])->orderBy('name')->limit(20)->get();
-        DB::table('products')->select(['id', 'code', 'name'])->orderBy('name')->limit(20)->get();
-        DB::table('sales_invoices')
-            ->select(['id', 'invoice_number', 'customer_id', 'invoice_date'])
-            ->orderByDesc('invoice_date')
-            ->limit(20)
-            ->get();
-        DB::table('suppliers')->select(['id', 'name'])->orderBy('name')->limit(20)->get();
+        $metrics['customers_list_ms'] += $measure(static function (): void {
+            DB::table('customers')->select(['id', 'name', 'city'])->orderBy('name')->limit(20)->get();
+        });
+        $metrics['customers_search_ms'] += $measure(static function () use ($searchToken): void {
+            DB::table('customers')
+                ->select(['id', 'name', 'city', 'phone'])
+                ->where(function ($query) use ($searchToken): void {
+                    $query->where('name', 'like', "%{$searchToken}%")
+                        ->orWhere('city', 'like', "%{$searchToken}%")
+                        ->orWhere('phone', 'like', "%{$searchToken}%");
+                })
+                ->orderBy('name')
+                ->limit(20)
+                ->get();
+        });
+        $metrics['products_list_ms'] += $measure(static function (): void {
+            DB::table('products')->select(['id', 'code', 'name'])->orderBy('name')->limit(20)->get();
+        });
+        $metrics['products_search_ms'] += $measure(static function () use ($searchToken): void {
+            DB::table('products')
+                ->select(['id', 'code', 'name'])
+                ->where(function ($query) use ($searchToken): void {
+                    $query->where('code', 'like', "%{$searchToken}%")
+                        ->orWhere('name', 'like', "%{$searchToken}%");
+                })
+                ->orderBy('name')
+                ->limit(20)
+                ->get();
+        });
+        $metrics['sales_invoice_list_ms'] += $measure(static function (): void {
+            DB::table('sales_invoices')
+                ->select(['id', 'invoice_number', 'customer_id', 'invoice_date'])
+                ->orderByDesc('invoice_date')
+                ->orderByDesc('id')
+                ->limit(20)
+                ->get();
+        });
+        $metrics['suppliers_list_ms'] += $measure(static function (): void {
+            DB::table('suppliers')->select(['id', 'name'])->orderBy('name')->limit(20)->get();
+        });
+        $metrics['suppliers_search_ms'] += $measure(static function () use ($searchToken): void {
+            DB::table('suppliers')
+                ->select(['id', 'name', 'company_name', 'phone'])
+                ->where(function ($query) use ($searchToken): void {
+                    $query->where('name', 'like', "%{$searchToken}%")
+                        ->orWhere('company_name', 'like', "%{$searchToken}%")
+                        ->orWhere('phone', 'like', "%{$searchToken}%");
+                })
+                ->orderBy('name')
+                ->limit(20)
+                ->get();
+        });
     }
     $durationMs = (microtime(true) - $startedAt) * 1000;
+    $avgLoopMs = $durationMs / max(1, $loops);
+    $avgMetrics = [];
+    foreach ($metrics as $metric => $value) {
+        $avgMetrics[$metric] = round($value / max(1, $loops), 2);
+    }
 
-    $this->info(sprintf('Load test light complete. loops=%d, duration=%.2f ms', $loops, $durationMs));
+    if (Schema::hasTable('performance_probe_logs')) {
+        PerformanceProbeLog::query()->create([
+            'loops' => $loops,
+            'duration_ms' => (int) round($durationMs),
+            'avg_loop_ms' => (int) round($avgLoopMs),
+            'search_token' => $searchToken,
+            'metrics' => $avgMetrics,
+            'probed_at' => now(),
+        ]);
+    }
+
+    $this->info(sprintf(
+        'Load test light complete. loops=%d, duration=%.2f ms, avg_loop=%.2f ms',
+        $loops,
+        $durationMs,
+        $avgLoopMs
+    ));
+    $this->line('Avg metrics(ms): '.json_encode($avgMetrics, JSON_UNESCAPED_UNICODE));
     return 0;
 })->purpose('Run lightweight DB load test for list/search endpoints');
 
@@ -577,6 +811,28 @@ Artisan::command('app:integrity-check', function () {
         ->whereNotIn('supplier_id', Supplier::query()->select('id'))
         ->count();
 
+    $customerMismatchCount = count($customerMismatches);
+    $supplierMismatchCount = count($supplierMismatches);
+    $isOk = $customerMismatchCount === 0
+        && $supplierMismatchCount === 0
+        && $invalidReceivableLinks === 0
+        && $invalidSupplierLinks === 0;
+
+    if (Schema::hasTable('integrity_check_logs')) {
+        IntegrityCheckLog::query()->create([
+            'customer_mismatch_count' => $customerMismatchCount,
+            'supplier_mismatch_count' => $supplierMismatchCount,
+            'invalid_receivable_links' => (int) $invalidReceivableLinks,
+            'invalid_supplier_links' => (int) $invalidSupplierLinks,
+            'details' => [
+                'customer_sample' => $customerMismatches[0] ?? null,
+                'supplier_sample' => $supplierMismatches[0] ?? null,
+            ],
+            'is_ok' => $isOk,
+            'checked_at' => now(),
+        ]);
+    }
+
     $this->info('Integrity check result');
     $this->line('Customer balance mismatches: '.count($customerMismatches));
     $this->line('Supplier payable mismatches: '.count($supplierMismatches));
@@ -590,7 +846,7 @@ Artisan::command('app:integrity-check', function () {
         $this->warn('Sample supplier mismatch: '.json_encode($supplierMismatches[0], JSON_UNESCAPED_UNICODE));
     }
 
-    return (count($customerMismatches) === 0 && count($supplierMismatches) === 0 && $invalidReceivableLinks === 0 && $invalidSupplierLinks === 0) ? 0 : 1;
+    return $isOk ? 0 : 1;
 })->purpose('Check cross-module financial integrity (invoice/receivable/supplier ledger)');
 
 Artisan::command('app:query-profile', function () {
@@ -690,5 +946,6 @@ Schedule::command('app:db-backup --gzip')->dailyAt('01:00');
 Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
 Schedule::command('app:integrity-check')->dailyAt('03:00');
 Schedule::command('app:financial-rebuild')->dailyAt('03:30');
+Schedule::command('app:load-test-light --loops=80 --search=ang')->dailyAt('04:30');
 Schedule::command('app:report-exports-prune --days=14')->dailyAt('04:00');
 Schedule::command('app:report-exports-fix-stuck --minutes=30')->hourly();

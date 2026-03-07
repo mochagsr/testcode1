@@ -48,8 +48,6 @@ class OrderNotePageController extends Controller
         $selectedSemester = $this->normalizedSemesterInput($semester);
         $selectedNoteDate = $this->selectedDateFilter($noteDate);
         $selectedNoteDateRange = $this->selectedDateRange($selectedNoteDate);
-        $isDefaultRecentMode = $selectedNoteDateRange === null && $selectedSemester === null && $search === '';
-        $recentRangeStart = $now->copy()->subDays(6)->startOfDay();
         $todayRange = [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
 
         $currentSemester = $this->currentSemesterPeriod();
@@ -78,9 +76,6 @@ class OrderNotePageController extends Controller
             ->when($selectedStatus === 'canceled', fn($query) => $query->canceled())
             ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
                 $query->betweenDates($selectedNoteDateRange[0], $selectedNoteDateRange[1]);
-            })
-            ->when($isDefaultRecentMode, function ($query) use ($recentRangeStart): void {
-                $query->where('note_date', '>=', $recentRangeStart);
             })
             ->latest('note_date')
             ->latest('id')
@@ -126,7 +121,6 @@ class OrderNotePageController extends Controller
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedNoteDate' => $selectedNoteDate,
-            'isDefaultRecentMode' => $isDefaultRecentMode,
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
@@ -642,15 +636,19 @@ class OrderNotePageController extends Controller
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Surat Pesanan');
+            $customerName = (string) ($orderNote->customer?->name ?: preg_replace('/\s*\([^)]+\)\s*$/', '', (string) $orderNote->customer_name));
+            $address = \App\Support\PrintTextFormatter::wrapWords((string) ($orderNote->address ?: $orderNote->customer?->address ?: ''), 5);
+            $notes = \App\Support\PrintTextFormatter::wrapWords(
+                trim((string) ($orderNote->notes ?: \App\Models\AppSetting::getValue('company_invoice_notes', ''))),
+                4
+            );
             $rows = [];
             $rows[] = [__('txn.order_notes_title') . ' ' . __('txn.note_number'), $orderNote->note_number];
             $rows[] = [__('txn.date'), $orderNote->note_date?->format('d-m-Y')];
-            $rows[] = [__('txn.customer'), $orderNote->customer_name];
+            $rows[] = [__('txn.name'), $customerName !== '' ? $customerName : '-'];
             $rows[] = [__('txn.phone'), $orderNote->customer_phone];
-            $rows[] = [__('txn.address'), $orderNote->address ?: $orderNote->customer?->address];
             $rows[] = [__('txn.city'), $orderNote->city];
-            $rows[] = [__('txn.created_by'), $orderNote->created_by_name];
-            $rows[] = [__('txn.notes'), $orderNote->notes];
+            $rows[] = [__('txn.address'), $address !== '' ? $address : '-'];
             $rows[] = [];
             $rows[] = [__('txn.items')];
             $rows[] = [__('txn.name'), __('txn.qty'), __('txn.notes')];
@@ -663,11 +661,16 @@ class OrderNotePageController extends Controller
                 ];
             }
 
+            $rows[] = [];
+            $rows[] = [__('txn.notes'), $notes !== '' ? $notes : '-'];
+            $rows[] = [__('txn.summary_total_qty'), (int) round((float) $orderNote->items->sum('quantity'), 0)];
+
             $sheet->fromArray($rows, null, 'A1');
             $itemsCount = $orderNote->items->count();
-            $itemsHeaderRow = 10;
+            $itemsHeaderRow = 8;
             ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 3, $itemsCount, true);
             ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [2], '#,##0');
+            $sheet->getStyle('B1:B'.(13 + $itemsCount))->getAlignment()->setWrapText(true);
 
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -724,7 +727,7 @@ class OrderNotePageController extends Controller
 
     private function generateNoteNumber(string $date): string
     {
-        $prefix = 'PO-' . date('Ymd', strtotime($date));
+        $prefix = 'PO-' . date('dmY', strtotime($date));
         $count = OrderNote::query()
             ->whereDate('note_date', $date)
             ->lockForUpdate()
