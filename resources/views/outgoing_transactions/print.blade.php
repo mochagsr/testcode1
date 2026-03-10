@@ -114,7 +114,7 @@
         </div>
     </div>
 
-    <table>
+    <table class="line-items">
         <thead>
         <tr>
             <th style="width: 6%">{{ __('txn.no') }}</th>

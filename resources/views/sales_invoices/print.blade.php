@@ -118,7 +118,7 @@
         <div class="canceled-banner">{{ strtoupper(__('txn.status_canceled')) }}</div>
     @endif
 
-    <table>
+    <table class="line-items">
         <thead>
         <tr>
             <th style="width: 4%">{{ __('txn.no') }}</th>

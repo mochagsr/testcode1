@@ -17,6 +17,7 @@
         .report-table th, .report-table td { border: 1px solid #111; padding: 4px; vertical-align: top; word-break: break-word; white-space: normal; }
         .report-table th { background: #efefef; font-size: 10px; text-align: center; }
         .report-table td { text-align: left; }
+        .report-table th:first-child, .report-table td:first-child { text-align: center; }
         .report-table .grand-total td { font-weight: 700; background: #f8f8f8; }
         .report-table .row-locked-auto td { background: #f5f8ff; }
         .report-table .row-locked-manual td { background: #fff7ea; }
