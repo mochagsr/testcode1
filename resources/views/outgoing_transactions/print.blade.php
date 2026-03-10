@@ -30,6 +30,7 @@
         .qty-box td:last-child { width: 34%; text-align: right; font-weight: 700; white-space: nowrap; }
         .total-box { width: 100%; }
         .total-box td { border: 1px solid #111; }
+        .total-box td:first-child { background: #f7f7f7; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
