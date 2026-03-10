@@ -30,6 +30,7 @@
         .total-box td { border: 1px solid #111; padding: 4px; }
         .total-box { width: 100%; border-collapse: collapse; }
         .total-box td { border: 1px solid #111; }
+        .total-box td:first-child { background: #f7f7f7; }
         .summary-spacer { min-height: 1px; }
         .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .signature-table { margin-top: 24px; }
