@@ -50,7 +50,7 @@
                 @endif
                 @if($type === 'sales_invoice')
                     <div class="col-12 flex">
-                        <button type="button" id="preview-stock-impact" class="btn secondary">Preview Dampak Stok</button>
+                        <button type="button" id="preview-stock-impact" class="btn info-btn">Preview Dampak Stok</button>
                         <span id="stock-impact-status" class="muted"></span>
                     </div>
                     <div class="col-12">

@@ -245,8 +245,8 @@
             <span id="permission-filter-count" class="muted">0 izin terlihat</span>
         </div>
         <div class="permission-toolbar-left">
-            <button type="button" id="permission-check-visible" class="btn secondary">Centang Terlihat</button>
-            <button type="button" id="permission-uncheck-visible" class="btn secondary">Hapus Centang Terlihat</button>
+            <button type="button" id="permission-check-visible" class="btn process-soft-btn">Centang Terlihat</button>
+            <button type="button" id="permission-uncheck-visible" class="btn warning-btn">Hapus Centang Terlihat</button>
         </div>
     </div>
     <div class="permission-grid">

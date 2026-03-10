@@ -214,7 +214,7 @@
     <div id="stock-edit-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:1201;">
         <div class="flex" style="justify-content:space-between; margin-bottom:10px;">
             <strong>{{ __('supplier_stock.edit_stock') }}</strong>
-            <button type="button" id="stock-edit-close" class="btn secondary" style="min-height:30px; padding:4px 10px;">×</button>
+            <button type="button" id="stock-edit-close" class="btn info-btn" style="min-height:30px; padding:4px 10px;">×</button>
         </div>
 
         <form id="stock-edit-form" method="post" action="{{ route('supplier-stock-cards.update-stock') }}">

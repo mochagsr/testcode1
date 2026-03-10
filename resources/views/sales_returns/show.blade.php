@@ -468,7 +468,7 @@
                         <td><input type="number" min="1" class="admin-return-item-qty" name="items[${index}][quantity]" value="1" style="max-width: 90px;" required></td>
                         <td><input type="number" min="0" step="1" class="admin-return-item-price" name="items[${index}][unit_price]" value="${defaultProduct ? (defaultProduct.price_general || 0) : 0}" style="max-width: 120px;" required></td>
                         <td>Rp <span class="admin-return-item-line-total">0</span></td>
-                        <td><button type="button" class="btn secondary admin-remove-return-item">{{ __('txn.remove') }}</button></td>
+                        <td><button type="button" class="btn danger-btn admin-remove-return-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
                     bindRow(tr);

@@ -7,7 +7,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('ui.stock_mutations_title') }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('products.index') }}">{{ __('txn.back') }}</a>
-            <a class="btn secondary" href="{{ route('products.edit', $product) }}">{{ __('ui.edit_product') }}</a>
+            <a class="btn edit-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit_product') }}</a>
         </div>
     </div>
 

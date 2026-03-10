@@ -8,19 +8,18 @@
         @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
-        .head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 18%) minmax(0, 34%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .head { display: grid; grid-template-columns: minmax(0, 42%) minmax(220px, 26%) minmax(0, 32%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 18px; }
         .company-left { display: flex; gap: 8px; min-width: 0; }
         .logo { width: 40px; height: 60px; object-fit: contain; border: none; padding: 0; background: transparent; }
         .company-name { font-size: 17px; font-weight: 700; text-transform: uppercase; line-height: 1.1; }
         .company-meta { margin-top: 2px; white-space: pre-line; }
-        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; margin-left: -36px; }
+        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; }
         .doc-title { font-size: 18px; font-weight: 700; text-transform: uppercase; line-height: 1.1; }
         .doc-number { margin-top: 2px; }
-        .doc-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; width: 100%; }
+        .doc-right { font-size: 11px; line-height: 1.25; min-width: 210px; max-width: 250px; justify-self: end; width: 100%; margin-left: auto; }
         .doc-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #111; padding: 4px; }
+        @include('partials.print.table_styles')
         th { text-align: center; background: #efefef; }
         td.num { text-align: right; white-space: nowrap; }
         .total-row td { font-weight: 700; background: #f7f7f7; }
@@ -31,11 +30,12 @@
         .transfer-wrap { margin-top: 10px; }
         .transfer-title { font-weight: 700; margin-bottom: 4px; }
         .transfer-line { white-space: pre-line; }
+        .footer-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 10px; }
+        .footer-box { border: 1px solid #111; padding: 8px; min-height: 64px; }
         .muted { color: #444; }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
-            th, td { padding: 3px; }
         }
     </style>
 </head>
@@ -58,7 +58,7 @@
         $notesText = \App\Support\PrintTextFormatter::wrapWords($notesText, 4);
         $transferText = trim((string) ($companyTransferAccounts ?? ''));
         $maxBlankRows = 3;
-        $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($customer->address ?? ''), 5);
+        $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($customer->address ?? ''), 4);
         $companyLogoSrc = null;
         $companyMetaLines = collect([
             $companyAddress,
@@ -218,25 +218,28 @@
         @endforeach
     @endif
 
-    @if($notesText !== '')
-        <div class="notes-wrap">
-            <div class="notes-title">{{ __('receivable.note_label') }} :</div>
-            @foreach(preg_split('/\r\n|\r|\n/', $notesText) ?: [] as $line)
-                @if(trim($line) !== '')
-                    <div class="notes-line">{{ $line }}</div>
+    @if($notesText !== '' || $transferText !== '')
+        <div class="footer-summary">
+            <div class="footer-box">
+                @if($notesText !== '')
+                    <div class="notes-title">{{ __('receivable.note_label') }} :</div>
+                    @foreach(preg_split('/\r\n|\r|\n/', $notesText) ?: [] as $line)
+                        @if(trim($line) !== '')
+                            <div class="notes-line">{{ $line }}</div>
+                        @endif
+                    @endforeach
                 @endif
-            @endforeach
-        </div>
-    @endif
-
-    @if($transferText !== '')
-        <div class="transfer-wrap">
-            <div class="transfer-title">{{ __('receivable.transfer_via_label') }} :</div>
-            @foreach(preg_split('/\r\n|\r|\n/', $transferText) ?: [] as $line)
-                @if(trim($line) !== '')
-                    <div class="transfer-line">{{ $line }}</div>
+            </div>
+            <div class="footer-box">
+                @if($transferText !== '')
+                    <div class="transfer-title">{{ __('receivable.transfer_via_label') }} :</div>
+                    @foreach(preg_split('/\r\n|\r|\n/', $transferText) ?: [] as $line)
+                        @if(trim($line) !== '')
+                            <div class="transfer-line">{{ $line }}</div>
+                        @endif
+                    @endforeach
                 @endif
-            @endforeach
+            </div>
         </div>
     @endif
 

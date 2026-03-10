@@ -4,7 +4,7 @@
             <label>{{ __('ui.code') }}</label>
             <input id="item-category-code" type="text" name="code" value="{{ old('code', $category?->code) }}">
             <small id="item-category-code-preview" class="muted" style="display:block; margin-top:4px;"></small>
-            <button id="item-category-code-reset" type="button" class="btn secondary" style="display:none; margin-top:6px;">
+            <button id="item-category-code-reset" type="button" class="btn info-btn" style="display:none; margin-top:6px;">
                 {{ __('ui.product_code_use_auto') }}
             </button>
         </div>

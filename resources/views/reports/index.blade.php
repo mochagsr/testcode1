@@ -117,18 +117,18 @@
                         <td>{{ $task->created_at?->format('d-m-Y H:i') }}</td>
                         <td>
                             @if($task->status === 'ready')
-                                <a class="btn secondary" href="{{ route('reports.queue.download', $task) }}">Download</a>
+                                <a class="btn info-btn" href="{{ route('reports.queue.download', $task) }}">Download</a>
                             @elseif($task->status === 'failed')
                                 <span class="muted">{{ $task->error_message ?: '-' }}</span>
                                 <form method="post" action="{{ route('reports.queue.retry', $task) }}" style="display:inline;">
                                     @csrf
-                                    <button type="submit" class="btn secondary">Retry</button>
+                                    <button type="submit" class="btn process-btn">Retry</button>
                                 </form>
                             @elseif(in_array($task->status, ['queued', 'processing'], true))
                                 <span class="muted">Menunggu...</span>
                                 <form method="post" action="{{ route('reports.queue.cancel', $task) }}" style="display:inline;">
                                     @csrf
-                                    <button type="submit" class="btn secondary">Batal</button>
+                                    <button type="submit" class="btn danger-btn">Batal</button>
                                 </form>
                             @elseif($task->status === 'canceled')
                                 <span class="muted">Dibatalkan</span>
@@ -162,20 +162,20 @@
                     const status = String(row.status || '').toUpperCase();
                     let actionHtml = '<span class="muted">Menunggu...</span>';
                     if (status === 'READY') {
-                        actionHtml = `<a class="btn secondary" href="${row.download_url}">Download</a>`;
+                        actionHtml = `<a class="btn info-btn" href="${row.download_url}">Download</a>`;
                     } else if (status === 'FAILED') {
                         const retryUrl = retryUrlTemplate.replace('__TASK__', String(row.id));
                         actionHtml = `<span class="muted">${row.error_message || '-'}</span>
                             <form method="post" action="${retryUrl}" style="display:inline;">
                                 <input type="hidden" name="_token" value="${csrf}">
-                                <button type="submit" class="btn secondary">Retry</button>
+                                <button type="submit" class="btn process-btn">Retry</button>
                             </form>`;
                     } else if (status === 'QUEUED' || status === 'PROCESSING') {
                         const cancelUrl = cancelUrlTemplate.replace('__TASK__', String(row.id));
                         actionHtml = `<span class="muted">Menunggu...</span>
                             <form method="post" action="${cancelUrl}" style="display:inline;">
                                 <input type="hidden" name="_token" value="${csrf}">
-                                <button type="submit" class="btn secondary">Batal</button>
+                                <button type="submit" class="btn danger-btn">Batal</button>
                             </form>`;
                     } else if (status === 'CANCELED') {
                         actionHtml = `<span class="muted">Dibatalkan</span>`;

@@ -89,7 +89,7 @@
         <div class="card">
             <div class="flex" style="justify-content: space-between;">
                 <h3 style="margin: 0;">{{ __('txn.outgoing_items') }}</h3>
-                <button type="button" id="add-item" class="btn secondary">{{ __('txn.add_row') }}</button>
+                <button type="button" id="add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
             </div>
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
@@ -122,7 +122,7 @@
     <div id="outgoing-category-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:1201;">
         <div class="flex" style="justify-content:space-between; margin-bottom:10px;">
             <strong>{{ __('txn.create_category_title') }}</strong>
-            <button type="button" id="outgoing-category-modal-close" class="btn secondary" style="min-height:30px; padding:4px 10px;">&times;</button>
+            <button type="button" id="outgoing-category-modal-close" class="btn info-btn" style="min-height:30px; padding:4px 10px;">&times;</button>
         </div>
         <div class="row">
             <div class="col-12">
@@ -677,7 +677,7 @@
                     </td>
                     <td style="white-space: nowrap;">Rp <span class="line-total">0</span></td>
                     <td><input type="text" class="item-notes" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
-                    <td><button type="button" class="btn secondary remove">{{ __('txn.remove') }}</button></td>
+                    <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
                 `;
                 tableBody.appendChild(tr);
 

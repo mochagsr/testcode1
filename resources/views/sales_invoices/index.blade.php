@@ -18,11 +18,11 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.sales_invoices_title') }}</h1>
         <div class="flex">
             @if((auth()->user()?->role ?? '') === 'admin')
-                <a class="btn secondary" href="{{ route('sales-invoices.import.template') }}">Template Import</a>
+                <a class="btn info-btn" href="{{ route('sales-invoices.import.template') }}">Template Import</a>
                 <form method="post" action="{{ route('sales-invoices.import') }}" enctype="multipart/form-data" class="flex">
                     @csrf
                     <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width: 220px;">
-                    <button type="submit" class="btn secondary">Import</button>
+                    <button type="submit" class="btn process-btn">Import</button>
                 </form>
             @endif
             <a class="btn create-transaction-btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice') }}</a>

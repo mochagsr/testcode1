@@ -19,14 +19,14 @@
             </select>
             <button type="submit">{{ __('ui.search') }}</button>
             <div style="margin-left: auto;">
-                <a class="btn secondary" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">{{ __('txn.excel') }}</a>
-                <a class="btn secondary" href="{{ route('customers-web.import.template') }}">Template Import</a>
+                <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">{{ __('txn.excel') }}</a>
+                <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
             </div>
         </form>
         <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data" class="flex" style="margin-top:8px;">
             @csrf
             <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width:320px;">
-            <button type="submit" class="btn secondary">Import</button>
+            <button type="submit" class="btn process-btn">Import</button>
         </form>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
@@ -110,7 +110,7 @@
         <div class="card" style="width:min(920px, 96vw); max-height:90vh; overflow:auto;">
             <div class="flex" style="justify-content:space-between; align-items:center;">
                 <div id="customer-level-modal-title" style="font-size:1.2rem; font-weight:700;">{{ __('ui.customer_level') }}</div>
-                <button type="button" id="customer-level-modal-close" class="btn secondary">{{ __('ui.cancel') }}</button>
+                <button type="button" id="customer-level-modal-close" class="btn info-btn">{{ __('ui.cancel') }}</button>
             </div>
             <table style="margin-top:12px;">
                 <thead>

@@ -63,14 +63,14 @@
             <input id="products-search-input" type="text" name="search" placeholder="{{ __('ui.search_products_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <button type="submit">{{ __('ui.search') }}</button>
             <div style="margin-left: auto;">
-                <a class="btn secondary product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">{{ __('txn.excel') }}</a>
-                <a class="btn secondary product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
+                <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">{{ __('txn.excel') }}</a>
+                <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
             </div>
         </form>
         <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="flex" style="margin-top:8px;">
             @csrf
             <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width:320px;">
-            <button type="submit" class="btn secondary product-action-btn">Import</button>
+            <button type="submit" class="btn process-btn product-action-btn">Import</button>
         </form>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
@@ -151,7 +151,7 @@
     <div id="product-stock-edit-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:1201;">
         <div class="flex" style="justify-content:space-between; margin-bottom:10px;">
             <strong>{{ __('ui.edit_stock') }}</strong>
-            <button type="button" id="product-stock-edit-close" class="btn secondary product-action-btn" style="min-height:30px; padding:4px 10px;">&times;</button>
+            <button type="button" id="product-stock-edit-close" class="btn info-btn product-action-btn" style="min-height:30px; padding:4px 10px;">&times;</button>
         </div>
         <form id="product-stock-edit-form" method="post" action="">
             @csrf

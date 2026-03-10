@@ -12,12 +12,12 @@
             @if(auth()->user()->role === 'admin')
                 <a class="btn" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
             @endif
-            <a class="btn secondary" href="{{ route('suppliers.import.template') }}">Template Import</a>
+            <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
         </form>
         <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="flex" style="margin-top:8px;">
             @csrf
             <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width:320px;">
-            <button type="submit" class="btn secondary">Import</button>
+            <button type="submit" class="btn process-btn">Import</button>
         </form>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">

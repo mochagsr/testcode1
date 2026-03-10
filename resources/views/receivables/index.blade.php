@@ -689,7 +689,7 @@
                                             <span style="display:inline-block; background:#fff3e0; color:#e65100; padding:2px 6px; border-radius:3px; font-size:10px; font-weight:500;">{{ __('txn.admin_badge_edit_minus') }}</span>
                                         @elseif($canPay)
                                             <a
-                                                class="btn secondary receivable-pay-btn"
+                                                class="btn payment-btn receivable-pay-btn"
                                                 href="{{ route('receivable-payments.create', ['customer_id' => $selectedCustomerId ?: $row->invoice->customer_id, 'amount' => (int) round((float) $row->invoice->balance), 'payment_date' => now()->format('Y-m-d'), 'preferred_invoice_id' => $row->invoice->id, 'return_to' => request()->getRequestUri()]) }}"
                                             >
                                                 {{ __('receivable.pay') }}
@@ -735,7 +735,7 @@
                                         <input type="hidden" name="semester" value="{{ $selectedSemester }}">
                                         <input type="hidden" name="search" value="{{ $search }}">
                                         <input type="hidden" name="customer_id" value="{{ $selectedCustomerId }}">
-                                        <button type="submit" class="btn secondary">{{ __('receivable.customer_semester_open_button') }}</button>
+                                        <button type="submit" class="btn warning-btn">{{ __('receivable.customer_semester_open_button') }}</button>
                                     </form>
                                 @else
                                     <form method="post" action="{{ route('receivables.customer-semester.close', ['customer' => $selectedCustomerId]) }}">
@@ -954,7 +954,7 @@
                         >
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                 <h4 id="receivable-adjustment-title" style="margin:0;">{{ __('receivable.method_writeoff') }}</h4>
-                                <button type="button" id="receivable-adjustment-close" class="btn secondary" style="min-height:30px; padding:4px 10px;">&times;</button>
+                                <button type="button" id="receivable-adjustment-close" class="btn info-btn" style="min-height:30px; padding:4px 10px;">&times;</button>
                             </div>
 
                             <div class="row">

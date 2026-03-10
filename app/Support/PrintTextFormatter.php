@@ -6,7 +6,7 @@ namespace App\Support;
 
 final class PrintTextFormatter
 {
-    public static function wrapWords(?string $text, int $wordsPerLine = 5): string
+    public static function wrapWords(?string $text, int $wordsPerLine = 4): string
     {
         $value = trim((string) $text);
 

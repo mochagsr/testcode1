@@ -92,7 +92,7 @@
         <div class="card">
             <div class="flex" style="justify-content: space-between;">
                 <h3 style="margin: 0;">{{ __('txn.items') }}</h3>
-                <button type="button" id="add-item" class="btn secondary">{{ __('txn.add_row') }}</button>
+                <button type="button" id="add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
             </div>
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
@@ -567,7 +567,7 @@
                 <td><input name="items[${index}][unit]" class="unit" style="max-width: 72px;"></td>
                 <td><input name="items[${index}][unit_price]" type="number" min="0" step="1" class="price-input" style="max-width: 104px;"></td>
                 <td><input name="items[${index}][notes]"></td>
-                <td><button type="button" class="btn secondary remove">{{ __('txn.remove') }}</button></td>
+                <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
 

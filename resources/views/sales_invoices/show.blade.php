@@ -591,7 +591,7 @@
                         <td><input type="number" min="0" step="1" class="admin-item-price" name="items[${index}][unit_price]" value="${defaultProduct ? (defaultProduct.price_general || 0) : 0}" style="max-width: 120px;" required></td>
                         <td><input type="number" min="0" max="100" step="1" class="admin-item-discount" name="items[${index}][discount]" value="0" style="max-width: 85px;"></td>
                         <td>Rp <span class="admin-item-line-total">0</span></td>
-                        <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>
+                        <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
                     bindRow(tr);

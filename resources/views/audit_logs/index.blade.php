@@ -20,7 +20,7 @@
             <input id="audit-logs-doc-code-input" type="text" name="doc_code" placeholder="No dokumen (INV-/RTR-/KWT-)" value="{{ $selectedDocumentCode ?? '' }}" style="max-width: 220px;">
             <button type="submit">{{ __('ui.search') }}</button>
             <a
-                class="btn secondary"
+                class="btn info-btn"
                 href="{{ route('audit-logs.export.csv', ['module' => $selectedModule, 'date_from' => $selectedDateFrom, 'date_to' => $selectedDateTo, 'search' => $search, 'doc_code' => ($selectedDocumentCode ?? '')]) }}"
             >
                 {{ __('ui.export_audit_csv') }}

@@ -31,7 +31,7 @@
                     <strong>{{ __('supplier_payable.supplier_invoice_photo') }}</strong>
                     <div>
                         @if($transaction->supplier_invoice_photo_path)
-                            <a class="btn secondary id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$transaction->supplier_invoice_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                            <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$transaction->supplier_invoice_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
                         @else
                             -
                         @endif
@@ -175,14 +175,14 @@
                                 <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
                                 <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
                                 <td><input type="text" class="admin-item-notes" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
-                                <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>
+                                <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                             </tr>
                         @endforeach
                         </tbody>
                     </table>
 
                     <div class="flex" style="margin-top:10px;">
-                        <button type="button" id="admin-add-item" class="btn secondary">{{ __('txn.add_row') }}</button>
+                        <button type="button" id="admin-add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
                         <button type="submit" class="btn">Simpan Perubahan</button>
                     </div>
                 </form>
@@ -294,7 +294,7 @@
                         <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" value=""></td>
                         <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0"></td>
                         <td><input type="text" class="admin-item-notes"></td>
-                        <td><button type="button" class="btn secondary admin-remove-item">{{ __('txn.remove') }}</button></td>
+                        <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                     `;
                     body.appendChild(tr);
                     bindRow(tr);

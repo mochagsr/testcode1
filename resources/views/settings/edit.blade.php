@@ -206,7 +206,7 @@
                                     </label>
                                 </td>
                                 <td>
-                                    <button type="button" class="btn secondary remove-row">{{ __('txn.remove') }}</button>
+                                    <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
                                 </td>
                             </tr>
                         @empty
@@ -226,12 +226,12 @@
                                         {{ __('ui.active') }}
                                     </label>
                                 </td>
-                                <td><button type="button" class="btn secondary remove-row">{{ __('txn.remove') }}</button></td>
+                                <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
                             </tr>
                         @endforelse
                         </tbody>
                     </table>
-                    <button type="button" id="add-semester-row" class="btn secondary" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
+                    <button type="button" id="add-semester-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                 </div>
 
                 <div class="form-section">
@@ -262,13 +262,13 @@
                                             <input type="text" name="product_unit_labels[]" value="{{ $productLabels[$i] ?? '' }}" placeholder="Exemplar">
                                         </td>
                                         <td>
-                                            <button type="button" class="btn secondary remove-row">{{ __('txn.remove') }}</button>
+                                            <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
                                         </td>
                                     </tr>
                                 @endfor
                                 </tbody>
                             </table>
-                            <button type="button" id="add-product-unit-row" class="btn secondary" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
+                            <button type="button" id="add-product-unit-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                         </div>
                         <div class="col-6">
                             <label>{{ __('ui.settings_units_list') }} ({{ __('txn.outgoing_transactions_title') }})</label>
@@ -294,13 +294,13 @@
                                             <input type="text" name="outgoing_unit_labels[]" value="{{ $outgoingLabels[$i] ?? '' }}" placeholder="Exemplar">
                                         </td>
                                         <td>
-                                            <button type="button" class="btn secondary remove-row">{{ __('txn.remove') }}</button>
+                                            <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
                                         </td>
                                     </tr>
                                 @endfor
                                 </tbody>
                             </table>
-                            <button type="button" id="add-outgoing-unit-row" class="btn secondary" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
+                            <button type="button" id="add-outgoing-unit-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                         </div>
                     </div>
                     <datalist id="product-unit-code-suggestions">
@@ -347,7 +347,7 @@
                                         @csrf
                                         <input type="hidden" name="semester_period" value="{{ $semesterOption }}">
                                         <input type="hidden" name="semester_book_page" value="{{ ($semesterBookPaginator ?? null)?->currentPage() ?? 1 }}">
-                                        <button type="submit" class="btn secondary">{{ __('ui.semester_open_button') }}</button>
+                                        <button type="submit" class="btn warning-btn">{{ __('ui.semester_open_button') }}</button>
                                     </form>
                                 @else
                                     <form method="post" action="{{ route('settings.semester.close') }}">
@@ -436,7 +436,7 @@
                             {{ __('ui.active') }}
                         </label>
                     </td>
-                    <td><button type="button" class="btn secondary remove-row">{{ __('txn.remove') }}</button></td>
+                    <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
                 `);
             });
 
@@ -444,7 +444,7 @@
                 addRow('product-units-table', `
                     <td><input type="text" name="product_unit_codes[]" value="" list="product-unit-code-suggestions" placeholder="exp"></td>
                     <td><input type="text" name="product_unit_labels[]" value="" placeholder="Exemplar"></td>
-                    <td><button type="button" class="btn secondary remove-row">{{ __('txn.remove') }}</button></td>
+                    <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
                 `);
             });
 
@@ -452,7 +452,7 @@
                 addRow('outgoing-units-table', `
                     <td><input type="text" name="outgoing_unit_codes[]" value="" list="outgoing-unit-code-suggestions" placeholder="exp"></td>
                     <td><input type="text" name="outgoing_unit_labels[]" value="" placeholder="Exemplar"></td>
-                    <td><button type="button" class="btn secondary remove-row">{{ __('txn.remove') }}</button></td>
+                    <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
                 `);
             });
 

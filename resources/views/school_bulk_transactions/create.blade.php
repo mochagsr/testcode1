@@ -51,8 +51,8 @@
             <div class="flex" style="justify-content: space-between;">
                 <h3 style="margin: 0;">{{ __('school_bulk.bulk_locations_title') }}</h3>
                 <div class="flex">
-                    <button type="button" class="btn secondary" id="fill-from-master">{{ __('school_bulk.fill_from_master') }}</button>
-                    <button type="button" class="btn secondary" id="add-location">{{ __('txn.add_row') }}</button>
+                    <button type="button" class="btn process-btn" id="fill-from-master">{{ __('school_bulk.fill_from_master') }}</button>
+                    <button type="button" class="btn process-soft-btn" id="add-location">{{ __('txn.add_row') }}</button>
                 </div>
             </div>
             <p class="muted" style="margin-top: 8px;">{{ __('school_bulk.bulk_locations_note') }}</p>
@@ -596,7 +596,7 @@
                     <td><input type="text" class="product-unit" value="${initial.unit || ''}" style="max-width: 92px;"></td>
                     <td><input type="number" min="0" step="1" class="product-price" value="${initial.unit_price || ''}" style="max-width: 110px;"></td>
                     <td><input type="text" class="product-notes" value="${initial.notes || ''}" style="max-width: 220px;"></td>
-                    <td><button type="button" class="btn secondary remove-item">{{ __('txn.remove') }}</button></td>
+                    <td><button type="button" class="btn danger-btn remove-item">{{ __('txn.remove') }}</button></td>
                 `;
 
                 const productNameInput = tr.querySelector('.product-name');
@@ -670,7 +670,7 @@
                     card.innerHTML = `
                         <div class="flex" style="justify-content: space-between; align-items: center;">
                             <h4 style="margin: 0;">${escapeAttribute(title)}</h4>
-                            <button type="button" class="btn secondary school-add-item" ${schoolName === '' ? 'disabled' : ''}>{{ __('txn.add_row') }}</button>
+                            <button type="button" class="btn process-soft-btn school-add-item" ${schoolName === '' ? 'disabled' : ''}>{{ __('txn.add_row') }}</button>
                         </div>
                         ${schoolName === '' ? `<p class="muted" style="margin-top:8px;">{{ __('school_bulk.fill_school_locations') }}</p>` : ''}
                         <table style="margin-top: 10px; ${schoolName === '' ? 'opacity:0.6;' : ''}">
@@ -720,7 +720,7 @@
                     <td><input type="text" class="school-phone" name="locations[${index}][recipient_phone]" value="${initial.recipient_phone || ''}" style="max-width: 130px;"></td>
                     <td><input type="text" class="school-city" name="locations[${index}][city]" value="${initial.city || ''}" style="max-width: 130px;"></td>
                     <td><input type="text" class="school-address" name="locations[${index}][address]" value="${initial.address || ''}" style="max-width: 320px;"></td>
-                    <td><button type="button" class="btn secondary remove-location">{{ __('txn.remove') }}</button></td>
+                    <td><button type="button" class="btn danger-btn remove-location">{{ __('txn.remove') }}</button></td>
                 `;
                 const schoolNameInput = tr.querySelector('.school-name');
                 const onSchoolInput = debounce(async (event) => {

@@ -47,7 +47,7 @@
                         <input id="product-code" type="text" name="code" value="{{ old('code', $product?->code) }}">
                         <small class="muted" style="display:block; margin-top:4px;">{{ __('ui.product_code_format_hint') }}</small>
                         <small id="product-code-preview" class="muted" style="display:block; margin-top:4px;"></small>
-                        <button id="product-code-reset" type="button" class="btn secondary" style="display:none; margin-top:6px;">
+                        <button id="product-code-reset" type="button" class="btn info-btn" style="display:none; margin-top:6px;">
                             {{ __('ui.product_code_use_auto') }}
                         </button>
                     </div>

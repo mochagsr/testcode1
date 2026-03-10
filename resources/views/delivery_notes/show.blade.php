@@ -483,7 +483,7 @@
                         <td><input type="text" name="items[${index}][unit]" class="admin-delivery-item-unit" value="" style="max-width: 72px;"></td>
                         <td><input type="number" min="0" step="1" name="items[${index}][unit_price]" class="admin-delivery-item-price price-input" value="" style="max-width: 104px;"></td>
                         <td><input type="text" name="items[${index}][notes]" class="admin-delivery-item-notes" value="" style="max-width: 130px;"></td>
-                        <td><button type="button" class="btn secondary admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
+                        <td><button type="button" class="btn danger-btn admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
                     bindRow(tr);

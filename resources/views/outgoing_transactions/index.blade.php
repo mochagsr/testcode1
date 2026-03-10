@@ -267,7 +267,7 @@
                                     <input type="hidden" name="semester" value="{{ $selectedSemester }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplierId }}">
-                                    <button class="btn secondary" type="submit">{{ __('txn.supplier_semester_open_button') }}</button>
+                                    <button class="btn warning-btn" type="submit">{{ __('txn.supplier_semester_open_button') }}</button>
                                 </form>
                             @else
                                 <span class="badge success">{{ __('txn.supplier_semester_open') }}</span>
@@ -276,7 +276,7 @@
                                     <input type="hidden" name="semester" value="{{ $selectedSemester }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplierId }}">
-                                    <button class="btn secondary" type="submit">{{ __('txn.supplier_semester_close_button') }}</button>
+                                    <button class="btn warning-btn" type="submit">{{ __('txn.supplier_semester_close_button') }}</button>
                                 </form>
                             @endif
                         </div>

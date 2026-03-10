@@ -468,7 +468,7 @@
                         </td>
                         <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="1" required></td>
                         <td><input type="text" name="items[${index}][notes]" class="admin-order-item-notes" value=""></td>
-                        <td><button type="button" class="btn secondary admin-remove-order-item">{{ __('txn.remove') }}</button></td>
+                        <td><button type="button" class="btn danger-btn admin-remove-order-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
                     bindRow(tr);

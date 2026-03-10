@@ -10,23 +10,21 @@
         .container { max-width: 900px; margin: 0 auto; }
         .school-page { page-break-after: always; break-after: page; padding-bottom: 6px; }
         .school-page:last-child { page-break-after: auto; break-after: auto; }
-        .company-head { display: grid; grid-template-columns: minmax(0, 44%) minmax(200px, 22%) minmax(0, 34%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 42%) minmax(220px, 26%) minmax(0, 32%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 18px; }
         .company-left { display: flex; gap: 8px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 16px; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 1px; line-height: 1.2; text-transform: uppercase; }
         .company-detail { font-size: 11px; line-height: 1.3; white-space: pre-line; }
         .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; min-width: 0; }
-        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; width: 100%; }
+        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; max-width: 250px; justify-self: end; width: 100%; margin-left: auto; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .doc-title { font-size: 18px; font-weight: 700; text-align: center; }
         .doc-number { text-align: center; margin-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-        th, td { border: 1px solid #111; padding: 4px; text-align: left; vertical-align: top; }
-        th { font-size: 10px; }
+        @include('partials.print.table_styles')
         .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 220px 340px; align-items: flex-start; gap: 16px; margin-top: 12px; }
-        .summary-spacer { min-height: 1px; }
+        .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .qty-box { width: 100%; table-layout: fixed; }
         .qty-box table,
         .total-box { margin-top: 0; }
@@ -41,7 +39,6 @@
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 10px; }
-            th, td { padding: 3px; }
         }
     </style>
 </head>
@@ -92,7 +89,7 @@
                 return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
             });
             $perSchoolQty = (int) round((float) $locationItems->sum('quantity'), 0);
-            $shipAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($location->address ?: ($transaction->customer?->address ?: '')), 5);
+            $shipAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($location->address ?: ($transaction->customer?->address ?: '')), 4);
             $noteNumber = $transaction->transaction_number . '-' . str_pad((string) $loop->iteration, 3, '0', STR_PAD_LEFT);
         @endphp
         <section class="school-page">
@@ -157,7 +154,9 @@
             </table>
 
             <div class="table-summary">
-                <div class="summary-spacer"></div>
+                <div class="notes-box">
+                    <strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}
+                </div>
                 <div class="qty-box">
                     <table>
                         <tr><td>{{ __('school_bulk.qty_total_per_school') }}</td><td>{{ number_format($perSchoolQty, 0, ',', '.') }}</td></tr>
@@ -170,8 +169,6 @@
                     <tr><td><strong>{{ __('txn.grand_total') }}</strong></td><td><strong>Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</strong></td></tr>
                 </table>
             </div>
-
-            <div style="margin-top: 10px; white-space: pre-line;"><strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}</div>
 
             <table class="signature-table">
                 <tr>

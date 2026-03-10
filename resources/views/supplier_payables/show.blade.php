@@ -6,9 +6,9 @@
     <div class="flex" style="justify-content: space-between;">
         <h1 class="page-title" style="margin:0;">{{ $payment->payment_number }}</h1>
         <div class="flex">
-            <a class="btn secondary" href="{{ route('supplier-payables.print-payment', $payment) }}" target="_blank">{{ __('txn.print') }}</a>
-            <a class="btn secondary" href="{{ route('supplier-payables.export-payment-pdf', $payment) }}">{{ __('txn.pdf') }}</a>
-            <a class="btn secondary" href="{{ route('supplier-payables.export-payment-excel', $payment) }}">{{ __('txn.excel') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.print-payment', $payment) }}" target="_blank">{{ __('txn.print') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.export-payment-pdf', $payment) }}">{{ __('txn.pdf') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.export-payment-excel', $payment) }}">{{ __('txn.excel') }}</a>
         </div>
     </div>
 

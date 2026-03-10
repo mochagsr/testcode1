@@ -9,14 +9,14 @@
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.25; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
         .receipt { border: 1px solid #111; padding: 12px; }
-        .company-head { display: grid; grid-template-columns: minmax(0, 44%) minmax(200px, 22%) minmax(0, 34%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 42%) minmax(220px, 26%) minmax(0, 32%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 18px; }
         .company-left { display: flex; gap: 8px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 16px; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
         .company-detail { white-space: pre-line; }
         .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; min-width: 0; }
-        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; justify-self: end; text-align: left; width: 100%; }
+        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; max-width: 250px; justify-self: end; text-align: left; width: 100%; margin-left: auto; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .kwitansi-title { font-size: 18px; font-weight: 700; letter-spacing: 0.6px; text-align: center; }
@@ -54,7 +54,7 @@
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
         $printNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($payment->notes ?? '')), 4);
-        $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($payment->customer_address ?: ''), 5);
+        $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($payment->customer_address ?: ''), 4);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();

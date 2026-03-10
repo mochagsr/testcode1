@@ -43,7 +43,7 @@
                     <td>{{ $payment->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
                     <td>
                         <div class="flex">
-                            <a class="btn secondary" href="{{ route('receivable-payments.show', $payment) }}">{{ __('txn.detail') }}</a>
+                            <a class="btn info-btn" href="{{ route('receivable-payments.show', $payment) }}">{{ __('txn.detail') }}</a>
                             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                 <option value="{{ route('receivable-payments.print', $payment) }}">{{ __('txn.print') }}</option>
