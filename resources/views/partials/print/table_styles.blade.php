@@ -4,6 +4,12 @@ th { font-size: 10px; text-align: center; }
 td { text-align: left; }
 .line-items th:first-child,
 .line-items td:first-child { text-align: center; }
+.num,
+.line-items .num,
+.total-box td.num,
+.qty-box td.num { text-align: right !important; white-space: nowrap; }
+.qty-box td:last-child,
+.total-box td:last-child { text-align: right !important; white-space: nowrap; }
 @media print {
     th, td { padding: 3px; }
 }
