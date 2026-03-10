@@ -21,7 +21,7 @@
         .doc-title { font-size: 18px; font-weight: 700; text-align: center; }
         .doc-number { text-align: center; margin-bottom: 4px; }
         @include('partials.print.table_styles')
-        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 220px 220px; align-items: flex-start; gap: 12px; margin-top: 10px; }
+        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 170px 220px; align-items: flex-start; gap: 12px; margin-top: 10px; }
         .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .qty-box { width: 100%; table-layout: fixed; }
         .qty-box table,
@@ -154,8 +154,8 @@
         </div>
         <div class="qty-box">
             <table>
-                <tr><td style="width: 50%;">{{ __('txn.summary_total_qty') }}</td><td style="width: 35%;">{{ number_format($totalQty, 0, ',', '.') }}</td></tr>
-                <tr><td style="width: 50%;">{{ __('txn.total_weight') }}</td><td style="width: 35%;">{{ number_format($totalWeight, 3, ',', '.') }}</td></tr>
+                <tr><td style="width: 112px;">{{ __('txn.summary_total_qty') }}</td><td style="width: 58px;">{{ number_format($totalQty, 0, ',', '.') }}</td></tr>
+                <tr><td style="width: 112px;">{{ __('txn.total_weight') }}</td><td style="width: 58px;">{{ number_format($totalWeight, 3, ',', '.') }}</td></tr>
             </table>
         </div>
         <table class="total-box">

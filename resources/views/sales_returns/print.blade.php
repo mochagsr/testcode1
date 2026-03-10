@@ -22,15 +22,16 @@
         .doc-number { text-align: center; margin-bottom: 4px; }
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
         @include('partials.print.table_styles')
-        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 140px 340px; align-items: flex-start; gap: 16px; margin-top: 12px; }
+        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 140px 200px; align-items: flex-start; gap: 16px; margin-top: 12px; }
         .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .qty-box { width: 100%; table-layout: fixed; }
         .qty-box table,
         .total-box { margin-top: 0; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 68%; }
         .qty-box td:last-child { width: 32%; text-align: right; font-weight: 700; white-space: nowrap; }
-        .total-box { width: 100%; }
+        .total-box { width: 100%; table-layout: fixed; }
         .total-box td { border: 1px solid #111; }
+        .total-box td:first-child { background: #f7f7f7; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
@@ -147,7 +148,7 @@
             </table>
         </div>
         <table class="total-box">
-            <tr><td style="width: 40%;"><strong>{{ __('txn.total_return') }}</strong></td><td class="num" style="width: 45%;"><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
+            <tr><td style="width: 58%;"><strong>{{ __('txn.total_return') }}</strong></td><td class="num" style="width: 42%;"><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
         </table>
     </div>
 
@@ -174,5 +175,4 @@
 </div>
 </body>
 </html>
-
 

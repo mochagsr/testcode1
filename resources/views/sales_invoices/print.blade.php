@@ -22,13 +22,13 @@
         .doc-number { text-align: center; margin-bottom: 4px; }
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
         @include('partials.print.table_styles')
-        .summary-row { display: grid; grid-template-columns: minmax(0, 1fr) 140px 280px; align-items: start; gap: 12px; margin-top: 10px; }
+        .summary-row { display: grid; grid-template-columns: minmax(0, 1fr) 140px 200px; align-items: start; gap: 12px; margin-top: 10px; }
         .qty-box { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 68%; }
         .qty-box td:last-child { width: 32%; text-align: right; font-weight: 700; white-space: nowrap; }
         .qty-box td,
         .total-box td { border: 1px solid #111; padding: 4px; }
-        .total-box { width: 100%; border-collapse: collapse; }
+        .total-box { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .total-box td { border: 1px solid #111; }
         .total-box td:first-child { background: #f7f7f7; }
         .summary-spacer { min-height: 1px; }
@@ -159,9 +159,9 @@
             </tr>
         </table>
         <table class="total-box">
-            <tr><td style="width: 40%;">{{ __('txn.sub_total') }}</td><td class="num" style="width: 45%;">Rp {{ number_format((int) round($invoice->subtotal), 0, ',', '.') }}</td></tr>
-            <tr><td style="width: 40%;">{{ __('txn.discount') }}</td><td class="num" style="width: 45%;">Rp {{ number_format((int) round($discountTotal), 0, ',', '.') }}</td></tr>
-            <tr><td style="width: 40%;"><strong>{{ __('txn.grand_total') }}</strong></td><td class="num" style="width: 45%;"><strong>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</strong></td></tr>
+            <tr><td style="width: 58%;">{{ __('txn.sub_total') }}</td><td class="num" style="width: 42%;">Rp {{ number_format((int) round($invoice->subtotal), 0, ',', '.') }}</td></tr>
+            <tr><td style="width: 58%;">{{ __('txn.discount') }}</td><td class="num" style="width: 42%;">Rp {{ number_format((int) round($discountTotal), 0, ',', '.') }}</td></tr>
+            <tr><td style="width: 58%;"><strong>{{ __('txn.grand_total') }}</strong></td><td class="num" style="width: 42%;"><strong>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</strong></td></tr>
         </table>
     </div>
 
