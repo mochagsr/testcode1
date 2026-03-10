@@ -133,8 +133,8 @@
         <div class="qty-box">
             <table>
                 <tr>
-                    <td>{{ __('txn.summary_total_qty') }}</td>
-                    <td>{{ number_format($totalQty, 0, ',', '.') }}</td>
+                    <td style="width: 68%;">{{ __('txn.summary_total_qty') }}</td>
+                    <td style="width: 32%;">{{ number_format($totalQty, 0, ',', '.') }}</td>
                 </tr>
             </table>
         </div>

@@ -141,13 +141,13 @@
         <div class="qty-box">
             <table>
                 <tr>
-                    <td>{{ __('txn.summary_total_qty') }}</td>
-                    <td>{{ number_format($totalQty, 0, ',', '.') }}</td>
+                    <td style="width: 68%;">{{ __('txn.summary_total_qty') }}</td>
+                    <td style="width: 32%;">{{ number_format($totalQty, 0, ',', '.') }}</td>
                 </tr>
             </table>
         </div>
         <table class="total-box">
-            <tr><td><strong>{{ __('txn.total_return') }}</strong></td><td class="num"><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
+            <tr><td style="width: 58%;"><strong>{{ __('txn.total_return') }}</strong></td><td class="num" style="width: 42%;"><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
         </table>
     </div>
 

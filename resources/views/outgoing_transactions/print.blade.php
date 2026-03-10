@@ -117,13 +117,13 @@
     <table class="line-items">
         <thead>
         <tr>
-            <th style="width: 6%">{{ __('txn.no') }}</th>
+            <th style="width: 4%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
-            <th style="width: 10%">{{ __('txn.unit') }}</th>
-            <th class="num" style="width: 8%">{{ __('txn.qty') }}</th>
-            <th class="num" style="width: 10%">{{ __('txn.weight') }}</th>
-            <th class="num" style="width: 14%">{{ __('txn.price') }}</th>
-            <th class="num" style="width: 14%">{{ __('txn.subtotal') }}</th>
+            <th style="width: 7%">{{ __('txn.unit') }}</th>
+            <th class="num" style="width: 7">{{ __('txn.qty') }}</th>
+            <th class="num" style="width: 7%">{{ __('txn.weight') }}</th>
+            <th class="num" style="width: 10%">{{ __('txn.price') }}</th>
+            <th class="num" style="width: 15%">{{ __('txn.subtotal') }}</th>
         </tr>
         </thead>
         <tbody>
@@ -153,12 +153,12 @@
         </div>
         <div class="qty-box">
             <table>
-                <tr><td>{{ __('txn.summary_total_qty') }}</td><td>{{ number_format($totalQty, 0, ',', '.') }}</td></tr>
-                <tr><td>{{ __('txn.total_weight') }}</td><td>{{ number_format($totalWeight, 3, ',', '.') }}</td></tr>
+                <tr><td style="width: 66%;">{{ __('txn.summary_total_qty') }}</td><td style="width: 34%;">{{ number_format($totalQty, 0, ',', '.') }}</td></tr>
+                <tr><td style="width: 66%;">{{ __('txn.total_weight') }}</td><td style="width: 34%;">{{ number_format($totalWeight, 3, ',', '.') }}</td></tr>
             </table>
         </div>
         <table class="total-box">
-            <tr><td>{{ __('txn.grand_total') }}</td><td class="num">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td></tr>
+            <tr><td style="width: 58%;">{{ __('txn.grand_total') }}</td><td class="num" style="width: 42%;">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td></tr>
         </table>
     </div>
     @if($supplierInvoicePhotoSrc)
@@ -191,4 +191,3 @@
 </div>
 </body>
 </html>
-

@@ -110,12 +110,12 @@
     <table class="line-items">
         <thead>
         <tr>
-            <th style="width: 6%">{{ __('txn.no') }}</th>
+            <th style="width: 4%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
-            <th style="width: 10%">{{ __('txn.unit') }}</th>
-            <th class="num" style="width: 10%">{{ __('txn.qty') }}</th>
-            <th class="num" style="width: 14%">{{ __('txn.price') }}</th>
-            <th style="width: 22%">{{ __('txn.notes') }}</th>
+            <th style="width: 7%">{{ __('txn.unit') }}</th>
+            <th class="num" style="width: 7%">{{ __('txn.qty') }}</th>
+            <th class="num" style="width: 10%">{{ __('txn.price') }}</th>
+            <th style="width: 20%">{{ __('txn.notes') }}</th>
         </tr>
         </thead>
         <tbody>
@@ -139,8 +139,8 @@
         <div class="qty-box">
             <table>
                 <tr>
-                    <td>{{ __('txn.summary_total_qty') }}</td>
-                    <td>{{ number_format($totalQty, 0, ',', '.') }}</td>
+                    <td style="width: 68%;">{{ __('txn.summary_total_qty') }}</td>
+                    <td style="width: 32%;">{{ number_format($totalQty, 0, ',', '.') }}</td>
                 </tr>
             </table>
         </div>
@@ -169,5 +169,4 @@
 </div>
 </body>
 </html>
-
 

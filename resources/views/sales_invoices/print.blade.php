@@ -126,7 +126,7 @@
             <th class="num" style="width: 5%">{{ __('txn.qty') }}</th>
             <th class="num" style="width: 10%">{{ __('txn.price') }}</th>
             <th class="num" style="width: 8%">{{ __('txn.discount') }} (%)</th>
-            <th class="num" style="width: 18%">{{ __('txn.subtotal') }}</th>
+            <th class="num" style="width: 15%">{{ __('txn.subtotal') }}</th>
         </tr>
         </thead>
         <tbody>
@@ -153,14 +153,14 @@
         </div>
         <table class="qty-box">
             <tr>
-                <td>{{ __('txn.summary_total_qty') }}</td>
-                <td>{{ number_format($totalQty, 0, ',', '.') }}</td>
+                <td style="width: 68%;">{{ __('txn.summary_total_qty') }}</td>
+                <td style="width: 32%;">{{ number_format($totalQty, 0, ',', '.') }}</td>
             </tr>
         </table>
         <table class="total-box">
-            <tr><td>{{ __('txn.sub_total') }}</td><td class="num">Rp {{ number_format((int) round($invoice->subtotal), 0, ',', '.') }}</td></tr>
-            <tr><td>{{ __('txn.discount') }}</td><td class="num">Rp {{ number_format((int) round($discountTotal), 0, ',', '.') }}</td></tr>
-            <tr><td><strong>{{ __('txn.grand_total') }}</strong></td><td class="num"><strong>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</strong></td></tr>
+            <tr><td style="width: 58%;">{{ __('txn.sub_total') }}</td><td class="num" style="width: 42%;">Rp {{ number_format((int) round($invoice->subtotal), 0, ',', '.') }}</td></tr>
+            <tr><td style="width: 58%;">{{ __('txn.discount') }}</td><td class="num" style="width: 42%;">Rp {{ number_format((int) round($discountTotal), 0, ',', '.') }}</td></tr>
+            <tr><td style="width: 58%;"><strong>{{ __('txn.grand_total') }}</strong></td><td class="num" style="width: 42%;"><strong>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</strong></td></tr>
         </table>
     </div>
 

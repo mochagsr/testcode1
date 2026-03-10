@@ -159,14 +159,14 @@
                 </div>
                 <div class="qty-box">
                     <table>
-                        <tr><td>{{ __('school_bulk.qty_total_per_school') }}</td><td>{{ number_format($perSchoolQty, 0, ',', '.') }}</td></tr>
-                        <tr><td>{{ __('school_bulk.qty_total_all_schools') }}</td><td>{{ number_format($overallQty, 0, ',', '.') }}</td></tr>
+                        <tr><td style="width: 66%;">{{ __('school_bulk.qty_total_per_school') }}</td><td style="width: 34%;">{{ number_format($perSchoolQty, 0, ',', '.') }}</td></tr>
+                        <tr><td style="width: 66%;">{{ __('school_bulk.qty_total_all_schools') }}</td><td style="width: 34%;">{{ number_format($overallQty, 0, ',', '.') }}</td></tr>
                     </table>
                 </div>
                 <table class="total-box">
-                    <tr><td>{{ __('txn.sub_total') }}</td><td class="num">Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</td></tr>
-                    <tr><td>{{ __('txn.discount') }}</td><td class="num">Rp 0</td></tr>
-                    <tr><td><strong>{{ __('txn.grand_total') }}</strong></td><td class="num"><strong>Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</strong></td></tr>
+                    <tr><td style="width: 58%;">{{ __('txn.sub_total') }}</td><td class="num" style="width: 42%;">Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</td></tr>
+                    <tr><td style="width: 58%;">{{ __('txn.discount') }}</td><td class="num" style="width: 42%;">Rp 0</td></tr>
+                    <tr><td style="width: 58%;"><strong>{{ __('txn.grand_total') }}</strong></td><td class="num" style="width: 42%;"><strong>Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</strong></td></tr>
                 </table>
             </div>
 
