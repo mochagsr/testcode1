@@ -153,12 +153,12 @@
         </div>
         <div class="qty-box">
             <table>
-                <tr><td style="width: 66%;">{{ __('txn.summary_total_qty') }}</td><td style="width: 34%;">{{ number_format($totalQty, 0, ',', '.') }}</td></tr>
-                <tr><td style="width: 66%;">{{ __('txn.total_weight') }}</td><td style="width: 34%;">{{ number_format($totalWeight, 3, ',', '.') }}</td></tr>
+                <tr><td style="width: 50%;">{{ __('txn.summary_total_qty') }}</td><td style="width: 35%;">{{ number_format($totalQty, 0, ',', '.') }}</td></tr>
+                <tr><td style="width: 50%;">{{ __('txn.total_weight') }}</td><td style="width: 35%;">{{ number_format($totalWeight, 3, ',', '.') }}</td></tr>
             </table>
         </div>
         <table class="total-box">
-            <tr><td style="width: 58%;">{{ __('txn.grand_total') }}</td><td class="num" style="width: 42%;">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td></tr>
+            <tr><td style="width: 50%;">{{ __('txn.grand_total') }}</td><td class="num" style="width: 50%;">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td></tr>
         </table>
     </div>
     @if($supplierInvoicePhotoSrc)

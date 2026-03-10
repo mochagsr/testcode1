@@ -113,9 +113,9 @@
         <tr>
             <th style="width: 6%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
-            <th class="num" style="width: 10%">{{ __('txn.qty') }}</th>
-            <th class="num" style="width: 16%">{{ __('txn.price') }}</th>
-            <th class="num" style="width: 22%">{{ __('txn.subtotal') }}</th>
+            <th class="num" style="width: 7%">{{ __('txn.qty') }}</th>
+            <th class="num" style="width: 10%">{{ __('txn.price') }}</th>
+            <th class="num" style="width: 15%">{{ __('txn.subtotal') }}</th>
         </tr>
         </thead>
         <tbody>
@@ -147,7 +147,7 @@
             </table>
         </div>
         <table class="total-box">
-            <tr><td style="width: 58%;"><strong>{{ __('txn.total_return') }}</strong></td><td class="num" style="width: 42%;"><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
+            <tr><td style="width: 40%;"><strong>{{ __('txn.total_return') }}</strong></td><td class="num" style="width: 45%;"><strong>Rp {{ number_format((int) round($salesReturn->total), 0, ',', '.') }}</strong></td></tr>
         </table>
     </div>
 

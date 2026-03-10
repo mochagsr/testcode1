@@ -32,7 +32,7 @@
         .doc-meta-table td { text-align: left; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { border: 1px solid #111; padding: 5px; vertical-align: top; }
-        th { background: #efefef; }
+        th { background: #efefef; font-weight: 700; }
         .meta { margin-top: 8px; }
         .meta-layout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
         .cost-box { grid-column: span 2; }

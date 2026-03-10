@@ -110,8 +110,8 @@
         <tr>
             <th style="width: 6%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
-            <th class="num" style="width: 12%">{{ __('txn.qty') }}</th>
-            <th style="width: 34%">{{ __('txn.notes') }}</th>
+            <th class="num" style="width: 10%">{{ __('txn.qty') }}</th>
+            <th style="width: 35%">{{ __('txn.notes') }}</th>
         </tr>
         </thead>
         <tbody>
@@ -133,8 +133,8 @@
         <div class="qty-box">
             <table>
                 <tr>
-                    <td style="width: 68%;">{{ __('txn.summary_total_qty') }}</td>
-                    <td style="width: 32%;">{{ number_format($totalQty, 0, ',', '.') }}</td>
+                    <td style="width: 50%;">{{ __('txn.summary_total_qty') }}</td>
+                    <td style="width: 40%;">{{ number_format($totalQty, 0, ',', '.') }}</td>
                 </tr>
             </table>
         </div>
