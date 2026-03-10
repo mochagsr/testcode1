@@ -25,7 +25,7 @@
         .summary-row { display: grid; grid-template-columns: minmax(0, 1fr) 140px 280px; align-items: start; gap: 12px; margin-top: 10px; }
         .qty-box { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 68%; }
-        .qty-box td:last-child { width: 32%; text-align: center; font-weight: 700; white-space: nowrap; }
+        .qty-box td:last-child { width: 32%; text-align: right; font-weight: 700; white-space: nowrap; }
         .qty-box td,
         .total-box td { border: 1px solid #111; padding: 4px; }
         .total-box { width: 100%; border-collapse: collapse; }
@@ -123,10 +123,10 @@
         <tr>
             <th style="width: 4%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
-            <th style="width: 5%">{{ __('txn.qty') }}</th>
-            <th style="width: 10%">{{ __('txn.price') }}</th>
-            <th style="width: 8%">{{ __('txn.discount') }} (%)</th>
-            <th style="width: 18%">{{ __('txn.subtotal') }}</th>
+            <th class="num" style="width: 5%">{{ __('txn.qty') }}</th>
+            <th class="num" style="width: 10%">{{ __('txn.price') }}</th>
+            <th class="num" style="width: 8%">{{ __('txn.discount') }} (%)</th>
+            <th class="num" style="width: 18%">{{ __('txn.subtotal') }}</th>
         </tr>
         </thead>
         <tbody>
@@ -138,10 +138,10 @@
             <tr>
                 <td>{{ $loop->iteration }}</td>
                 <td>{{ $item->product_name }}</td>
-                <td>{{ (int) round($item->quantity) }}</td>
-                <td>Rp {{ number_format((int) round($item->unit_price), 0, ',', '.') }}</td>
-                <td>{{ (int) round($discountPercent) > 0 ? ((int) round($discountPercent)).'%' : '-' }}</td>
-                <td>Rp {{ number_format((int) round($item->line_total), 0, ',', '.') }}</td>
+                <td class="num">{{ (int) round($item->quantity) }}</td>
+                <td class="num">Rp {{ number_format((int) round($item->unit_price), 0, ',', '.') }}</td>
+                <td class="num">{{ (int) round($discountPercent) > 0 ? ((int) round($discountPercent)).'%' : '-' }}</td>
+                <td class="num">Rp {{ number_format((int) round($item->line_total), 0, ',', '.') }}</td>
             </tr>
         @endforeach
         </tbody>
@@ -158,9 +158,9 @@
             </tr>
         </table>
         <table class="total-box">
-            <tr><td>{{ __('txn.sub_total') }}</td><td>Rp {{ number_format((int) round($invoice->subtotal), 0, ',', '.') }}</td></tr>
-            <tr><td>{{ __('txn.discount') }}</td><td>Rp {{ number_format((int) round($discountTotal), 0, ',', '.') }}</td></tr>
-            <tr><td><strong>{{ __('txn.grand_total') }}</strong></td><td><strong>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</strong></td></tr>
+            <tr><td>{{ __('txn.sub_total') }}</td><td class="num">Rp {{ number_format((int) round($invoice->subtotal), 0, ',', '.') }}</td></tr>
+            <tr><td>{{ __('txn.discount') }}</td><td class="num">Rp {{ number_format((int) round($discountTotal), 0, ',', '.') }}</td></tr>
+            <tr><td><strong>{{ __('txn.grand_total') }}</strong></td><td class="num"><strong>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</strong></td></tr>
         </table>
     </div>
 

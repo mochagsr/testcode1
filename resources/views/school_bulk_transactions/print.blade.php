@@ -29,7 +29,7 @@
         .qty-box table,
         .total-box { margin-top: 0; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 66%; }
-        .qty-box td:last-child { width: 34%; text-align: center; font-weight: 700; white-space: nowrap; }
+        .qty-box td:last-child { width: 34%; text-align: right; font-weight: 700; white-space: nowrap; }
         .total-box { width: 100%; }
         .total-box td { border: 1px solid #111; }
         .signature-table { margin-top: 24px; }
@@ -129,10 +129,10 @@
                 <tr>
                     <th style="width: 6%">{{ __('txn.no') }}</th>
                     <th>{{ __('txn.name') }}</th>
-                    <th style="width: 10%">{{ __('txn.qty') }}</th>
+                    <th class="num" style="width: 10%">{{ __('txn.qty') }}</th>
                     <th style="width: 12%">{{ __('txn.unit') }}</th>
-                    <th style="width: 18%">{{ __('txn.price') }}</th>
-                    <th style="width: 20%">{{ __('txn.subtotal') }}</th>
+                    <th class="num" style="width: 18%">{{ __('txn.price') }}</th>
+                    <th class="num" style="width: 20%">{{ __('txn.subtotal') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -144,10 +144,10 @@
                     <tr>
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $item->product_name }}</td>
-                        <td>{{ $adjustedQuantity }}</td>
+                        <td class="num">{{ $adjustedQuantity }}</td>
                         <td>{{ $item->unit ?: '-' }}</td>
-                        <td>Rp {{ number_format((int) ($item->unit_price ?? 0), 0, ',', '.') }}</td>
-                        <td>Rp {{ number_format($lineTotal, 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) ($item->unit_price ?? 0), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format($lineTotal, 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
                 </tbody>
@@ -164,9 +164,9 @@
                     </table>
                 </div>
                 <table class="total-box">
-                    <tr><td>{{ __('txn.sub_total') }}</td><td>Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</td></tr>
-                    <tr><td>{{ __('txn.discount') }}</td><td>Rp 0</td></tr>
-                    <tr><td><strong>{{ __('txn.grand_total') }}</strong></td><td><strong>Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</strong></td></tr>
+                    <tr><td>{{ __('txn.sub_total') }}</td><td class="num">Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</td></tr>
+                    <tr><td>{{ __('txn.discount') }}</td><td class="num">Rp 0</td></tr>
+                    <tr><td><strong>{{ __('txn.grand_total') }}</strong></td><td class="num"><strong>Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</strong></td></tr>
                 </table>
             </div>
 

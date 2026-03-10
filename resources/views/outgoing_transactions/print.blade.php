@@ -27,7 +27,7 @@
         .qty-box table,
         .total-box { margin-top: 0; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 66%; }
-        .qty-box td:last-child { width: 34%; text-align: center; font-weight: 700; white-space: nowrap; }
+        .qty-box td:last-child { width: 34%; text-align: right; font-weight: 700; white-space: nowrap; }
         .total-box { width: 100%; }
         .total-box td { border: 1px solid #111; }
         .signature-table { margin-top: 24px; }
@@ -120,10 +120,10 @@
             <th style="width: 6%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
             <th style="width: 10%">{{ __('txn.unit') }}</th>
-            <th style="width: 8%">{{ __('txn.qty') }}</th>
-            <th style="width: 10%">{{ __('txn.weight') }}</th>
-            <th style="width: 14%">{{ __('txn.price') }}</th>
-            <th style="width: 14%">{{ __('txn.subtotal') }}</th>
+            <th class="num" style="width: 8%">{{ __('txn.qty') }}</th>
+            <th class="num" style="width: 10%">{{ __('txn.weight') }}</th>
+            <th class="num" style="width: 14%">{{ __('txn.price') }}</th>
+            <th class="num" style="width: 14%">{{ __('txn.subtotal') }}</th>
         </tr>
         </thead>
         <tbody>
@@ -138,10 +138,10 @@
                 <td>{{ $loop->iteration }}</td>
                 <td>{{ $item->product_name }}</td>
                 <td>{{ $item->unit ?: '-' }}</td>
-                <td>{{ (int) round((float) $item->quantity, 0) }}</td>
-                <td>{{ $item->weight !== null ? number_format((float) $item->weight, 3, ',', '.') : '-' }}</td>
-                <td>{{ $unitCostText }}</td>
-                <td>{{ $lineTotalText }}</td>
+                <td class="num">{{ (int) round((float) $item->quantity, 0) }}</td>
+                <td class="num">{{ $item->weight !== null ? number_format((float) $item->weight, 3, ',', '.') : '-' }}</td>
+                <td class="num">{{ $unitCostText }}</td>
+                <td class="num">{{ $lineTotalText }}</td>
             </tr>
         @endforeach
         </tbody>
@@ -158,7 +158,7 @@
             </table>
         </div>
         <table class="total-box">
-            <tr><td>{{ __('txn.grand_total') }}</td><td>Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td></tr>
+            <tr><td>{{ __('txn.grand_total') }}</td><td class="num">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td></tr>
         </table>
     </div>
     @if($supplierInvoicePhotoSrc)

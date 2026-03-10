@@ -27,7 +27,7 @@
         .qty-box { width: 100%; table-layout: fixed; }
         .qty-box table { margin-top: 0; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 68%; }
-        .qty-box td:last-child { width: 32%; text-align: center; font-weight: 700; white-space: nowrap; }
+        .qty-box td:last-child { width: 32%; text-align: right; font-weight: 700; white-space: nowrap; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
@@ -110,7 +110,7 @@
         <tr>
             <th style="width: 6%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
-            <th style="width: 12%">{{ __('txn.qty') }}</th>
+            <th class="num" style="width: 12%">{{ __('txn.qty') }}</th>
             <th style="width: 34%">{{ __('txn.notes') }}</th>
         </tr>
         </thead>
@@ -119,7 +119,7 @@
             <tr>
                 <td>{{ $loop->iteration }}</td>
                 <td>{{ $item->product_name }}</td>
-                <td>{{ (int) round($item->quantity) }}</td>
+                <td class="num">{{ (int) round($item->quantity) }}</td>
                 <td>{{ $item->notes ?: '' }}</td>
             </tr>
         @endforeach
