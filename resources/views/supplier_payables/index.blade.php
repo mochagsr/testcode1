@@ -131,9 +131,52 @@
                 @endforeach
             </select>
             <button type="submit">{{ __('txn.search') }}</button>
+            <a class="btn info-btn" href="{{ route('supplier-payables.print', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear]) }}" target="_blank">{{ __('txn.print') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear]) }}">{{ __('txn.pdf') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.export.excel', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear]) }}">{{ __('txn.excel') }}</a>
             <a class="btn payment-btn" href="{{ route('supplier-payables.create') }}">{{ __('supplier_payable.add_payment') }}</a>
         </form>
     </div>
+
+    @if(auth()->user()->role === 'admin')
+        <div class="card">
+            <div class="form-section">
+                <h3 class="form-section-title">{{ __('supplier_payable.year_book_title') }}</h3>
+                <p class="form-section-note">{{ __('supplier_payable.year_book_note') }}</p>
+                @if($selectedSupplier && $selectedYear)
+                    <div class="flex" style="align-items:center; justify-content:space-between;">
+                        <div>
+                            <strong>{{ $selectedSupplier->name }}</strong>
+                            <div class="muted">{{ __('supplier_payable.year_label') }}: {{ $selectedYear }}</div>
+                        </div>
+                        <div class="flex" style="align-items:center; gap:8px;">
+                            @if($selectedSupplierYearClosed)
+                                <span class="badge warning">{{ __('supplier_payable.year_closed_badge') }}</span>
+                                <form method="post" action="{{ route('supplier-payables.year-open') }}">
+                                    @csrf
+                                    <input type="hidden" name="supplier_id" value="{{ $selectedSupplier->id }}">
+                                    <input type="hidden" name="year" value="{{ $selectedYear }}">
+                                    <input type="hidden" name="search" value="{{ $search }}">
+                                    <button type="submit" class="btn payment-btn">{{ __('supplier_payable.open_year_action') }}</button>
+                                </form>
+                            @else
+                                <span class="badge success">{{ __('supplier_payable.year_open_badge') }}</span>
+                                <form method="post" action="{{ route('supplier-payables.year-close') }}">
+                                    @csrf
+                                    <input type="hidden" name="supplier_id" value="{{ $selectedSupplier->id }}">
+                                    <input type="hidden" name="year" value="{{ $selectedYear }}">
+                                    <input type="hidden" name="search" value="{{ $search }}">
+                                    <button type="submit" class="btn warning-btn">{{ __('supplier_payable.close_year_action') }}</button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+                @else
+                    <div class="muted">{{ __('supplier_payable.select_supplier_year_hint') }}</div>
+                @endif
+            </div>
+        </div>
+    @endif
 
     <div class="row supplier-payable-main-grid">
         <div class="col-4 supplier-payable-col-suppliers">

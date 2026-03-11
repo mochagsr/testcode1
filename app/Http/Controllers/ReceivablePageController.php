@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
 use App\Models\Customer;
+use App\Models\CustomerLevel;
 use App\Models\InvoicePayment;
 use App\Models\ReceivableLedger;
 use App\Models\SalesInvoice;
@@ -251,6 +252,583 @@ class ReceivablePageController extends Controller
         ]);
     }
 
+    public function semesterIndex(Request $request): View
+    {
+        return view('receivables.semester_index', $this->semesterReceivableData($request, true));
+    }
+
+    public function globalIndex(Request $request): View
+    {
+        return view('receivables.global_index', $this->globalReceivableData($request, true));
+    }
+
+    public function semesterPrint(Request $request): View
+    {
+        return view('receivables.semester_print', array_merge(
+            $this->semesterReceivableData($request, false),
+            ['isPdf' => false]
+        ));
+    }
+
+    public function globalPrint(Request $request): View
+    {
+        return view('receivables.global_print', array_merge(
+            $this->globalReceivableData($request, false),
+            ['isPdf' => false]
+        ));
+    }
+
+    public function semesterExportPdf(Request $request)
+    {
+        $data = array_merge($this->semesterReceivableData($request, false), ['isPdf' => true]);
+        $html = view('receivables.semester_print', $data)->render();
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape');
+
+        return $pdf->download($this->semesterReportFilename('pdf', (string) ($data['selectedSemester'] ?? '')));
+    }
+
+    public function globalExportPdf(Request $request)
+    {
+        $data = array_merge($this->globalReceivableData($request, false), ['isPdf' => true]);
+        $html = view('receivables.global_print', $data)->render();
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape');
+
+        $filename = ($data['selectedCustomer'] ?? null) instanceof Customer
+            ? 'invoice-piutang-' . ((int) $data['selectedCustomer']->id) . '-' . $this->nowWib()->format('Ymd-His') . '.pdf'
+            : 'piutang-global-' . $this->nowWib()->format('Ymd-His') . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    public function semesterExportExcel(Request $request): StreamedResponse
+    {
+        $data = $this->semesterReceivableData($request, false);
+        $rows = collect($data['rows'] ?? []);
+        $filename = $this->semesterReportFilename('xlsx', (string) ($data['selectedSemester'] ?? ''));
+
+        return response()->streamDownload(function () use ($rows, $data): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Piutang Semester');
+
+            $sheet->mergeCells('A1:I1');
+            $sheet->setCellValue('A1', (string) ($data['printTitle'] ?? $data['title'] ?? __('receivable.semester_page_title')));
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+            $sheet->mergeCells('H2:I2');
+            $sheet->setCellValue('H2', 'Update : ' . now()->translatedFormat('j F Y'));
+            $sheet->getStyle('H2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('H2')->getFont()->setItalic(true)->setBold(true);
+
+            $tableStart = 4;
+            $rowsOut = [[
+                'No.',
+                'NAMA',
+                'ALAMAT',
+                'Ket.',
+                'REKAP PENJUALAN',
+                'ANGSURAN',
+                'RETUR PENJUALAN',
+                'PIUTANG',
+                'STATUS',
+            ]];
+
+            foreach ($rows as $idx => $row) {
+                $outstanding = (int) ($row['outstanding_total'] ?? 0);
+                $rowsOut[] = [
+                    (int) $idx + 1,
+                    strtoupper((string) ($row['name'] ?? '')),
+                    (string) ($row['address'] ?? '-'),
+                    strtoupper((string) (($row['level_label'] ?? '') !== '' ? $row['level_label'] : '-')),
+                    'Rp ' . number_format((int) ($row['sales_total'] ?? 0), 0, ',', '.'),
+                    'Rp ' . number_format((int) ($row['payment_total'] ?? 0), 0, ',', '.'),
+                    'Rp ' . number_format((int) ($row['return_total'] ?? 0), 0, ',', '.'),
+                    ($outstanding < 0 ? '-Rp ' : 'Rp ') . number_format(abs($outstanding), 0, ',', '.'),
+                    $outstanding <= 0 ? 'LUNAS' : '-',
+                ];
+            }
+
+            $totals = (array) ($data['totals'] ?? []);
+            $rowsOut[] = [
+                '',
+                __('receivable.semester_total'),
+                '',
+                '',
+                'Rp ' . number_format((int) ($totals['sales_total'] ?? 0), 0, ',', '.'),
+                'Rp ' . number_format((int) ($totals['payment_total'] ?? 0), 0, ',', '.'),
+                'Rp ' . number_format((int) ($totals['return_total'] ?? 0), 0, ',', '.'),
+                ((int) ($totals['outstanding_total'] ?? 0) < 0 ? '-Rp ' : 'Rp ') . number_format(abs((int) ($totals['outstanding_total'] ?? 0)), 0, ',', '.'),
+                '',
+            ];
+
+            $sheet->fromArray($rowsOut, null, 'A' . $tableStart);
+            $lastRow = $tableStart + count($rowsOut) - 1;
+            $sheet->getStyle('A' . $tableStart . ':I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A' . $tableStart . ':I' . $lastRow)->getAlignment()->setWrapText(true);
+            $sheet->getStyle('A' . $tableStart . ':I' . $lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getFont()->setBold(true);
+            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
+            $sheet->getStyle('A' . ($tableStart + 1) . ':A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D' . ($tableStart + 1) . ':D' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E' . ($tableStart + 1) . ':H' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('A' . ($tableStart + 1) . ':C' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $totalRow = $tableStart + count($rowsOut) - 1;
+            $sheet->getStyle('A' . $totalRow . ':I' . $totalRow)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle('A' . $totalRow . ':I' . $totalRow)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
+            $sheet->getStyle('E' . $totalRow . ':H' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('B' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+            for ($rowIndex = $tableStart + 1; $rowIndex < $totalRow; $rowIndex++) {
+                if (strtoupper((string) $sheet->getCell('I' . $rowIndex)->getValue()) === 'LUNAS') {
+                    $sheet->getStyle('I' . $rowIndex)->getFont()->getColor()->setARGB('FFD60000');
+                    $sheet->getStyle('I' . $rowIndex)->getFont()->setBold(true);
+                    $sheet->getStyle('I' . $rowIndex)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                } else {
+                    $sheet->getStyle('I' . $rowIndex)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                }
+            }
+
+            foreach (['A' => 5, 'B' => 20, 'C' => 24, 'D' => 8, 'E' => 18, 'F' => 18, 'G' => 18, 'H' => 18, 'I' => 10] as $column => $width) {
+                $sheet->getColumnDimension($column)->setWidth($width);
+            }
+            $sheet->getRowDimension(1)->setRowHeight(24);
+            $sheet->getRowDimension($tableStart)->setRowHeight(24);
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    public function globalExportExcel(Request $request): StreamedResponse
+    {
+        $data = $this->globalReceivableData($request, false);
+        $rows = collect($data['rows'] ?? []);
+        $semesterHeaders = collect($data['semesterHeaders'] ?? []);
+        $semesterCodes = collect($data['semesterCodes'] ?? []);
+        $selectedCustomer = $data['selectedCustomer'] ?? null;
+        $filename = $selectedCustomer instanceof Customer
+            ? 'invoice-piutang-' . ((int) $selectedCustomer->id) . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx'
+            : 'piutang-global-' . $this->nowWib()->format('Ymd-His') . '.xlsx';
+
+        return response()->streamDownload(function () use ($rows, $data, $semesterHeaders, $semesterCodes, $selectedCustomer): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle($selectedCustomer instanceof Customer ? 'Invoice Piutang' : 'Piutang Global');
+
+            if ($selectedCustomer instanceof Customer) {
+                $companyName = trim((string) ($data['companyName'] ?? 'CV. PUSTAKA GRAFIKA'));
+                $companyAddress = PrintTextFormatter::wrapWords(trim((string) ($data['companyAddress'] ?? '')), 5);
+                $companyPhone = trim((string) ($data['companyPhone'] ?? ''));
+                $companyEmail = trim((string) ($data['companyEmail'] ?? ''));
+                $customerAddress = PrintTextFormatter::wrapWords(trim((string) ($selectedCustomer->address ?? '')), 4);
+                $notesText = PrintTextFormatter::wrapWords(trim((string) ($data['companyInvoiceNotes'] ?? '')), 4);
+                $transferText = trim((string) ($data['companyTransferAccounts'] ?? ''));
+                $invoiceRows = collect($data['customerInvoiceRows'] ?? []);
+                $invoiceTotal = (int) ($data['customerInvoiceTotal'] ?? 0);
+
+                $sheet->mergeCells('A1:C1');
+                $sheet->setCellValue('A1', $companyName);
+                $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(18);
+                $sheet->mergeCells('A2:C4');
+                $sheet->setCellValue('A2', collect([$companyAddress, $companyPhone, $companyEmail])->filter()->implode("\n"));
+                $sheet->getStyle('A2:C4')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+
+                $sheet->mergeCells('E1:G2');
+                $sheet->setCellValue('E1', 'Invoice');
+                $sheet->getStyle('E1:G2')->getFont()->setBold(true)->setSize(24);
+                $sheet->getStyle('E1:G2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->mergeCells('I1:J1');
+                $sheet->setCellValue('I1', 'Update : ' . now()->translatedFormat('j F Y'));
+                $sheet->getStyle('I1:J1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('I1:J1')->getFont()->setItalic(true)->setBold(true);
+
+                $sheet->setCellValue('A6', 'Konsumen');
+                $sheet->setCellValue('B6', ':');
+                $sheet->setCellValue('C6', strtoupper((string) $selectedCustomer->name));
+                $sheet->setCellValue('A7', 'Alamat');
+                $sheet->setCellValue('B7', ':');
+                $sheet->setCellValue('C7', strtoupper($customerAddress !== '' ? $customerAddress : '-'));
+                $sheet->getStyle('A6:C7')->getAlignment()->setWrapText(true);
+
+                $tableStart = 9;
+                $sheet->fromArray([['No.', 'Deskripsi', 'Nominal']], null, 'A' . $tableStart);
+                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getFont()->setBold(true);
+                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFE5E7EB');
+                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+
+                $cursor = $tableStart + 1;
+                foreach ($invoiceRows as $index => $invoiceRow) {
+                    $sheet->setCellValue('A' . $cursor, (int) $index + 1);
+                    $sheet->setCellValue('B' . $cursor, strtoupper((string) ($invoiceRow['description'] ?? '')));
+                    $sheet->setCellValue('C' . $cursor, 'Rp ' . number_format((int) ($invoiceRow['nominal'] ?? 0), 0, ',', '.'));
+                    $cursor++;
+                }
+                for ($i = $invoiceRows->count(); $i < 7; $i++) {
+                    $sheet->setCellValue('A' . $cursor, $i + 1);
+                    $cursor++;
+                }
+                $dataEnd = $cursor - 1;
+                $sheet->getStyle('A' . ($tableStart + 1) . ':C' . $dataEnd)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A' . ($tableStart + 1) . ':A' . $dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('C' . ($tableStart + 1) . ':C' . $dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                $sheet->mergeCells('A' . ($cursor + 1) . ':B' . ($cursor + 1));
+                $sheet->setCellValue('A' . ($cursor + 1), 'TOTAL');
+                $sheet->setCellValue('C' . ($cursor + 1), 'Rp ' . number_format($invoiceTotal, 0, ',', '.'));
+                $sheet->getStyle('A' . ($cursor + 1) . ':C' . ($cursor + 1))->getFont()->setBold(true);
+                $sheet->getStyle('A' . ($cursor + 1) . ':C' . ($cursor + 1))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A' . ($cursor + 1) . ':B' . ($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('C' . ($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                $cursor += 4;
+                if ($notesText !== '') {
+                    $sheet->setCellValue('A' . $cursor, 'Note :');
+                    $sheet->getStyle('A' . $cursor)->getFont()->setBold(true);
+                    foreach (preg_split('/\r\n|\r|\n/', $notesText) ?: [] as $line) {
+                        if (trim($line) === '') {
+                            continue;
+                        }
+                        $cursor++;
+                        $sheet->mergeCells('A' . $cursor . ':F' . $cursor);
+                        $sheet->setCellValue('A' . $cursor, $line);
+                    }
+                    $cursor += 2;
+                }
+
+                if ($transferText !== '') {
+                    $sheet->setCellValue('A' . $cursor, 'Transfer via :');
+                    $sheet->getStyle('A' . $cursor)->getFont()->setBold(true);
+                    foreach (preg_split('/\r\n|\r|\n/', $transferText) ?: [] as $line) {
+                        if (trim($line) === '') {
+                            continue;
+                        }
+                        $cursor++;
+                        $sheet->mergeCells('A' . $cursor . ':F' . $cursor);
+                        $sheet->setCellValue('A' . $cursor, $line);
+                    }
+                }
+
+                foreach (['A' => 6, 'B' => 18, 'C' => 24, 'D' => 4, 'E' => 14, 'F' => 16, 'G' => 16, 'H' => 4, 'I' => 16, 'J' => 16] as $column => $width) {
+                    $sheet->getColumnDimension($column)->setWidth($width);
+                }
+
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+                $spreadsheet->disconnectWorksheets();
+                unset($spreadsheet);
+
+                return;
+            }
+
+            $columnCount = 4 + $semesterHeaders->count() + 1;
+            $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
+
+            $sheet->mergeCells('A1:' . $lastColumn . '1');
+            $sheet->setCellValue('A1', (string) ($data['printTitle'] ?? $data['title']));
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $sheet->mergeCells(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A') . '2:' . $lastColumn . '2');
+            $sheet->setCellValue(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A') . '2', 'Update : ' . now()->translatedFormat('j F Y'));
+            $sheet->getStyle('A2:' . $lastColumn . '2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('A2:' . $lastColumn . '2')->getFont()->setItalic(true)->setBold(true);
+
+            $tableStart = 4;
+            $sheet->setCellValue('A' . $tableStart, 'NO');
+            $sheet->setCellValue('B' . $tableStart, 'NAMA PELANGGAN');
+            $sheet->setCellValue('C' . $tableStart, 'KOTA');
+            $sheet->setCellValue('D' . $tableStart, 'ALAMAT');
+
+            if ($semesterHeaders->isNotEmpty()) {
+                $semesterStartColumn = 5;
+                $semesterEndColumn = $semesterStartColumn + $semesterHeaders->count() - 1;
+                $semesterStartLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterStartColumn);
+                $semesterEndLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterEndColumn);
+                $sheet->mergeCells($semesterStartLetter . $tableStart . ':' . $semesterEndLetter . $tableStart);
+                $sheet->setCellValue($semesterStartLetter . $tableStart, 'PIUTANG');
+                foreach ($semesterHeaders->values() as $index => $header) {
+                    $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterStartColumn + $index);
+                    $sheet->setCellValue($columnLetter . ($tableStart + 1), (string) $header);
+                }
+            }
+
+            $totalColumnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
+            $sheet->mergeCells($totalColumnLetter . $tableStart . ':' . $totalColumnLetter . ($tableStart + 1));
+            $sheet->setCellValue($totalColumnLetter . $tableStart, 'TOTAL PIUTANG');
+
+            $sheet->mergeCells('A' . $tableStart . ':A' . ($tableStart + 1));
+            $sheet->mergeCells('B' . $tableStart . ':B' . ($tableStart + 1));
+            $sheet->mergeCells('C' . $tableStart . ':C' . ($tableStart + 1));
+            $sheet->mergeCells('D' . $tableStart . ':D' . ($tableStart + 1));
+
+            $dataStartRow = $tableStart + 2;
+            $rowCursor = $dataStartRow;
+
+            foreach ($rows as $index => $row) {
+                $sheet->setCellValue('A' . $rowCursor, (int) $index + 1);
+                $sheet->setCellValue('B' . $rowCursor, strtoupper((string) ($row['name'] ?? '')));
+                $sheet->setCellValue('C' . $rowCursor, (string) ($row['city'] ?? '-'));
+                $sheet->setCellValue('D' . $rowCursor, (string) ($row['address'] ?? '-'));
+
+                foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
+                    $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex);
+                    $value = (int) ($row['semester_totals'][$semesterCode] ?? 0);
+                    $sheet->setCellValue($columnLetter . $rowCursor, 'Rp ' . number_format($value, 0, ',', '.'));
+                    $sheet->getStyle($columnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                }
+
+                $sheet->setCellValue($totalColumnLetter . $rowCursor, 'Rp ' . number_format((int) ($row['total_outstanding'] ?? 0), 0, ',', '.'));
+                $sheet->getStyle($totalColumnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $rowCursor++;
+            }
+
+            $sheet->mergeCells('A' . $rowCursor . ':D' . $rowCursor);
+            $sheet->setCellValue('A' . $rowCursor, __('receivable.semester_total'));
+            foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
+                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex);
+                $sheet->setCellValue($columnLetter . $rowCursor, 'Rp ' . number_format((int) ($data['totals']['per_semester'][$semesterCode] ?? 0), 0, ',', '.'));
+                $sheet->getStyle($columnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            }
+            $sheet->setCellValue($totalColumnLetter . $rowCursor, 'Rp ' . number_format((int) ($data['totals']['grand_total'] ?? 0), 0, ',', '.'));
+            $sheet->getStyle($totalColumnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getFont()->setBold(true);
+            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFEFF3F8');
+            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $rowCursor)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $rowCursor)->getAlignment()->setWrapText(true);
+            $sheet->getStyle('A' . $rowCursor . ':' . $lastColumn . $rowCursor)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle('A' . $rowCursor . ':' . $lastColumn . $rowCursor)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
+            $sheet->getStyle('A' . $dataStartRow . ':A' . ($rowCursor - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            foreach (['A' => 5, 'B' => 20, 'C' => 14, 'D' => 34] as $column => $width) {
+                $sheet->getColumnDimension($column)->setWidth($width);
+            }
+            foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
+                $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex))->setWidth(16);
+            }
+            $sheet->getColumnDimension($totalColumnLetter)->setWidth(16);
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    private function semesterReportFilename(string $extension, string $semester): string
+    {
+        $normalizedSemester = trim($semester) !== '' ? strtolower(trim($semester)) : 'semua-customer';
+
+        return 'daftar-piutang-' . $normalizedSemester . '-' . $this->nowWib()->format('Ymd-His') . '.' . $extension;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function globalReceivableData(Request $request, bool $paginate = true): array
+    {
+        $search = trim((string) $request->string('search', ''));
+        $status = strtolower(trim((string) $request->string('status', 'all')));
+        $selectedCustomerId = max(0, (int) $request->integer('customer_id'));
+        if (! in_array($status, ['all', 'outstanding', 'paid', 'credit'], true)) {
+            $status = 'all';
+        }
+
+        $baseSemesterOptions = Cache::remember(
+            AppCache::lookupCacheKey('receivables.global_page.options'),
+            now()->addSeconds(60),
+            fn() => $this->semesterBookService->buildSemesterOptionCollection(
+                ReceivableLedger::query()
+                    ->whereNotNull('period_code')
+                    ->where('period_code', '!=', '')
+                    ->distinct()
+                    ->pluck('period_code')
+                    ->merge($this->semesterBookService->configuredSemesterOptions()),
+                false,
+                false
+            )->values()
+        );
+
+        $activeSemesterCodes = collect($this->semesterBookService->filterToActiveSemesters($baseSemesterOptions->all()))
+            ->reject(fn (string $semester): bool => $this->semesterBookService->isClosed($semester))
+            ->values();
+
+        if ($activeSemesterCodes->isEmpty()) {
+            $activeSemesterCodes = $baseSemesterOptions
+                ->reject(fn (string $semester): bool => $this->semesterBookService->isClosed($semester))
+                ->values();
+        }
+
+        $customerOptions = Cache::remember(
+            AppCache::lookupCacheKey('receivables.global_page.customer_options'),
+            now()->addSeconds(60),
+            fn() => Customer::query()
+                ->select(['id', 'name', 'city'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Customer $customer): array => [
+                    'id' => (int) $customer->id,
+                    'label' => trim((string) $customer->name) . ((string) ($customer->city ?? '') !== '' ? ' (' . trim((string) $customer->city) . ')' : ''),
+                ])
+                ->all()
+        );
+
+        $selectedCustomer = $selectedCustomerId > 0
+            ? Customer::query()->find($selectedCustomerId)
+            : null;
+        if ($selectedCustomer === null) {
+            $selectedCustomerId = 0;
+        }
+
+        $ledgerRows = ReceivableLedger::query()
+            ->selectRaw('customer_id, period_code, COALESCE(SUM(debit - credit), 0) as outstanding_total')
+            ->whereIn('period_code', $activeSemesterCodes->all())
+            ->groupBy('customer_id', 'period_code')
+            ->get();
+
+        $balanceMap = [];
+        foreach ($ledgerRows as $ledgerRow) {
+            $periodCode = (string) ($ledgerRow->period_code ?? '');
+            if ($periodCode === '') {
+                continue;
+            }
+            $balanceMap[(int) $ledgerRow->customer_id][$periodCode] = (int) round((float) ($ledgerRow->outstanding_total ?? 0));
+        }
+
+        $totalAggregate = ReceivableLedger::query()
+            ->selectRaw('customer_id, COALESCE(SUM(debit - credit), 0) as total_outstanding')
+            ->whereIn('period_code', $activeSemesterCodes->all())
+            ->groupBy('customer_id');
+
+        $customerQuery = Customer::query()
+            ->leftJoinSub($totalAggregate, 'global_ledger', function ($join): void {
+                $join->on('customers.id', '=', 'global_ledger.customer_id');
+            })
+            ->select([
+                'customers.id',
+                'customers.name',
+                'customers.city',
+                'customers.address',
+                DB::raw('COALESCE(global_ledger.total_outstanding, 0) as total_outstanding'),
+            ])
+            ->when($search !== '', function ($builder) use ($search): void {
+                $builder->where(function ($subQuery) use ($search): void {
+                    $subQuery->where('customers.name', 'like', '%' . $search . '%')
+                        ->orWhere('customers.city', 'like', '%' . $search . '%')
+                        ->orWhere('customers.address', 'like', '%' . $search . '%');
+                });
+            })
+            ->when($selectedCustomerId > 0, function ($builder) use ($selectedCustomerId): void {
+                $builder->where('customers.id', $selectedCustomerId);
+            })
+            ->when($status === 'outstanding', function ($builder): void {
+                $builder->whereRaw('COALESCE(global_ledger.total_outstanding, 0) > 0');
+            })
+            ->when($status === 'paid', function ($builder): void {
+                $builder->whereRaw('COALESCE(global_ledger.total_outstanding, 0) = 0');
+            })
+            ->when($status === 'credit', function ($builder): void {
+                $builder->whereRaw('COALESCE(global_ledger.total_outstanding, 0) < 0');
+            })
+            ->orderBy('name');
+
+        $customers = $paginate
+            ? $customerQuery->paginate(10)->withQueryString()
+            : $customerQuery->get();
+
+        $customerCollection = $paginate ? collect($customers->items()) : collect($customers);
+        $rows = $customerCollection->map(function (Customer $customer) use ($balanceMap, $activeSemesterCodes): array {
+            $semesterTotals = [];
+            $grandTotal = 0;
+            foreach ($activeSemesterCodes as $semesterCode) {
+                $value = (int) ($balanceMap[(int) $customer->id][$semesterCode] ?? 0);
+                $semesterTotals[$semesterCode] = $value;
+                $grandTotal += $value;
+            }
+
+            return [
+                'id' => (int) $customer->id,
+                'name' => (string) $customer->name,
+                'city' => trim((string) ($customer->city ?? '')) !== '' ? (string) $customer->city : '-',
+                'address' => trim((string) ($customer->address ?? '')) !== '' ? (string) $customer->address : '-',
+                'semester_totals' => $semesterTotals,
+                'total_outstanding' => $grandTotal,
+            ];
+        });
+
+        $totalsPerSemester = [];
+        foreach ($activeSemesterCodes as $semesterCode) {
+            $totalsPerSemester[$semesterCode] = (int) $rows->sum(fn (array $row): int => (int) ($row['semester_totals'][$semesterCode] ?? 0));
+        }
+
+        $grandTotal = (int) $rows->sum(fn (array $row): int => (int) ($row['total_outstanding'] ?? 0));
+
+        $customerInvoiceRows = collect();
+        $customerInvoiceTotal = 0;
+        $companySettings = [];
+
+        if ($selectedCustomer instanceof Customer) {
+            $customerInvoiceRows = collect($activeSemesterCodes)
+                ->map(function (string $semesterCode) use ($selectedCustomer, $balanceMap): array {
+                    $nominal = (int) ($balanceMap[(int) $selectedCustomer->id][$semesterCode] ?? 0);
+
+                    return [
+                        'semester_code' => $semesterCode,
+                        'description' => $this->semesterDescriptionLabel($semesterCode),
+                        'nominal' => $nominal,
+                    ];
+                })
+                ->filter(fn (array $row): bool => (int) $row['nominal'] !== 0)
+                ->values();
+
+            $customerInvoiceTotal = (int) $customerInvoiceRows->sum(fn (array $row): int => (int) $row['nominal']);
+            $companySettings = $this->companyPrintSettings();
+        }
+
+        return [
+            'title' => __('receivable.global_page_title'),
+            'printTitle' => $selectedCustomer instanceof Customer
+                ? 'Invoice'
+                : strtoupper(__('receivable.global_page_title')),
+            'rows' => $rows,
+            'paginator' => $paginate ? $customers : null,
+            'totalItems' => $paginate ? $customers->total() : $rows->count(),
+            'search' => $search,
+            'selectedStatus' => $status,
+            'selectedCustomerId' => $selectedCustomerId,
+            'selectedCustomer' => $selectedCustomer,
+            'customerOptions' => $customerOptions,
+            'semesterHeaders' => $activeSemesterCodes->map(fn (string $code): string => $this->semesterDescriptionLabel($code))->all(),
+            'semesterCodes' => $activeSemesterCodes->all(),
+            'totals' => [
+                'per_semester' => $totalsPerSemester,
+                'grand_total' => $grandTotal,
+            ],
+            'customerInvoiceRows' => $customerInvoiceRows,
+            'customerInvoiceTotal' => $customerInvoiceTotal,
+            'companyLogoPath' => $companySettings['companyLogoPath'] ?? null,
+            'companyName' => $companySettings['companyName'] ?? 'CV. PUSTAKA GRAFIKA',
+            'companyAddress' => $companySettings['companyAddress'] ?? '',
+            'companyPhone' => $companySettings['companyPhone'] ?? '',
+            'companyEmail' => $companySettings['companyEmail'] ?? '',
+            'companyInvoiceNotes' => $companySettings['companyInvoiceNotes'] ?? '',
+            'companyTransferAccounts' => $companySettings['companyTransferAccounts'] ?? '',
+        ];
+    }
+
     public function closeCustomerSemester(Request $request, Customer $customer): RedirectResponse
     {
         $data = $request->validate([
@@ -410,7 +988,7 @@ class ReceivablePageController extends Controller
             $notesText = PrintTextFormatter::wrapWords(trim((string) ($data['companyInvoiceNotes'] ?? '')), 4);
 
             $sheet->mergeCells('A1:F1');
-            $sheet->setCellValue('A1', __('receivable.customer_bill_title'));
+            $sheet->setCellValue('A1', (string) ($data['reportTitle'] ?? __('receivable.customer_bill_title')));
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->mergeCells('A2:B2');
@@ -684,6 +1262,142 @@ class ReceivablePageController extends Controller
         return $this->semesterBookService->previousSemester($period);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function semesterReceivableData(Request $request, bool $paginate = true): array
+    {
+        $search = trim((string) $request->string('search', ''));
+        $status = strtolower(trim((string) $request->string('status', 'all')));
+        if (! in_array($status, ['all', 'outstanding', 'paid', 'credit'], true)) {
+            $status = 'all';
+        }
+
+        $semesterOptions = Cache::remember(
+            AppCache::lookupCacheKey('receivables.semester_page.options'),
+            now()->addSeconds(60),
+            fn() => $this->semesterBookService->buildSemesterOptionCollection(
+                ReceivableLedger::query()
+                    ->whereNotNull('period_code')
+                    ->where('period_code', '!=', '')
+                    ->distinct()
+                    ->pluck('period_code')
+                    ->merge($this->semesterBookService->configuredSemesterOptions()),
+                false,
+                true
+            )->values()
+        );
+
+        $selectedSemester = trim((string) $request->string('semester', ''));
+        $selectedSemester = $selectedSemester !== ''
+            ? ($this->semesterBookService->normalizeSemester($selectedSemester) ?? '')
+            : '';
+        if ($selectedSemester === '' || ! $semesterOptions->contains($selectedSemester)) {
+            $selectedSemester = (string) ($semesterOptions->first() ?: $this->currentSemesterPeriod());
+        }
+
+        $ledgerAggregate = ReceivableLedger::query()
+            ->selectRaw("
+                customer_id,
+                COALESCE(SUM(debit), 0) as sales_total,
+                COALESCE(SUM(CASE WHEN lower(description) like '%retur%' OR lower(description) like '%return%' THEN credit ELSE 0 END), 0) as return_total,
+                COALESCE(SUM(CASE WHEN lower(description) like '%retur%' OR lower(description) like '%return%' THEN 0 ELSE credit END), 0) as payment_total,
+                COALESCE(SUM(debit - credit), 0) as outstanding_total
+            ")
+            ->where('period_code', $selectedSemester)
+            ->groupBy('customer_id');
+
+        $query = Customer::query()
+            ->leftJoinSub($ledgerAggregate, 'semester_ledger', function ($join): void {
+                $join->on('customers.id', '=', 'semester_ledger.customer_id');
+            })
+            ->leftJoin('customer_levels', 'customer_levels.id', '=', 'customers.customer_level_id')
+            ->select([
+                'customers.id',
+                'customers.name',
+                'customers.city',
+                'customers.address',
+                DB::raw('COALESCE(customer_levels.code, \'\') as level_code'),
+                DB::raw('COALESCE(customer_levels.name, \'\') as level_name'),
+                DB::raw('COALESCE(semester_ledger.sales_total, 0) as sales_total'),
+                DB::raw('COALESCE(semester_ledger.payment_total, 0) as payment_total'),
+                DB::raw('COALESCE(semester_ledger.return_total, 0) as return_total'),
+                DB::raw('COALESCE(semester_ledger.outstanding_total, 0) as outstanding_total'),
+            ])
+            ->when($search !== '', function ($builder) use ($search): void {
+                $builder->where(function ($subQuery) use ($search): void {
+                    $subQuery->where('customers.name', 'like', '%' . $search . '%')
+                        ->orWhere('customers.city', 'like', '%' . $search . '%')
+                        ->orWhere('customers.address', 'like', '%' . $search . '%');
+                });
+            })
+            ->when($status === 'outstanding', function ($builder): void {
+                $builder->whereRaw('COALESCE(semester_ledger.outstanding_total, 0) > 0');
+            })
+            ->when($status === 'paid', function ($builder): void {
+                $builder->whereRaw('COALESCE(semester_ledger.outstanding_total, 0) = 0');
+            })
+            ->when($status === 'credit', function ($builder): void {
+                $builder->whereRaw('COALESCE(semester_ledger.outstanding_total, 0) < 0');
+            })
+            ->orderBy('customers.name');
+
+        $totalQuery = clone $query;
+        $totalsRow = $totalQuery
+            ->selectRaw('
+                COALESCE(SUM(COALESCE(semester_ledger.sales_total, 0)), 0) as sales_total,
+                COALESCE(SUM(COALESCE(semester_ledger.payment_total, 0)), 0) as payment_total,
+                COALESCE(SUM(COALESCE(semester_ledger.return_total, 0)), 0) as return_total,
+                COALESCE(SUM(COALESCE(semester_ledger.outstanding_total, 0)), 0) as outstanding_total
+            ')
+            ->first();
+
+        $rows = $paginate
+            ? $query->paginate(10)->withQueryString()
+            : $query->get();
+
+        $rowCollection = $paginate ? collect($rows->items()) : collect($rows);
+
+        return [
+            'title' => __('receivable.semester_page_title'),
+            'semesterOptions' => $semesterOptions,
+            'selectedSemester' => $selectedSemester,
+            'selectedSemesterLabel' => $this->semesterDescriptionLabel($selectedSemester),
+            'selectedStatus' => $status,
+            'selectedStatusLabel' => match ($status) {
+                'outstanding' => __('receivable.semester_status_outstanding'),
+                'paid' => __('receivable.semester_status_paid'),
+                'credit' => __('receivable.semester_status_credit'),
+                default => __('receivable.semester_status_all'),
+            },
+            'search' => $search,
+            'rows' => $rowCollection->map(function ($row): array {
+                return [
+                    'id' => (int) $row->id,
+                    'name' => (string) ($row->name ?? ''),
+                    'city' => trim((string) ($row->city ?? '')) !== '' ? (string) $row->city : '-',
+                    'address' => trim((string) ($row->address ?? '')) !== '' ? (string) $row->address : '-',
+                    'level_label' => trim((string) ($row->level_code ?? '')) !== ''
+                        ? strtoupper(trim((string) $row->level_code))
+                        : strtoupper(trim((string) ($row->level_name ?? ''))),
+                    'sales_total' => (int) round((float) ($row->sales_total ?? 0)),
+                    'payment_total' => (int) round((float) ($row->payment_total ?? 0)),
+                    'return_total' => (int) round((float) ($row->return_total ?? 0)),
+                    'outstanding_total' => (int) round((float) ($row->outstanding_total ?? 0)),
+                ];
+            }),
+            'paginator' => $paginate ? $rows : null,
+            'totals' => [
+                'sales_total' => (int) round((float) ($totalsRow->sales_total ?? 0)),
+                'payment_total' => (int) round((float) ($totalsRow->payment_total ?? 0)),
+                'return_total' => (int) round((float) ($totalsRow->return_total ?? 0)),
+                'outstanding_total' => (int) round((float) ($totalsRow->outstanding_total ?? 0)),
+            ],
+            'printTitle' => 'DAFTAR PIUTANG ' . strtoupper($this->semesterDescriptionLabel($selectedSemester)),
+            'totalItems' => $paginate ? (int) $rows->total() : (int) $rowCollection->count(),
+        ];
+    }
+
     private function semesterDescriptionLabel(string $periodCode): string
     {
         if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $periodCode, $matches) === 1) {
@@ -709,6 +1423,32 @@ class ReceivablePageController extends Controller
             (int) $customer->id,
             $selectedSemester !== '' ? $selectedSemester : null
         );
+        $settings = $this->companyPrintSettings();
+
+        return [
+            'customer' => $customer,
+            'selectedSemester' => $selectedSemester !== '' ? $selectedSemester : null,
+            'selectedSemesterLabel' => $selectedSemester !== '' ? $this->semesterDescriptionLabel($selectedSemester) : null,
+            'reportTitle' => $this->customerBillReportTitle($customer, $selectedSemester !== '' ? $selectedSemester : null),
+            'rows' => $statementRows,
+            'totalOutstanding' => (int) round((float) $totals['running_balance']),
+            'totals' => $totals,
+            'schoolBreakdown' => $schoolBreakdown,
+            'companyLogoPath' => $settings['companyLogoPath'] ?? null,
+            'companyName' => $settings['companyName'] ?? 'CV. PUSTAKA GRAFIKA',
+            'companyAddress' => $settings['companyAddress'] ?? '',
+            'companyPhone' => $settings['companyPhone'] ?? '',
+            'companyEmail' => $settings['companyEmail'] ?? '',
+            'companyInvoiceNotes' => $settings['companyInvoiceNotes'] ?? '',
+            'companyTransferAccounts' => $settings['companyTransferAccounts'] ?? '',
+        ];
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    private function companyPrintSettings(): array
+    {
         $settings = AppSetting::getValues([
             'company_logo_path' => null,
             'company_name' => 'CV. PUSTAKA GRAFIKA',
@@ -716,23 +1456,30 @@ class ReceivablePageController extends Controller
             'company_phone' => '',
             'company_email' => '',
             'company_invoice_notes' => '',
+            'company_transfer_accounts' => '',
         ]);
 
         return [
-            'customer' => $customer,
-            'selectedSemester' => $selectedSemester !== '' ? $selectedSemester : null,
-            'selectedSemesterLabel' => $selectedSemester !== '' ? $this->semesterDescriptionLabel($selectedSemester) : null,
-            'rows' => $statementRows,
-            'totalOutstanding' => (int) round((float) $totals['running_balance']),
-            'totals' => $totals,
-            'schoolBreakdown' => $schoolBreakdown,
             'companyLogoPath' => $settings['company_logo_path'] ?? null,
             'companyName' => trim((string) ($settings['company_name'] ?? 'CV. PUSTAKA GRAFIKA')),
             'companyAddress' => trim((string) ($settings['company_address'] ?? '')),
             'companyPhone' => trim((string) ($settings['company_phone'] ?? '')),
             'companyEmail' => trim((string) ($settings['company_email'] ?? '')),
             'companyInvoiceNotes' => trim((string) ($settings['company_invoice_notes'] ?? '')),
+            'companyTransferAccounts' => trim((string) ($settings['company_transfer_accounts'] ?? __('receivable.default_transfer_accounts'))),
         ];
+    }
+
+    private function customerBillReportTitle(Customer $customer, ?string $selectedSemester): string
+    {
+        $customerName = trim((string) $customer->name);
+        $namePart = $customerName !== '' ? $customerName : 'Customer';
+
+        if ($selectedSemester !== null) {
+            return sprintf('Rekap Piutang %s %s', $namePart, strtoupper($selectedSemester));
+        }
+
+        return sprintf('Rekap Piutang %s', $namePart);
     }
 
     private function normalizeSemester(string $semester): string

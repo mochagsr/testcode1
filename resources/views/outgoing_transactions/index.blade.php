@@ -257,42 +257,6 @@
                     <div style="margin-top: 10px;">{{ $supplierRecap->links() }}</div>
                 </div>
             </div>
-            @if(auth()->user()->role === 'admin' && $selectedYear && $selectedSupplierId)
-                @php
-                    $selectedSupplier = $supplierOptions->firstWhere('id', $selectedSupplierId);
-                @endphp
-                @if($selectedSupplier)
-                    <div class="card">
-                        <div class="form-section">
-                            <h3 class="form-section-title">{{ __('txn.supplier_semester_book_title') }}</h3>
-                            <p class="form-section-note">{{ __('txn.supplier_semester_status') }}: {{ $selectedSupplier->name }} / {{ $selectedYear }}</p>
-                            @if($selectedSupplierYearClosed)
-                                <span class="badge danger">{{ __('txn.supplier_semester_closed') }}</span>
-                                <form method="post" action="{{ route('outgoing-transactions.supplier-semester.open', ['supplier' => $selectedSupplierId]) }}" style="margin-top: 10px;">
-                                    @csrf
-                                    <input type="hidden" name="year" value="{{ $selectedYear }}">
-                                    <input type="hidden" name="search" value="{{ $search }}">
-                                    <input type="hidden" name="semester" value="{{ $selectedSemester }}">
-                                    <input type="hidden" name="transaction_date" value="{{ $selectedTransactionDate }}">
-                                    <input type="hidden" name="supplier_id" value="{{ $selectedSupplierId }}">
-                                    <button class="btn warning-btn" type="submit">{{ __('txn.supplier_semester_open_button') }}</button>
-                                </form>
-                            @else
-                                <span class="badge success">{{ __('txn.supplier_semester_open') }}</span>
-                                <form method="post" action="{{ route('outgoing-transactions.supplier-semester.close', ['supplier' => $selectedSupplierId]) }}" style="margin-top: 10px;">
-                                    @csrf
-                                    <input type="hidden" name="year" value="{{ $selectedYear }}">
-                                    <input type="hidden" name="search" value="{{ $search }}">
-                                    <input type="hidden" name="semester" value="{{ $selectedSemester }}">
-                                    <input type="hidden" name="transaction_date" value="{{ $selectedTransactionDate }}">
-                                    <input type="hidden" name="supplier_id" value="{{ $selectedSupplierId }}">
-                                    <button class="btn warning-btn" type="submit">{{ __('txn.supplier_semester_close_button') }}</button>
-                                </form>
-                            @endif
-                        </div>
-                    </div>
-                @endif
-            @endif
         </div>
     </div>
 

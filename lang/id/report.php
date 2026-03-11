@@ -45,6 +45,7 @@ return [
         'type' => 'Tipe',
     ],
     'columns' => [
+        'no' => 'No',
         'invoice_no' => 'No Faktur',
         'return_no' => 'No Retur',
         'note_no' => 'No Surat',

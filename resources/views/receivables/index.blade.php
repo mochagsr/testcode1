@@ -384,7 +384,7 @@
                 $activeSemesterForReport = $selectedSemester ?: $currentSemester;
             @endphp
             <div style="flex:1 1 460px; min-width:320px;">
-                <div class="muted" style="margin-bottom:8px; font-weight:600;">{{ __('receivable.print_options_title') }}</div>
+                <div class="muted" style="margin-bottom:8px; font-weight:600; text-align:right;">{{ __('receivable.print_options_title') }}</div>
                 <div style="display:grid; gap:8px;">
                     <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
                         <span>{{ __('receivable.report_all_unpaid') }}</span>

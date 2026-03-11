@@ -152,10 +152,16 @@ class SemesterBookService
             return $this->closedSupplierSemestersCache;
         }
 
-        $this->closedSupplierSemestersCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_supplier_year_periods', '')) ?: [])
+        $rawValues = collect([
+            (string) AppSetting::getValue('closed_supplier_year_periods', ''),
+            (string) AppSetting::getValue('closed_supplier_semester_periods', ''),
+        ])->implode(',');
+
+        $this->closedSupplierSemestersCache = collect(preg_split('/[\r\n,]+/', $rawValues) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->map(fn (string $item): ?string => $this->normalizeSupplierYearKey($item))
             ->filter(fn (?string $item): bool => $item !== null)
+            ->unique()
             ->values()
             ->all();
 
@@ -851,12 +857,24 @@ class SemesterBookService
 
     private function normalizeSupplierYearKey(string $value): ?string
     {
-        if (preg_match('/^(\d+)\s*[:|]\s*(\d{4})$/', trim($value), $matches) !== 1) {
+        $trimmed = trim($value);
+        if (preg_match('/^(\d+)\s*[:|]\s*(\d{4})$/', $trimmed, $matches) === 1) {
+            $supplierId = (int) $matches[1];
+            $year = $this->normalizeYear((string) $matches[2]);
+            if ($supplierId <= 0 || $year === null) {
+                return null;
+            }
+
+            return $this->supplierYearKey($supplierId, $year);
+        }
+
+        if (preg_match('/^(\d+)\s*[:|]\s*(S[12]-\d{4})$/i', $trimmed, $matches) !== 1) {
             return null;
         }
 
         $supplierId = (int) $matches[1];
-        $year = $this->normalizeYear((string) $matches[2]);
+        $semester = $this->normalizeSemester((string) $matches[2]);
+        $year = $semester !== null ? $this->yearFromSemester($semester) : null;
         if ($supplierId <= 0 || $year === null) {
             return null;
         }
@@ -867,6 +885,19 @@ class SemesterBookService
     private function supplierYearKey(int $supplierId, string $year): string
     {
         return $supplierId.':'.$year;
+    }
+
+    private function yearFromSemester(string $semester): ?string
+    {
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $semester, $matches) !== 1) {
+            return null;
+        }
+
+        $part = (int) $matches[1];
+        $startYear = 2000 + (int) $matches[2];
+        $endYear = 2000 + (int) $matches[3];
+
+        return (string) ($part === 1 ? $startYear : $endYear);
     }
 
     private function invalidateSemesterCaches(): void

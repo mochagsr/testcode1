@@ -19,6 +19,7 @@ use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,104 +41,23 @@ class SupplierPayablePageController extends Controller
 
     public function index(Request $request): View
     {
-        $search = trim((string) $request->string('search', ''));
-        $selectedYear = $this->semesterBookService->normalizeYear((string) $request->string('year', ''));
-        $supplierId = $request->integer('supplier_id');
-        $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
-
-        $suppliers = Supplier::query()
-            ->onlyListColumns()
-            ->searchKeyword($search)
-            ->orderBy('name')
-            ->paginate(20)
-            ->withQueryString();
-
-        $selectedSupplier = $selectedSupplierId
-            ? Supplier::query()->onlyListColumns()->find($selectedSupplierId)
-            : null;
-
-        $ledgerRows = collect();
-        $supplierPaymentAdminEditedMap = [];
-        $outgoingTransactionAdminEditedMap = [];
-        $totalDebit = 0;
-        $totalCredit = 0;
-        $mutationBalance = 0;
-        $finalOutstanding = 0;
-        if ($selectedSupplier !== null) {
-            $ledgerRows = SupplierLedger::query()
-                ->forSupplier((int) $selectedSupplier->id)
-                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
-                ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
-                ->orderByDate()
-                ->limit(500)
-                ->get();
-
-            $totalDebit = (int) round((float) $ledgerRows->sum('debit'));
-            $totalCredit = (int) round((float) $ledgerRows->sum('credit'));
-            $mutationBalance = $totalDebit - $totalCredit;
-            $finalOutstanding = (int) ($selectedSupplier->outstanding_payable ?? 0);
-
-            $supplierPaymentIds = $ledgerRows
-                ->pluck('supplier_payment_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
-                ->unique()
-                ->values();
-            if ($supplierPaymentIds->isNotEmpty()) {
-                $paymentRows = AuditLog::query()
-                    ->selectRaw("subject_id, MAX(CASE WHEN action = 'supplier.payment.admin_update' THEN 1 ELSE 0 END) as edited")
-                    ->where('subject_type', SupplierPayment::class)
-                    ->whereIn('subject_id', $supplierPaymentIds->all())
-                    ->where('action', 'supplier.payment.admin_update')
-                    ->groupBy('subject_id')
-                    ->get();
-                foreach ($paymentRows as $row) {
-                    $paymentId = (int) ($row->subject_id ?? 0);
-                    if ($paymentId <= 0) {
-                        continue;
-                    }
-                    $supplierPaymentAdminEditedMap[$paymentId] = (int) ($row->edited ?? 0) === 1;
-                }
-            }
-
-            $outgoingTransactionIds = $ledgerRows
-                ->pluck('outgoing_transaction_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
-                ->unique()
-                ->values();
-            if ($outgoingTransactionIds->isNotEmpty()) {
-                $outgoingRows = AuditLog::query()
-                    ->selectRaw("subject_id, MAX(CASE WHEN action = 'outgoing.transaction.admin_update' THEN 1 ELSE 0 END) as edited")
-                    ->where('subject_type', OutgoingTransaction::class)
-                    ->whereIn('subject_id', $outgoingTransactionIds->all())
-                    ->where('action', 'outgoing.transaction.admin_update')
-                    ->groupBy('subject_id')
-                    ->get();
-                foreach ($outgoingRows as $row) {
-                    $outgoingId = (int) ($row->subject_id ?? 0);
-                    if ($outgoingId <= 0) {
-                        continue;
-                    }
-                    $outgoingTransactionAdminEditedMap[$outgoingId] = (int) ($row->edited ?? 0) === 1;
-                }
-            }
-        }
+        $pageData = $this->buildIndexData($request);
 
         return view('supplier_payables.index', [
-            'suppliers' => $suppliers,
-            'selectedSupplier' => $selectedSupplier,
-            'selectedSupplierId' => $selectedSupplierId,
-            'ledgerRows' => $ledgerRows,
-            'selectedYear' => $selectedYear,
-            'search' => $search,
+            'suppliers' => $pageData['suppliers'],
+            'selectedSupplier' => $pageData['selectedSupplier'],
+            'selectedSupplierId' => $pageData['selectedSupplierId'],
+            'ledgerRows' => $pageData['ledgerRows'],
+            'selectedYear' => $pageData['selectedYear'],
+            'search' => $pageData['search'],
             'yearOptions' => $this->supplierYearOptions(),
-            'supplierPaymentAdminEditedMap' => $supplierPaymentAdminEditedMap,
-            'outgoingTransactionAdminEditedMap' => $outgoingTransactionAdminEditedMap,
-            'totalDebit' => $totalDebit,
-            'totalCredit' => $totalCredit,
-            'mutationBalance' => $mutationBalance,
-            'finalOutstanding' => $finalOutstanding,
+            'supplierPaymentAdminEditedMap' => $pageData['supplierPaymentAdminEditedMap'],
+            'outgoingTransactionAdminEditedMap' => $pageData['outgoingTransactionAdminEditedMap'],
+            'totalDebit' => $pageData['totalDebit'],
+            'totalCredit' => $pageData['totalCredit'],
+            'mutationBalance' => $pageData['mutationBalance'],
+            'finalOutstanding' => $pageData['finalOutstanding'],
+            'selectedSupplierYearClosed' => $pageData['selectedSupplierYearClosed'],
         ]);
     }
 
@@ -178,7 +98,7 @@ class SupplierPayablePageController extends Controller
             ? $request->file('payment_proof_photo')->store('supplier_payment_proofs', 'public')
             : null;
 
-        $payment = DB::transaction(function () use ($data, $semester, $request, $paymentProofPhotoPath): SupplierPayment {
+        $payment = DB::transaction(function () use ($data, $request, $paymentProofPhotoPath): SupplierPayment {
             $supplier = Supplier::query()->lockForUpdate()->findOrFail((int) $data['supplier_id']);
             $amount = (int) $data['amount'];
             $beforeOutstanding = (int) $supplier->outstanding_payable;
@@ -235,6 +155,165 @@ class SupplierPayablePageController extends Controller
         return redirect()
             ->route('supplier-payables.show-payment', $payment)
             ->with('success', __('supplier_payable.payment_saved'));
+    }
+
+    public function closeYear(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'year' => ['required', 'digits:4'],
+            'search' => ['nullable', 'string'],
+        ]);
+
+        $normalizedYear = $this->semesterBookService->normalizeYear((string) $data['year']);
+        if ($normalizedYear === null) {
+            return back()->with('error', __('supplier_payable.invalid_year'));
+        }
+
+        $this->semesterBookService->closeSupplierYear((int) $data['supplier_id'], $normalizedYear);
+
+        return redirect()
+            ->route('supplier-payables.index', [
+                'supplier_id' => (int) $data['supplier_id'],
+                'year' => $normalizedYear,
+                'search' => trim((string) ($data['search'] ?? '')),
+            ])
+            ->with('success', __('supplier_payable.year_closed_success', ['year' => $normalizedYear]));
+    }
+
+    public function openYear(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'year' => ['required', 'digits:4'],
+            'search' => ['nullable', 'string'],
+        ]);
+
+        $normalizedYear = $this->semesterBookService->normalizeYear((string) $data['year']);
+        if ($normalizedYear === null) {
+            return back()->with('error', __('supplier_payable.invalid_year'));
+        }
+
+        $this->semesterBookService->openSupplierYear((int) $data['supplier_id'], $normalizedYear);
+
+        return redirect()
+            ->route('supplier-payables.index', [
+                'supplier_id' => (int) $data['supplier_id'],
+                'year' => $normalizedYear,
+                'search' => trim((string) ($data['search'] ?? '')),
+            ])
+            ->with('success', __('supplier_payable.year_opened_success', ['year' => $normalizedYear]));
+    }
+
+    public function printReport(Request $request): View
+    {
+        return view('supplier_payables.report', $this->buildReportData($request) + ['isPdf' => false]);
+    }
+
+    public function exportReportPdf(Request $request)
+    {
+        $data = $this->buildReportData($request);
+        $pdf = Pdf::loadView('supplier_payables.report', $data + ['isPdf' => true])->setPaper('a4', 'portrait');
+
+        return $pdf->download($this->buildReportFileName($data).'.pdf');
+    }
+
+    public function exportReportExcel(Request $request): StreamedResponse
+    {
+        $data = $this->buildReportData($request);
+        $filename = $this->buildReportFileName($data).'.xlsx';
+
+        return response()->streamDownload(function () use ($data): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Hutang Supplier');
+
+            $sheet->mergeCells('A1:F1');
+            $sheet->setCellValue('A1', __('supplier_payable.report_title'));
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(15);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $metaRows = [
+                [__('txn.supplier'), $data['selectedSupplier']?->name ?: __('supplier_payable.all_suppliers')],
+                [__('supplier_payable.year_label'), $data['selectedYear'] ?: __('supplier_payable.all_years')],
+                [__('txn.date'), now()->format('d-m-Y H:i:s')],
+            ];
+            $metaStartRow = 3;
+            foreach ($metaRows as $offset => [$label, $value]) {
+                $row = $metaStartRow + $offset;
+                $sheet->setCellValue('A'.$row, $label);
+                $sheet->setCellValue('B'.$row, $value);
+            }
+            $sheet->getStyle('A'.$metaStartRow.':A'.($metaStartRow + count($metaRows) - 1))->getFont()->setBold(true);
+
+            $summaryHeaderRow = 8;
+            $sheet->fromArray([[
+                __('txn.supplier'),
+                __('supplier_payable.outstanding'),
+                __('receivable.total_debit'),
+                __('receivable.total_credit'),
+                __('supplier_payable.final_outstanding'),
+            ]], null, 'A'.$summaryHeaderRow);
+
+            $summaryRows = $data['summarySuppliers']->map(fn (Supplier $supplier): array => [
+                (string) $supplier->name,
+                'Rp '.number_format((int) ($supplier->outstanding_payable ?? 0), 0, ',', '.'),
+                'Rp '.number_format((int) ($data['summaryDebitMap'][(int) $supplier->id] ?? 0), 0, ',', '.'),
+                'Rp '.number_format((int) ($data['summaryCreditMap'][(int) $supplier->id] ?? 0), 0, ',', '.'),
+                'Rp '.number_format((int) ($data['summaryBalanceMap'][(int) $supplier->id] ?? 0), 0, ',', '.'),
+            ])->all();
+
+            if ($summaryRows !== []) {
+                $sheet->fromArray($summaryRows, null, 'A'.($summaryHeaderRow + 1));
+            }
+            ExcelExportStyler::styleTable($sheet, $summaryHeaderRow, 5, count($summaryRows), true);
+
+            if ($data['selectedSupplier'] !== null) {
+                $ledgerHeaderRow = $summaryHeaderRow + max(3, count($summaryRows) + 3);
+                $sheet->mergeCells('A'.$ledgerHeaderRow.':F'.$ledgerHeaderRow);
+                $sheet->setCellValue('A'.$ledgerHeaderRow, __('supplier_payable.mutation'));
+                $sheet->getStyle('A'.$ledgerHeaderRow)->getFont()->setBold(true);
+
+                $ledgerTableHeaderRow = $ledgerHeaderRow + 1;
+                $sheet->fromArray([[
+                    __('txn.date'),
+                    __('receivable.description'),
+                    __('receivable.debit'),
+                    __('receivable.credit'),
+                    __('receivable.balance'),
+                    __('txn.type'),
+                ]], null, 'A'.$ledgerTableHeaderRow);
+
+                $ledgerRows = $data['ledgerRows']->map(function (SupplierLedger $row): array {
+                    $type = $row->supplier_payment_id ? __('supplier_payable.pay') : __('txn.outgoing_transactions_title');
+
+                    return [
+                        $row->entry_date?->format('d-m-Y') ?: '-',
+                        (string) ($row->description ?: '-'),
+                        'Rp '.number_format((int) $row->debit, 0, ',', '.'),
+                        'Rp '.number_format((int) $row->credit, 0, ',', '.'),
+                        'Rp '.number_format((int) $row->balance_after, 0, ',', '.'),
+                        $type,
+                    ];
+                })->all();
+
+                if ($ledgerRows !== []) {
+                    $sheet->fromArray($ledgerRows, null, 'A'.($ledgerTableHeaderRow + 1));
+                }
+                ExcelExportStyler::styleTable($sheet, $ledgerTableHeaderRow, 6, count($ledgerRows), true);
+            }
+
+            foreach (range('A', 'F') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     public function showPayment(SupplierPayment $supplierPayment): View
@@ -363,7 +442,7 @@ class SupplierPayablePageController extends Controller
             $sheet->setTitle('Kwitansi');
 
             $settings = AppSetting::getValues([
-                'company_name' => 'CV. PUSTAKA GRAFIKA',
+                'company_name' => '',
                 'company_address' => '',
                 'company_phone' => '',
                 'company_email' => '',
@@ -385,7 +464,7 @@ class SupplierPayablePageController extends Controller
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             $sheet->mergeCells('A2:B2');
-            $sheet->setCellValue('A2', trim((string) ($settings['company_name'] ?? 'CV. PUSTAKA GRAFIKA')));
+            $sheet->setCellValue('A2', trim((string) ($settings['company_name'] ?? '')));
             $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(13);
             $sheet->mergeCells('A3:B5');
             $sheet->setCellValue('A3', $companyDetail !== '' ? $companyDetail : '-');
@@ -504,7 +583,7 @@ class SupplierPayablePageController extends Controller
     /**
      * @return \Illuminate\Support\Collection<int, string>
      */
-    private function supplierYearOptions(): \Illuminate\Support\Collection
+    private function supplierYearOptions(): Collection
     {
         return SupplierLedger::query()
             ->whereNotNull('entry_date')
@@ -515,5 +594,224 @@ class SupplierPayablePageController extends Controller
             ->unique()
             ->sort()
             ->values();
+    }
+
+    /**
+     * @return array{
+     *   suppliers:\Illuminate\Contracts\Pagination\LengthAwarePaginator,
+     *   selectedSupplier:?Supplier,
+     *   selectedSupplierId:?int,
+     *   ledgerRows:Collection<int, SupplierLedger>,
+     *   selectedYear:?string,
+     *   search:string,
+     *   supplierPaymentAdminEditedMap:array<int,bool>,
+     *   outgoingTransactionAdminEditedMap:array<int,bool>,
+     *   totalDebit:int,
+     *   totalCredit:int,
+     *   mutationBalance:int,
+     *   finalOutstanding:int,
+     *   selectedSupplierYearClosed:bool
+     * }
+     */
+    private function buildIndexData(Request $request): array
+    {
+        $search = trim((string) $request->string('search', ''));
+        $selectedYear = $this->semesterBookService->normalizeYear((string) $request->string('year', ''));
+        $supplierId = $request->integer('supplier_id');
+        $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
+
+        $suppliers = Supplier::query()
+            ->onlyListColumns()
+            ->searchKeyword($search)
+            ->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
+
+        $selectedSupplier = $selectedSupplierId
+            ? Supplier::query()->onlyListColumns()->find($selectedSupplierId)
+            : null;
+
+        $ledgerRows = collect();
+        $supplierPaymentAdminEditedMap = [];
+        $outgoingTransactionAdminEditedMap = [];
+        $totalDebit = 0;
+        $totalCredit = 0;
+        $mutationBalance = 0;
+        $finalOutstanding = 0;
+        $selectedSupplierYearClosed = false;
+        if ($selectedSupplier !== null) {
+            $ledgerRows = SupplierLedger::query()
+                ->forSupplier((int) $selectedSupplier->id)
+                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
+                ->orderByDate()
+                ->limit(500)
+                ->get();
+
+            $totalDebit = (int) round((float) $ledgerRows->sum('debit'));
+            $totalCredit = (int) round((float) $ledgerRows->sum('credit'));
+            $mutationBalance = $totalDebit - $totalCredit;
+            $finalOutstanding = $selectedYear !== null ? $mutationBalance : (int) ($selectedSupplier->outstanding_payable ?? 0);
+            $selectedSupplierYearClosed = $selectedYear !== null
+                && $this->semesterBookService->isSupplierYearClosed((int) $selectedSupplier->id, $selectedYear);
+
+            $supplierPaymentIds = $ledgerRows
+                ->pluck('supplier_payment_id')
+                ->map(fn($id): int => (int) $id)
+                ->filter(fn(int $id): bool => $id > 0)
+                ->unique()
+                ->values();
+            if ($supplierPaymentIds->isNotEmpty()) {
+                $paymentRows = AuditLog::query()
+                    ->selectRaw("subject_id, MAX(CASE WHEN action = 'supplier.payment.admin_update' THEN 1 ELSE 0 END) as edited")
+                    ->where('subject_type', SupplierPayment::class)
+                    ->whereIn('subject_id', $supplierPaymentIds->all())
+                    ->where('action', 'supplier.payment.admin_update')
+                    ->groupBy('subject_id')
+                    ->get();
+                foreach ($paymentRows as $row) {
+                    $paymentId = (int) ($row->subject_id ?? 0);
+                    if ($paymentId <= 0) {
+                        continue;
+                    }
+                    $supplierPaymentAdminEditedMap[$paymentId] = (int) ($row->edited ?? 0) === 1;
+                }
+            }
+
+            $outgoingTransactionIds = $ledgerRows
+                ->pluck('outgoing_transaction_id')
+                ->map(fn($id): int => (int) $id)
+                ->filter(fn(int $id): bool => $id > 0)
+                ->unique()
+                ->values();
+            if ($outgoingTransactionIds->isNotEmpty()) {
+                $outgoingRows = AuditLog::query()
+                    ->selectRaw("subject_id, MAX(CASE WHEN action = 'outgoing.transaction.admin_update' THEN 1 ELSE 0 END) as edited")
+                    ->where('subject_type', OutgoingTransaction::class)
+                    ->whereIn('subject_id', $outgoingTransactionIds->all())
+                    ->where('action', 'outgoing.transaction.admin_update')
+                    ->groupBy('subject_id')
+                    ->get();
+                foreach ($outgoingRows as $row) {
+                    $outgoingId = (int) ($row->subject_id ?? 0);
+                    if ($outgoingId <= 0) {
+                        continue;
+                    }
+                    $outgoingTransactionAdminEditedMap[$outgoingId] = (int) ($row->edited ?? 0) === 1;
+                }
+            }
+        }
+
+        return compact(
+            'suppliers',
+            'selectedSupplier',
+            'selectedSupplierId',
+            'ledgerRows',
+            'selectedYear',
+            'search',
+            'supplierPaymentAdminEditedMap',
+            'outgoingTransactionAdminEditedMap',
+            'totalDebit',
+            'totalCredit',
+            'mutationBalance',
+            'finalOutstanding',
+            'selectedSupplierYearClosed',
+        );
+    }
+
+    /**
+     * @return array{
+     *   search:string,
+     *   selectedYear:?string,
+     *   selectedSupplierId:?int,
+     *   selectedSupplier:?Supplier,
+     *   summarySuppliers:Collection<int,Supplier>,
+     *   summaryDebitMap:array<int,int>,
+     *   summaryCreditMap:array<int,int>,
+     *   summaryBalanceMap:array<int,int>,
+     *   totalOutstanding:int,
+     *   ledgerRows:Collection<int,SupplierLedger>
+     * }
+     */
+    private function buildReportData(Request $request): array
+    {
+        $search = trim((string) $request->string('search', ''));
+        $selectedYear = $this->semesterBookService->normalizeYear((string) $request->string('year', ''));
+        $selectedSupplierId = $request->integer('supplier_id') ?: null;
+
+        $summarySuppliers = Supplier::query()
+            ->onlyListColumns()
+            ->searchKeyword($search)
+            ->when($selectedSupplierId, fn($query) => $query->whereKey($selectedSupplierId))
+            ->orderBy('name')
+            ->get();
+
+        $selectedSupplier = $selectedSupplierId
+            ? $summarySuppliers->firstWhere('id', $selectedSupplierId)
+            : null;
+
+        $supplierIds = $summarySuppliers->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $ledgerAggregateRows = collect();
+        if ($supplierIds !== []) {
+            $ledgerAggregateRows = SupplierLedger::query()
+                ->whereIn('supplier_id', $supplierIds)
+                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->selectRaw('supplier_id, COALESCE(SUM(debit), 0) as total_debit, COALESCE(SUM(credit), 0) as total_credit')
+                ->groupBy('supplier_id')
+                ->get();
+        }
+
+        $summaryDebitMap = [];
+        $summaryCreditMap = [];
+        $summaryBalanceMap = [];
+        foreach ($ledgerAggregateRows as $row) {
+            $supplierId = (int) $row->supplier_id;
+            $debit = (int) round((float) $row->total_debit);
+            $credit = (int) round((float) $row->total_credit);
+            $summaryDebitMap[$supplierId] = $debit;
+            $summaryCreditMap[$supplierId] = $credit;
+            $summaryBalanceMap[$supplierId] = $debit - $credit;
+        }
+
+        $totalOutstanding = $selectedYear !== null
+            ? (int) array_sum($summaryBalanceMap)
+            : (int) $summarySuppliers->sum(fn(Supplier $supplier): int => (int) ($supplier->outstanding_payable ?? 0));
+
+        $ledgerRows = collect();
+        if ($selectedSupplier !== null) {
+            $ledgerRows = SupplierLedger::query()
+                ->forSupplier((int) $selectedSupplier->id)
+                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
+                ->orderByDate()
+                ->limit(500)
+                ->get();
+        }
+
+        return compact(
+            'search',
+            'selectedYear',
+            'selectedSupplierId',
+            'selectedSupplier',
+            'summarySuppliers',
+            'summaryDebitMap',
+            'summaryCreditMap',
+            'summaryBalanceMap',
+            'totalOutstanding',
+            'ledgerRows',
+        );
+    }
+
+    /**
+     * @param array{selectedSupplier:?Supplier,selectedYear:?string} $data
+     */
+    private function buildReportFileName(array $data): string
+    {
+        $supplierPart = $data['selectedSupplier']?->name
+            ? preg_replace('/[^A-Za-z0-9\-]+/', '-', strtolower((string) $data['selectedSupplier']->name))
+            : 'semua-supplier';
+        $yearPart = $data['selectedYear'] ?: 'semua-tahun';
+
+        return 'hutang-supplier-'.$supplierPart.'-'.$yearPart;
     }
 }

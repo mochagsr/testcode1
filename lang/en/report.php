@@ -38,6 +38,7 @@ return [
         'type' => 'Type',
     ],
     'columns' => [
+        'no' => 'No',
         'invoice_no' => 'Invoice No',
         'return_no' => 'Return No',
         'note_no' => 'Note No',

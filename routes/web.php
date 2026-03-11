@@ -141,6 +141,14 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         ->name('outgoing-transactions.supplier-semester.open');
 
     Route::get('/receivables', [ReceivablePageController::class, 'index'])->middleware('perm:receivables.view')->name('receivables.index');
+    Route::get('/receivables/global', [ReceivablePageController::class, 'globalIndex'])->middleware('perm:receivables.view')->name('receivables.global.index');
+    Route::get('/receivables/global/print', [ReceivablePageController::class, 'globalPrint'])->middleware('perm:receivables.view')->name('receivables.global.print');
+    Route::get('/receivables/global/pdf', [ReceivablePageController::class, 'globalExportPdf'])->middleware('perm:receivables.view')->name('receivables.global.export.pdf');
+    Route::get('/receivables/global/excel', [ReceivablePageController::class, 'globalExportExcel'])->middleware('perm:receivables.view')->name('receivables.global.export.excel');
+    Route::get('/receivables/semester', [ReceivablePageController::class, 'semesterIndex'])->middleware('perm:receivables.view')->name('receivables.semester.index');
+    Route::get('/receivables/semester/print', [ReceivablePageController::class, 'semesterPrint'])->middleware('perm:receivables.view')->name('receivables.semester.print');
+    Route::get('/receivables/semester/pdf', [ReceivablePageController::class, 'semesterExportPdf'])->middleware('perm:receivables.view')->name('receivables.semester.export.pdf');
+    Route::get('/receivables/semester/excel', [ReceivablePageController::class, 'semesterExportExcel'])->middleware('perm:receivables.view')->name('receivables.semester.export.excel');
     Route::get('/receivables/customer/{customer}/print-bill', [ReceivablePageController::class, 'printCustomerBill'])
         ->middleware('perm:receivables.view')
         ->name('receivables.print-customer-bill');
@@ -229,12 +237,21 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/suppliers/{supplier}/edit', [SupplierPageController::class, 'edit'])->middleware('perm:masters.suppliers.edit')->name('suppliers.edit');
     Route::put('/suppliers/{supplier}', [SupplierPageController::class, 'update'])->middleware('perm:masters.suppliers.edit')->name('suppliers.update');
     Route::get('/supplier-payables', [SupplierPayablePageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-payables.index');
+    Route::get('/supplier-payables/print', [SupplierPayablePageController::class, 'printReport'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print');
+    Route::get('/supplier-payables/pdf', [SupplierPayablePageController::class, 'exportReportPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export.pdf');
+    Route::get('/supplier-payables/excel', [SupplierPayablePageController::class, 'exportReportExcel'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export.excel');
     Route::get('/supplier-stock-cards', [SupplierStockCardPageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.index');
     Route::post('/supplier-stock-cards/update-stock', [SupplierStockCardPageController::class, 'updateStock'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.update-stock');
     Route::get('/supplier-payables/create', [SupplierPayablePageController::class, 'create'])->middleware('perm:supplier_payables.pay')->name('supplier-payables.create');
     Route::post('/supplier-payables', [SupplierPayablePageController::class, 'store'])
         ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
         ->name('supplier-payables.store');
+    Route::post('/supplier-payables/year-close', [SupplierPayablePageController::class, 'closeYear'])
+        ->middleware(['admin', 'perm:supplier_payables.adjust'])
+        ->name('supplier-payables.year-close');
+    Route::post('/supplier-payables/year-open', [SupplierPayablePageController::class, 'openYear'])
+        ->middleware(['admin', 'perm:supplier_payables.adjust'])
+        ->name('supplier-payables.year-open');
     Route::get('/supplier-payables/payment/{supplierPayment}', [SupplierPayablePageController::class, 'showPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.show-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/print', [SupplierPayablePageController::class, 'printPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/pdf', [SupplierPayablePageController::class, 'exportPaymentPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-pdf');

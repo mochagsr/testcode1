@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ __('receivable.customer_bill_title') }} - {{ $customer->name }}</title>
+    <title>{{ $reportTitle ?? __('receivable.customer_bill_title') }} - {{ $customer->name }}</title>
     <style>
         @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
@@ -95,7 +95,8 @@
             </div>
         </div>
         <div class="doc-center">
-            <div class="doc-title">{{ __('receivable.customer_bill_title') }}</div>
+            <div class="doc-title">{{ $reportTitle ?? __('receivable.customer_bill_title') }}</div>
+            <div class="doc-number">{{ __('receivable.customer_bill_title') }}</div>
             <div class="doc-number">{{ __('txn.no') }}: {{ $customer->code ?: $customer->id }}</div>
         </div>
         <div class="doc-right">
@@ -113,12 +114,12 @@
     <table>
         <thead>
         <tr>
-            <th style="width: 14%;">{{ __('receivable.bill_date') }}</th>
-            <th style="width: 24%;">{{ __('receivable.bill_proof_number') }}</th>
-            <th style="width: 14%;">{{ __('receivable.bill_credit_sales') }}</th>
-            <th style="width: 14%;">{{ __('receivable.bill_installment_payment') }}</th>
-            <th style="width: 14%;">{{ __('receivable.bill_sales_return') }}</th>
-            <th style="width: 20%;">{{ __('receivable.bill_running_balance') }}</th>
+            <th style="width: 12%;">{{ __('receivable.bill_date') }}</th>
+            <th style="width: 30%;">{{ __('receivable.bill_proof_number') }}</th>
+            <th style="width: 12%;">{{ __('receivable.bill_credit_sales') }}</th>
+            <th style="width: 12%;">{{ __('receivable.bill_installment_payment') }}</th>
+            <th style="width: 12%;">{{ __('receivable.bill_sales_return') }}</th>
+            <th style="width: 15%;">{{ __('receivable.bill_running_balance') }}</th>
         </tr>
         </thead>
         <tbody>

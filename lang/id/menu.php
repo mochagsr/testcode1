@@ -17,6 +17,8 @@ return [
     'outgoing_transactions' => 'Tanda Terima Barang',
     'receivables' => 'Piutang',
     'receivable_ledger' => 'Piutang',
+    'receivable_semester' => 'Piutang Semester',
+    'receivable_global' => 'Piutang Global',
     'receivable_payments' => 'Bayar Piutang',
     'school_distribution' => 'Distribusi Sekolah',
     'ship_locations' => 'Lokasi Kirim Sekolah',

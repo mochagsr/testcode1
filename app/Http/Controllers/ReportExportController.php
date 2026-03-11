@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryTrip;
 use App\Models\OutgoingTransaction;
 use App\Models\OrderNote;
 use App\Models\Product;
+use App\Models\ReceivableLedger;
 use App\Models\ReportExportTask;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
@@ -340,6 +342,7 @@ class ReportExportController extends Controller
             'filters' => $report['filters'],
             'layout' => $report['layout'] ?? null,
             'receivableSemesterHeaders' => $report['receivable_semester_headers'] ?? [],
+            'receivableCustomerDetail' => $report['receivable_customer_detail'] ?? null,
             'printedAt' => $printedAt,
         ]);
     }
@@ -367,6 +370,7 @@ class ReportExportController extends Controller
             'filters' => $report['filters'],
             'layout' => $report['layout'] ?? null,
             'receivableSemesterHeaders' => $report['receivable_semester_headers'] ?? [],
+            'receivableCustomerDetail' => $report['receivable_customer_detail'] ?? null,
             'printedAt' => $printedAt,
             'isPdf' => true,
         ])->setPaper('a4', 'landscape');
@@ -399,6 +403,32 @@ class ReportExportController extends Controller
     private function nowWib(): Carbon
     {
         return now('Asia/Jakarta');
+    }
+
+    private function receivableReportTitle(?string $selectedSemester, ?int $selectedCustomerId): string
+    {
+        if ($selectedCustomerId !== null) {
+            $customerName = trim((string) Customer::query()->whereKey($selectedCustomerId)->value('name'));
+
+            if ($selectedSemester !== null) {
+                return trim(sprintf(
+                    'REKAP PIUTANG %s %s',
+                    $customerName !== '' ? strtoupper($customerName) : 'CUSTOMER',
+                    strtoupper($selectedSemester)
+                ));
+            }
+
+            return trim(sprintf(
+                'REKAP PIUTANG %s',
+                $customerName !== '' ? strtoupper($customerName) : 'CUSTOMER'
+            ));
+        }
+
+        if ($selectedSemester !== null) {
+            return 'REKAP PIUTANG 1 SEMESTER ('.strtoupper($selectedSemester).')';
+        }
+
+        return 'REKAP PIUTANG SEMUA CUSTOMER';
     }
 
     /**
@@ -671,7 +701,7 @@ class ReportExportController extends Controller
                 },
             ],
             'receivables' => [
-                'title' => 'REKAP PIUTANG (GLOBAL)',
+                'title' => $this->receivableReportTitle($selectedSemester, $selectedCustomerId),
                 'headers' => [],
                 'layout' => 'receivable_recap',
                 'receivable_semester_headers' => $receivableSemesterCodes
@@ -1120,6 +1150,7 @@ class ReportExportController extends Controller
         }
         if ($dataset === 'receivables') {
             $filters = $this->receivableFilters($selectedSemester, $selectedCustomerId);
+            $summary = $this->receivableSummary($selectedSemester, $selectedCustomerId);
         }
         if ($dataset === 'income_statement' || $dataset === 'balance_sheet') {
             $filters = [[
@@ -1154,6 +1185,9 @@ class ReportExportController extends Controller
             'filters' => $filters,
             'layout' => $layout,
             'receivable_semester_headers' => $receivableSemesterHeaders,
+            'receivable_customer_detail' => $dataset === 'receivables' && $selectedCustomerId !== null
+                ? $this->receivableCustomerDetail($selectedSemester, $selectedCustomerId)
+                : null,
         ];
     }
 
@@ -1344,6 +1378,233 @@ class ReportExportController extends Controller
                 'type' => 'currency',
             ],
         ];
+    }
+
+    /**
+     * @return array{
+     *   customer:?Customer,
+     *   rows:array<int,array{date:string,description:string,debit:int,credit:int,balance:int}>,
+     *   total_debit:int,
+     *   total_credit:int,
+     *   final_outstanding:int
+     * }|null
+     */
+    private function receivableCustomerDetail(?string $selectedSemester, ?int $selectedCustomerId): ?array
+    {
+        if ($selectedCustomerId === null) {
+            return null;
+        }
+
+        $customer = Customer::query()->select(['id', 'name', 'city', 'address', 'outstanding_receivable'])->find($selectedCustomerId);
+        if (! $customer) {
+            return null;
+        }
+
+        $semester = $selectedSemester ?? '';
+        $ledgerRows = ReceivableLedger::query()
+            ->with('invoice:id,invoice_number,invoice_date')
+            ->forCustomer($selectedCustomerId)
+            ->when($semester !== '', function ($query) use ($semester): void {
+                $query->forSemester($semester);
+            })
+            ->orderByDate('asc')
+            ->get();
+
+        if ($ledgerRows->isNotEmpty()) {
+            $first = $ledgerRows->first();
+            $openingBalance = (int) round((float) $first->balance_after - (float) $first->debit + (float) $first->credit);
+        } else {
+            $openingBalance = (int) round((float) SalesInvoice::query()
+                ->forCustomer($selectedCustomerId)
+                ->active()
+                ->withOpenBalance()
+                ->when($semester !== '', function ($query) use ($semester): void {
+                    $query->forSemester($semester);
+                })
+                ->sum('balance'));
+        }
+
+        $statementRows = [[
+            'date_label' => __('receivable.bill_opening_balance'),
+            'proof_number' => '',
+            'credit_sales' => 0,
+            'installment_payment' => 0,
+            'sales_return' => 0,
+            'running_balance' => $openingBalance,
+        ]];
+
+        $totals = [
+            'credit_sales' => 0,
+            'installment_payment' => 0,
+            'sales_return' => 0,
+            'running_balance' => $openingBalance,
+        ];
+
+        $groupedRows = [];
+        foreach ($ledgerRows as $ledgerRow) {
+            $debit = (int) round((float) $ledgerRow->debit);
+            $credit = (int) round((float) $ledgerRow->credit);
+            $description = strtolower((string) ($ledgerRow->description ?? ''));
+            $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
+            $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
+            $isDiscount = str_contains($description, 'diskon') || str_contains($description, 'discount');
+            $isAdminInvoiceAdjustment = str_contains($description, 'admin edit faktur')
+                || str_contains($description, 'admin invoice edit')
+                || str_contains($description, 'penyesuaian nilai faktur')
+                || str_contains($description, 'invoice adjustment');
+            $salesReturn = $isReturn ? $credit : 0;
+            $installment = $isReturn ? 0 : $credit;
+            $baseProofNumber = $ledgerRow->invoice?->invoice_number ?: (trim((string) ($ledgerRow->description ?? '')) ?: '-');
+            $entryType = 'payment';
+            if ($debit > 0) {
+                $entryType = 'debit';
+            } elseif ($salesReturn > 0) {
+                $entryType = 'return';
+            } elseif ($isWriteoff) {
+                $entryType = 'writeoff';
+            } elseif ($isDiscount) {
+                $entryType = 'discount';
+            }
+            if ($isAdminInvoiceAdjustment) {
+                $entryType = 'adjustment';
+            }
+
+            $proofNumber = match ($entryType) {
+                'writeoff' => $baseProofNumber . ' - ' . __('receivable.method_writeoff'),
+                'discount' => $baseProofNumber . ' - ' . __('receivable.method_discount'),
+                'adjustment' => (trim((string) ($ledgerRow->description ?? '')) !== '')
+                    ? trim((string) $ledgerRow->description)
+                    : $baseProofNumber,
+                default => $baseProofNumber,
+            };
+            $invoiceId = $ledgerRow->invoice?->id;
+            $groupKey = $isAdminInvoiceAdjustment
+                ? 'ledger:' . (int) $ledgerRow->id . ':adjustment'
+                : ($invoiceId !== null
+                    ? 'invoice:' . $invoiceId . ':' . $entryType
+                    : 'text:' . $baseProofNumber . ':' . $entryType);
+            $dateValue = $debit > 0
+                ? ($ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date)
+                : $ledgerRow->entry_date;
+
+            if (! isset($groupedRows[$groupKey])) {
+                $groupedRows[$groupKey] = [
+                    'date_value' => $dateValue,
+                    'date_ts' => $this->toReportTimestamp($dateValue),
+                    'proof_number' => $proofNumber,
+                    'entry_type' => $entryType,
+                    'adjustment_amount' => 0,
+                    'credit_sales' => 0,
+                    'installment_payment' => 0,
+                    'sales_return' => 0,
+                ];
+            }
+
+            if ($entryType === 'adjustment') {
+                $groupedRows[$groupKey]['adjustment_amount'] += ($debit - $credit);
+            } else {
+                $groupedRows[$groupKey]['credit_sales'] += $debit;
+                $groupedRows[$groupKey]['installment_payment'] += $installment;
+                $groupedRows[$groupKey]['sales_return'] += $salesReturn;
+            }
+        }
+
+        uasort($groupedRows, function (array $left, array $right): int {
+            $leftTs = (int) ($left['date_ts'] ?? 0);
+            $rightTs = (int) ($right['date_ts'] ?? 0);
+            if ($leftTs === $rightTs) {
+                return strcmp((string) ($left['proof_number'] ?? ''), (string) ($right['proof_number'] ?? ''));
+            }
+
+            return $leftTs <=> $rightTs;
+        });
+
+        $runningBalance = $openingBalance;
+        foreach ($groupedRows as $groupedRow) {
+            $delta = (int) $groupedRow['credit_sales']
+                - (int) $groupedRow['installment_payment']
+                - (int) $groupedRow['sales_return']
+                + (int) ($groupedRow['adjustment_amount'] ?? 0);
+            $runningBalance += $delta;
+
+            $statementRows[] = [
+                'date_label' => $this->formatReportDate($groupedRow['date_value']),
+                'proof_number' => (string) ($groupedRow['proof_number'] ?? '-'),
+                'credit_sales' => (int) $groupedRow['credit_sales'],
+                'installment_payment' => (int) $groupedRow['installment_payment'],
+                'sales_return' => (int) $groupedRow['sales_return'],
+                'running_balance' => $runningBalance,
+            ];
+
+            $totals['credit_sales'] += (int) $groupedRow['credit_sales'];
+            $totals['installment_payment'] += (int) $groupedRow['installment_payment'];
+            $totals['sales_return'] += (int) $groupedRow['sales_return'];
+            $totals['running_balance'] = $runningBalance;
+        }
+
+        $settings = AppSetting::getValues([
+            'company_invoice_notes' => '',
+        ]);
+        $finalOutstanding = (int) $totals['running_balance'];
+
+        return [
+            'customer' => $customer,
+            'period_label' => $this->receivablePeriodLabel($selectedSemester),
+            'rows' => $statementRows,
+            'total_debit' => (int) $totals['credit_sales'],
+            'total_credit' => (int) ($totals['installment_payment'] + $totals['sales_return']),
+            'total_credit_sales' => (int) $totals['credit_sales'],
+            'total_installment_payment' => (int) $totals['installment_payment'],
+            'total_sales_return' => (int) $totals['sales_return'],
+            'final_outstanding' => $finalOutstanding,
+            'closing_note' => $finalOutstanding < 0
+                ? __('receivable.customer_balance_note')
+                : trim((string) ($settings['company_invoice_notes'] ?? '')),
+        ];
+    }
+
+    private function receivablePeriodLabel(?string $selectedSemester): string
+    {
+        if ($selectedSemester === null || trim($selectedSemester) === '') {
+            return __('report.all_semesters');
+        }
+
+        $normalized = $this->semesterBookService()->normalizeSemester($selectedSemester) ?? strtoupper(trim($selectedSemester));
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $normalized, $matches) === 1) {
+            return sprintf('SMT %d (20%s-20%s)', (int) $matches[1], $matches[2], $matches[3]);
+        }
+
+        return $normalized;
+    }
+
+    private function formatReportDate(mixed $value): string
+    {
+        if (! $value) {
+            return '-';
+        }
+
+        try {
+            $date = $value instanceof Carbon ? $value : Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return '-';
+        }
+
+        return $date->format('d-m-Y');
+    }
+
+    private function toReportTimestamp(mixed $value): int
+    {
+        if (! $value) {
+            return 0;
+        }
+
+        try {
+            $date = $value instanceof Carbon ? $value : Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return 0;
+        }
+
+        return (int) $date->timestamp;
     }
 
     /**

@@ -17,6 +17,8 @@ return [
     'outgoing_transactions' => 'Goods Receipt',
     'receivables' => 'Receivables',
     'receivable_ledger' => 'Receivables',
+    'receivable_semester' => 'Receivables by Semester',
+    'receivable_global' => 'Global Receivables',
     'receivable_payments' => 'Receivable Payments',
     'school_distribution' => 'School Distribution',
     'ship_locations' => 'School Ship Locations',

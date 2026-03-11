@@ -699,7 +699,9 @@
             <div class="nav-group {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">
                 <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
                 <div class="nav-sub">
-                    <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
+                    <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.index') || request()->routeIs('receivables.customer-*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
+                    <a href="{{ route('receivables.global.index') }}" class="{{ request()->routeIs('receivables.global.*') ? 'active' : '' }}">{{ __('menu.receivable_global') }}</a>
+                    <a href="{{ route('receivables.semester.index') }}" class="{{ request()->routeIs('receivables.semester.*') ? 'active' : '' }}">{{ __('menu.receivable_semester') }}</a>
                     <a href="{{ route('receivable-payments.index') }}" class="{{ request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivable_payments') }}</a>
                 </div>
             </div>

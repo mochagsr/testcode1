@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
@@ -1150,5 +1151,169 @@ class ReceivableFlowsTest extends TestCase
         $this->assertNull($invoice->ship_to_phone);
         $this->assertNull($invoice->ship_to_city);
         $this->assertNull($invoice->ship_to_address);
+    }
+
+    public function test_receivable_semester_page_loads_with_filtered_rows(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-SMT-001',
+            'name' => 'Angga',
+            'city' => 'Sidoarjo',
+            'address' => 'Jl Prambon',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => null,
+            'entry_date' => '2026-02-10',
+            'description' => 'Invoice INV-10022026-0001',
+            'debit' => 70000,
+            'credit' => 0,
+            'balance_after' => 70000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.semester.index', [
+            'semester' => 'S2-2526',
+            'status' => 'outstanding',
+            'search' => 'Angga',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.semester_page_title'));
+        $response->assertSee('Angga');
+        $response->assertSee('Rp 70.000');
+    }
+
+    public function test_receivable_semester_print_renders_totals(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-SMT-002',
+            'name' => 'Difa',
+            'city' => 'Subang',
+            'address' => 'Jl Soekarno',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => null,
+            'entry_date' => '2026-02-11',
+            'description' => 'Invoice INV-11022026-0001',
+            'debit' => 50000,
+            'credit' => 0,
+            'balance_after' => 50000,
+            'period_code' => 'S2-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => null,
+            'entry_date' => '2026-02-12',
+            'description' => 'Pembayaran KWT-12022026-0001',
+            'debit' => 0,
+            'credit' => 10000,
+            'balance_after' => 40000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.semester.print', [
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.semester_total'));
+        $response->assertSee('Rp 50.000');
+        $response->assertSee('Rp 10.000');
+        $response->assertSee('Rp 40.000');
+    }
+
+    public function test_receivable_global_page_shows_only_active_semester_columns(): void
+    {
+        $user = User::factory()->create();
+        AppSetting::setValue('semester_active_periods', 'S1-2526');
+
+        $customer = Customer::query()->create([
+            'code' => 'CUST-GLOBAL-001',
+            'name' => 'Global Customer',
+            'city' => 'Malang',
+            'address' => 'Alamat Global',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'entry_date' => '2026-02-10',
+            'description' => 'Invoice INV-10022026-0001',
+            'debit' => 100000,
+            'credit' => 0,
+            'balance_after' => 100000,
+            'period_code' => 'S1-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'entry_date' => '2025-08-10',
+            'description' => 'Invoice INV-10082025-0001',
+            'debit' => 50000,
+            'credit' => 0,
+            'balance_after' => 50000,
+            'period_code' => 'S2-2425',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.global.index'));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.global_page_title'));
+        $response->assertSee('SMT 1 (2025-2026)');
+        $response->assertDontSee('SMT 2 (2024-2025)');
+        $response->assertSee('Rp 100.000');
+        $response->assertDontSee('Rp 150.000');
+    }
+
+    public function test_receivable_global_print_renders_invoice_layout_when_customer_selected(): void
+    {
+        $user = User::factory()->create();
+        AppSetting::setValue('semester_active_periods', 'S1-2526,S2-2526');
+        AppSetting::setValue('company_name', 'CV. Mitra Sejati Berkah');
+        AppSetting::setValue('company_invoice_notes', "Catatan baris satu\nCatatan baris dua");
+        AppSetting::setValue('company_transfer_accounts', "BCA : 123\nBRI : 456");
+
+        $customer = Customer::query()->create([
+            'code' => 'CUST-GLOBAL-INV-001',
+            'name' => 'Angga',
+            'city' => 'Sidoarjo',
+            'address' => 'Jl Sidoarjo Dekte Tol Porong Itu Lhgo',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'entry_date' => '2026-02-10',
+            'description' => 'Invoice INV-10022026-0001',
+            'debit' => 120000,
+            'credit' => 0,
+            'balance_after' => 120000,
+            'period_code' => 'S1-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'entry_date' => '2026-08-10',
+            'description' => 'Invoice INV-10082026-0001',
+            'debit' => 52500,
+            'credit' => 0,
+            'balance_after' => 172500,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.global.print', [
+            'customer_id' => $customer->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Invoice');
+        $response->assertSee('Konsumen');
+        $response->assertSee('ANGGA');
+        $response->assertSee('SMT 1 (2025-2026)');
+        $response->assertSee('SMT 2 (2025-2026)');
+        $response->assertSee('Rp 172.500');
+        $response->assertSee('Transfer via');
     }
 }

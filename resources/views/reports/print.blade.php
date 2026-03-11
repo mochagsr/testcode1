@@ -85,7 +85,106 @@
         </div>
     @endif
 
-    @if(($layout ?? null) === 'receivable_recap')
+    @if(($layout ?? null) === 'receivable_recap' && !empty($receivableCustomerDetail))
+        <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+            <table class="report-table" style="width: 52%; table-layout: fixed;">
+                <tbody>
+                <tr>
+                    <th style="width: 30%;">NAMA</th>
+                    <td style="width: 70%;">{{ $receivableCustomerDetail['customer']->name ?? '-' }}</td>
+                </tr>
+                <tr>
+                    <th style="width: 30%;">ALAMAT</th>
+                    <td style="width: 70%;">{{ trim((string) (($receivableCustomerDetail['customer']->address ?? '') !== '' ? $receivableCustomerDetail['customer']->address : ($receivableCustomerDetail['customer']->city ?? '-'))) }}</td>
+                </tr>
+                <tr>
+                    <th style="width: 30%;">PERIODE</th>
+                    <td style="width: 70%;">{{ $receivableCustomerDetail['period_label'] ?? __('report.all_semesters') }}</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <table class="report-table">
+            <thead>
+            <tr>
+                <th style="width: 6%;">TANGGAL</th>
+                <th style="width: 40%;">NOMOR BUKTI</th>
+                <th style="width: 10%;">PENJUALAN KREDIT</th>
+                <th style="width: 10%;">PEMBAYARAN ANGSURAN</th>
+                <th style="width: 10%;">RETUR PENJUALAN</th>
+                <th style="width: 10%;">SALDO</th>
+            </tr>
+            </thead>
+            <tbody>
+            @forelse(($receivableCustomerDetail['rows'] ?? []) as $detailRow)
+                <tr>
+                    <td>{{ ($detailRow['proof_number'] ?? '') === '' ? '' : ($detailRow['date_label'] ?? '-') }}</td>
+                    <td>{{ $detailRow['proof_number'] !== '' ? $detailRow['proof_number'] : ($detailRow['date_label'] ?? '-') }}</td>
+                    <td class="num">
+                        @if((int) ($detailRow['credit_sales'] ?? 0) !== 0)
+                            Rp {{ number_format((int) ($detailRow['credit_sales'] ?? 0), 0, ',', '.') }}
+                        @endif
+                    </td>
+                    <td class="num">
+                        @if((int) ($detailRow['installment_payment'] ?? 0) !== 0)
+                            Rp {{ number_format((int) ($detailRow['installment_payment'] ?? 0), 0, ',', '.') }}
+                        @endif
+                    </td>
+                    <td class="num">
+                        @if((int) ($detailRow['sales_return'] ?? 0) !== 0)
+                            Rp {{ number_format((int) ($detailRow['sales_return'] ?? 0), 0, ',', '.') }}
+                        @endif
+                    </td>
+                    <td class="num">
+                        @if(array_key_exists('running_balance', $detailRow))
+                            @php $rowBalance = (int) ($detailRow['running_balance'] ?? 0); @endphp
+                            @if($rowBalance < 0)
+                                (Rp {{ number_format(abs($rowBalance), 0, ',', '.') }})
+                            @else
+                                Rp {{ number_format($rowBalance, 0, ',', '.') }}
+                            @endif
+                        @endif
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="6">{{ __('report.no_data') }}</td>
+                </tr>
+            @endforelse
+            <tr class="grand-total">
+                <td colspan="2">GRAND TOTAL PIUTANG</td>
+                <td class="num">Rp {{ number_format((int) ($receivableCustomerDetail['total_credit_sales'] ?? 0), 0, ',', '.') }}</td>
+                <td class="num">Rp {{ number_format((int) ($receivableCustomerDetail['total_installment_payment'] ?? 0), 0, ',', '.') }}</td>
+                <td class="num">Rp {{ number_format((int) ($receivableCustomerDetail['total_sales_return'] ?? 0), 0, ',', '.') }}</td>
+                <td class="num"></td>
+            </tr>
+            <tr class="grand-total">
+                <td colspan="5">SALDO AKHIR</td>
+                <td class="num">
+                    @php $finalOutstanding = (int) ($receivableCustomerDetail['final_outstanding'] ?? 0); @endphp
+                    @if($finalOutstanding < 0)
+                        (Rp {{ number_format(abs($finalOutstanding), 0, ',', '.') }})
+                    @else
+                        Rp {{ number_format($finalOutstanding, 0, ',', '.') }}
+                    @endif
+                </td>
+            </tr>
+            @if(!empty($receivableCustomerDetail['closing_note']))
+                <tr>
+                    <td colspan="6" style="text-align: center; background:#dfe8f7; font-weight:700;">
+                        {{ $receivableCustomerDetail['closing_note'] }}
+                    </td>
+                </tr>
+            @endif
+            @if(((int) ($receivableCustomerDetail['final_outstanding'] ?? 0)) === 0)
+                <tr>
+                    <td colspan="6" style="text-align: center; font-weight:700;">LUNAS</td>
+                </tr>
+            @endif
+            </tbody>
+        </table>
+    @elseif(($layout ?? null) === 'receivable_recap')
         @php
             $semesterCount = count($receivableSemesterHeaders ?? []);
         @endphp
