@@ -294,16 +294,17 @@ class SemesterTransactionPageController extends Controller
             ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
             ->filter(fn(?string $item): bool => $item !== null);
 
-        return $configured
-            ->merge($invoiceSemesters)
-            ->merge($returnSemesters)
-            ->merge($outgoingSemesters)
-            ->merge($this->semesterBookService->closedSemesters())
-            ->push($this->semesterBookService->currentSemester())
-            ->push($this->semesterBookService->previousSemester($this->semesterBookService->currentSemester()))
-            ->unique()
-            ->sortDesc()
-            ->values();
+        return $this->semesterBookService->sortSemesterCollection(
+            $configured
+                ->merge($invoiceSemesters)
+                ->merge($returnSemesters)
+                ->merge($outgoingSemesters)
+                ->merge($this->semesterBookService->closedSemesters())
+                ->push($this->semesterBookService->currentSemester())
+                ->push($this->semesterBookService->previousSemester($this->semesterBookService->currentSemester()))
+                ->unique()
+                ->values()
+        );
     }
 
     private function reportDatasetFromType(string $type): string

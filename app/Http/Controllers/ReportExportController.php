@@ -682,8 +682,7 @@ class ReportExportController extends Controller
                     $header = [
                         'NO',
                         'NAMA KONSUMEN',
-                        'ALAMAT',
-                        'STATUS BUKU',
+                        'KOTA',
                         ...$semesterCodes->map(fn(string $code): string => $this->semesterDisplayLabel($code))->all(),
                         'TOTAL PIUTANG',
                     ];
@@ -721,13 +720,6 @@ class ReportExportController extends Controller
                         })
                         ->orderBy('name')
                         ->get();
-                    $selectedSemesterLockStates = $selectedSemester !== null
-                        ? $this->semesterBookService()->customerSemesterLockStates(
-                            $customers->pluck('id')->all(),
-                            $selectedSemester
-                        )
-                        : [];
-
                     $rows = [];
                     $grandPerSemester = array_fill(0, $semesterCodes->count(), 0);
                     $grandTotal = 0;
@@ -743,23 +735,11 @@ class ReportExportController extends Controller
                             $grandPerSemester[$semesterIndex] += $value;
                         }
                         $grandTotal += $rowTotal;
-                        $bookStatus = '-';
-                        if ($selectedSemester !== null) {
-                            $state = $selectedSemesterLockStates[(int) $customer->id] ?? null;
-                            if ($state !== null && (bool) ($state['locked'] ?? false)) {
-                                $bookStatus = (bool) ($state['auto'] ?? false)
-                                    ? __('receivable.customer_semester_locked_auto')
-                                    : __('receivable.customer_semester_locked_manual');
-                            } else {
-                                $bookStatus = __('receivable.customer_semester_unlocked');
-                            }
-                        }
 
                         $rows[] = [
                             $index + 1,
                             (string) $customer->name,
-                            (string) ($customer->address ?: '-'),
-                            $bookStatus,
+                            (string) ($customer->city ?: '-'),
                             ...$semesterValues,
                             $rowTotal,
                         ];
@@ -767,7 +747,6 @@ class ReportExportController extends Controller
 
                     $rows[] = [
                         'GRAND TOTAL PIUTANG',
-                        '',
                         '',
                         '',
                         ...$grandPerSemester,
@@ -1681,8 +1660,12 @@ class ReportExportController extends Controller
 
     private function receivableSemesterColumns(?string $selectedSemester)
     {
+        $closedSemesters = collect($this->semesterBookService()->closedSemesters())->values();
+
         if ($selectedSemester !== null) {
-            return collect([$selectedSemester]);
+            return $closedSemesters->contains($selectedSemester)
+                ? collect()
+                : collect([$selectedSemester]);
         }
 
         $columns = SalesInvoice::query()
@@ -1699,6 +1682,7 @@ class ReportExportController extends Controller
         );
 
         return $normalized
+            ->reject(fn(string $item): bool => $closedSemesters->contains($item))
             ->sortBy(fn(string $item): int => $this->semesterSortValue($item))
             ->values();
     }

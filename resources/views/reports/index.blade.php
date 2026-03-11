@@ -35,15 +35,15 @@
             </select>
             <label for="transaction_type" style="min-width: 130px; align-self: center;">{{ __('report.filters.type') }}</label>
             <select id="transaction_type" name="transaction_type" style="max-width: 180px;">
-                <option value="" @selected($selectedTransactionType === null)>All</option>
-                <option value="all" @selected($selectedTransactionType === 'all')>All</option>
-                <option value="sales_invoice" @selected($selectedTransactionType === 'sales_invoice')>Sales Invoice</option>
-                <option value="sales_return" @selected($selectedTransactionType === 'sales_return')>Sales Return</option>
-                <option value="delivery_note" @selected($selectedTransactionType === 'delivery_note')>Delivery Note</option>
-                <option value="delivery_trip" @selected($selectedTransactionType === 'delivery_trip')>Delivery Trip</option>
-                <option value="order_note" @selected($selectedTransactionType === 'order_note')>Order Note</option>
-                <option value="outgoing_transaction" @selected($selectedTransactionType === 'outgoing_transaction')>Outgoing</option>
-                <option value="receivable_payment" @selected($selectedTransactionType === 'receivable_payment')>Receivable Payment</option>
+                <option value="" @selected($selectedTransactionType === null)>Semua</option>
+                <option value="all" @selected($selectedTransactionType === 'all')>Semua</option>
+                <option value="sales_invoice" @selected($selectedTransactionType === 'sales_invoice')>Faktur Penjualan</option>
+                <option value="sales_return" @selected($selectedTransactionType === 'sales_return')>Retur Penjualan</option>
+                <option value="delivery_note" @selected($selectedTransactionType === 'delivery_note')>Surat Jalan</option>
+                <option value="delivery_trip" @selected($selectedTransactionType === 'delivery_trip')>Catatan Perjalanan</option>
+                <option value="order_note" @selected($selectedTransactionType === 'order_note')>Surat Pesanan</option>
+                <option value="outgoing_transaction" @selected($selectedTransactionType === 'outgoing_transaction')>Tanda Terima Barang</option>
+                <option value="receivable_payment" @selected($selectedTransactionType === 'receivable_payment')>Pembayaran Piutang</option>
             </select>
             <button type="submit">{{ __('report.apply_filter') }}</button>
         </form>
@@ -84,10 +84,10 @@
                         <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                             <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                             <option value="{{ route('reports.print', $query) }}">{{ __('report.open_print') }}</option>
-                            <option value="{{ route('reports.export.pdf', $query) }}">{{ __('report.download_pdf') }}</option>
-                            <option value="{{ route('reports.export.csv', $query) }}">{{ __('txn.excel') }}</option>
-                            <option value="{{ route('reports.queue', array_merge($query, ['format' => 'pdf'])) }}">Queue PDF</option>
-                            <option value="{{ route('reports.queue', array_merge($query, ['format' => 'excel'])) }}">Queue Excel</option>
+                            <option value="{{ route('reports.export.pdf', $query) }}">{{ __('report.save_pdf') }}</option>
+                            <option value="{{ route('reports.export.csv', $query) }}">{{ __('report.save_excel') }}</option>
+                            <option value="{{ route('reports.queue', array_merge($query, ['format' => 'pdf'])) }}">{{ __('report.queue_pdf') }}</option>
+                            <option value="{{ route('reports.queue', array_merge($query, ['format' => 'excel'])) }}">{{ __('report.queue_excel') }}</option>
                         </select>
                     </td>
                 </tr>
@@ -97,7 +97,7 @@
     </div>
 
     <div class="card">
-        <h2 class="page-title" style="font-size:16px; margin:0 0 10px 0;">Queue Export</h2>
+        <h2 class="page-title" style="font-size:16px; margin:0 0 10px 0;">{{ __('report.export_queue_title') }}</h2>
         <table>
             <thead>
                 <tr>
@@ -125,15 +125,15 @@
                                     <button type="submit" class="btn process-btn">Retry</button>
                                 </form>
                             @elseif(in_array($task->status, ['queued', 'processing'], true))
-                                <span class="muted">Menunggu...</span>
+                                <span class="muted">{{ __('report.queue_waiting') }}</span>
                                 <form method="post" action="{{ route('reports.queue.cancel', $task) }}" style="display:inline;">
                                     @csrf
                                     <button type="submit" class="btn danger-btn">Batal</button>
                                 </form>
                             @elseif($task->status === 'canceled')
-                                <span class="muted">Dibatalkan</span>
+                                <span class="muted">{{ __('report.queue_canceled') }}</span>
                             @else
-                                <span class="muted">Menunggu...</span>
+                                <span class="muted">{{ __('report.queue_waiting') }}</span>
                             @endif
                         </td>
                     </tr>
@@ -160,7 +160,7 @@
                 }
                 tableBody.innerHTML = rows.map((row) => {
                     const status = String(row.status || '').toUpperCase();
-                    let actionHtml = '<span class="muted">Menunggu...</span>';
+                    let actionHtml = `<span class="muted">{{ __('report.queue_waiting') }}</span>`;
                     if (status === 'READY') {
                         actionHtml = `<a class="btn info-btn" href="${row.download_url}">Download</a>`;
                     } else if (status === 'FAILED') {
@@ -172,13 +172,13 @@
                             </form>`;
                     } else if (status === 'QUEUED' || status === 'PROCESSING') {
                         const cancelUrl = cancelUrlTemplate.replace('__TASK__', String(row.id));
-                        actionHtml = `<span class="muted">Menunggu...</span>
+                        actionHtml = `<span class="muted">{{ __('report.queue_waiting') }}</span>
                             <form method="post" action="${cancelUrl}" style="display:inline;">
                                 <input type="hidden" name="_token" value="${csrf}">
                                 <button type="submit" class="btn danger-btn">Batal</button>
                             </form>`;
                     } else if (status === 'CANCELED') {
-                        actionHtml = `<span class="muted">Dibatalkan</span>`;
+                        actionHtml = `<span class="muted">{{ __('report.queue_canceled') }}</span>`;
                     }
                     return `<tr>
                         <td>${row.dataset_label || row.dataset}</td>

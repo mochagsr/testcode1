@@ -44,6 +44,16 @@ class SemesterBookService
     private ?array $closedSemestersCache = null;
 
     /**
+     * @var array<string, array{created_at?:string|null}>|null
+     */
+    private ?array $configuredSemesterMetadataCache = null;
+
+    /**
+     * @var array<string, array{closed_at?:string|null}>|null
+     */
+    private ?array $closedSemesterMetadataCache = null;
+
+    /**
      * @return \Illuminate\Support\Collection<int, string>
      */
     public function configuredSemesterOptions(): \Illuminate\Support\Collection
@@ -58,7 +68,42 @@ class SemesterBookService
             ->values()
             ->all();
 
+        $this->configuredSemesterOptionsCache = $this->sortSemesterCollection(collect($this->configuredSemesterOptionsCache))
+            ->values()
+            ->all();
+
         return collect($this->configuredSemesterOptionsCache);
+    }
+
+    /**
+     * @return array<string, array{created_at?:string|null}>
+     */
+    public function configuredSemesterMetadata(): array
+    {
+        if (is_array($this->configuredSemesterMetadataCache)) {
+            return $this->configuredSemesterMetadataCache;
+        }
+
+        $decoded = json_decode((string) AppSetting::getValue('semester_period_metadata', '{}'), true);
+        if (! is_array($decoded)) {
+            $decoded = [];
+        }
+
+        $metadata = [];
+        foreach ($decoded as $semester => $item) {
+            $normalized = $this->normalizeSemester((string) $semester);
+            if ($normalized === null || ! is_array($item)) {
+                continue;
+            }
+
+            $metadata[$normalized] = [
+                'created_at' => isset($item['created_at']) ? (string) $item['created_at'] : null,
+            ];
+        }
+
+        $this->configuredSemesterMetadataCache = $metadata;
+
+        return $this->configuredSemesterMetadataCache;
     }
 
     /**
@@ -85,10 +130,11 @@ class SemesterBookService
                 ->push($this->previousSemester($current));
         }
 
-        $normalized = $normalized
-            ->unique()
-            ->sortDesc()
-            ->values();
+        $normalized = $this->sortSemesterCollection(
+            $normalized
+                ->unique()
+                ->values()
+        );
 
         if ($activeOnly) {
             return collect($this->filterToActiveSemesters($normalized->all()))->values();
@@ -498,14 +544,46 @@ class SemesterBookService
             return $this->closedSemestersCache;
         }
 
-        $this->closedSemestersCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_semester_periods', '')) ?: [])
+        $this->closedSemestersCache = $this->sortSemesterCollection(
+            collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_semester_periods', '')) ?: [])
             ->map(fn (string $item): string => trim($item))
             ->map(fn (string $item): ?string => $this->normalizeSemester($item))
             ->filter(fn (?string $item): bool => $item !== null)
             ->values()
-            ->all();
+        )->all();
 
         return $this->closedSemestersCache;
+    }
+
+    /**
+     * @return array<string, array{closed_at?:string|null}>
+     */
+    public function closedSemesterMetadata(): array
+    {
+        if (is_array($this->closedSemesterMetadataCache)) {
+            return $this->closedSemesterMetadataCache;
+        }
+
+        $decoded = json_decode((string) AppSetting::getValue('closed_semester_period_metadata', '{}'), true);
+        if (! is_array($decoded)) {
+            $decoded = [];
+        }
+
+        $metadata = [];
+        foreach ($decoded as $semester => $item) {
+            $normalized = $this->normalizeSemester((string) $semester);
+            if ($normalized === null || ! is_array($item)) {
+                continue;
+            }
+
+            $metadata[$normalized] = [
+                'closed_at' => isset($item['closed_at']) ? (string) $item['closed_at'] : null,
+            ];
+        }
+
+        $this->closedSemesterMetadataCache = $metadata;
+
+        return $this->closedSemesterMetadataCache;
     }
 
     public function isClosed(?string $semester): bool
@@ -525,14 +603,22 @@ class SemesterBookService
             return;
         }
 
-        $items = collect($this->closedSemesters())
-            ->push($normalized)
-            ->unique()
-            ->sortDesc()
-            ->values()
-            ->implode(',');
+        $items = $this->sortSemesterCollection(
+            collect($this->closedSemesters())
+                ->push($normalized)
+                ->unique()
+                ->values()
+        )->implode(',');
 
-        AppSetting::setValue('closed_semester_periods', $items);
+        $metadata = $this->closedSemesterMetadata();
+        $metadata[$normalized] = [
+            'closed_at' => now()->format('Y-m-d H:i:s'),
+        ];
+
+        AppSetting::setValues([
+            'closed_semester_periods' => $items,
+            'closed_semester_period_metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE),
+        ]);
         $this->invalidateSemesterCaches();
     }
 
@@ -548,7 +634,13 @@ class SemesterBookService
             ->values()
             ->implode(',');
 
-        AppSetting::setValue('closed_semester_periods', $items);
+        $metadata = $this->closedSemesterMetadata();
+        unset($metadata[$normalized]);
+
+        AppSetting::setValues([
+            'closed_semester_periods' => $items,
+            'closed_semester_period_metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE),
+        ]);
         $this->invalidateSemesterCaches();
     }
 
@@ -738,7 +830,36 @@ class SemesterBookService
         $this->closedCustomerSemestersCache = null;
         $this->activeSemestersCache = null;
         $this->closedSemestersCache = null;
+        $this->configuredSemesterMetadataCache = null;
+        $this->closedSemesterMetadataCache = null;
         $this->normalizeSemesterCache = [];
         $this->semesterFromDateCache = [];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, string>  $collection
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    public function sortSemesterCollection(\Illuminate\Support\Collection $collection): \Illuminate\Support\Collection
+    {
+        return $collection
+            ->sort(function (string $left, string $right): int {
+                return $this->semesterSortKey($left) <=> $this->semesterSortKey($right);
+            })
+            ->values();
+    }
+
+    private function semesterSortKey(string $semester): string
+    {
+        $normalized = $this->normalizeSemester($semester) ?? strtoupper(trim($semester));
+        if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $normalized, $matches) === 1) {
+            $semesterNo = (int) $matches[1];
+            $startYear = (int) $matches[2];
+            $endYear = (int) $matches[3];
+
+            return sprintf('%02d%02d%d', $startYear, $endYear, $semesterNo);
+        }
+
+        return '9999999'.$normalized;
     }
 }

@@ -50,12 +50,13 @@ class SettingsController extends Controller
         $currentSemester = $this->semesterBookService->currentSemester();
         $previousSemester = $this->semesterBookService->previousSemester($currentSemester);
         $closedSemesters = collect($this->semesterBookService->closedSemesters());
-        $semesterBookOptions = $semesterPeriodCollection
+        $semesterBookOptions = $this->semesterBookService->sortSemesterCollection(
+            $semesterPeriodCollection
             ->merge([$currentSemester, $previousSemester])
             ->merge($closedSemesters)
             ->unique()
-            ->sortDesc()
-            ->values();
+            ->values()
+        );
         $semesterBookPage = max(1, (int) $request->integer('semester_book_page', 1));
         $semesterBookPerPage = 10;
         $semesterBookPaginator = new LengthAwarePaginator(
@@ -119,6 +120,8 @@ class SettingsController extends Controller
             'outgoingUnitCodeSuggestions' => $outgoingUnitCodeSuggestions,
             'semesterBookOptions' => $semesterBookOptions,
             'closedSemesters' => $closedSemesters->values(),
+            'semesterMetadata' => $this->semesterBookService->configuredSemesterMetadata(),
+            'closedSemesterMetadata' => $this->semesterBookService->closedSemesterMetadata(),
             'selectedActiveSemesters' => $selectedActiveSemesters,
             'semesterBookPaginator' => $semesterBookPaginator,
             'currentSemester' => $currentSemester,
@@ -232,12 +235,20 @@ class SettingsController extends Controller
                     ->filter(fn(string $item): bool => $item !== '');
             }
 
-            $normalizedSemesterOptions = $semesterCodeInputs
+            $normalizedSemesterOptions = $this->semesterBookService->sortSemesterCollection(
+                $semesterCodeInputs
                 ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
                 ->filter(fn(?string $item): bool => $item !== null)
                 ->unique()
-                ->sortDesc()
-                ->values();
+                ->values()
+            );
+            $existingSemesterMetadata = $this->semesterBookService->configuredSemesterMetadata();
+            $semesterMetadata = [];
+            foreach ($normalizedSemesterOptions as $semesterOption) {
+                $semesterMetadata[$semesterOption] = [
+                    'created_at' => $existingSemesterMetadata[$semesterOption]['created_at'] ?? now()->format('Y-m-d H:i:s'),
+                ];
+            }
             $activeSemesterInputs = collect($request->input('semester_active_period_codes', []))
                 ->map(fn($item): string => trim((string) $item))
                 ->filter(fn(string $item): bool => $item !== '');
@@ -247,15 +258,17 @@ class SettingsController extends Controller
                     ->filter(fn(string $item): bool => $item !== '');
             }
 
-            $normalizedActiveSemesters = $activeSemesterInputs
+            $normalizedActiveSemesters = $this->semesterBookService->sortSemesterCollection(
+                $activeSemesterInputs
                 ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
                 ->filter(fn(?string $item): bool => $item !== null)
                 ->filter(fn(string $item): bool => $normalizedSemesterOptions->contains($item))
                 ->unique()
-                ->sortDesc()
-                ->implode(',');
+                ->values()
+            )->implode(',');
             AppSetting::setValues([
                 'semester_period_options' => $normalizedSemesterOptions->implode(','),
+                'semester_period_metadata' => json_encode($semesterMetadata, JSON_UNESCAPED_UNICODE),
                 'semester_active_periods' => $normalizedActiveSemesters,
                 'company_name' => trim((string) ($data['company_name'] ?? '')),
                 'company_address' => trim((string) ($data['company_address'] ?? '')),

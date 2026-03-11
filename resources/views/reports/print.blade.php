@@ -22,6 +22,7 @@
         .report-table .row-locked-auto td { background: #f5f8ff; }
         .report-table .row-locked-manual td { background: #fff7ea; }
         .num { text-align: right; white-space: nowrap; }
+        .report-table td.num { text-align: right !important; white-space: nowrap; }
         .no-print { margin-bottom: 10px; }
         @media print {
             .no-print { display: none; }
@@ -92,9 +93,8 @@
             <thead>
             <tr>
                 <th rowspan="2" style="width: 5%;">NO</th>
-                <th rowspan="2" style="width: 20%;">NAMA KONSUMEN</th>
-                <th rowspan="2" style="width: 16%;">ALAMAT</th>
-                <th rowspan="2" style="width: 12%;">STATUS BUKU</th>
+                <th rowspan="2" style="width: 24%;">NAMA KONSUMEN</th>
+                <th rowspan="2" style="width: 16%;">KOTA</th>
                 <th colspan="{{ max(1, $semesterCount) }}">PIUTANG</th>
                 <th rowspan="2" style="width: 11%;">TOTAL PIUTANG</th>
             </tr>
@@ -106,10 +106,6 @@
                 @endforelse
             </tr>
             </thead>
-            <caption style="caption-side: top; text-align: left; padding: 6px 0; font-size: 10px; color: #333;">
-                {{ __('receivable.customer_semester_locked_auto') }}: biru lembut,
-                {{ __('receivable.customer_semester_locked_manual') }}: kuning lembut
-            </caption>
             <tbody>
             @forelse($rows as $row)
                 @php
@@ -117,11 +113,11 @@
                 @endphp
                 @if($isGrandTotal)
                     <tr class="grand-total">
-                        <td colspan="4">{{ $row[0] }}</td>
-                        @for($i = 4; $i < count($row); $i++)
+                        <td colspan="3">{{ $row[0] }}</td>
+                        @for($i = 3; $i < count($row); $i++)
                             <td class="num">
                                 @if(is_numeric($row[$i]))
-                                    {{ number_format((int) round((float) $row[$i]), 0, ',', '.') }}
+                                    Rp {{ number_format((int) round((float) $row[$i]), 0, ',', '.') }}
                                 @else
                                     {{ $row[$i] }}
                                 @endif
@@ -129,26 +125,14 @@
                         @endfor
                     </tr>
                 @else
-                    @php
-                        $bookStatus = strtolower(trim((string) ($row[3] ?? '')));
-                        $lockedAutoLabel = strtolower(__('receivable.customer_semester_locked_auto'));
-                        $lockedManualLabel = strtolower(__('receivable.customer_semester_locked_manual'));
-                        $rowClass = '';
-                        if ($bookStatus === $lockedAutoLabel) {
-                            $rowClass = 'row-locked-auto';
-                        } elseif ($bookStatus === $lockedManualLabel) {
-                            $rowClass = 'row-locked-manual';
-                        }
-                    @endphp
-                    <tr class="{{ $rowClass }}">
+                    <tr>
                         <td class="num">{{ $row[0] ?? '' }}</td>
                         <td>{{ $row[1] ?? '' }}</td>
                         <td>{{ $row[2] ?? '' }}</td>
-                        <td>{{ $row[3] ?? '' }}</td>
-                        @for($i = 4; $i < count($row); $i++)
-                            <td class="{{ is_numeric($row[$i]) ? 'num' : '' }}">
+                        @for($i = 3; $i < count($row); $i++)
+                            <td class="num">
                                 @if(is_numeric($row[$i]))
-                                    {{ number_format((int) round((float) $row[$i]), 0, ',', '.') }}
+                                    Rp {{ number_format((int) round((float) $row[$i]), 0, ',', '.') }}
                                 @else
                                     {{ $row[$i] }}
                                 @endif
@@ -158,7 +142,7 @@
                 @endif
             @empty
                 <tr>
-                    <td colspan="{{ 5 + max(1, $semesterCount) }}">{{ __('report.no_data') }}</td>
+                    <td colspan="{{ 4 + max(1, $semesterCount) }}">{{ __('report.no_data') }}</td>
                 </tr>
             @endforelse
             </tbody>

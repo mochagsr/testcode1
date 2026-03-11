@@ -85,7 +85,7 @@
                                     </div>
                                     <div class="col-12">
                                         <label>{{ __('ui.settings_company_address') }}</label>
-                                        <input type="text" name="company_address" value="{{ old('company_address', $companyAddress) }}">
+                                        <textarea name="company_address" rows="3" style="min-height: 86px;">{{ old('company_address', $companyAddress) }}</textarea>
                                     </div>
                                     <div class="col-12">
                                         <label>{{ __('ui.settings_company_phone') }}</label>
@@ -173,9 +173,23 @@
                         if ($semesterRows->isEmpty()) {
                             $semesterRows = collect($semesterBookOptions ?? []);
                         }
+                        $semesterRows = $semesterRows
+                            ->sort(function (string $left, string $right): int {
+                                $semesterSortKey = function (string $semester): string {
+                                    if (preg_match('/^S([12])-(\d{2})(\d{2})$/', strtoupper(trim($semester)), $matches) === 1) {
+                                        return sprintf('%02d%02d%d', (int) $matches[2], (int) $matches[3], (int) $matches[1]);
+                                    }
+
+                                    return '9999999' . strtoupper(trim($semester));
+                                };
+
+                                return $semesterSortKey($left) <=> $semesterSortKey($right);
+                            })
+                            ->values();
                         $activeSemesters = collect(old('semester_active_period_codes', $selectedActiveSemesters ?? []))
                             ->map(fn ($item) => (string) $item)
                             ->values();
+                        $semesterMetadataMap = $semesterMetadata ?? [];
                     @endphp
                     <label>{{ __('ui.settings_semester_list') }} / {{ __('ui.active') }}</label>
                     <p class="muted" style="margin: 0 0 8px 0;">{{ __('ui.settings_semester_active_note') }}</p>
@@ -183,16 +197,22 @@
                         <thead>
                         <tr>
                             <th>{{ __('txn.semester_period') }}</th>
+                            <th style="width: 140px;">Tanggal Dibuat</th>
                             <th style="width: 140px;">{{ __('ui.active') }}</th>
                             <th style="width: 110px;">{{ __('txn.action') }}</th>
                         </tr>
                         </thead>
                         <tbody>
                         @forelse($semesterRows as $semesterRow)
+                            @php
+                                $createdAtRaw = $semesterMetadataMap[(string) $semesterRow]['created_at'] ?? null;
+                                $createdAt = $createdAtRaw ? \Carbon\Carbon::parse($createdAtRaw)->format('d-m-Y') : '-';
+                            @endphp
                             <tr>
                                 <td>
                                     <input type="text" name="semester_period_codes[]" value="{{ $semesterRow }}" placeholder="S1-2526" class="semester-code-input">
                                 </td>
+                                <td>{{ $createdAt }}</td>
                                 <td>
                                     <label style="display: inline-flex; align-items: center; gap: 6px;">
                                         <input
@@ -214,6 +234,7 @@
                                 <td>
                                     <input type="text" name="semester_period_codes[]" value="" placeholder="S1-2526" class="semester-code-input">
                                 </td>
+                                <td>-</td>
                                 <td>
                                     <label style="display: inline-flex; align-items: center; gap: 6px;">
                                         <input
@@ -329,6 +350,8 @@
                     <thead>
                     <tr>
                         <th>{{ __('txn.semester_period') }}</th>
+                        <th style="width: 140px;">Tanggal Dibuat</th>
+                        <th style="width: 140px;">Tanggal Tutup</th>
                         <th>{{ __('txn.status') }}</th>
                         <th>{{ __('ui.actions') }}</th>
                     </tr>
@@ -337,9 +360,15 @@
                     @forelse(($semesterBookPaginator ?? collect()) as $semesterOption)
                         @php
                             $isClosed = collect($closedSemesters ?? [])->contains((string) $semesterOption);
+                            $createdAtRaw = ($semesterMetadata ?? [])[(string) $semesterOption]['created_at'] ?? null;
+                            $createdAt = $createdAtRaw ? \Carbon\Carbon::parse($createdAtRaw)->format('d-m-Y') : '-';
+                            $closedAtRaw = ($closedSemesterMetadata ?? [])[(string) $semesterOption]['closed_at'] ?? null;
+                            $closedAt = $closedAtRaw ? \Carbon\Carbon::parse($closedAtRaw)->format('d-m-Y') : '-';
                         @endphp
                         <tr>
                             <td>{{ $semesterOption }}</td>
+                            <td>{{ $createdAt }}</td>
+                            <td>{{ $closedAt }}</td>
                             <td>{{ $isClosed ? __('ui.semester_closed') : __('ui.semester_open') }}</td>
                             <td>
                                 @if($isClosed)
@@ -361,7 +390,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="muted">{{ __('ui.no_semester_book_options') }}</td>
+                            <td colspan="5" class="muted">{{ __('ui.no_semester_book_options') }}</td>
                         </tr>
                     @endforelse
                     </tbody>
@@ -430,6 +459,7 @@
             document.getElementById('add-semester-row')?.addEventListener('click', () => {
                 addRow('semester-codes-table', `
                     <td><input type="text" name="semester_period_codes[]" value="" placeholder="S1-2526" class="semester-code-input"></td>
+                    <td>-</td>
                     <td>
                         <label style="display: inline-flex; align-items: center; gap: 6px;">
                             <input type="checkbox" name="semester_active_period_codes[]" value="" class="semester-active-checkbox" checked>

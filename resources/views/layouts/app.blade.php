@@ -123,15 +123,16 @@
         .nav-group {
             margin-bottom: 8px;
             border-radius: 10px;
-            padding: 2px;
+            padding: 2px 0;
+            overflow: hidden;
         }
         .nav-group:hover {
-            background: var(--sidebar-group-hover);
+            background: transparent;
         }
         .nav-group.active {
-            background: var(--sidebar-group-active);
-            border: 1px solid var(--sidebar-group-border);
-            padding: 6px;
+            background: transparent;
+            border: none;
+            padding: 2px 0;
         }
         .nav-section-title {
             display: block;
@@ -158,6 +159,7 @@
         }
         .nav-sub {
             padding: 0 6px 2px;
+            overflow: hidden;
         }
         .nav-group.active .nav-sub a {
             color: var(--sidebar-text);
