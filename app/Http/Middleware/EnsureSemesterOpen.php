@@ -36,15 +36,16 @@ class EnsureSemesterOpen
         }
         $customerId = $this->resolveCustomerId($request);
         $supplierId = $this->resolveSupplierId($request);
+        $supplierYear = $this->resolveSupplierYear($request);
         $isAdmin = (($request->user()?->role ?? '') === 'admin');
         if (! $isAdmin && $semester !== null && $this->semesterBookService->isCustomerLocked($customerId, $semester)) {
             return back()->withErrors([
                 'semester' => __('ui.customer_semester_closed_error', ['semester' => $semester]),
             ])->withInput()->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
-        if (! $isAdmin && $semester !== null && $this->semesterBookService->isSupplierClosed($supplierId, $semester)) {
+        if (! $isAdmin && $supplierYear !== null && $this->semesterBookService->isSupplierYearClosed($supplierId, $supplierYear)) {
             return back()->withErrors([
-                'semester_period' => __('txn.supplier_semester_closed_error', ['semester' => $semester]),
+                'semester_period' => __('txn.supplier_semester_closed_error', ['semester' => $supplierYear]),
             ])->withInput()->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
         if ($semester !== null && ! $this->semesterBookService->isActive($semester)) {
@@ -137,6 +138,21 @@ class EnsureSemesterOpen
             'outgoing-transactions.show', 'outgoing-transactions.print', 'outgoing-transactions.export.pdf', 'outgoing-transactions.export.excel' => $this->normalizeSupplierId(optional($request->route('outgoingTransaction'))->supplier_id),
             'supplier-payables.show-payment', 'supplier-payables.print-payment', 'supplier-payables.export-payment-pdf' => $this->normalizeSupplierId(optional($request->route('supplierPayment'))->supplier_id),
             default => $this->normalizeSupplierId($request->input('supplier_id') ?? $request->route('supplier')),
+        };
+    }
+
+    private function resolveSupplierYear(Request $request): ?string
+    {
+        $routeName = (string) optional($request->route())->getName();
+
+        return match ($routeName) {
+            'outgoing-transactions.store' => $this->semesterBookService->yearFromDate((string) $request->input('transaction_date')),
+            'supplier-payables.store' => $this->semesterBookService->yearFromDate((string) $request->input('payment_date')),
+            'outgoing-transactions.show', 'outgoing-transactions.print', 'outgoing-transactions.export.pdf', 'outgoing-transactions.export.excel' => $this->semesterBookService->yearFromDate((string) optional($request->route('outgoingTransaction'))->transaction_date),
+            'supplier-payables.show-payment', 'supplier-payables.print-payment', 'supplier-payables.export-payment-pdf' => $this->semesterBookService->yearFromDate((string) optional($request->route('supplierPayment'))->payment_date),
+            default => $this->semesterBookService->normalizeYear((string) $request->input('year'))
+                ?? $this->semesterBookService->yearFromDate((string) $request->input('transaction_date'))
+                ?? $this->semesterBookService->yearFromDate((string) $request->input('payment_date')),
         };
     }
 

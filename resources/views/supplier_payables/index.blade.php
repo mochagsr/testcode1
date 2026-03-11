@@ -124,10 +124,10 @@
                     <option value="{{ $supplier->id }}" @selected((int) $selectedSupplierId === (int) $supplier->id)>{{ $supplier->name }}</option>
                 @endforeach
             </select>
-            <select name="semester" id="supplier-payable-semester" style="max-width:200px;">
-                <option value="">{{ __('supplier_payable.all_semesters') }}</option>
-                @foreach($semesterOptions as $option)
-                    <option value="{{ $option }}" @selected($selectedSemester === $option)>{{ $option }}</option>
+            <select name="year" id="supplier-payable-year" style="max-width:160px;">
+                <option value="">{{ __('supplier_payable.all_years') }}</option>
+                @foreach($yearOptions as $option)
+                    <option value="{{ $option }}" @selected($selectedYear === $option)>{{ $option }}</option>
                 @endforeach
             </select>
             <button type="submit">{{ __('txn.search') }}</button>
@@ -159,7 +159,7 @@
                             <td class="num">Rp {{ number_format((int) ($supplier->outstanding_payable ?? 0), 0, ',', '.') }}</td>
                             <td class="action">
                                 <div class="supplier-payable-actions">
-                                    <a class="btn orange-btn" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'semester' => $selectedSemester]) }}">
+                                    <a class="btn orange-btn" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'year' => $selectedYear]) }}">
                                         {{ __('supplier_payable.mutation') }}
                                     </a>
                                     <a class="btn process-btn" href="{{ route('supplier-stock-cards.index', ['supplier_id' => $supplier->id]) }}">
@@ -278,8 +278,8 @@
             const form = document.getElementById('supplier-payable-filter-form');
             const searchInput = document.getElementById('supplier-payable-search');
             const supplierSelect = document.getElementById('supplier-payable-supplier');
-            const semesterSelect = document.getElementById('supplier-payable-semester');
-            if (!form || !searchInput || !supplierSelect || !semesterSelect) return;
+            const yearSelect = document.getElementById('supplier-payable-year');
+            if (!form || !searchInput || !supplierSelect || !yearSelect) return;
             const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
                 ? window.PgposAutoSearch.debounce
                 : (fn, wait = 100) => { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), wait); }; };
@@ -289,7 +289,7 @@
             }, 100);
             searchInput.addEventListener('input', onSearch);
             supplierSelect.addEventListener('change', () => form.requestSubmit());
-            semesterSelect.addEventListener('change', () => form.requestSubmit());
+            yearSelect.addEventListener('change', () => form.requestSubmit());
         })();
     </script>
 @endsection

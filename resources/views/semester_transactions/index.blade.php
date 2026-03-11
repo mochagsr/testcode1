@@ -58,8 +58,6 @@
                     <option value="" selected disabled>Pilih aksi</option>
                     <option value="close_customer_all">Tutup semester semua customer ({{ $selectedSemester }})</option>
                     <option value="open_customer_all">Buka semester semua customer ({{ $selectedSemester }})</option>
-                    <option value="close_supplier_all">Tutup semester semua supplier ({{ $selectedSemester }})</option>
-                    <option value="open_supplier_all">Buka semester semua supplier ({{ $selectedSemester }})</option>
                     <option value="export_print">Export Print (bulk)</option>
                     <option value="export_pdf">Export PDF (bulk)</option>
                     <option value="export_excel">Export Excel (bulk)</option>

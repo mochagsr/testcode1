@@ -379,38 +379,6 @@
                     <input id="receivable-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('receivable.search_placeholder') }}" style="max-width: 320px;">
                     <button type="submit">{{ __('txn.search') }}</button>
                 </form>
-                <div class="flex" style="margin-top: 10px; gap: 8px;">
-                    <a class="btn secondary" href="{{ route('receivables.index', ['search' => $search, 'customer_id' => $selectedCustomerId]) }}">{{ __('receivable.all') }}</a>
-                    <a class="btn secondary" href="{{ route('receivables.index', ['search' => $search, 'customer_id' => $selectedCustomerId, 'semester' => $currentSemester]) }}">{{ __('receivable.current_semester') }} ({{ $currentSemester }})</a>
-                    <a class="btn secondary" href="{{ route('receivables.index', ['search' => $search, 'customer_id' => $selectedCustomerId, 'semester' => $previousSemester]) }}">{{ __('receivable.previous_semester') }} ({{ $previousSemester }})</a>
-                </div>
-                @if($selectedSemester)
-                    <div class="flex" style="margin-top: 10px; gap: 8px;">
-                        <span class="badge">{{ __('txn.semester_period') }}: {{ $selectedSemester }}</span>
-                        <span class="badge {{ $selectedSemesterActive ? 'success' : 'warning' }}">
-                            {{ $selectedSemesterActive ? __('ui.active') : __('ui.inactive') }}
-                        </span>
-                        <span class="badge {{ $selectedSemesterGlobalClosed ? 'danger' : 'success' }}">
-                            {{ $selectedSemesterGlobalClosed ? __('ui.semester_closed') : __('ui.semester_open') }}
-                        </span>
-                        @if($selectedCustomerId > 0)
-                            <span class="badge {{ $selectedCustomerSemesterClosed ? 'danger' : 'success' }}">
-                                {{ __('receivable.customer_semester_status') }}:
-                                @if($selectedCustomerSemesterClosed)
-                                    @if(($customerSemesterAutoClosedMap[$selectedCustomerId] ?? false) === true)
-                                        {{ __('receivable.customer_semester_locked_auto') }}
-                                    @elseif(($customerSemesterManualClosedMap[$selectedCustomerId] ?? false) === true)
-                                        {{ __('receivable.customer_semester_locked_manual') }}
-                                    @else
-                                        {{ __('receivable.customer_semester_closed') }}
-                                    @endif
-                                @else
-                                    {{ __('receivable.customer_semester_unlocked') }}
-                                @endif
-                            </span>
-                        @endif
-                    </div>
-                @endif
             </div>
             @php
                 $activeSemesterForReport = $selectedSemester ?: $currentSemester;

@@ -4,7 +4,7 @@ return [
     'title' => 'Hutang Supplier',
     'search_placeholder' => 'Cari supplier...',
     'all_suppliers' => 'Semua Supplier',
-    'all_semesters' => 'Semua Semester',
+    'all_years' => 'Semua Tahun',
     'outstanding' => 'Sisa Hutang',
     'mutation' => 'Mutasi Hutang',
     'pay' => 'Bayar',

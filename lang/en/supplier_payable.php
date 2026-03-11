@@ -4,7 +4,7 @@ return [
     'title' => 'Supplier Payables',
     'search_placeholder' => 'Search supplier...',
     'all_suppliers' => 'All Suppliers',
-    'all_semesters' => 'All Semesters',
+    'all_years' => 'All Years',
     'outstanding' => 'Outstanding Payable',
     'mutation' => 'Payable Mutation',
     'pay' => 'Pay',

@@ -41,7 +41,7 @@ class SupplierPayablePageController extends Controller
     public function index(Request $request): View
     {
         $search = trim((string) $request->string('search', ''));
-        $semester = $this->semesterBookService->normalizeSemester((string) $request->string('semester', ''));
+        $selectedYear = $this->semesterBookService->normalizeYear((string) $request->string('year', ''));
         $supplierId = $request->integer('supplier_id');
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
 
@@ -66,7 +66,7 @@ class SupplierPayablePageController extends Controller
         if ($selectedSupplier !== null) {
             $ledgerRows = SupplierLedger::query()
                 ->forSupplier((int) $selectedSupplier->id)
-                ->when($semester !== null, fn($query) => $query->forSemester($semester))
+                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
                 ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
                 ->orderByDate()
                 ->limit(500)
@@ -129,9 +129,9 @@ class SupplierPayablePageController extends Controller
             'selectedSupplier' => $selectedSupplier,
             'selectedSupplierId' => $selectedSupplierId,
             'ledgerRows' => $ledgerRows,
-            'selectedSemester' => $semester,
+            'selectedYear' => $selectedYear,
             'search' => $search,
-            'semesterOptions' => $this->semesterBookService->configuredSemesterOptions(),
+            'yearOptions' => $this->supplierYearOptions(),
             'supplierPaymentAdminEditedMap' => $supplierPaymentAdminEditedMap,
             'outgoingTransactionAdminEditedMap' => $outgoingTransactionAdminEditedMap,
             'totalDebit' => $totalDebit,
@@ -165,11 +165,11 @@ class SupplierPayablePageController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $semester = $this->semesterBookService->semesterFromDate((string) $data['payment_date']);
+        $supplierYear = $this->semesterBookService->yearFromDate((string) $data['payment_date']);
         $isAdmin = ((string) ($request->user()?->role ?? '') === 'admin');
-        if (! $isAdmin && $this->semesterBookService->isSupplierClosed((int) $data['supplier_id'], $semester)) {
+        if (! $isAdmin && $this->semesterBookService->isSupplierYearClosed((int) $data['supplier_id'], $supplierYear)) {
             return back()
-                ->withErrors(['payment_date' => __('txn.supplier_semester_closed_error', ['semester' => $semester ?? '-'])])
+                ->withErrors(['payment_date' => __('txn.supplier_semester_closed_error', ['semester' => $supplierYear ?? '-'])])
                 ->withInput()
                 ->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
@@ -208,7 +208,7 @@ class SupplierPayablePageController extends Controller
                 supplierPaymentId: (int) $payment->id,
                 entryDate: $paymentDate,
                 amount: (float) $amount,
-                periodCode: $semester,
+                periodCode: $this->semesterBookService->semesterFromDate((string) $data['payment_date']),
                 description: __('supplier_payable.payment_ledger_note', ['payment' => $payment->payment_number])
             );
 
@@ -499,5 +499,21 @@ class SupplierPayablePageController extends Controller
         }
 
         return $this->spellNumber((int) floor($number / 1000000000)) . ' miliar ' . $this->spellNumber($number % 1000000000);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function supplierYearOptions(): \Illuminate\Support\Collection
+    {
+        return SupplierLedger::query()
+            ->whereNotNull('entry_date')
+            ->pluck('entry_date')
+            ->map(fn ($date): ?string => $this->semesterBookService->yearFromDate((string) $date))
+            ->filter()
+            ->push((string) now()->format('Y'))
+            ->unique()
+            ->sort()
+            ->values();
     }
 }

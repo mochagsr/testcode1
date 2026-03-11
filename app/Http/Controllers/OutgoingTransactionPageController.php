@@ -51,6 +51,7 @@ class OutgoingTransactionPageController extends Controller
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $semester = (string) $request->string('semester', '');
+        $year = (string) $request->string('year', '');
         $transactionDate = trim((string) $request->string('transaction_date', ''));
         $supplierId = $request->integer('supplier_id');
 
@@ -65,12 +66,17 @@ class OutgoingTransactionPageController extends Controller
         $selectedSemester = $this->selectedSemesterIfAvailable($selectedSemester, $semesterOptions);
         $selectedTransactionDate = $this->selectedDateFilter($transactionDate);
         $selectedTransactionDateRange = $this->selectedDateRange($selectedTransactionDate);
+        $selectedYear = $this->semesterBookService->normalizeYear($year)
+            ?? ($selectedTransactionDateRange !== null ? Carbon::parse($selectedTransactionDateRange[0])->format('Y') : now()->format('Y'));
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
 
         $baseQuery = OutgoingTransaction::query()
             ->searchKeyword($search)
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                 $query->forSemester($selectedSemester);
+            })
+            ->when($selectedYear !== null, function ($query) use ($selectedYear): void {
+                $query->whereYear('transaction_date', (int) $selectedYear);
             })
             ->when($selectedSupplierId !== null, function ($query) use ($selectedSupplierId): void {
                 $query->forSupplier($selectedSupplierId);
@@ -144,15 +150,15 @@ class OutgoingTransactionPageController extends Controller
                 ];
             }
         }
-        $supplierSemesterClosedMap = [];
-        $selectedSupplierSemesterClosed = false;
-        if ($selectedSemester !== null) {
-            $supplierSemesterClosedMap = $this->semesterBookService->supplierSemesterClosedStates(
+        $supplierYearClosedMap = [];
+        $selectedSupplierYearClosed = false;
+        if ($selectedYear !== null) {
+            $supplierYearClosedMap = $this->semesterBookService->supplierYearClosedStates(
                 $supplierRecap->pluck('supplier_id')->all(),
-                $selectedSemester
+                $selectedYear
             );
             if ($selectedSupplierId !== null) {
-                $selectedSupplierSemesterClosed = $this->semesterBookService->isSupplierClosed($selectedSupplierId, $selectedSemester);
+                $selectedSupplierYearClosed = $this->semesterBookService->isSupplierYearClosed($selectedSupplierId, $selectedYear);
             }
         }
 
@@ -164,6 +170,7 @@ class OutgoingTransactionPageController extends Controller
             'search' => $search,
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
+            'selectedYear' => $selectedYear,
             'selectedTransactionDate' => $selectedTransactionDate,
             'selectedSupplierId' => $selectedSupplierId,
             'supplierOptions' => Cache::remember(
@@ -173,8 +180,9 @@ class OutgoingTransactionPageController extends Controller
             ),
             'currentSemester' => $defaultSemester,
             'previousSemester' => $previousSemester,
-            'selectedSupplierSemesterClosed' => $selectedSupplierSemesterClosed,
-            'supplierSemesterClosedMap' => $supplierSemesterClosedMap,
+            'yearOptions' => $this->supplierYearOptions(),
+            'selectedSupplierYearClosed' => $selectedSupplierYearClosed,
+            'supplierYearClosedMap' => $supplierYearClosedMap,
             'transactionAdminActionMap' => $transactionAdminActionMap,
         ]);
     }
@@ -279,9 +287,10 @@ class OutgoingTransactionPageController extends Controller
             (string) ($data['semester_period'] ?? ''),
             (string) $data['transaction_date']
         );
-        if ($this->semesterBookService->isSupplierClosed((int) $data['supplier_id'], $selectedSemester)) {
+        $supplierYear = $this->semesterBookService->yearFromDate((string) $data['transaction_date']);
+        if ($this->semesterBookService->isSupplierYearClosed((int) $data['supplier_id'], $supplierYear)) {
             throw ValidationException::withMessages([
-                'semester_period' => __('txn.supplier_semester_closed_error', ['semester' => $selectedSemester]),
+                'semester_period' => __('txn.supplier_semester_closed_error', ['semester' => $supplierYear]),
             ]);
         }
 
@@ -716,28 +725,32 @@ class OutgoingTransactionPageController extends Controller
     public function closeSupplierSemester(Request $request, Supplier $supplier): RedirectResponse
     {
         $data = $request->validate([
-            'semester' => ['required', 'string', 'max:30'],
+            'year' => ['required', 'string', 'size:4'],
             'search' => ['nullable', 'string'],
             'supplier_id' => ['nullable', 'integer'],
+            'transaction_date' => ['nullable', 'date'],
+            'semester' => ['nullable', 'string'],
         ]);
 
-        $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester'] ?? ''));
-        if ($semester === null) {
+        $year = $this->semesterBookService->normalizeYear((string) ($data['year'] ?? ''));
+        if ($year === null) {
             return redirect()
                 ->route('outgoing-transactions.index')
-                ->withErrors(['semester' => __('ui.invalid_semester_format')]);
+                ->withErrors(['year' => __('ui.invalid_year_format')]);
         }
 
-        $this->semesterBookService->closeSupplierSemester((int) $supplier->id, $semester);
+        $this->semesterBookService->closeSupplierYear((int) $supplier->id, $year);
 
         return redirect()
             ->route('outgoing-transactions.index', [
                 'search' => $data['search'] ?? null,
-                'semester' => $semester,
+                'semester' => $data['semester'] ?? null,
+                'year' => $year,
+                'transaction_date' => $data['transaction_date'] ?? null,
                 'supplier_id' => (int) $supplier->id,
             ])
             ->with('success', __('txn.supplier_semester_closed_success', [
-                'semester' => $semester,
+                'semester' => $year,
                 'supplier' => $supplier->name,
             ]));
     }
@@ -745,28 +758,32 @@ class OutgoingTransactionPageController extends Controller
     public function openSupplierSemester(Request $request, Supplier $supplier): RedirectResponse
     {
         $data = $request->validate([
-            'semester' => ['required', 'string', 'max:30'],
+            'year' => ['required', 'string', 'size:4'],
             'search' => ['nullable', 'string'],
             'supplier_id' => ['nullable', 'integer'],
+            'transaction_date' => ['nullable', 'date'],
+            'semester' => ['nullable', 'string'],
         ]);
 
-        $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester'] ?? ''));
-        if ($semester === null) {
+        $year = $this->semesterBookService->normalizeYear((string) ($data['year'] ?? ''));
+        if ($year === null) {
             return redirect()
                 ->route('outgoing-transactions.index')
-                ->withErrors(['semester' => __('ui.invalid_semester_format')]);
+                ->withErrors(['year' => __('ui.invalid_year_format')]);
         }
 
-        $this->semesterBookService->openSupplierSemester((int) $supplier->id, $semester);
+        $this->semesterBookService->openSupplierYear((int) $supplier->id, $year);
 
         return redirect()
             ->route('outgoing-transactions.index', [
                 'search' => $data['search'] ?? null,
-                'semester' => $semester,
+                'semester' => $data['semester'] ?? null,
+                'year' => $year,
+                'transaction_date' => $data['transaction_date'] ?? null,
                 'supplier_id' => (int) $supplier->id,
             ])
             ->with('success', __('txn.supplier_semester_opened_success', [
-                'semester' => $semester,
+                'semester' => $year,
                 'supplier' => $supplier->name,
             ]));
     }
@@ -1089,5 +1106,21 @@ class OutgoingTransactionPageController extends Controller
         }
 
         return round(max(0, (float) $raw), 3);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function supplierYearOptions(): \Illuminate\Support\Collection
+    {
+        return OutgoingTransaction::query()
+            ->whereNotNull('transaction_date')
+            ->pluck('transaction_date')
+            ->map(fn ($date): ?string => $this->semesterBookService->yearFromDate((string) $date))
+            ->filter()
+            ->push((string) now()->format('Y'))
+            ->unique()
+            ->sort()
+            ->values();
     }
 }

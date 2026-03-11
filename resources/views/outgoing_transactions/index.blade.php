@@ -104,6 +104,12 @@
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
                 @endforeach
             </select>
+            <select id="outgoing-year-input" name="year" style="max-width: 120px;">
+                <option value="">{{ __('txn.all_years') }}</option>
+                @foreach($yearOptions as $yearOption)
+                    <option value="{{ $yearOption }}" @selected($selectedYear === $yearOption)>{{ $yearOption }}</option>
+                @endforeach
+            </select>
             <select id="outgoing-supplier-input" name="supplier_id" style="max-width: 260px;">
                 <option value="">{{ __('txn.all_suppliers') }}</option>
                 @foreach($supplierOptions as $supplierOption)
@@ -114,9 +120,9 @@
             </select>
             <button type="submit">{{ __('txn.search') }}</button>
             <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
-                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate]) }}">{{ __('txn.all') }}</a>
-                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $currentSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
-                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $previousSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
+                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.all') }}</a>
+                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $currentSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
+                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $previousSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
             </div>
         </form>
     </div>
@@ -220,7 +226,7 @@
                         <tbody>
                         @forelse($supplierRecap as $recap)
                             @php
-                                $state = $supplierSemesterClosedMap[(int) $recap->supplier_id] ?? false;
+                                $state = $supplierYearClosedMap[(int) $recap->supplier_id] ?? false;
                             @endphp
                             <tr>
                                 <td>
@@ -228,7 +234,7 @@
                                     @if($recap->supplier_company_name)
                                         <div class="muted">{{ $recap->supplier_company_name }}</div>
                                     @endif
-                                    @if($selectedSemester)
+                                    @if($selectedYear)
                                         <div style="margin-top: 4px;">
                                             @if($state)
                                                 <span class="badge danger">{{ __('txn.supplier_semester_closed') }}</span>
@@ -251,7 +257,7 @@
                     <div style="margin-top: 10px;">{{ $supplierRecap->links() }}</div>
                 </div>
             </div>
-            @if(auth()->user()->role === 'admin' && $selectedSemester && $selectedSupplierId)
+            @if(auth()->user()->role === 'admin' && $selectedYear && $selectedSupplierId)
                 @php
                     $selectedSupplier = $supplierOptions->firstWhere('id', $selectedSupplierId);
                 @endphp
@@ -259,13 +265,15 @@
                     <div class="card">
                         <div class="form-section">
                             <h3 class="form-section-title">{{ __('txn.supplier_semester_book_title') }}</h3>
-                            <p class="form-section-note">{{ __('txn.supplier_semester_status') }}: {{ $selectedSupplier->name }} / {{ $selectedSemester }}</p>
-                            @if($selectedSupplierSemesterClosed)
+                            <p class="form-section-note">{{ __('txn.supplier_semester_status') }}: {{ $selectedSupplier->name }} / {{ $selectedYear }}</p>
+                            @if($selectedSupplierYearClosed)
                                 <span class="badge danger">{{ __('txn.supplier_semester_closed') }}</span>
                                 <form method="post" action="{{ route('outgoing-transactions.supplier-semester.open', ['supplier' => $selectedSupplierId]) }}" style="margin-top: 10px;">
                                     @csrf
-                                    <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+                                    <input type="hidden" name="year" value="{{ $selectedYear }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
+                                    <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+                                    <input type="hidden" name="transaction_date" value="{{ $selectedTransactionDate }}">
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplierId }}">
                                     <button class="btn warning-btn" type="submit">{{ __('txn.supplier_semester_open_button') }}</button>
                                 </form>
@@ -273,8 +281,10 @@
                                 <span class="badge success">{{ __('txn.supplier_semester_open') }}</span>
                                 <form method="post" action="{{ route('outgoing-transactions.supplier-semester.close', ['supplier' => $selectedSupplierId]) }}" style="margin-top: 10px;">
                                     @csrf
-                                    <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+                                    <input type="hidden" name="year" value="{{ $selectedYear }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
+                                    <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+                                    <input type="hidden" name="transaction_date" value="{{ $selectedTransactionDate }}">
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplierId }}">
                                     <button class="btn warning-btn" type="submit">{{ __('txn.supplier_semester_close_button') }}</button>
                                 </form>
@@ -292,9 +302,10 @@
             const searchInput = document.getElementById('outgoing-search-input');
             const dateInput = document.getElementById('outgoing-date-input');
             const semesterInput = document.getElementById('outgoing-semester-input');
+            const yearInput = document.getElementById('outgoing-year-input');
             const supplierInput = document.getElementById('outgoing-supplier-input');
 
-            if (!form || !searchInput || !dateInput || !semesterInput || !supplierInput) {
+            if (!form || !searchInput || !dateInput || !semesterInput || !yearInput || !supplierInput) {
                 return;
             }
 
@@ -316,6 +327,7 @@
             searchInput.addEventListener('input', onSearchInput);
             dateInput.addEventListener('change', () => form.requestSubmit());
             semesterInput.addEventListener('change', () => form.requestSubmit());
+            yearInput.addEventListener('change', () => form.requestSubmit());
             supplierInput.addEventListener('change', () => form.requestSubmit());
         })();
     </script>
