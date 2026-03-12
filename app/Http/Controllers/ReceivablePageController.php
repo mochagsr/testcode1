@@ -24,10 +24,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -291,10 +293,11 @@ class ReceivablePageController extends Controller
     {
         $data = array_merge($this->globalReceivableData($request, false), ['isPdf' => true]);
         $html = view('receivables.global_print', $data)->render();
-        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape');
+        $selectedCustomer = $data['selectedCustomer'] ?? null;
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', $selectedCustomer instanceof Customer ? 'portrait' : 'landscape');
 
-        $filename = ($data['selectedCustomer'] ?? null) instanceof Customer
-            ? 'invoice-piutang-' . ((int) $data['selectedCustomer']->id) . '-' . $this->nowWib()->format('Ymd-His') . '.pdf'
+        $filename = $selectedCustomer instanceof Customer
+            ? 'invoice-piutang-' . Str::slug((string) $selectedCustomer->name) . '-' . $this->nowWib()->format('Ymd-His') . '.pdf'
             : 'piutang-global-' . $this->nowWib()->format('Ymd-His') . '.pdf';
 
         return $pdf->download($filename);
@@ -415,7 +418,7 @@ class ReceivablePageController extends Controller
         $semesterCodes = collect($data['semesterCodes'] ?? []);
         $selectedCustomer = $data['selectedCustomer'] ?? null;
         $filename = $selectedCustomer instanceof Customer
-            ? 'invoice-piutang-' . ((int) $selectedCustomer->id) . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx'
+            ? 'invoice-piutang-' . Str::slug((string) $selectedCustomer->name) . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx'
             : 'piutang-global-' . $this->nowWib()->format('Ymd-His') . '.xlsx';
 
         return response()->streamDownload(function () use ($rows, $data, $semesterHeaders, $semesterCodes, $selectedCustomer): void {
@@ -433,13 +436,25 @@ class ReceivablePageController extends Controller
                 $transferText = trim((string) ($data['companyTransferAccounts'] ?? ''));
                 $invoiceRows = collect($data['customerInvoiceRows'] ?? []);
                 $invoiceTotal = (int) ($data['customerInvoiceTotal'] ?? 0);
+                $companyLogoPath = trim((string) ($data['companyLogoPath'] ?? ''));
 
-                $sheet->mergeCells('A1:C1');
-                $sheet->setCellValue('A1', $companyName);
-                $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(18);
-                $sheet->mergeCells('A2:C4');
-                $sheet->setCellValue('A2', collect([$companyAddress, $companyPhone, $companyEmail])->filter()->implode("\n"));
-                $sheet->getStyle('A2:C4')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+                if ($companyLogoPath !== '') {
+                    $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
+                    if (is_file($absoluteLogoPath)) {
+                        $drawing = new Drawing();
+                        $drawing->setPath($absoluteLogoPath);
+                        $drawing->setHeight(74);
+                        $drawing->setCoordinates('A1');
+                        $drawing->setWorksheet($sheet);
+                    }
+                }
+
+                $sheet->mergeCells('B1:D1');
+                $sheet->setCellValue('B1', $companyName);
+                $sheet->getStyle('B1')->getFont()->setBold(true)->setSize(18);
+                $sheet->mergeCells('B2:D4');
+                $sheet->setCellValue('B2', collect([$companyAddress, $companyPhone, $companyEmail])->filter()->implode("\n"));
+                $sheet->getStyle('B2:D4')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
                 $sheet->mergeCells('E1:G2');
                 $sheet->setCellValue('E1', 'Invoice');

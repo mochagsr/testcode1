@@ -3,6 +3,7 @@
 @section('title', __('receivable.global_page_title').' - PgPOS ERP')
 
 @section('content')
+    <div class="muted" style="font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:2px;">List</div>
     <h1 class="page-title">{{ __('receivable.global_page_title') }}</h1>
 
     <div class="card">
@@ -30,13 +31,19 @@
                     <label>{{ __('txn.search') }}</label>
                     <input type="text" name="search" value="{{ $search }}" placeholder="{{ __('receivable.global_search_placeholder') }}" style="max-width: 280px;">
                 </div>
-                <button type="submit">{{ __('txn.search') }}</button>
+                <button type="submit" class="btn edit-btn">{{ __('txn.search') }}</button>
             </div>
 
             <div class="flex" style="gap:8px;">
-                <a class="btn info-btn" target="_blank" href="{{ route('receivables.global.print', request()->query()) }}">{{ __('txn.print') }}</a>
-                <a class="btn info-btn" target="_blank" href="{{ route('receivables.global.export.pdf', request()->query()) }}">{{ __('txn.pdf') }}</a>
-                <a class="btn info-btn" href="{{ route('receivables.global.export.excel', request()->query()) }}">{{ __('txn.excel') }}</a>
+                <a class="btn info-btn" target="_blank" href="{{ route('receivables.global.print', request()->query()) }}">
+                    {{ $selectedCustomerId > 0 ? 'Print Invoice' : __('txn.print') }}
+                </a>
+                <a class="btn danger-btn" target="_blank" href="{{ route('receivables.global.export.pdf', request()->query()) }}">
+                    {{ $selectedCustomerId > 0 ? 'Download Invoice PDF' : 'Download PDF' }}
+                </a>
+                <a class="btn payment-btn" href="{{ route('receivables.global.export.excel', request()->query()) }}">
+                    {{ $selectedCustomerId > 0 ? 'Download Invoice Excel' : 'Download Excel' }}
+                </a>
             </div>
         </form>
     </div>
