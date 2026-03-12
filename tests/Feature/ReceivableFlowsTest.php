@@ -32,7 +32,8 @@ class ReceivableFlowsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee(__('receivable.title'));
-        $response->assertSee(__('receivable.print_options_title'));
+        $response->assertSee(__('receivable.all_semesters'));
+        $response->assertSee(__('receivable.all_customers'));
     }
 
     public function test_receivable_report_print_respects_semester_and_customer_filters(): void

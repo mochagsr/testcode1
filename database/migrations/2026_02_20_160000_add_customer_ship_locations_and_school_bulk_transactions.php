@@ -13,7 +13,10 @@ return new class extends Migration
         if (! Schema::hasTable('customer_ship_locations')) {
             Schema::create('customer_ship_locations', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('customer_id')->constrained('customers')->cascadeOnUpdate()->cascadeOnDelete();
+                $table->foreignId('customer_id')
+                    ->constrained('customers', 'id', 'csl_customer_fk')
+                    ->cascadeOnUpdate()
+                    ->cascadeOnDelete();
                 $table->string('school_name', 150);
                 $table->string('recipient_name', 150)->nullable();
                 $table->string('recipient_phone', 30)->nullable();
@@ -33,7 +36,7 @@ return new class extends Migration
                 $table->foreignId('customer_ship_location_id')
                     ->nullable()
                     ->after('customer_id')
-                    ->constrained('customer_ship_locations')
+                    ->constrained('customer_ship_locations', 'id', 'si_ship_location_fk')
                     ->cascadeOnUpdate()
                     ->nullOnDelete();
             }
@@ -56,7 +59,7 @@ return new class extends Migration
                 $table->foreignId('customer_ship_location_id')
                     ->nullable()
                     ->after('customer_id')
-                    ->constrained('customer_ship_locations')
+                    ->constrained('customer_ship_locations', 'id', 'dn_ship_location_fk')
                     ->cascadeOnUpdate()
                     ->nullOnDelete();
             }
@@ -67,12 +70,19 @@ return new class extends Migration
                 $table->id();
                 $table->string('transaction_number', 50)->unique();
                 $table->date('transaction_date');
-                $table->foreignId('customer_id')->constrained('customers')->cascadeOnUpdate()->restrictOnDelete();
+                $table->foreignId('customer_id')
+                    ->constrained('customers', 'id', 'sbt_customer_fk')
+                    ->cascadeOnUpdate()
+                    ->restrictOnDelete();
                 $table->string('semester_period', 30)->nullable();
                 $table->unsignedInteger('total_locations')->default(0);
                 $table->unsignedInteger('total_items')->default(0);
                 $table->text('notes')->nullable();
-                $table->foreignId('created_by_user_id')->nullable()->constrained('users')->cascadeOnUpdate()->nullOnDelete();
+                $table->foreignId('created_by_user_id')
+                    ->nullable()
+                    ->constrained('users', 'id', 'sbt_created_by_fk')
+                    ->cascadeOnUpdate()
+                    ->nullOnDelete();
                 $table->timestamps();
 
                 $table->index(['transaction_date', 'customer_id'], 'school_bulk_transactions_date_customer_idx');
@@ -83,12 +93,12 @@ return new class extends Migration
             Schema::create('school_bulk_transaction_locations', function (Blueprint $table): void {
                 $table->id();
                 $table->foreignId('school_bulk_transaction_id')
-                    ->constrained('school_bulk_transactions')
+                    ->constrained('school_bulk_transactions', 'id', 'sbtl_transaction_fk')
                     ->cascadeOnUpdate()
                     ->cascadeOnDelete();
                 $table->foreignId('customer_ship_location_id')
                     ->nullable()
-                    ->constrained('customer_ship_locations')
+                    ->constrained('customer_ship_locations', 'id', 'sbtl_ship_location_fk')
                     ->cascadeOnUpdate()
                     ->nullOnDelete();
                 $table->string('school_name', 150);
@@ -107,10 +117,14 @@ return new class extends Migration
             Schema::create('school_bulk_transaction_items', function (Blueprint $table): void {
                 $table->id();
                 $table->foreignId('school_bulk_transaction_id')
-                    ->constrained('school_bulk_transactions')
+                    ->constrained('school_bulk_transactions', 'id', 'sbti_transaction_fk')
                     ->cascadeOnUpdate()
                     ->cascadeOnDelete();
-                $table->foreignId('product_id')->nullable()->constrained('products')->cascadeOnUpdate()->nullOnDelete();
+                $table->foreignId('product_id')
+                    ->nullable()
+                    ->constrained('products', 'id', 'sbti_product_fk')
+                    ->cascadeOnUpdate()
+                    ->nullOnDelete();
                 $table->string('product_code', 60)->nullable();
                 $table->string('product_name', 200);
                 $table->string('unit', 30)->nullable();
@@ -141,13 +155,15 @@ return new class extends Migration
 
         Schema::table('delivery_notes', function (Blueprint $table): void {
             if (Schema::hasColumn('delivery_notes', 'customer_ship_location_id')) {
-                $table->dropConstrainedForeignId('customer_ship_location_id');
+                $table->dropForeign('dn_ship_location_fk');
+                $table->dropColumn('customer_ship_location_id');
             }
         });
 
         Schema::table('sales_invoices', function (Blueprint $table): void {
             if (Schema::hasColumn('sales_invoices', 'customer_ship_location_id')) {
-                $table->dropConstrainedForeignId('customer_ship_location_id');
+                $table->dropForeign('si_ship_location_fk');
+                $table->dropColumn('customer_ship_location_id');
             }
             if (Schema::hasColumn('sales_invoices', 'ship_to_name')) {
                 $table->dropColumn('ship_to_name');
@@ -168,4 +184,3 @@ return new class extends Migration
         }
     }
 };
-

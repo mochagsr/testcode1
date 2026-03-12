@@ -63,19 +63,16 @@
                 </colgroup>
                 <thead>
                 <tr>
-                    <th rowspan="2">{{ __('report.columns.no') }}</th>
-                    <th rowspan="2">{{ __('receivable.semester_customer_name') }}</th>
-                    <th rowspan="2">{{ __('receivable.city') }}</th>
-                    <th rowspan="2">{{ __('txn.address') }}</th>
-                    <th colspan="{{ max(1, count($semesterHeaders)) }}">{{ __('receivable.semester_receivable') }}</th>
-                    <th rowspan="2">{{ __('receivable.outstanding') }}</th>
-                </tr>
-                <tr>
+                    <th>{{ __('report.columns.no') }}</th>
+                    <th>{{ __('receivable.semester_customer_name') }}</th>
+                    <th>{{ __('receivable.city') }}</th>
+                    <th>{{ __('txn.address') }}</th>
                     @forelse($semesterHeaders as $semesterHeader)
                         <th>{{ $semesterHeader }}</th>
                     @empty
                         <th>{{ __('report.columns.semester') }}</th>
                     @endforelse
+                    <th>{{ __('receivable.outstanding') }}</th>
                 </tr>
                 </thead>
                 <tbody>

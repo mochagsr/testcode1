@@ -552,7 +552,7 @@ class AuditLogPageController extends Controller
         }
 
         $translationKey = 'ui.audit_action_'.str_replace(['.', '-'], '_', $normalized);
-        if (lang()->has($translationKey)) {
+        if (app('translator')->has($translationKey)) {
             return (string) __($translationKey);
         }
 

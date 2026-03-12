@@ -17,6 +17,48 @@
                 grid-column: span 12;
             }
         }
+        #semester-codes-table .semester-code-input {
+            width: 110px;
+            max-width: 110px;
+            min-width: 110px;
+            padding: 7px 8px;
+        }
+        #semester-codes-table {
+            table-layout: fixed;
+        }
+        #semester-codes-table th,
+        #semester-codes-table td {
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+        #semester-codes-table th:nth-child(1),
+        #semester-codes-table td:nth-child(1) {
+            width: 150px;
+        }
+        #semester-codes-table th:nth-child(2),
+        #semester-codes-table td:nth-child(2),
+        #semester-codes-table th:nth-child(3),
+        #semester-codes-table td:nth-child(3),
+        #semester-codes-table th:nth-child(4),
+        #semester-codes-table td:nth-child(4),
+        #semester-codes-table th:nth-child(5),
+        #semester-codes-table td:nth-child(5) {
+            width: 110px;
+            text-align: center;
+        }
+        #semester-codes-table th:nth-child(6),
+        #semester-codes-table td:nth-child(6) {
+            width: 190px;
+            text-align: center;
+        }
+        #semester-codes-table td .flex {
+            justify-content: center;
+            gap: 6px;
+        }
+        #semester-codes-table td .btn {
+            min-height: 32px;
+            padding: 7px 10px;
+        }
     </style>
 
     <h1 class="page-title">{{ __('menu.settings') }}</h1>
@@ -198,7 +240,9 @@
                         <tr>
                             <th>{{ __('txn.semester_period') }}</th>
                             <th style="width: 140px;">Tanggal Dibuat</th>
+                            <th style="width: 140px;">Tanggal Tutup</th>
                             <th style="width: 140px;">{{ __('ui.active') }}</th>
+                            <th style="width: 140px;">{{ __('txn.status') }}</th>
                             <th style="width: 110px;">{{ __('txn.action') }}</th>
                         </tr>
                         </thead>
@@ -207,12 +251,16 @@
                             @php
                                 $createdAtRaw = $semesterMetadataMap[(string) $semesterRow]['created_at'] ?? null;
                                 $createdAt = $createdAtRaw ? \Carbon\Carbon::parse($createdAtRaw)->format('d-m-Y') : '-';
+                                $closedAtRaw = ($closedSemesterMetadata ?? [])[(string) $semesterRow]['closed_at'] ?? null;
+                                $closedAt = $closedAtRaw ? \Carbon\Carbon::parse($closedAtRaw)->format('d-m-Y') : '-';
+                                $isClosed = collect($closedSemesters ?? [])->contains((string) $semesterRow);
                             @endphp
                             <tr>
                                 <td>
                                     <input type="text" name="semester_period_codes[]" value="{{ $semesterRow }}" placeholder="S1-2526" class="semester-code-input">
                                 </td>
                                 <td>{{ $createdAt }}</td>
+                                <td>{{ $closedAt }}</td>
                                 <td>
                                     <label style="display: inline-flex; align-items: center; gap: 6px;">
                                         <input
@@ -225,8 +273,16 @@
                                         {{ __('ui.active') }}
                                     </label>
                                 </td>
+                                <td>{{ $isClosed ? __('ui.semester_closed') : __('ui.semester_open') }}</td>
                                 <td>
-                                    <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
+                                    <div class="flex" style="justify-content: center;">
+                                        @if($isClosed)
+                                            <button type="submit" class="btn warning-btn" form="semester-open-{{ md5((string) $semesterRow) }}">{{ __('ui.semester_open_button') }}</button>
+                                        @else
+                                            <button type="submit" class="btn edit-btn" form="semester-close-{{ md5((string) $semesterRow) }}">{{ __('ui.semester_close_button') }}</button>
+                                        @endif
+                                        <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -234,6 +290,7 @@
                                 <td>
                                     <input type="text" name="semester_period_codes[]" value="" placeholder="S1-2526" class="semester-code-input">
                                 </td>
+                                <td>-</td>
                                 <td>-</td>
                                 <td>
                                     <label style="display: inline-flex; align-items: center; gap: 6px;">
@@ -247,6 +304,7 @@
                                         {{ __('ui.active') }}
                                     </label>
                                 </td>
+                                <td>{{ __('ui.semester_open') }}</td>
                                 <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
                             </tr>
                         @endforelse
@@ -342,66 +400,16 @@
     </form>
 
     @if($user->role === 'admin')
-        <div class="card" style="margin-top: 12px;">
-            <div class="form-section">
-                <h3 class="form-section-title">{{ __('ui.semester_book_title') }}</h3>
-                <p class="form-section-note">{{ __('ui.semester_book_note') }}</p>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>{{ __('txn.semester_period') }}</th>
-                        <th style="width: 140px;">Tanggal Dibuat</th>
-                        <th style="width: 140px;">Tanggal Tutup</th>
-                        <th>{{ __('txn.status') }}</th>
-                        <th>{{ __('ui.actions') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @forelse(($semesterBookPaginator ?? collect()) as $semesterOption)
-                        @php
-                            $isClosed = collect($closedSemesters ?? [])->contains((string) $semesterOption);
-                            $createdAtRaw = ($semesterMetadata ?? [])[(string) $semesterOption]['created_at'] ?? null;
-                            $createdAt = $createdAtRaw ? \Carbon\Carbon::parse($createdAtRaw)->format('d-m-Y') : '-';
-                            $closedAtRaw = ($closedSemesterMetadata ?? [])[(string) $semesterOption]['closed_at'] ?? null;
-                            $closedAt = $closedAtRaw ? \Carbon\Carbon::parse($closedAtRaw)->format('d-m-Y') : '-';
-                        @endphp
-                        <tr>
-                            <td>{{ $semesterOption }}</td>
-                            <td>{{ $createdAt }}</td>
-                            <td>{{ $closedAt }}</td>
-                            <td>{{ $isClosed ? __('ui.semester_closed') : __('ui.semester_open') }}</td>
-                            <td>
-                                @if($isClosed)
-                                    <form method="post" action="{{ route('settings.semester.open') }}">
-                                        @csrf
-                                        <input type="hidden" name="semester_period" value="{{ $semesterOption }}">
-                                        <input type="hidden" name="semester_book_page" value="{{ ($semesterBookPaginator ?? null)?->currentPage() ?? 1 }}">
-                                        <button type="submit" class="btn warning-btn">{{ __('ui.semester_open_button') }}</button>
-                                    </form>
-                                @else
-                                    <form method="post" action="{{ route('settings.semester.close') }}">
-                                        @csrf
-                                        <input type="hidden" name="semester_period" value="{{ $semesterOption }}">
-                                        <input type="hidden" name="semester_book_page" value="{{ ($semesterBookPaginator ?? null)?->currentPage() ?? 1 }}">
-                                        <button type="submit" class="btn">{{ __('ui.semester_close_button') }}</button>
-                                    </form>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="muted">{{ __('ui.no_semester_book_options') }}</td>
-                        </tr>
-                    @endforelse
-                    </tbody>
-                </table>
-                @if(isset($semesterBookPaginator) && $semesterBookPaginator->lastPage() > 1)
-                    <div style="margin-top: 10px;">
-                        {{ $semesterBookPaginator->links() }}
-                    </div>
-                @endif
-            </div>
-        </div>
+        @foreach($semesterRows as $semesterRow)
+            <form id="semester-close-{{ md5((string) $semesterRow) }}" method="post" action="{{ route('settings.semester.close') }}" style="display:none;">
+                @csrf
+                <input type="hidden" name="semester_period" value="{{ $semesterRow }}">
+            </form>
+            <form id="semester-open-{{ md5((string) $semesterRow) }}" method="post" action="{{ route('settings.semester.open') }}" style="display:none;">
+                @csrf
+                <input type="hidden" name="semester_period" value="{{ $semesterRow }}">
+            </form>
+        @endforeach
     @endif
 
     <script>
@@ -460,12 +468,14 @@
                 addRow('semester-codes-table', `
                     <td><input type="text" name="semester_period_codes[]" value="" placeholder="S1-2526" class="semester-code-input"></td>
                     <td>-</td>
+                    <td>-</td>
                     <td>
                         <label style="display: inline-flex; align-items: center; gap: 6px;">
                             <input type="checkbox" name="semester_active_period_codes[]" value="" class="semester-active-checkbox" checked>
                             {{ __('ui.active') }}
                         </label>
                     </td>
+                    <td>{{ __('ui.semester_open') }}</td>
                     <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
                 `);
             });

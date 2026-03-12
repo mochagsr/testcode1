@@ -574,4 +574,50 @@ class OutgoingTransactionFlowsTest extends TestCase
         $response->assertOk();
         $response->assertSee(__('txn.admin_badge_edit'));
     }
+
+    public function test_outgoing_transaction_show_displays_correction_wizard_link_for_user_with_permission(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Koreksi',
+            'company_name' => 'PT Koreksi',
+        ]);
+        $transaction = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-CORR-0001',
+            'transaction_date' => '2026-02-20',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'total' => 10000,
+            'created_by_user_id' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('outgoing-transactions.show', $transaction));
+
+        $response->assertOk();
+        $response->assertSee('transaction-corrections/create?type=outgoing_transaction&amp;id='.$transaction->id, false);
+        $response->assertSee('Wizard Koreksi');
+    }
+
+    public function test_supplier_payment_show_displays_correction_wizard_link_for_user_with_permission(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Koreksi Bayar',
+            'company_name' => 'PT Koreksi Bayar',
+        ]);
+        $payment = SupplierPayment::query()->create([
+            'payment_number' => 'KWTS-CORR-0001',
+            'supplier_id' => $supplier->id,
+            'payment_date' => '2026-02-20',
+            'amount' => 10000,
+            'amount_in_words' => 'sepuluh ribu rupiah',
+            'created_by_user_id' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('supplier-payables.show-payment', $payment));
+
+        $response->assertOk();
+        $response->assertSee('transaction-corrections/create?type=supplier_payment&amp;id='.$payment->id, false);
+        $response->assertSee('Wizard Koreksi');
+    }
 }

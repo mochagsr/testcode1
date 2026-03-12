@@ -354,83 +354,72 @@
     <h1 class="page-title">{{ __('receivable.title') }}</h1>
 
     <div class="card">
-        <div style="display:flex; gap:16px; justify-content:space-between; align-items:flex-start; flex-wrap:wrap;">
-            <div style="flex:1 1 620px; min-width:320px;">
-                <form id="receivable-filter-form" method="get" class="flex">
-                    <select id="receivable-semester" name="semester" style="max-width: 180px;">
-                        <option value="">{{ __('receivable.all_semesters') }}</option>
-                        @foreach($semesterOptions as $semester)
-                            <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
-                        @endforeach
-                    </select>
-                    <select id="receivable-customer-id" name="customer_id" style="max-width: 180px;">
-                        <option value="">{{ __('receivable.all_customers') }}</option>
-                        @if($selectedCustomerId > 0 && isset($selectedCustomerOption) && $selectedCustomerOption && !$customers->contains('id', $selectedCustomerId))
-                            <option value="{{ $selectedCustomerOption['id'] }}" selected>
-                                {{ $selectedCustomerOption['name'] }}
-                            </option>
-                        @endif
-                        @foreach($customers as $customer)
-                            <option value="{{ $customer->id }}" @selected($selectedCustomerId === $customer->id)>
-                                {{ $customer->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <input id="receivable-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('receivable.search_placeholder') }}" style="max-width: 320px;">
-                    <button type="submit">{{ __('txn.search') }}</button>
-                </form>
-            </div>
-            @php
-                $activeSemesterForReport = $selectedSemester ?: $currentSemester;
-            @endphp
-            <div style="flex:1 1 460px; min-width:320px;">
-                <div class="muted" style="margin-bottom:8px; font-weight:600; text-align:right;">{{ __('receivable.print_options_title') }}</div>
-                <div style="display:grid; gap:8px;">
-                    <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
-                        <span>{{ __('receivable.report_all_unpaid') }}</span>
-                        <span class="flex" style="gap:6px;">
-                            <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                                <option value="{{ route('reports.print', ['dataset' => 'receivables']) }}">{{ __('receivable.print_now') }}</option>
-                                <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables']) }}">{{ __('receivable.save_pdf') }}</option>
-                                <option value="{{ route('reports.export.csv', ['dataset' => 'receivables']) }}">{{ __('receivable.save_excel') }}</option>
-                            </select>
-                        </span>
-                    </div>
-                    <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
-                        <span>{{ __('receivable.report_by_semester') }} ({{ $activeSemesterForReport }})</span>
-                        <span class="flex" style="gap:6px;">
-                            <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                                <option value="{{ route('reports.print', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('receivable.print_now') }}</option>
-                                <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('receivable.save_pdf') }}</option>
-                                <option value="{{ route('reports.export.csv', ['dataset' => 'receivables', 'semester' => $activeSemesterForReport]) }}">{{ __('receivable.save_excel') }}</option>
-                            </select>
-                        </span>
-                    </div>
-                    <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
-                        <span>
-                            {{ __('receivable.report_by_customer_semester') }}
-                            @if($selectedCustomerId > 0)
-                                ({{ ($selectedCustomerName ?? null) ?: __('receivable.customer_id').' '.$selectedCustomerId }} / {{ $activeSemesterForReport }})
-                            @endif
-                        </span>
-                        <span class="flex" style="gap:6px;">
-                            @if($selectedCustomerId > 0)
-                                <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                    <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                                    <option value="{{ route('reports.print', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('receivable.print_now') }}</option>
-                                    <option value="{{ route('reports.export.pdf', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('receivable.save_pdf') }}</option>
-                                    <option value="{{ route('reports.export.csv', ['dataset' => 'receivables', 'customer_id' => $selectedCustomerId, 'semester' => $activeSemesterForReport]) }}">{{ __('receivable.save_excel') }}</option>
-                                </select>
+        <form id="receivable-filter-form" method="get" class="flex">
+            <select id="receivable-semester" name="semester" style="max-width: 180px;">
+                <option value="">{{ __('receivable.all_semesters') }}</option>
+                @foreach($semesterOptions as $semester)
+                    <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
+                @endforeach
+            </select>
+            <select id="receivable-customer-id" name="customer_id" style="max-width: 180px;">
+                <option value="">{{ __('receivable.all_customers') }}</option>
+                @if($selectedCustomerId > 0 && isset($selectedCustomerOption) && $selectedCustomerOption && !$customers->contains('id', $selectedCustomerId))
+                    <option value="{{ $selectedCustomerOption['id'] }}" selected>
+                        {{ $selectedCustomerOption['name'] }}
+                    </option>
+                @endif
+                @foreach($customers as $customer)
+                    <option value="{{ $customer->id }}" @selected($selectedCustomerId === $customer->id)>
+                        {{ $customer->name }}
+                    </option>
+                @endforeach
+            </select>
+            <input id="receivable-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('receivable.search_placeholder') }}" style="max-width: 320px;">
+            <button type="submit">{{ __('txn.search') }}</button>
+        </form>
+
+        @if((auth()->user()?->role ?? '') === 'admin' && $selectedCustomerId > 0 && $selectedSemester)
+            <div style="margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-color, #d0d7de); border-radius: 8px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+                <div>
+                    <strong>{{ __('receivable.customer_semester_book_title') }}</strong><br>
+                    <span class="muted">
+                        {{ ($selectedCustomerName ?? null) ?: __('receivable.customer_id').' '.$selectedCustomerId }}
+                        • {{ $selectedSemester }}
+                        •
+                        @if($selectedCustomerSemesterClosed)
+                            @if(($customerSemesterAutoClosedMap[$selectedCustomerId] ?? false) === true)
+                                {{ __('receivable.customer_semester_locked_auto') }}
+                            @elseif(($customerSemesterManualClosedMap[$selectedCustomerId] ?? false) === true)
+                                {{ __('receivable.customer_semester_locked_manual') }}
                             @else
-                                <span class="muted">{{ __('receivable.select_customer_first') }}</span>
+                                {{ __('receivable.customer_semester_closed') }}
                             @endif
-                        </span>
-                    </div>
+                        @else
+                            {{ __('receivable.customer_semester_unlocked') }}
+                        @endif
+                    </span>
+                </div>
+                <div>
+                    @if($selectedCustomerSemesterClosed)
+                        <form method="post" action="{{ route('receivables.customer-semester.open', ['customer' => $selectedCustomerId]) }}">
+                            @csrf
+                            <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+                            <input type="hidden" name="search" value="{{ $search }}">
+                            <input type="hidden" name="customer_id" value="{{ $selectedCustomerId }}">
+                            <button type="submit" class="btn warning-btn">{{ __('receivable.customer_semester_open_button') }}</button>
+                        </form>
+                    @else
+                        <form method="post" action="{{ route('receivables.customer-semester.close', ['customer' => $selectedCustomerId]) }}">
+                            @csrf
+                            <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+                            <input type="hidden" name="search" value="{{ $search }}">
+                            <input type="hidden" name="customer_id" value="{{ $selectedCustomerId }}">
+                            <button type="submit" class="btn">{{ __('receivable.customer_semester_close_button') }}</button>
+                        </form>
+                    @endif
                 </div>
             </div>
-        </div>
+        @endif
     </div>
 
     <div class="row receivable-main-grid">
@@ -681,47 +670,6 @@
                 </div>
                 </div>
                 @if($selectedCustomerId > 0)
-                    @if((auth()->user()?->role ?? '') === 'admin' && $selectedSemester)
-                        <div style="margin-bottom: 10px; padding: 10px; border: 1px solid var(--border-color, #d0d7de); border-radius: 8px; display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
-                            <div>
-                                <strong>{{ __('receivable.customer_semester_book_title') }}</strong><br>
-                                <span class="muted">
-                                    {{ __('receivable.customer_semester_status') }}:
-                                    @if($selectedCustomerSemesterClosed)
-                                        @if(($customerSemesterAutoClosedMap[$selectedCustomerId] ?? false) === true)
-                                            {{ __('receivable.customer_semester_locked_auto') }}
-                                        @elseif(($customerSemesterManualClosedMap[$selectedCustomerId] ?? false) === true)
-                                            {{ __('receivable.customer_semester_locked_manual') }}
-                                        @else
-                                            {{ __('receivable.customer_semester_closed') }}
-                                        @endif
-                                    @else
-                                        {{ __('receivable.customer_semester_unlocked') }}
-                                    @endif
-                                    ({{ $selectedSemester }})
-                                </span>
-                            </div>
-                            <div>
-                                @if($selectedCustomerSemesterClosed)
-                                    <form method="post" action="{{ route('receivables.customer-semester.open', ['customer' => $selectedCustomerId]) }}">
-                                        @csrf
-                                        <input type="hidden" name="semester" value="{{ $selectedSemester }}">
-                                        <input type="hidden" name="search" value="{{ $search }}">
-                                        <input type="hidden" name="customer_id" value="{{ $selectedCustomerId }}">
-                                        <button type="submit" class="btn warning-btn">{{ __('receivable.customer_semester_open_button') }}</button>
-                                    </form>
-                                @else
-                                    <form method="post" action="{{ route('receivables.customer-semester.close', ['customer' => $selectedCustomerId]) }}">
-                                        @csrf
-                                        <input type="hidden" name="semester" value="{{ $selectedSemester }}">
-                                        <input type="hidden" name="search" value="{{ $search }}">
-                                        <input type="hidden" name="customer_id" value="{{ $selectedCustomerId }}">
-                                        <button type="submit" class="btn">{{ __('receivable.customer_semester_close_button') }}</button>
-                                    </form>
-                                @endif
-                            </div>
-                        </div>
-                    @endif
                     <div class="receivable-subcard" style="margin-top: 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom: 10px;">
                         <h4 style="margin: 0;">{{ __('receivable.customer_bill_title') }}</h4>

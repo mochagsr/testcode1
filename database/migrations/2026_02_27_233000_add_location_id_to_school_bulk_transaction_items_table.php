@@ -15,7 +15,7 @@ return new class extends Migration
                 $table->foreignId('school_bulk_transaction_location_id')
                     ->nullable()
                     ->after('school_bulk_transaction_id')
-                    ->constrained('school_bulk_transaction_locations')
+                    ->constrained('school_bulk_transaction_locations', 'id', 'sbti_location_fk')
                     ->cascadeOnUpdate()
                     ->cascadeOnDelete();
             }
@@ -26,9 +26,9 @@ return new class extends Migration
     {
         Schema::table('school_bulk_transaction_items', function (Blueprint $table): void {
             if (Schema::hasColumn('school_bulk_transaction_items', 'school_bulk_transaction_location_id')) {
-                $table->dropConstrainedForeignId('school_bulk_transaction_location_id');
+                $table->dropForeign('sbti_location_fk');
+                $table->dropColumn('school_bulk_transaction_location_id');
             }
         });
     }
 };
-

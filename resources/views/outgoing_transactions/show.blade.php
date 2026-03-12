@@ -5,11 +5,18 @@
 @section('content')
     @php
         $totalWeight = (float) $transaction->items->sum(fn($item) => (float) ($item->weight ?? 0));
+        $resolvedPermissions = auth()->user()?->resolvedPermissions() ?? [];
+        $canRequestCorrection = in_array('*', $resolvedPermissions, true)
+            || in_array('transactions.correction.request', $resolvedPermissions, true);
+        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ $transaction->transaction_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('outgoing-transactions.index') }}">{{ __('txn.back') }}</a>
+            @if($canRequestCorrection)
+                <a class="btn warning-btn" href="{{ route('transaction-corrections.create', ['type' => 'outgoing_transaction', 'id' => $transaction->id]) }}">Wizard Koreksi</a>
+            @endif
             <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('outgoing-transactions.print', $transaction) }}">{{ __('txn.print') }}</option>
@@ -98,10 +105,11 @@
         </div>
     </div>
 
-    @if((auth()->user()?->role ?? '') === 'admin')
+    @if($isAdminUser)
         <div class="card">
             <div class="form-section">
                 <h3 class="form-section-title">{{ __('txn.admin_edit_outgoing_title') }}</h3>
+                <p class="form-section-note">Gunakan Wizard Koreksi untuk jejak approval. Edit langsung ini khusus admin untuk koreksi cepat.</p>
                 <form method="post" action="{{ route('outgoing-transactions.admin-update', $transaction) }}">
                     @csrf
                     @method('PUT')

@@ -10,64 +10,86 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('CREATE INDEX IF NOT EXISTS products_name_idx ON products (name)');
-        DB::statement('CREATE INDEX IF NOT EXISTS products_code_idx ON products (code)');
-        DB::statement('CREATE INDEX IF NOT EXISTS products_category_name_idx ON products (item_category_id, name)');
+        $this->createIndexIfMissing('products', 'products_name_idx', 'name');
+        $this->createIndexIfMissing('products', 'products_code_idx', 'code');
+        $this->createIndexIfMissing('products', 'products_category_name_idx', 'item_category_id, name');
 
-        DB::statement('CREATE INDEX IF NOT EXISTS customers_name_idx ON customers (name)');
-        DB::statement('CREATE INDEX IF NOT EXISTS customers_phone_idx ON customers (phone)');
-        DB::statement('CREATE INDEX IF NOT EXISTS customers_city_idx ON customers (city)');
+        $this->createIndexIfMissing('customers', 'customers_name_idx', 'name');
+        $this->createIndexIfMissing('customers', 'customers_phone_idx', 'phone');
+        $this->createIndexIfMissing('customers', 'customers_city_idx', 'city');
 
-        DB::statement('CREATE INDEX IF NOT EXISTS suppliers_name_idx ON suppliers (name)');
-        DB::statement('CREATE INDEX IF NOT EXISTS suppliers_company_name_idx ON suppliers (company_name)');
+        $this->createIndexIfMissing('suppliers', 'suppliers_name_idx', 'name');
+        $this->createIndexIfMissing('suppliers', 'suppliers_company_name_idx', 'company_name');
 
-        DB::statement('CREATE INDEX IF NOT EXISTS sales_invoices_number_idx ON sales_invoices (invoice_number)');
-        DB::statement('CREATE INDEX IF NOT EXISTS sales_invoices_customer_date_idx ON sales_invoices (customer_id, invoice_date)');
-        DB::statement('CREATE INDEX IF NOT EXISTS sales_invoices_semester_date_idx ON sales_invoices (semester_period, invoice_date)');
+        $this->createIndexIfMissing('sales_invoices', 'sales_invoices_number_idx', 'invoice_number');
+        $this->createIndexIfMissing('sales_invoices', 'sales_invoices_customer_date_idx', 'customer_id, invoice_date');
+        $this->createIndexIfMissing('sales_invoices', 'sales_invoices_semester_date_idx', 'semester_period, invoice_date');
 
-        DB::statement('CREATE INDEX IF NOT EXISTS receivable_ledgers_customer_date_idx ON receivable_ledgers (customer_id, entry_date)');
-        DB::statement('CREATE INDEX IF NOT EXISTS receivable_ledgers_invoice_idx ON receivable_ledgers (sales_invoice_id)');
+        $this->createIndexIfMissing('receivable_ledgers', 'receivable_ledgers_customer_date_idx', 'customer_id, entry_date');
+        $this->createIndexIfMissing('receivable_ledgers', 'receivable_ledgers_invoice_idx', 'sales_invoice_id');
 
-        DB::statement('CREATE INDEX IF NOT EXISTS supplier_ledgers_supplier_date_idx ON supplier_ledgers (supplier_id, entry_date)');
-        DB::statement('CREATE INDEX IF NOT EXISTS supplier_ledgers_outgoing_idx ON supplier_ledgers (outgoing_transaction_id)');
+        $this->createIndexIfMissing('supplier_ledgers', 'supplier_ledgers_supplier_date_idx', 'supplier_id, entry_date');
+        $this->createIndexIfMissing('supplier_ledgers', 'supplier_ledgers_outgoing_idx', 'outgoing_transaction_id');
     }
 
     public function down(): void
     {
-        $driver = Schema::getConnection()->getDriverName();
-        if ($driver === 'sqlite') {
-            DB::statement('DROP INDEX IF EXISTS products_name_idx');
-            DB::statement('DROP INDEX IF EXISTS products_code_idx');
-            DB::statement('DROP INDEX IF EXISTS products_category_name_idx');
-            DB::statement('DROP INDEX IF EXISTS customers_name_idx');
-            DB::statement('DROP INDEX IF EXISTS customers_phone_idx');
-            DB::statement('DROP INDEX IF EXISTS customers_city_idx');
-            DB::statement('DROP INDEX IF EXISTS suppliers_name_idx');
-            DB::statement('DROP INDEX IF EXISTS suppliers_company_name_idx');
-            DB::statement('DROP INDEX IF EXISTS sales_invoices_number_idx');
-            DB::statement('DROP INDEX IF EXISTS sales_invoices_customer_date_idx');
-            DB::statement('DROP INDEX IF EXISTS sales_invoices_semester_date_idx');
-            DB::statement('DROP INDEX IF EXISTS receivable_ledgers_customer_date_idx');
-            DB::statement('DROP INDEX IF EXISTS receivable_ledgers_invoice_idx');
-            DB::statement('DROP INDEX IF EXISTS supplier_ledgers_supplier_date_idx');
-            DB::statement('DROP INDEX IF EXISTS supplier_ledgers_outgoing_idx');
+        $this->dropIndexIfExists('products', 'products_name_idx');
+        $this->dropIndexIfExists('products', 'products_code_idx');
+        $this->dropIndexIfExists('products', 'products_category_name_idx');
+        $this->dropIndexIfExists('customers', 'customers_name_idx');
+        $this->dropIndexIfExists('customers', 'customers_phone_idx');
+        $this->dropIndexIfExists('customers', 'customers_city_idx');
+        $this->dropIndexIfExists('suppliers', 'suppliers_name_idx');
+        $this->dropIndexIfExists('suppliers', 'suppliers_company_name_idx');
+        $this->dropIndexIfExists('sales_invoices', 'sales_invoices_number_idx');
+        $this->dropIndexIfExists('sales_invoices', 'sales_invoices_customer_date_idx');
+        $this->dropIndexIfExists('sales_invoices', 'sales_invoices_semester_date_idx');
+        $this->dropIndexIfExists('receivable_ledgers', 'receivable_ledgers_customer_date_idx');
+        $this->dropIndexIfExists('receivable_ledgers', 'receivable_ledgers_invoice_idx');
+        $this->dropIndexIfExists('supplier_ledgers', 'supplier_ledgers_supplier_date_idx');
+        $this->dropIndexIfExists('supplier_ledgers', 'supplier_ledgers_outgoing_idx');
+    }
+
+    private function createIndexIfMissing(string $table, string $indexName, string $columns): void
+    {
+        if ($this->indexExists($table, $indexName)) {
             return;
         }
 
-        DB::statement('DROP INDEX products_name_idx ON products');
-        DB::statement('DROP INDEX products_code_idx ON products');
-        DB::statement('DROP INDEX products_category_name_idx ON products');
-        DB::statement('DROP INDEX customers_name_idx ON customers');
-        DB::statement('DROP INDEX customers_phone_idx ON customers');
-        DB::statement('DROP INDEX customers_city_idx ON customers');
-        DB::statement('DROP INDEX suppliers_name_idx ON suppliers');
-        DB::statement('DROP INDEX suppliers_company_name_idx ON suppliers');
-        DB::statement('DROP INDEX sales_invoices_number_idx ON sales_invoices');
-        DB::statement('DROP INDEX sales_invoices_customer_date_idx ON sales_invoices');
-        DB::statement('DROP INDEX sales_invoices_semester_date_idx ON sales_invoices');
-        DB::statement('DROP INDEX receivable_ledgers_customer_date_idx ON receivable_ledgers');
-        DB::statement('DROP INDEX receivable_ledgers_invoice_idx ON receivable_ledgers');
-        DB::statement('DROP INDEX supplier_ledgers_supplier_date_idx ON supplier_ledgers');
-        DB::statement('DROP INDEX supplier_ledgers_outgoing_idx ON supplier_ledgers');
+        DB::statement(sprintf('CREATE INDEX %s ON %s (%s)', $indexName, $table, $columns));
+    }
+
+    private function dropIndexIfExists(string $table, string $indexName): void
+    {
+        if (! $this->indexExists($table, $indexName)) {
+            return;
+        }
+
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            DB::statement(sprintf('DROP INDEX %s', $indexName));
+            return;
+        }
+
+        DB::statement(sprintf('DROP INDEX %s ON %s', $indexName, $table));
+    }
+
+    private function indexExists(string $table, string $indexName): bool
+    {
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            return DB::table('sqlite_master')
+                ->where('type', 'index')
+                ->where('tbl_name', $table)
+                ->where('name', $indexName)
+                ->exists();
+        }
+
+        return DB::table('information_schema.statistics')
+            ->where('table_schema', DB::getDatabaseName())
+            ->where('table_name', $table)
+            ->where('index_name', $indexName)
+            ->exists();
     }
 };

@@ -3,9 +3,18 @@
 @section('title', $payment->payment_number.' - PgPOS ERP')
 
 @section('content')
+    @php
+        $resolvedPermissions = auth()->user()?->resolvedPermissions() ?? [];
+        $canRequestCorrection = in_array('*', $resolvedPermissions, true)
+            || in_array('transactions.correction.request', $resolvedPermissions, true);
+        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+    @endphp
     <div class="flex" style="justify-content: space-between;">
         <h1 class="page-title" style="margin:0;">{{ $payment->payment_number }}</h1>
         <div class="flex">
+            @if($canRequestCorrection)
+                <a class="btn warning-btn" href="{{ route('transaction-corrections.create', ['type' => 'supplier_payment', 'id' => $payment->id]) }}">Wizard Koreksi</a>
+            @endif
             <a class="btn info-btn" href="{{ route('supplier-payables.print-payment', $payment) }}" target="_blank">{{ __('txn.print') }}</a>
             <a class="btn info-btn" href="{{ route('supplier-payables.export-payment-pdf', $payment) }}">{{ __('txn.pdf') }}</a>
             <a class="btn info-btn" href="{{ route('supplier-payables.export-payment-excel', $payment) }}">{{ __('txn.excel') }}</a>
@@ -33,9 +42,10 @@
         </table>
     </div>
 
-    @if((auth()->user()?->role ?? '') === 'admin')
+    @if($isAdminUser)
         <div class="card">
             <h3 style="margin-top:0;">Admin Edit Pembayaran Supplier</h3>
+            <p class="form-section-note">Gunakan Wizard Koreksi untuk jejak approval. Edit langsung ini khusus admin untuk koreksi cepat.</p>
             <form method="post" action="{{ route('supplier-payables.admin-update', $payment) }}" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')

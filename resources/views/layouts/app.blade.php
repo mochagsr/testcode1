@@ -102,21 +102,29 @@
             background: var(--sidebar-bg);
             color: var(--sidebar-text);
             padding: 24px 16px;
+            position: relative;
+            overflow: hidden;
         }
         .brand {
             font-size: 20px;
             font-weight: 700;
             margin-bottom: 24px;
         }
-        .nav a {
+        .nav {
+            position: relative;
+            z-index: 1;
+        }
+        .nav > a,
+        .nav-sub a {
             display: block;
             color: var(--sidebar-text);
             text-decoration: none;
             padding: 10px 12px;
             border-radius: 8px;
             margin-bottom: 6px;
+            position: relative;
         }
-        .nav a.active, .nav a:hover {
+        .nav > a.active, .nav > a:hover {
             background: var(--sidebar-hover);
             color: var(--sidebar-active-text);
         }
@@ -125,13 +133,14 @@
             border-radius: 10px;
             padding: 2px 0;
             overflow: hidden;
+            position: relative;
         }
         .nav-group:hover {
-            background: transparent;
+            background: transparent !important;
         }
         .nav-group.active {
-            background: transparent;
-            border: none;
+            background: transparent !important;
+            border: none !important;
             padding: 2px 0;
         }
         .nav-section-title {
@@ -149,23 +158,32 @@
             padding: 8px 12px 6px;
             border-radius: 8px;
             font-weight: 700;
+            position: relative;
+            z-index: 1;
+            background: transparent !important;
         }
         .nav-group-title.active {
             color: var(--sidebar-active-text);
         }
         .nav-group.active .nav-group-title {
-            background: transparent;
+            background: transparent !important;
             color: var(--sidebar-active-text);
         }
         .nav-sub {
             padding: 0 6px 2px;
             overflow: hidden;
+            position: relative;
+            z-index: 1;
         }
         .nav-group.active .nav-sub a {
             color: var(--sidebar-text);
         }
+        .nav-sub a:hover {
+            background: var(--sidebar-group-hover);
+            color: var(--sidebar-active-text);
+        }
         .nav-group.active .nav-sub a.active {
-            background: var(--sidebar-sub-active);
+            background: var(--sidebar-sub-active) !important;
             border-left: 3px solid var(--sidebar-sub-active-border);
             padding-left: 11px;
             color: var(--sidebar-active-text);
@@ -176,6 +194,7 @@
             padding: 8px 10px;
             font-size: 13px;
             color: var(--sidebar-sub-text);
+            background: transparent;
         }
         .main {
             padding: 24px;
