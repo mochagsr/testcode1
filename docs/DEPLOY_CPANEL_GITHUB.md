@@ -68,7 +68,8 @@ Jika cPanel tidak mengizinkan:
 
 Gunakan contoh:
 
-- `.env.cpanel.example`
+- `.env.cpanel.test.example` untuk uji deploy pertama
+- `.env.cpanel.prod.example` untuk production final
 
 Salin menjadi `.env`, lalu isi:
 
@@ -129,13 +130,18 @@ php artisan migrate --force
 php artisan db:seed --force
 ```
 
-### Opsi B - Import SQL bootstrap
+### Opsi B - Import SQL yang sudah disiapkan
 
-File yang sudah disiapkan:
+File yang sudah disiapkan untuk 2 environment:
 
-- `database/sql/tespgpos_mysql_bootstrap.sql`
+- `database/sql/tespgpos_mysql_test_snapshot.sql`
+  - snapshot MySQL dari database SQLite yang sedang dipakai sekarang
+  - pakai ini untuk deploy `tes`
+- `database/sql/tespgpos_mysql_prod_bootstrap.sql`
+  - schema + seed dasar bersih
+  - pakai ini untuk deploy `prod`
 
-Import ke database MySQL hosting, lalu jalankan:
+Import ke database MySQL hosting yang sesuai, lalu jalankan:
 
 ```bash
 php artisan db:seed --force
@@ -143,8 +149,47 @@ php artisan db:seed --force
 
 Catatan:
 
-- file SQL bootstrap ini cocok untuk uji deploy awal
-- untuk production final, migrate tetap jalur yang lebih aman
+- untuk `tes`, snapshot ini membuat data hosting sama dengan data lokal saat ini
+- untuk `prod`, jalur paling aman tetap `php artisan migrate --force` lalu seed seperlunya
+
+## 7A. Rekomendasi pemetaan environment
+
+### Deploy tes
+
+- file env:
+  - `.env.cpanel.test.example`
+- database:
+  - `cpanel_pgpos_tes`
+- SQL:
+  - `database/sql/tespgpos_mysql_test_snapshot.sql`
+
+### Deploy prod
+
+- file env:
+  - `.env.cpanel.prod.example`
+- database:
+  - `cpanel_pgpos_prod`
+- SQL:
+  - `database/sql/tespgpos_mysql_prod_bootstrap.sql`
+
+## 7B. Regenerate snapshot `tes` dari database SQLite lokal
+
+Kalau data lokal berubah dan kamu ingin deploy ulang env `tes` dengan data terbaru, jalankan:
+
+```bash
+php artisan app:sqlite-to-mysql-snapshot
+```
+
+Output default:
+
+- `database/sql/tespgpos_mysql_test_snapshot.sql`
+
+Command ini:
+
+- membaca `database/database.sqlite`
+- membangun schema MySQL dari migrasi terbaru
+- menyalin semua data lokal ke MySQL
+- menghasilkan dump SQL MySQL siap import untuk env `tes`
 
 ## 8. Jalankan optimasi production
 

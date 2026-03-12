@@ -462,6 +462,187 @@ Artisan::command('app:db-backup {--path=} {--gzip}', function () {
     return 0;
 })->purpose('Create database backup file');
 
+Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-db=} {--mysql-host=} {--mysql-port=} {--mysql-user=} {--mysql-password=}', function () {
+    $source = (string) ($this->option('source') ?: database_path('database.sqlite'));
+    if (! File::exists($source)) {
+        $this->error('SQLite source file not found: ' . $source);
+        return 1;
+    }
+
+    $target = (string) ($this->option('target') ?: database_path('sql/tespgpos_mysql_test_snapshot.sql'));
+    File::ensureDirectoryExists(dirname($target));
+
+    $mysqlConfig = config('database.connections.mysql', []);
+    $host = (string) ($this->option('mysql-host') ?: ($mysqlConfig['host'] ?? '127.0.0.1'));
+    $port = (string) ($this->option('mysql-port') ?: ($mysqlConfig['port'] ?? '3306'));
+    $username = (string) ($this->option('mysql-user') ?: ($mysqlConfig['username'] ?? 'root'));
+    $password = (string) ($this->option('mysql-password') ?: ($mysqlConfig['password'] ?? ''));
+    $tempDb = (string) ($this->option('temp-db') ?: 'tespgpos_test_snapshot');
+
+    $this->line('Preparing temporary MySQL database: ' . $tempDb);
+
+    try {
+        $adminPdo = new PDO(
+            sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port),
+            $username,
+            $password,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]
+        );
+        $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
+        $adminPdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', str_replace('`', '``', $tempDb)));
+    } catch (Throwable $e) {
+        $this->error('Failed preparing temporary MySQL database: ' . $e->getMessage());
+        return 1;
+    }
+
+    config([
+        'database.connections.mysql.host' => $host,
+        'database.connections.mysql.port' => $port,
+        'database.connections.mysql.database' => $tempDb,
+        'database.connections.mysql.username' => $username,
+        'database.connections.mysql.password' => $password,
+        'database.connections.mysql.charset' => 'utf8mb4',
+        'database.connections.mysql.collation' => 'utf8mb4_unicode_ci',
+        'database.connections.mysql.strict' => true,
+    ]);
+    DB::purge('mysql');
+
+    $migrateExit = Artisan::call('migrate:fresh', [
+        '--database' => 'mysql',
+        '--force' => true,
+    ]);
+    $this->output->write(Artisan::output());
+    if ($migrateExit !== 0) {
+        $this->error('MySQL migrate:fresh failed.');
+        return 1;
+    }
+
+    try {
+        $sourcePdo = new PDO(
+            'sqlite:' . $source,
+            null,
+            null,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]
+        );
+        $destPdo = new PDO(
+            sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $tempDb),
+            $username,
+            $password,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4',
+            ]
+        );
+
+        $tables = $sourcePdo
+            ->query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+            ->fetchAll(PDO::FETCH_COLUMN);
+
+        $destPdo->exec('SET FOREIGN_KEY_CHECKS=0');
+
+        foreach ($tables as $tableName) {
+            $table = (string) $tableName;
+            $existsStmt = $destPdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?');
+            $existsStmt->execute([$tempDb, $table]);
+            if ((int) $existsStmt->fetchColumn() === 0) {
+                $this->warn('Skipping missing destination table: ' . $table);
+                continue;
+            }
+
+            $sourceColumns = collect($sourcePdo->query(sprintf('PRAGMA table_info("%s")', str_replace('"', '""', $table)))->fetchAll())
+                ->pluck('name')
+                ->map(fn ($name) => (string) $name)
+                ->values()
+                ->all();
+
+            $destColumnsStmt = $destPdo->prepare('SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION');
+            $destColumnsStmt->execute([$tempDb, $table]);
+            $destColumns = collect($destColumnsStmt->fetchAll(PDO::FETCH_COLUMN))
+                ->map(fn ($name) => (string) $name)
+                ->values()
+                ->all();
+
+            $commonColumns = array_values(array_filter(
+                $sourceColumns,
+                fn (string $column): bool => in_array($column, $destColumns, true)
+            ));
+
+            if ($commonColumns === []) {
+                $this->warn('Skipping table with no shared columns: ' . $table);
+                continue;
+            }
+
+            $destPdo->exec(sprintf('DELETE FROM `%s`', str_replace('`', '``', $table)));
+
+            $quotedSqliteColumns = implode(', ', array_map(
+                fn (string $column): string => sprintf('"%s"', str_replace('"', '""', $column)),
+                $commonColumns
+            ));
+            $selectStmt = $sourcePdo->query(sprintf(
+                'SELECT %s FROM "%s"',
+                $quotedSqliteColumns,
+                str_replace('"', '""', $table)
+            ));
+
+            $insertStmt = $destPdo->prepare(sprintf(
+                'INSERT INTO `%s` (`%s`) VALUES (%s)',
+                str_replace('`', '``', $table),
+                implode('`,`', array_map(fn (string $column): string => str_replace('`', '``', $column), $commonColumns)),
+                implode(', ', array_fill(0, count($commonColumns), '?'))
+            ));
+
+            $copied = 0;
+            while (($row = $selectStmt->fetch()) !== false) {
+                $values = [];
+                foreach ($commonColumns as $column) {
+                    $value = $row[$column] ?? null;
+                    if (is_resource($value)) {
+                        $value = stream_get_contents($value);
+                    }
+                    if (is_bool($value)) {
+                        $value = $value ? 1 : 0;
+                    }
+                    $values[] = $value;
+                }
+                $insertStmt->execute($values);
+                $copied++;
+            }
+
+            $this->line(sprintf('Copied %d rows from %s', $copied, $table));
+        }
+
+        $destPdo->exec('SET FOREIGN_KEY_CHECKS=1');
+    } catch (Throwable $e) {
+        $this->error('Snapshot copy failed: ' . $e->getMessage());
+        return 1;
+    }
+
+    $dumpCommand = sprintf(
+        'mysqldump --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false --default-character-set=utf8mb4 %s > "%s"',
+        escapeshellarg($host),
+        escapeshellarg($port),
+        escapeshellarg($username),
+        escapeshellarg($password),
+        escapeshellarg($tempDb),
+        $target
+    );
+    exec($dumpCommand, $dumpOutput, $dumpExitCode);
+    if ($dumpExitCode !== 0 || ! File::exists($target)) {
+        $this->error('mysqldump failed. Ensure mysqldump is available in PATH.');
+        return 1;
+    }
+
+    $this->info('MySQL test snapshot created: ' . $target);
+    return 0;
+})->purpose('Build a MySQL SQL snapshot from the current SQLite database for test deployment');
+
 Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
     $startedAt = microtime(true);
     $connection = config('database.default');
