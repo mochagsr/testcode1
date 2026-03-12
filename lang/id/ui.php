@@ -5,6 +5,7 @@ return [
     'dashboard_total_products' => 'Total Barang',
     'dashboard_total_customers' => 'Total Customer',
     'dashboard_global_receivable' => 'Total Piutang',
+    'dashboard_total_supplier_payable' => 'Total Hutang Supplier',
     'dashboard_invoice_this_month' => 'Faktur Bulan Ini',
     'dashboard_outgoing_this_month' => 'Tanda Terima Barang Bulan Ini',
     'dashboard_recent_invoices' => 'Faktur Penjualan Terbaru',

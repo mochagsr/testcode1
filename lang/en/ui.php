@@ -5,6 +5,7 @@ return [
     'dashboard_total_products' => 'Total Products',
     'dashboard_total_customers' => 'Total Customers',
     'dashboard_global_receivable' => 'Global Receivable',
+    'dashboard_total_supplier_payable' => 'Total Supplier Payable',
     'dashboard_invoice_this_month' => 'Invoice This Month',
     'dashboard_outgoing_this_month' => 'Goods Receipts This Month',
     'dashboard_recent_invoices' => 'Recent Sales Invoices',

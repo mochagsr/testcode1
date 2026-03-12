@@ -274,6 +274,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:masters.products.manage')->name('products.import');
         Route::get('/sales-invoices/import/template', [MassImportController::class, 'templateSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import.template');
         Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
+        Route::get('/item-categories/import/template', [MassImportController::class, 'templateCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import.template');
+        Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import');
         Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('products.create');
         Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('products.store');
         Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
@@ -294,6 +296,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->middleware('perm:masters.customers.view')->name('customers-web.export.csv');
         Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import.template');
         Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import');
+        Route::get('/customer-ship-locations/import/template', [MassImportController::class, 'templateCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import.template');
+        Route::post('/customer-ship-locations/import', [MassImportController::class, 'importCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import');
         Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->middleware('perm:masters.customers.manage')->name('customers-web.create');
         Route::post('/customers-web', [CustomerPageController::class, 'store'])->middleware('perm:masters.customers.manage')->name('customers-web.store');
         Route::get('/customers-web/{customer}/edit', [CustomerPageController::class, 'edit'])->middleware('perm:masters.customers.manage')->name('customers-web.edit');

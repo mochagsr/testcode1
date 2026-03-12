@@ -28,7 +28,10 @@
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.item_categories_title') }}</h1>
-        <a class="btn" href="{{ route('item-categories.create') }}">{{ __('ui.add_category') }}</a>
+        <div class="flex" style="gap:8px;">
+            <a class="btn info-btn" href="{{ route('item-categories.import.template') }}">Template Import</a>
+            <a class="btn" href="{{ route('item-categories.create') }}">{{ __('ui.add_category') }}</a>
+        </div>
     </div>
 
     <div class="card">
@@ -42,6 +45,11 @@
     </div>
 
     <div class="card">
+        <form method="post" action="{{ route('item-categories.import') }}" enctype="multipart/form-data" class="flex" style="margin-bottom: 12px;">
+            @csrf
+            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" style="max-width: 280px;" required>
+            <button type="submit" class="btn process-btn">Import</button>
+        </form>
         <table class="item-categories-table">
             <thead>
             <tr>

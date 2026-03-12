@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\CustomerShipLocation;
 use App\Models\CustomerLevel;
 use App\Models\InvoicePayment;
 use App\Models\ItemCategory;
@@ -23,6 +24,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -52,6 +54,22 @@ class MassImportController extends Controller
             ['name', 'level', 'phone', 'city', 'address', 'notes'],
             ['Toko Sumber Ilmu', 'Agen', '08123456789', 'Malang', 'Jl. Soekarno Hatta 10', 'Customer lama'],
         ], 'Customers');
+    }
+
+    public function templateCategories(): StreamedResponse
+    {
+        return $this->downloadTemplate('template-import-item-categories.xlsx', [
+            ['code', 'name', 'description'],
+            ['', 'Paket SD', 'Kategori paket sekolah dasar'],
+        ], 'ItemCategories');
+    }
+
+    public function templateCustomerShipLocations(): StreamedResponse
+    {
+        return $this->downloadTemplate('template-import-customer-ship-locations.xlsx', [
+            ['customer', 'school_name', 'phone', 'city', 'address', 'notes', 'is_active'],
+            ['CUS-01012026-0001', 'SDN Prambon 1', '08123456789', 'Sidoarjo', 'Jl. Raya Prambon No. 1', 'Lokasi kirim utama', 1],
+        ], 'ShipLocations');
     }
 
     public function templateSuppliers(): StreamedResponse
@@ -258,6 +276,162 @@ class MassImportController extends Controller
         AppCache::forgetAfterFinancialMutation();
 
         return back()->with('success', "Import selesai. Baru: {$created}, Update: {$updated}, Error: ".count($errors))
+            ->with('import_errors', $errors);
+    }
+
+    public function importCategories(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+        ]);
+
+        $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
+        if ($rows === []) {
+            return back()->with('error', 'File import kosong.');
+        }
+
+        $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $errors = [];
+        $created = 0;
+        $updated = 0;
+
+        DB::transaction(function () use ($rows, $headers, &$errors, &$created, &$updated): void {
+            foreach ($rows as $rowIndex => $row) {
+                $data = $this->mapRow($headers, $row);
+                if ($this->isEmptyRow($data)) {
+                    continue;
+                }
+
+                $validator = Validator::make($data, [
+                    'name' => ['required', 'string', 'max:150'],
+                    'description' => ['nullable', 'string'],
+                    'code' => ['nullable', 'string', 'max:50'],
+                ]);
+
+                if ($validator->fails()) {
+                    $errors[] = 'Baris '.($rowIndex + 2).': '.implode('; ', $validator->errors()->all());
+                    continue;
+                }
+
+                $name = trim((string) $data['name']);
+                $code = $this->resolveImportCategoryCode((string) ($data['code'] ?? ''), $name);
+
+                $existing = ItemCategory::query()
+                    ->where('code', $code)
+                    ->orWhere('name', $name)
+                    ->first();
+
+                $payload = [
+                    'code' => $code,
+                    'name' => $name,
+                    'description' => (string) ($data['description'] ?? ''),
+                ];
+
+                if ($existing !== null) {
+                    $existing->update($payload);
+                    $updated++;
+                    continue;
+                }
+
+                ItemCategory::query()->create($payload);
+                $created++;
+            }
+        });
+
+        $this->auditLogService->log(
+            'master.category.import',
+            null,
+            "Import categories: created={$created}, updated={$updated}, errors=".count($errors),
+            $request
+        );
+
+        return back()->with('success', "Import kategori selesai. Baru: {$created}, Update: {$updated}, Error: ".count($errors))
+            ->with('import_errors', $errors);
+    }
+
+    public function importCustomerShipLocations(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+        ]);
+
+        $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
+        if ($rows === []) {
+            return back()->with('error', 'File import kosong.');
+        }
+
+        $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $errors = [];
+        $created = 0;
+        $updated = 0;
+
+        DB::transaction(function () use ($rows, $headers, &$errors, &$created, &$updated): void {
+            foreach ($rows as $rowIndex => $row) {
+                $data = $this->mapRow($headers, $row);
+                if ($this->isEmptyRow($data)) {
+                    continue;
+                }
+
+                $validator = Validator::make($data, [
+                    'customer' => ['required', 'string', 'max:150'],
+                    'school_name' => ['required', 'string', 'max:150'],
+                    'phone' => ['nullable', 'string', 'max:30'],
+                    'city' => ['nullable', 'string', 'max:100'],
+                    'address' => ['nullable', 'string'],
+                    'notes' => ['nullable', 'string'],
+                    'is_active' => ['nullable'],
+                ]);
+
+                if ($validator->fails()) {
+                    $errors[] = 'Baris '.($rowIndex + 2).': '.implode('; ', $validator->errors()->all());
+                    continue;
+                }
+
+                $customerLookup = trim((string) $data['customer']);
+                $customer = Customer::query()
+                    ->where('name', $customerLookup)
+                    ->orWhere('code', $customerLookup)
+                    ->first();
+                if ($customer === null) {
+                    $errors[] = 'Baris '.($rowIndex + 2).': customer tidak ditemukan.';
+                    continue;
+                }
+
+                $payload = [
+                    'customer_id' => (int) $customer->id,
+                    'school_name' => trim((string) $data['school_name']),
+                    'recipient_name' => null,
+                    'recipient_phone' => (string) ($data['phone'] ?? ''),
+                    'city' => (string) ($data['city'] ?? ''),
+                    'address' => (string) ($data['address'] ?? ''),
+                    'notes' => (string) ($data['notes'] ?? ''),
+                    'is_active' => $this->importTruthy($data['is_active'] ?? '1'),
+                ];
+
+                $existing = CustomerShipLocation::query()
+                    ->where('customer_id', (int) $customer->id)
+                    ->where('school_name', $payload['school_name'])
+                    ->first();
+
+                if ($existing !== null) {
+                    $existing->update($payload);
+                    $updated++;
+                    continue;
+                }
+
+                CustomerShipLocation::query()->create($payload);
+                $created++;
+            }
+        });
+
+        $this->auditLogService->log(
+            'master.customer_ship_location.import',
+            null,
+            "Import ship locations: created={$created}, updated={$updated}, errors=".count($errors),
+            $request
+        );
+
+        return back()->with('success', "Import lokasi kirim selesai. Baru: {$created}, Update: {$updated}, Error: ".count($errors))
             ->with('import_errors', $errors);
     }
 
@@ -610,6 +784,39 @@ class MassImportController extends Controller
             ->count() + 1;
 
         return sprintf('%s-%04d', $prefix, $count);
+    }
+
+    private function resolveImportCategoryCode(string $rawCode, string $name): string
+    {
+        $candidate = trim($rawCode);
+        if ($candidate === '') {
+            $parts = preg_split('/\s+/', Str::lower(trim($name))) ?: [];
+            $candidate = collect($parts)
+                ->filter(fn (string $part): bool => $part !== '')
+                ->map(fn (string $part): string => Str::ascii($part))
+                ->map(fn (string $part): string => strlen($part) <= 3 ? $part : substr($part, 0, 3))
+                ->implode('');
+            $candidate = preg_replace('/[^a-z0-9]/', '', $candidate) ?: 'cat';
+        }
+
+        $base = strtolower(preg_replace('/[^a-z0-9]/', '', Str::ascii($candidate)) ?: 'cat');
+        $code = $base;
+        $suffix = 1;
+        while (ItemCategory::query()->where('code', $code)->exists()) {
+            $existingName = (string) (ItemCategory::query()->where('code', $code)->value('name') ?? '');
+            if (strcasecmp($existingName, $name) === 0) {
+                return $code;
+            }
+            $code = $base.$suffix;
+            $suffix++;
+        }
+
+        return $code;
+    }
+
+    private function importTruthy(mixed $value): bool
+    {
+        return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'ya', 'aktif'], true);
     }
 
     /**

@@ -5,10 +5,18 @@
 @section('content')
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('school_bulk.ship_location_master_title') }}</h1>
-        <a class="btn" href="{{ route('customer-ship-locations.create') }}">{{ __('school_bulk.add_ship_location') }}</a>
+        <div class="flex" style="gap:8px;">
+            <a class="btn info-btn" href="{{ route('customer-ship-locations.import.template') }}">Template Import</a>
+            <a class="btn" href="{{ route('customer-ship-locations.create') }}">{{ __('school_bulk.add_ship_location') }}</a>
+        </div>
     </div>
 
     <div class="card">
+        <form method="post" action="{{ route('customer-ship-locations.import') }}" enctype="multipart/form-data" class="flex" style="margin-bottom: 12px;">
+            @csrf
+            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" style="max-width: 280px;" required>
+            <button type="submit" class="btn process-btn">Import</button>
+        </form>
         <form method="get" class="flex">
             <select name="customer_id" style="max-width: 280px;">
                 <option value="">{{ __('school_bulk.all_customers') }}</option>

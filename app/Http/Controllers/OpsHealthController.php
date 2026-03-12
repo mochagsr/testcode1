@@ -22,9 +22,14 @@ class OpsHealthController extends Controller
             ->whereIn('status', ['queued', 'processing'])
             ->count();
         $pendingApprovals = (int) ApprovalRequest::query()->pending()->count();
-        $latestBackup = collect(Storage::disk('local')->files('backups'))
+        $backupFiles = collect(Storage::disk('local')->files('backups'))
+            ->merge(Storage::disk('local')->files('backups/db'))
             ->sort()
-            ->last();
+            ->values();
+        $latestBackup = $backupFiles->last();
+        $latestRestoreDrill = Schema::hasTable('restore_drill_logs')
+            ? DB::table('restore_drill_logs')->latest('checked_at')->latest('id')->first()
+            : null;
         $latestIntegrityLog = null;
         $integrityIssueRuns7d = 0;
         if (Schema::hasTable('integrity_check_logs')) {
@@ -51,6 +56,8 @@ class OpsHealthController extends Controller
             'pendingReportTasks' => $pendingReportTasks,
             'pendingApprovals' => $pendingApprovals,
             'latestBackup' => $latestBackup,
+            'backupFileCount' => $backupFiles->count(),
+            'latestRestoreDrill' => $latestRestoreDrill,
             'dbConnection' => (string) config('database.default'),
             'appEnv' => (string) config('app.env'),
             'appDebug' => (bool) config('app.debug'),

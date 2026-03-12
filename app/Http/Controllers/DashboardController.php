@@ -9,6 +9,7 @@ use App\Models\OrderNote;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
 use App\Models\SalesInvoice;
+use App\Models\Supplier;
 use App\Support\AppCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -26,8 +27,12 @@ class DashboardController extends Controller
         $currentQuery = request()->query();
         $uncollectedPerPage = 20;
         $pendingOrderNotesPerPage = 20;
+        $supplierExpensePerPage = 20;
+        $lowStockPerPage = 20;
         $uncollectedPageName = 'uncollected_customers_page';
         $pendingOrderNotesPageName = 'pending_order_notes_page';
+        $supplierExpensePageName = 'supplier_expense_page';
+        $lowStockPageName = 'low_stock_page';
 
         if (! $this->hasRequiredDashboardTables()) {
             return view('dashboard', [
@@ -35,12 +40,14 @@ class DashboardController extends Controller
                     'total_products' => 0,
                     'total_customers' => 0,
                     'total_receivable' => 0,
+                    'total_supplier_payable' => 0,
                     'invoice_this_month' => 0,
                     'outgoing_this_month' => 0,
                 ],
                 'uncollectedCustomers' => $this->emptyPaginator($uncollectedPerPage, $currentPath, $currentQuery, $uncollectedPageName),
                 'pendingOrderNotes' => $this->emptyPaginator($pendingOrderNotesPerPage, $currentPath, $currentQuery, $pendingOrderNotesPageName),
-                'supplierExpenseRecap' => $this->emptyPaginator(20, $currentPath, $currentQuery, 'supplier_expense_page'),
+                'supplierExpenseRecap' => $this->emptyPaginator($supplierExpensePerPage, $currentPath, $currentQuery, $supplierExpensePageName),
+                'lowStockProducts' => $this->emptyPaginator($lowStockPerPage, $currentPath, $currentQuery, $lowStockPageName),
             ]);
         }
 
@@ -57,6 +64,7 @@ class DashboardController extends Controller
                 'total_products' => Product::count(),
                 'total_customers' => Customer::count(),
                 'total_receivable' => Customer::sum('outstanding_receivable'),
+                'total_supplier_payable' => $hasOutgoingTable ? Supplier::sum('outstanding_payable') : 0,
                 'invoice_this_month' => SalesInvoice::query()
                     ->whereYear('invoice_date', $now->year)
                     ->whereMonth('invoice_date', $now->month)
@@ -77,7 +85,25 @@ class DashboardController extends Controller
             ->paginate($uncollectedPerPage, ['*'], $uncollectedPageName)
             ->withQueryString();
 
-        $supplierExpenseRecap = $this->emptyPaginator(20, $currentPath, $currentQuery, 'supplier_expense_page');
+        $supplierExpenseRecap = $hasOutgoingTable
+            ? Supplier::query()
+                ->onlyListColumns()
+                ->where('outstanding_payable', '>', 0)
+                ->orderByDesc('outstanding_payable')
+                ->orderBy('name')
+                ->paginate($supplierExpensePerPage, ['*'], $supplierExpensePageName)
+                ->withQueryString()
+            : $this->emptyPaginator($supplierExpensePerPage, $currentPath, $currentQuery, $supplierExpensePageName);
+
+        $lowStockProducts = Product::query()
+            ->onlyListColumns()
+            ->withCategoryInfo()
+            ->where('stock', '<=', 10)
+            ->orderBy('stock')
+            ->orderBy('name')
+            ->paginate($lowStockPerPage, ['*'], $lowStockPageName)
+            ->withQueryString();
+
         $pendingOrderNotes = $hasOrderNoteTable
             ? $this->pendingOrderNotesPaginator($pendingOrderNotesPerPage, $pendingOrderNotesPageName)
             : $this->emptyPaginator($pendingOrderNotesPerPage, $currentPath, $currentQuery, $pendingOrderNotesPageName);
@@ -87,6 +113,7 @@ class DashboardController extends Controller
             'uncollectedCustomers' => $uncollectedCustomers,
             'pendingOrderNotes' => $pendingOrderNotes,
             'supplierExpenseRecap' => $supplierExpenseRecap,
+            'lowStockProducts' => $lowStockProducts,
         ]);
     }
 

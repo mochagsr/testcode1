@@ -40,8 +40,32 @@
             <tr><th>Queued Report Tasks</th><td>{{ $pendingReportTasks }}</td></tr>
             <tr><th>Pending Approval</th><td>{{ $pendingApprovals }}</td></tr>
             <tr><th>Latest Backup File</th><td>{{ $latestBackup ?: '-' }}</td></tr>
+            <tr><th>Total Backup Files</th><td>{{ number_format((int) $backupFileCount, 0, ',', '.') }}</td></tr>
             </tbody>
         </table>
+    </div>
+
+    <div class="card ops-col-6">
+        <h3 style="margin-top:0;">Restore Drill</h3>
+        @if($latestRestoreDrill)
+            <table class="ops-kv">
+                <tbody>
+                <tr>
+                    <th>Status Terakhir</th>
+                    <td>
+                        <span class="{{ ($latestRestoreDrill->status ?? '') === 'passed' ? 'ops-metric-ok' : 'ops-metric-bad' }}">
+                            {{ strtoupper((string) ($latestRestoreDrill->status ?? '-')) }}
+                        </span>
+                    </td>
+                </tr>
+                <tr><th>Checked At</th><td>{{ \Illuminate\Support\Carbon::parse((string) $latestRestoreDrill->checked_at)->format('d-m-Y H:i:s') }}</td></tr>
+                <tr><th>Backup File</th><td>{{ $latestRestoreDrill->backup_file ?: '-' }}</td></tr>
+                <tr><th>Message</th><td>{{ $latestRestoreDrill->message ?: '-' }}</td></tr>
+                </tbody>
+            </table>
+        @else
+            <div class="muted">Belum ada restore drill log. Jalankan `php artisan app:db-restore-test`.</div>
+        @endif
     </div>
 
     <div class="card ops-col-6">

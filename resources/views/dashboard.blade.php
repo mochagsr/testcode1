@@ -19,6 +19,10 @@
             <div class="stat-value">Rp {{ number_format((int) round($summary['total_receivable']), 0, ',', '.') }}</div>
         </div>
         <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_total_supplier_payable') }}</div>
+            <div class="stat-value">Rp {{ number_format((int) round($summary['total_supplier_payable'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="stat">
             <div class="stat-label">{{ __('ui.dashboard_invoice_this_month') }}</div>
             <div class="stat-value">Rp {{ number_format((int) round($summary['invoice_this_month']), 0, ',', '.') }}</div>
         </div>
@@ -96,6 +100,75 @@
                 @if(method_exists($pendingOrderNotes, 'links'))
                     <div style="margin-top: 12px;">
                         {{ $pendingOrderNotes->links() }}
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="margin-top: 8px;">
+        <div class="col-6">
+            <div class="card">
+                <h3>{{ __('ui.dashboard_supplier_expense_recap') }}</h3>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>{{ __('ui.name') }}</th>
+                        <th>{{ __('ui.phone') }}</th>
+                        <th>{{ __('supplier_payable.outstanding') }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @forelse ($supplierExpenseRecap as $supplier)
+                        <tr>
+                            <td>{{ $supplier->name }}</td>
+                            <td>{{ $supplier->phone ?: '-' }}</td>
+                            <td>Rp {{ number_format((int) round($supplier->outstanding_payable ?? 0), 0, ',', '.') }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="muted">{{ __('ui.dashboard_no_supplier_expense_recap') }}</td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                </table>
+                @if(method_exists($supplierExpenseRecap, 'links'))
+                    <div style="margin-top: 12px;">
+                        {{ $supplierExpenseRecap->links() }}
+                    </div>
+                @endif
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card">
+                <h3>{{ __('ui.dashboard_low_stock_products') }}</h3>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>{{ __('ui.code') }}</th>
+                        <th>{{ __('ui.category') }}</th>
+                        <th>{{ __('ui.name') }}</th>
+                        <th>{{ __('ui.stock') }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @forelse ($lowStockProducts as $product)
+                        <tr>
+                            <td>{{ $product->code }}</td>
+                            <td>{{ $product->category?->name ?: '-' }}</td>
+                            <td>{{ $product->name }}</td>
+                            <td>{{ number_format((int) ($product->stock ?? 0), 0, ',', '.') }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="muted">{{ __('ui.dashboard_no_low_stock_products') }}</td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                </table>
+                @if(method_exists($lowStockProducts, 'links'))
+                    <div style="margin-top: 12px;">
+                        {{ $lowStockProducts->links() }}
                     </div>
                 @endif
             </div>
