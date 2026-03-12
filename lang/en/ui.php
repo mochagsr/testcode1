@@ -128,7 +128,7 @@ return [
     'search_audit_logs_placeholder' => 'Search action/user/description...',
     'all_levels' => 'All Levels',
     'loading' => 'Loading...',
-    'export_audit_csv' => 'Export Audit CSV',
+    'export_audit_csv' => 'Export Audit Excel',
     'audit_module_all' => 'All Modules',
     'audit_module_sales_invoice' => 'Sales Invoices',
     'audit_module_sales_return' => 'Sales Returns',
@@ -368,4 +368,5 @@ return [
     'supplier_deleted_success' => 'Supplier deleted successfully.',
     'duplicate_submit_blocked' => 'Duplicate submission detected. Please wait a few seconds and try again.',
 ];
+
 

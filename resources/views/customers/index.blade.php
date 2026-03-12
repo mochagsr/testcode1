@@ -3,31 +3,79 @@
 @section('title', __('ui.customers_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .customers-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .customers-toolbar .toolbar-left,
+        .customers-toolbar .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .customers-toolbar .toolbar-left {
+            flex: 1 1 420px;
+        }
+        .customers-toolbar .toolbar-right {
+            justify-content: flex-end;
+            flex: 1 1 460px;
+        }
+        .customers-toolbar .search-form,
+        .customers-toolbar .import-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+            margin: 0;
+        }
+        .customers-toolbar .search-form input[type="text"] {
+            width: 320px;
+            max-width: 320px;
+        }
+        .customers-toolbar .search-form select {
+            width: 250px;
+            max-width: 250px;
+            margin-left: 0;
+        }
+        .customers-toolbar .import-form input[type="file"] {
+            width: 320px;
+            max-width: 320px;
+        }
+    </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.customers_title') }}</h1>
         <a class="btn" href="{{ route('customers-web.create') }}">{{ __('ui.add_customer') }}</a>
     </div>
 
     <div class="card">
-        <form id="customers-search-form" method="get" class="flex">
-            <input id="customers-search-input" type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <select name="level_id" id="customers-level-filter" style="max-width: 250px; margin-left: 12px;">
-                <option value="">{{ __('ui.all_levels') }}</option>
-                @foreach($levels as $level)
-                    <option value="{{ $level->id }}" @selected((int) $selectedLevelId === (int) $level->id)>{{ $level->code }} - {{ $level->name }}</option>
-                @endforeach
-            </select>
-            <button type="submit">{{ __('ui.search') }}</button>
-            <div style="margin-left: auto;">
-                <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">{{ __('txn.excel') }}</a>
-                <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
+        <div class="customers-toolbar">
+            <div class="toolbar-left">
+                <form id="customers-search-form" method="get" class="search-form">
+                    <input id="customers-search-input" type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}">
+                    <select name="level_id" id="customers-level-filter">
+                        <option value="">{{ __('ui.all_levels') }}</option>
+                        @foreach($levels as $level)
+                            <option value="{{ $level->id }}" @selected((int) $selectedLevelId === (int) $level->id)>{{ $level->code }} - {{ $level->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit">{{ __('ui.search') }}</button>
+                </form>
             </div>
-        </form>
-        <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data" class="flex" style="margin-top:8px;">
-            @csrf
-            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width:320px;">
-            <button type="submit" class="btn process-btn">Import</button>
-        </form>
+            <div class="toolbar-right">
+                <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data" class="import-form">
+                    @csrf
+                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    <button type="submit" class="btn process-btn">Import</button>
+                    <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
+                    <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">Export Excel</a>
+                </form>
+            </div>
+        </div>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
                 <strong>Error Import:</strong>

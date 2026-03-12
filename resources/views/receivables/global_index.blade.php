@@ -39,10 +39,10 @@
                     {{ $selectedCustomerId > 0 ? 'Print Invoice' : __('txn.print') }}
                 </a>
                 <a class="btn danger-btn" target="_blank" href="{{ route('receivables.global.export.pdf', request()->query()) }}">
-                    {{ $selectedCustomerId > 0 ? 'Download Invoice PDF' : 'Download PDF' }}
+                    {{ $selectedCustomerId > 0 ? 'Export Invoice PDF' : 'Export PDF' }}
                 </a>
                 <a class="btn payment-btn" href="{{ route('receivables.global.export.excel', request()->query()) }}">
-                    {{ $selectedCustomerId > 0 ? 'Download Invoice Excel' : 'Download Excel' }}
+                    {{ $selectedCustomerId > 0 ? 'Export Invoice Excel' : 'Export Excel' }}
                 </a>
             </div>
         </form>
@@ -113,3 +113,4 @@
         @endif
     </div>
 @endsection
+

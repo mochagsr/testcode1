@@ -20,6 +20,7 @@
             --sidebar-group-hover: rgba(255, 255, 255, 0.04);
             --sidebar-group-active: rgba(255, 255, 255, 0.08);
             --sidebar-group-border: rgba(255, 255, 255, 0.18);
+            --sidebar-group-title-active-bg: rgba(255, 255, 255, 0.08);
             --sidebar-sub-text: #e6e6e6;
             --sidebar-sub-active: #4a4a4a;
             --sidebar-sub-active-border: #d9d9d9;
@@ -153,7 +154,11 @@
             font-weight: 700;
         }
         .nav-group-title {
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            border: none;
             color: var(--sidebar-text);
             padding: 8px 12px 6px;
             border-radius: 8px;
@@ -161,19 +166,37 @@
             position: relative;
             z-index: 1;
             background: transparent !important;
+            text-align: left;
+            cursor: pointer;
+            font: inherit;
+        }
+        .nav-group-title::after {
+            content: '+';
+            font-size: 16px;
+            line-height: 1;
+            color: var(--sidebar-muted);
         }
         .nav-group-title.active {
             color: var(--sidebar-active-text);
         }
-        .nav-group.active .nav-group-title {
-            background: transparent !important;
+        .nav-group.active .nav-group-title::after {
+            content: '-';
             color: var(--sidebar-active-text);
+        }
+        .nav-group.active .nav-group-title {
+            background: var(--sidebar-group-title-active-bg) !important;
+            color: var(--sidebar-active-text);
+            border: 1px solid var(--sidebar-group-border);
         }
         .nav-sub {
             padding: 0 6px 2px;
             overflow: hidden;
             position: relative;
             z-index: 1;
+            display: none;
+        }
+        .nav-group.active .nav-sub {
+            display: block;
         }
         .nav-group.active .nav-sub a {
             color: var(--sidebar-text);
@@ -658,7 +681,7 @@
 @php
     $isDark = auth()->check() && auth()->user()->theme === 'dark';
 @endphp
-<body @if($isDark) style="--bg:#111827;--surface:#111827;--card:#1F2937;--text:#F9FAFB;--muted:#9CA3AF;--border:#374151;--accent:#F9FAFB;--sidebar-bg:#1F2937;--sidebar-text:#D1D5DB;--sidebar-muted:#9CA3AF;--sidebar-hover:#2563EB;--sidebar-group-hover:rgba(37,99,235,0.12);--sidebar-group-active:rgba(37,99,235,0.18);--sidebar-group-border:rgba(37,99,235,0.35);--sidebar-sub-text:#D1D5DB;--sidebar-sub-active:#2563EB;--sidebar-sub-active-border:#2563EB;--sidebar-active-text:#FFFFFF;--table-bg:#1F2937;--table-header-bg:#111827;--table-border:#374151;--table-border-soft:#374151;--input-bg:#111827;--link:#93c5fd;--link-hover:#bfdbfe;--btn-secondary-bg:#374151;--btn-secondary-text:#F9FAFB;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-increase-bg:#11301f;--alert-increase-border:#4fb06e;--alert-increase-text:#d9ffe7;--alert-decrease-bg:#3a1717;--alert-decrease-border:#d86868;--alert-decrease-text:#ffd9d9;--alert-edit-bg:#3f3415;--alert-edit-border:#d3b25a;--alert-edit-text:#ffedb8;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
+<body @if($isDark) style="--bg:#111827;--surface:#111827;--card:#1F2937;--text:#F9FAFB;--muted:#9CA3AF;--border:#374151;--accent:#F9FAFB;--sidebar-bg:#1F2937;--sidebar-text:#D1D5DB;--sidebar-muted:#9CA3AF;--sidebar-hover:#2563EB;--sidebar-group-hover:rgba(37,99,235,0.12);--sidebar-group-active:rgba(37,99,235,0.18);--sidebar-group-border:rgba(37,99,235,0.35);--sidebar-group-title-active-bg:rgba(37,99,235,0.20);--sidebar-sub-text:#D1D5DB;--sidebar-sub-active:#2563EB;--sidebar-sub-active-border:#2563EB;--sidebar-active-text:#FFFFFF;--table-bg:#1F2937;--table-header-bg:#111827;--table-border:#374151;--table-border-soft:#374151;--input-bg:#111827;--link:#93c5fd;--link-hover:#bfdbfe;--btn-secondary-bg:#374151;--btn-secondary-text:#F9FAFB;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-increase-bg:#11301f;--alert-increase-border:#4fb06e;--alert-increase-text:#d9ffe7;--alert-decrease-bg:#3a1717;--alert-decrease-border:#d86868;--alert-decrease-text:#ffd9d9;--alert-edit-bg:#3f3415;--alert-edit-border:#d3b25a;--alert-edit-text:#ffedb8;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
 <div class="wrap">
     <aside class="sidebar">
         <div class="brand">PgPOS ERP</div>
@@ -666,16 +689,15 @@
             <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">{{ __('menu.dashboard') }}</a>
             @auth
                 @if(auth()->user()->role === 'admin')
-                    <span class="nav-section-title">{{ __('ui.nav_master_data') }}</span>
-                    <div class="nav-group {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}">
-                        <span class="nav-group-title {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}">{{ __('ui.nav_items_group') }}</span>
+                    <div class="nav-group {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-group>
+                        <button type="button" class="nav-group-title {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_items_group') }}</button>
                         <div class="nav-sub">
                             <a href="{{ route('item-categories.index') }}" class="{{ request()->routeIs('item-categories.*') ? 'active' : '' }}">{{ __('menu.item_categories') }}</a>
                             <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'active' : '' }}">{{ __('menu.items') }}</a>
                         </div>
                     </div>
-                    <div class="nav-group {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}">
-                        <span class="nav-group-title {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}">{{ __('ui.nav_customers_group') }}</span>
+                    <div class="nav-group {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}" data-nav-group>
+                        <button type="button" class="nav-group-title {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_customers_group') }}</button>
                         <div class="nav-sub">
                             <a href="{{ route('customer-levels-web.index') }}" class="{{ request()->routeIs('customer-levels-web.*') ? 'active' : '' }}">{{ __('menu.customer_levels') }}</a>
                             <a href="{{ route('customers-web.index') }}" class="{{ request()->routeIs('customers-web.*') ? 'active' : '' }}">{{ __('menu.customers') }}</a>
@@ -684,8 +706,8 @@
                 @endif
             @endauth
             @auth
-                <div class="nav-group {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}">
-                    <span class="nav-group-title {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</span>
+                <div class="nav-group {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}" data-nav-group>
+                    <button type="button" class="nav-group-title {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}" data-nav-toggle>{{ __('menu.suppliers') }}</button>
                     <div class="nav-sub">
                         @if(auth()->user()->role === 'admin')
                             <a href="{{ route('suppliers.index') }}" class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</a>
@@ -697,16 +719,16 @@
                 </div>
             @endauth
             @auth
-                <div class="nav-group {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">
-                    <span class="nav-group-title {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">{{ __('menu.school_distribution') }}</span>
+                <div class="nav-group {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}" data-nav-group>
+                    <button type="button" class="nav-group-title {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}" data-nav-toggle>{{ __('menu.school_distribution') }}</button>
                     <div class="nav-sub">
                         <a href="{{ route('customer-ship-locations.index') }}" class="{{ request()->routeIs('customer-ship-locations.*') ? 'active' : '' }}">{{ __('menu.ship_locations') }}</a>
                         <a href="{{ route('school-bulk-transactions.index') }}" class="{{ request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">{{ __('menu.school_bulk_transactions') }}</a>
                     </div>
                 </div>
             @endauth
-            <div class="nav-group {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}">
-                <span class="nav-group-title {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('ui.nav_transactions') }}</span>
+            <div class="nav-group {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-group>
+                <button type="button" class="nav-group-title {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_transactions') }}</button>
                 <div class="nav-sub">
                     <a href="{{ route('sales-invoices.index') }}" class="{{ request()->routeIs('sales-invoices.*') ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
                     <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
@@ -715,8 +737,8 @@
                     <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
                 </div>
             </div>
-            <div class="nav-group {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">
-                <span class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivables') }}</span>
+            <div class="nav-group {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}" data-nav-group>
+                <button type="button" class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}" data-nav-toggle>{{ __('menu.receivables') }}</button>
                 <div class="nav-sub">
                     <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.index') || request()->routeIs('receivables.customer-*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
                     <a href="{{ route('receivables.global.index') }}" class="{{ request()->routeIs('receivables.global.*') ? 'active' : '' }}">{{ __('menu.receivable_global') }}</a>
@@ -724,15 +746,15 @@
                     <a href="{{ route('receivable-payments.index') }}" class="{{ request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivable_payments') }}</a>
                 </div>
             </div>
-            <div class="nav-group {{ request()->routeIs('reports.*') ? 'active' : '' }}">
-                <span class="nav-group-title {{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('ui.nav_reports') }}</span>
+            <div class="nav-group {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-nav-group>
+                <button type="button" class="nav-group-title {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_reports') }}</button>
                 <div class="nav-sub">
                     <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('menu.reports') }}</a>
                 </div>
             </div>
             @auth
-                <div class="nav-group {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}">
-                    <span class="nav-group-title {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}">{{ __('ui.nav_system') }}</span>
+                <div class="nav-group {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-group>
+                    <button type="button" class="nav-group-title {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_system') }}</button>
                     <div class="nav-sub">
                     @if(auth()->user()->role === 'admin')
                         <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'active' : '' }}">{{ __('menu.users') }}</a>
@@ -797,6 +819,44 @@
 </div>
 <script>
     (function () {
+        const navGroups = Array.from(document.querySelectorAll('[data-nav-group]'));
+        const navStorageKey = 'pgpos-open-nav-group';
+
+        function openNavGroup(targetGroup) {
+            navGroups.forEach((group) => {
+                const shouldOpen = group === targetGroup;
+                group.classList.toggle('active', shouldOpen);
+                if (shouldOpen) {
+                    const groupName = group.querySelector('[data-nav-toggle]')?.textContent?.trim() || '';
+                    if (groupName !== '') {
+                        localStorage.setItem(navStorageKey, groupName);
+                    }
+                }
+            });
+        }
+
+        navGroups.forEach((group) => {
+            const toggle = group.querySelector('[data-nav-toggle]');
+            toggle?.addEventListener('click', () => {
+                if (group.classList.contains('active')) {
+                    return;
+                }
+                openNavGroup(group);
+            });
+        });
+
+        const activeGroup = navGroups.find((group) => group.querySelector('.nav-sub a.active'));
+        const storedGroupName = localStorage.getItem(navStorageKey);
+        const storedGroup = navGroups.find((group) => group.querySelector('[data-nav-toggle]')?.textContent?.trim() === storedGroupName);
+
+        if (activeGroup) {
+            openNavGroup(activeGroup);
+        } else if (storedGroup) {
+            openNavGroup(storedGroup);
+        } else if (navGroups.length > 0) {
+            openNavGroup(navGroups[0]);
+        }
+
         function debounce(fn, wait) {
             let timeoutId = null;
             return (...args) => {

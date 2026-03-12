@@ -4,6 +4,40 @@
 
 @section('content')
     <style>
+        .products-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .products-toolbar .toolbar-left,
+        .products-toolbar .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .products-toolbar .toolbar-left {
+            flex: 1 1 320px;
+        }
+        .products-toolbar .toolbar-right {
+            justify-content: flex-end;
+            flex: 1 1 460px;
+        }
+        .products-toolbar .search-form,
+        .products-toolbar .import-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+            margin: 0;
+        }
+        .products-toolbar .search-form input[type="text"],
+        .products-toolbar .import-form input[type="file"] {
+            width: 320px;
+            max-width: 320px;
+        }
         .products-table {
             table-layout: fixed;
         }
@@ -59,19 +93,23 @@
     </div>
 
     <div class="card">
-        <form id="products-search-form" method="get" class="flex">
-            <input id="products-search-input" type="text" name="search" placeholder="{{ __('ui.search_products_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <button type="submit">{{ __('ui.search') }}</button>
-            <div style="margin-left: auto;">
-                <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">{{ __('txn.excel') }}</a>
-                <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
+        <div class="products-toolbar">
+            <div class="toolbar-left">
+                <form id="products-search-form" method="get" class="search-form">
+                    <input id="products-search-input" type="text" name="search" placeholder="{{ __('ui.search_products_placeholder') }}" value="{{ $search }}">
+                    <button type="submit">{{ __('ui.search') }}</button>
+                </form>
             </div>
-        </form>
-        <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="flex" style="margin-top:8px;">
-            @csrf
-            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width:320px;">
-            <button type="submit" class="btn process-btn product-action-btn">Import</button>
-        </form>
+            <div class="toolbar-right">
+                <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="import-form">
+                    @csrf
+                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    <button type="submit" class="btn process-btn product-action-btn">Import</button>
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">Export Excel</a>
+                </form>
+            </div>
+        </div>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
                 <strong>Error Import:</strong>

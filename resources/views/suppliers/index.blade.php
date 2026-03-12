@@ -3,22 +3,66 @@
 @section('title', __('ui.suppliers_title').' - PgPOS ERP')
 
 @section('content')
-    <h1 class="page-title">{{ __('ui.suppliers_title') }}</h1>
+    <style>
+        .suppliers-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .suppliers-toolbar .toolbar-left,
+        .suppliers-toolbar .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .suppliers-toolbar .toolbar-left {
+            flex: 1 1 320px;
+        }
+        .suppliers-toolbar .toolbar-right {
+            justify-content: flex-end;
+            flex: 1 1 460px;
+        }
+        .suppliers-toolbar .search-form,
+        .suppliers-toolbar .import-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+            margin: 0;
+        }
+        .suppliers-toolbar .search-form input[type="text"],
+        .suppliers-toolbar .import-form input[type="file"] {
+            width: 320px;
+            max-width: 320px;
+        }
+    </style>
+    <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
+        <h1 class="page-title" style="margin: 0;">{{ __('ui.suppliers_title') }}</h1>
+        @if(auth()->user()->role === 'admin')
+            <a class="btn" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
+        @endif
+    </div>
 
     <div class="card">
-        <form id="suppliers-search-form" method="get" class="flex">
-            <input id="suppliers-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('ui.search_suppliers_placeholder') }}" style="max-width:320px;">
-            <button type="submit">{{ __('ui.search') }}</button>
-            @if(auth()->user()->role === 'admin')
-                <a class="btn" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
-            @endif
-            <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
-        </form>
-        <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="flex" style="margin-top:8px;">
-            @csrf
-            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width:320px;">
-            <button type="submit" class="btn process-btn">Import</button>
-        </form>
+        <div class="suppliers-toolbar">
+            <div class="toolbar-left">
+                <form id="suppliers-search-form" method="get" class="search-form">
+                    <input id="suppliers-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('ui.search_suppliers_placeholder') }}">
+                    <button type="submit">{{ __('ui.search') }}</button>
+                </form>
+            </div>
+            <div class="toolbar-right">
+                <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="import-form">
+                    @csrf
+                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    <button type="submit" class="btn process-btn">Import</button>
+                    <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
+                </form>
+            </div>
+        </div>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
                 <strong>Error Import:</strong>

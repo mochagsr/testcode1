@@ -7,6 +7,48 @@
         .item-categories-table {
             table-layout: fixed;
         }
+        .item-categories-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .item-categories-toolbar .toolbar-left,
+        .item-categories-toolbar .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .item-categories-toolbar .toolbar-left {
+            flex: 1 1 320px;
+        }
+        .item-categories-toolbar .toolbar-right {
+            justify-content: flex-end;
+            flex: 1 1 420px;
+        }
+        .item-categories-toolbar .import-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 0;
+        }
+        .item-categories-toolbar .search-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+            margin: 0;
+        }
+        .item-categories-toolbar .search-form input[type="text"] {
+            width: 320px;
+            max-width: 320px;
+        }
+        .item-categories-toolbar .import-form input[type="file"] {
+            max-width: 260px;
+        }
         .item-categories-table th.action-col,
         .item-categories-table td.action-col {
             width: 150px;
@@ -28,28 +70,31 @@
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.item_categories_title') }}</h1>
-        <div class="flex" style="gap:8px;">
-            <a class="btn info-btn" href="{{ route('item-categories.import.template') }}">Template Import</a>
-            <a class="btn" href="{{ route('item-categories.create') }}">{{ __('ui.add_category') }}</a>
+        <a class="btn" href="{{ route('item-categories.create') }}">{{ __('ui.add_category') }}</a>
+    </div>
+
+    <div class="card">
+        <div class="item-categories-toolbar">
+            <div class="toolbar-left">
+                <form id="item-categories-search-form" method="get" class="search-form">
+                    <input id="item-categories-search-input" type="text" name="search" placeholder="{{ __('ui.search_item_categories_placeholder') }}" value="{{ $search }}">
+                    <button type="submit">{{ __('ui.search') }}</button>
+                    @if($search !== '')
+                        <a class="btn secondary" href="{{ route('item-categories.index') }}">{{ __('ui.reset') }}</a>
+                    @endif
+                </form>
+            </div>
+            <div class="toolbar-right">
+                <form method="post" action="{{ route('item-categories.import') }}" enctype="multipart/form-data" class="import-form">
+                    @csrf
+                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    <button type="submit" class="btn process-btn">Import</button>
+                    <a class="btn info-btn" href="{{ route('item-categories.import.template') }}">Template Import</a>
+                </form>
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <form id="item-categories-search-form" method="get" class="flex">
-            <input id="item-categories-search-input" type="text" name="search" placeholder="{{ __('ui.search_item_categories_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <button type="submit">{{ __('ui.search') }}</button>
-            @if($search !== '')
-                <a class="btn secondary" href="{{ route('item-categories.index') }}">{{ __('ui.reset') }}</a>
-            @endif
-        </form>
-    </div>
-
-    <div class="card">
-        <form method="post" action="{{ route('item-categories.import') }}" enctype="multipart/form-data" class="flex" style="margin-bottom: 12px;">
-            @csrf
-            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" style="max-width: 280px;" required>
-            <button type="submit" class="btn process-btn">Import</button>
-        </form>
+        <div style="margin-top: 12px;">
         <table class="item-categories-table">
             <thead>
             <tr>
@@ -81,6 +126,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
 
         <div style="margin-top: 12px;">
             {{ $categories->links() }}

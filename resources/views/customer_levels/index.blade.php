@@ -3,16 +3,38 @@
 @section('title', __('ui.customer_levels_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .customer-levels-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .customer-levels-toolbar .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+            flex: 1 1 320px;
+        }
+        .customer-levels-toolbar .toolbar-left input[type="text"] {
+            width: 320px;
+            max-width: 320px;
+        }
+    </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.customer_levels_title') }}</h1>
         <a class="btn" href="{{ route('customer-levels-web.create') }}">{{ __('ui.add_customer_level') }}</a>
     </div>
 
     <div class="card">
-        <form id="customer-levels-search-form" method="get" class="flex">
-            <input id="customer-levels-search-input" type="text" name="search" placeholder="{{ __('ui.search_customer_levels_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <button type="submit">{{ __('ui.search') }}</button>
-        </form>
+        <div class="customer-levels-toolbar">
+            <form id="customer-levels-search-form" method="get" class="toolbar-left">
+                <input id="customer-levels-search-input" type="text" name="search" placeholder="{{ __('ui.search_customer_levels_placeholder') }}" value="{{ $search }}">
+                <button type="submit">{{ __('ui.search') }}</button>
+            </form>
+        </div>
     </div>
 
     <div class="card">

@@ -128,7 +128,7 @@ return [
     'search_audit_logs_placeholder' => 'Cari action/user/deskripsi...',
     'all_levels' => 'Semua Level',
     'loading' => 'Memuat...',
-    'export_audit_csv' => 'Export CSV Audit',
+    'export_audit_csv' => 'Export Excel Audit',
     'audit_module_all' => 'Semua Modul',
     'audit_module_sales_invoice' => 'Faktur Penjualan',
     'audit_module_sales_return' => 'Retur Penjualan',
@@ -368,4 +368,5 @@ return [
     'supplier_deleted_success' => 'Supplier berhasil dihapus.',
     'duplicate_submit_blocked' => 'Submit ganda terdeteksi. Silakan tunggu beberapa detik sebelum mencoba lagi.',
 ];
+
 
