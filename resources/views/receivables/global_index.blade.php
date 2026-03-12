@@ -3,12 +3,50 @@
 @section('title', __('receivable.global_page_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .receivable-global-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .receivable-global-toolbar .toolbar-left,
+        .receivable-global-toolbar .toolbar-right {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .receivable-global-toolbar .toolbar-left {
+            flex: 1 1 720px;
+        }
+        .receivable-global-toolbar .toolbar-right {
+            flex: 1 1 260px;
+            justify-content: flex-end;
+        }
+        .receivable-global-table-wrap {
+            overflow-x: auto;
+        }
+        .receivable-global-table {
+            min-width: 1160px;
+        }
+        @media (max-width: 1400px) {
+            .receivable-global-toolbar .toolbar-left,
+            .receivable-global-toolbar .toolbar-right {
+                flex: 1 1 100%;
+            }
+            .receivable-global-toolbar .toolbar-right {
+                justify-content: flex-start;
+            }
+        }
+    </style>
     <div class="muted" style="font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:2px;">List</div>
     <h1 class="page-title">{{ __('receivable.global_page_title') }}</h1>
 
     <div class="card">
-        <form method="get" class="flex" style="justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap;">
-            <div class="flex" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
+        <form method="get" class="receivable-global-toolbar">
+            <div class="toolbar-left">
                 <div>
                     <label>{{ __('receivable.customer') }}</label>
                     <select name="customer_id" style="max-width: 260px;">
@@ -34,7 +72,7 @@
                 <button type="submit" class="btn edit-btn">{{ __('txn.search') }}</button>
             </div>
 
-            <div class="flex" style="gap:8px;">
+            <div class="toolbar-right">
                 <a class="btn info-btn" target="_blank" href="{{ route('receivables.global.print', request()->query()) }}">
                     {{ $selectedCustomerId > 0 ? 'Print Invoice' : __('txn.print') }}
                 </a>
@@ -49,8 +87,8 @@
     </div>
 
     <div class="card">
-        <div style="overflow:auto;">
-            <table>
+        <div class="receivable-global-table-wrap">
+            <table class="receivable-global-table">
                 <colgroup>
                     <col style="width: 52px;">
                     <col style="width: 220px;">

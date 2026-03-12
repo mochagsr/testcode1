@@ -39,15 +39,24 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             margin: 0;
+            width: 100%;
+            max-width: 420px;
         }
         .item-categories-toolbar .search-form input[type="text"] {
             width: 320px;
-            max-width: 320px;
+            max-width: min(320px, 100%);
+            flex: 1 1 260px;
+            min-width: 0;
         }
         .item-categories-toolbar .import-form input[type="file"] {
-            max-width: 260px;
+            max-width: min(260px, 100%);
+            flex: 0 1 260px;
+            min-width: 220px;
+        }
+        .item-categories-table-wrap {
+            overflow-x: auto;
         }
         .item-categories-table th.action-col,
         .item-categories-table td.action-col {
@@ -66,6 +75,26 @@
             min-height: 30px;
             padding: 5px 10px;
             white-space: nowrap;
+        }
+        @media (max-width: 1400px) {
+            .item-categories-toolbar .toolbar-left,
+            .item-categories-toolbar .toolbar-right {
+                flex: 1 1 100%;
+            }
+            .item-categories-toolbar .toolbar-right {
+                justify-content: flex-start;
+            }
+        }
+        @media (max-width: 1280px) {
+            .item-categories-toolbar .search-form,
+            .item-categories-toolbar .import-form {
+                width: 100%;
+            }
+            .item-categories-toolbar .search-form input[type="text"],
+            .item-categories-toolbar .import-form input[type="file"] {
+                width: min(100%, 280px);
+                max-width: min(100%, 280px);
+            }
         }
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -94,7 +123,7 @@
             </div>
         </div>
 
-        <div style="margin-top: 12px;">
+        <div style="margin-top: 12px;" class="item-categories-table-wrap">
         <table class="item-categories-table">
             <thead>
             <tr>

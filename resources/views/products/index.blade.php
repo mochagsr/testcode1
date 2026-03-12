@@ -30,16 +30,35 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             margin: 0;
+        }
+        .products-toolbar .search-form {
+            width: 100%;
+            max-width: 420px;
         }
         .products-toolbar .search-form input[type="text"],
         .products-toolbar .import-form input[type="file"] {
             width: 320px;
-            max-width: 320px;
+            max-width: min(320px, 100%);
+        }
+        .products-toolbar .search-form input[type="text"] {
+            flex: 1 1 260px;
+            min-width: 0;
+        }
+        .products-toolbar .import-form {
+            justify-content: flex-start;
+        }
+        .products-toolbar .import-form input[type="file"] {
+            flex: 0 1 260px;
+            min-width: 220px;
+        }
+        .products-table-wrap {
+            overflow-x: auto;
         }
         .products-table {
-            table-layout: fixed;
+            table-layout: auto;
+            min-width: 1180px;
         }
         .products-table th,
         .products-table td {
@@ -67,7 +86,10 @@
             width: 360px;
         }
         .products-table td.name-col {
-            word-break: break-word;
+            min-width: 230px;
+            white-space: normal;
+            word-break: normal;
+            overflow-wrap: anywhere;
         }
         .products-table td.stock-col,
         .products-table td.price-col {
@@ -85,6 +107,33 @@
             line-height: 1.2;
             border-radius: 7px;
             white-space: nowrap;
+        }
+        @media (max-width: 1400px) {
+            .products-toolbar .toolbar-left,
+            .products-toolbar .toolbar-right {
+                flex: 1 1 100%;
+            }
+            .products-toolbar .toolbar-right {
+                justify-content: flex-start;
+            }
+            .products-toolbar .import-form input[type="file"] {
+                width: 260px;
+                max-width: 260px;
+            }
+        }
+        @media (max-width: 1280px) {
+            .products-toolbar {
+                align-items: flex-start;
+            }
+            .products-toolbar .search-form,
+            .products-toolbar .import-form {
+                width: 100%;
+            }
+            .products-toolbar .search-form input[type="text"],
+            .products-toolbar .import-form input[type="file"] {
+                width: min(100%, 280px);
+                max-width: min(100%, 280px);
+            }
         }
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -123,6 +172,7 @@
     </div>
 
     <div class="card">
+        <div class="products-table-wrap">
         <table class="products-table">
             <thead>
             <tr>
@@ -179,6 +229,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
 
         <div style="margin-top: 12px;">
             {{ $products->links() }}

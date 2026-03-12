@@ -3,11 +3,49 @@
 @section('title', __('receivable.semester_page_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .receivable-semester-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .receivable-semester-toolbar .toolbar-left,
+        .receivable-semester-toolbar .toolbar-right {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .receivable-semester-toolbar .toolbar-left {
+            flex: 1 1 720px;
+        }
+        .receivable-semester-toolbar .toolbar-right {
+            flex: 1 1 240px;
+            justify-content: flex-end;
+        }
+        .receivable-semester-table-wrap {
+            overflow-x: auto;
+        }
+        .receivable-semester-table {
+            min-width: 1120px;
+        }
+        @media (max-width: 1400px) {
+            .receivable-semester-toolbar .toolbar-left,
+            .receivable-semester-toolbar .toolbar-right {
+                flex: 1 1 100%;
+            }
+            .receivable-semester-toolbar .toolbar-right {
+                justify-content: flex-start;
+            }
+        }
+    </style>
     <h1 class="page-title">{{ __('receivable.semester_page_title') }}</h1>
 
     <div class="card">
-        <form method="get" class="flex" style="justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap;">
-            <div class="flex" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
+        <form method="get" class="receivable-semester-toolbar">
+            <div class="toolbar-left">
                 <div>
                     <label>{{ __('receivable.semester_filter') }}</label>
                     <select name="semester" style="max-width: 220px;">
@@ -32,17 +70,17 @@
                 <button type="submit">{{ __('txn.search') }}</button>
             </div>
 
-            <div class="flex" style="gap:8px;">
+            <div class="toolbar-right">
                 <a class="btn info-btn" target="_blank" href="{{ route('receivables.semester.print', request()->query()) }}">{{ __('txn.print') }}</a>
                 <a class="btn info-btn" target="_blank" href="{{ route('receivables.semester.export.pdf', request()->query()) }}">{{ __('txn.pdf') }}</a>
-                <a class="btn info-btn" href="{{ route('receivables.semester.export.excel', request()->query()) }}">{{ __('txn.excel') }}</a>
+                <a class="btn info-btn" href="{{ route('receivables.semester.export.excel', request()->query()) }}">Export Excel</a>
             </div>
         </form>
     </div>
 
     <div class="card">
-        <div style="overflow:auto;">
-            <table>
+        <div class="receivable-semester-table-wrap">
+            <table class="receivable-semester-table">
                 <colgroup>
                     <col style="width: 52px;">
                     <col style="width: 220px;">

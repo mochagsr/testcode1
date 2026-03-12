@@ -30,21 +30,55 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             margin: 0;
+        }
+        .customers-toolbar .search-form {
+            width: 100%;
+            max-width: 680px;
         }
         .customers-toolbar .search-form input[type="text"] {
             width: 320px;
-            max-width: 320px;
+            max-width: min(320px, 100%);
+            flex: 1 1 240px;
+            min-width: 0;
         }
         .customers-toolbar .search-form select {
             width: 250px;
-            max-width: 250px;
+            max-width: min(250px, 100%);
             margin-left: 0;
         }
         .customers-toolbar .import-form input[type="file"] {
             width: 320px;
-            max-width: 320px;
+            max-width: min(320px, 100%);
+            flex: 0 1 260px;
+            min-width: 220px;
+        }
+        .customers-table-wrap {
+            overflow-x: auto;
+        }
+        .customers-table {
+            min-width: 1180px;
+        }
+        @media (max-width: 1400px) {
+            .customers-toolbar .toolbar-left,
+            .customers-toolbar .toolbar-right {
+                flex: 1 1 100%;
+            }
+            .customers-toolbar .toolbar-right {
+                justify-content: flex-start;
+            }
+        }
+        @media (max-width: 1280px) {
+            .customers-toolbar .search-form,
+            .customers-toolbar .import-form {
+                width: 100%;
+            }
+            .customers-toolbar .search-form input[type="text"],
+            .customers-toolbar .import-form input[type="file"] {
+                width: min(100%, 280px);
+                max-width: min(100%, 280px);
+            }
         }
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -89,7 +123,8 @@
     </div>
 
     <div class="card">
-        <table>
+        <div class="customers-table-wrap">
+        <table class="customers-table">
             <thead>
             <tr>
                 <th>{{ __('ui.name') }}</th>
@@ -145,6 +180,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
 
         <div style="margin-top: 12px;">
             {{ $customers->links() }}

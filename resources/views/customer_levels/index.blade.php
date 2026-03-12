@@ -15,12 +15,29 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             flex: 1 1 320px;
         }
         .customer-levels-toolbar .toolbar-left input[type="text"] {
             width: 320px;
-            max-width: 320px;
+            max-width: min(320px, 100%);
+            flex: 1 1 260px;
+            min-width: 0;
+        }
+        .customer-levels-table-wrap {
+            overflow-x: auto;
+        }
+        .customer-levels-table {
+            min-width: 640px;
+        }
+        @media (max-width: 1280px) {
+            .customer-levels-toolbar .toolbar-left {
+                width: 100%;
+            }
+            .customer-levels-toolbar .toolbar-left input[type="text"] {
+                width: min(100%, 280px);
+                max-width: min(100%, 280px);
+            }
         }
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -38,7 +55,8 @@
     </div>
 
     <div class="card">
-        <table>
+        <div class="customer-levels-table-wrap">
+        <table class="customer-levels-table">
             <thead>
             <tr>
                 <th>{{ __('ui.code') }}</th>
@@ -67,6 +85,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
         <div style="margin-top: 12px;">
             {{ $levels->links() }}
         </div>

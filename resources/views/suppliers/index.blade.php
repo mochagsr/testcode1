@@ -30,13 +30,51 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             margin: 0;
         }
         .suppliers-toolbar .search-form input[type="text"],
         .suppliers-toolbar .import-form input[type="file"] {
             width: 320px;
-            max-width: 320px;
+            max-width: min(320px, 100%);
+        }
+        .suppliers-toolbar .search-form {
+            width: 100%;
+            max-width: 420px;
+        }
+        .suppliers-toolbar .search-form input[type="text"] {
+            flex: 1 1 260px;
+            min-width: 0;
+        }
+        .suppliers-toolbar .import-form input[type="file"] {
+            flex: 0 1 260px;
+            min-width: 220px;
+        }
+        .suppliers-table-wrap {
+            overflow-x: auto;
+        }
+        .suppliers-table {
+            min-width: 980px;
+        }
+        @media (max-width: 1400px) {
+            .suppliers-toolbar .toolbar-left,
+            .suppliers-toolbar .toolbar-right {
+                flex: 1 1 100%;
+            }
+            .suppliers-toolbar .toolbar-right {
+                justify-content: flex-start;
+            }
+        }
+        @media (max-width: 1280px) {
+            .suppliers-toolbar .search-form,
+            .suppliers-toolbar .import-form {
+                width: 100%;
+            }
+            .suppliers-toolbar .search-form input[type="text"],
+            .suppliers-toolbar .import-form input[type="file"] {
+                width: min(100%, 280px);
+                max-width: min(100%, 280px);
+            }
         }
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -76,7 +114,8 @@
     </div>
 
     <div class="card">
-        <table>
+        <div class="suppliers-table-wrap">
+        <table class="suppliers-table">
             <thead>
             <tr>
                 <th>{{ __('ui.name') }}</th>
@@ -111,6 +150,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
         <div style="margin-top:12px;">{{ $suppliers->links() }}</div>
     </div>
 
