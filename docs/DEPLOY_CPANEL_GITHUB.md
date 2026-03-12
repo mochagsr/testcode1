@@ -6,6 +6,12 @@ Dokumen ini untuk uji deploy pertama di hosting cPanel dengan:
 - database MySQL
 - queue/session/cache berbasis database
 
+Dokumen pendamping:
+
+- `docs/DEPLOY_FINAL_CHECKLIST.md`
+- `docs/CPANEL_TERMINAL_COMMANDS.md`
+- `docs/ENV_PRODUCTION_REVIEW_TEMPLATE.md`
+
 ## 1. Prasyarat cPanel
 
 Minimal yang harus tersedia:
