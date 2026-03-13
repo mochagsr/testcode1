@@ -49,8 +49,10 @@ class SupplierPayablePageController extends Controller
             'selectedSupplierId' => $pageData['selectedSupplierId'],
             'ledgerRows' => $pageData['ledgerRows'],
             'selectedYear' => $pageData['selectedYear'],
+            'selectedMonth' => $pageData['selectedMonth'],
             'search' => $pageData['search'],
             'yearOptions' => $this->supplierYearOptions(),
+            'monthOptions' => $this->monthOptions(),
             'supplierPaymentAdminEditedMap' => $pageData['supplierPaymentAdminEditedMap'],
             'outgoingTransactionAdminEditedMap' => $pageData['outgoingTransactionAdminEditedMap'],
             'totalDebit' => $pageData['totalDebit'],
@@ -162,6 +164,7 @@ class SupplierPayablePageController extends Controller
         $data = $request->validate([
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'year' => ['required', 'digits:4'],
+            'month' => ['nullable', 'integer', 'min:1', 'max:12'],
             'search' => ['nullable', 'string'],
         ]);
 
@@ -176,6 +179,7 @@ class SupplierPayablePageController extends Controller
             ->route('supplier-payables.index', [
                 'supplier_id' => (int) $data['supplier_id'],
                 'year' => $normalizedYear,
+                'month' => isset($data['month']) ? (int) $data['month'] : null,
                 'search' => trim((string) ($data['search'] ?? '')),
             ])
             ->with('success', __('supplier_payable.year_closed_success', ['year' => $normalizedYear]));
@@ -186,6 +190,7 @@ class SupplierPayablePageController extends Controller
         $data = $request->validate([
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'year' => ['required', 'digits:4'],
+            'month' => ['nullable', 'integer', 'min:1', 'max:12'],
             'search' => ['nullable', 'string'],
         ]);
 
@@ -200,6 +205,7 @@ class SupplierPayablePageController extends Controller
             ->route('supplier-payables.index', [
                 'supplier_id' => (int) $data['supplier_id'],
                 'year' => $normalizedYear,
+                'month' => isset($data['month']) ? (int) $data['month'] : null,
                 'search' => trim((string) ($data['search'] ?? '')),
             ])
             ->with('success', __('supplier_payable.year_opened_success', ['year' => $normalizedYear]));
@@ -236,15 +242,16 @@ class SupplierPayablePageController extends Controller
             $metaRows = [
                 [__('txn.supplier'), $data['selectedSupplier']?->name ?: __('supplier_payable.all_suppliers')],
                 [__('supplier_payable.year_label'), $data['selectedYear'] ?: __('supplier_payable.all_years')],
+                [__('supplier_payable.month_label'), $data['selectedMonthLabel'] ?: __('supplier_payable.all_months')],
                 [__('txn.date'), now()->format('d-m-Y H:i:s')],
             ];
             $metaStartRow = 3;
             foreach ($metaRows as $offset => [$label, $value]) {
                 $row = $metaStartRow + $offset;
-                $sheet->setCellValue('A'.$row, $label);
-                $sheet->setCellValue('B'.$row, $value);
-            }
-            $sheet->getStyle('A'.$metaStartRow.':A'.($metaStartRow + count($metaRows) - 1))->getFont()->setBold(true);
+            $sheet->setCellValue('A'.$row, $label);
+            $sheet->setCellValue('B'.$row, $value);
+        }
+        $sheet->getStyle('A'.$metaStartRow.':A'.($metaStartRow + count($metaRows) - 1))->getFont()->setBold(true);
 
             $summaryHeaderRow = 8;
             $sheet->fromArray([[
@@ -603,6 +610,7 @@ class SupplierPayablePageController extends Controller
      *   selectedSupplierId:?int,
      *   ledgerRows:Collection<int, SupplierLedger>,
      *   selectedYear:?string,
+     *   selectedMonth:?int,
      *   search:string,
      *   supplierPaymentAdminEditedMap:array<int,bool>,
      *   outgoingTransactionAdminEditedMap:array<int,bool>,
@@ -617,6 +625,7 @@ class SupplierPayablePageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $selectedYear = $this->semesterBookService->normalizeYear((string) $request->string('year', ''));
+        $selectedMonth = $this->normalizeMonth((string) $request->string('month', ''));
         $supplierId = $request->integer('supplier_id');
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
 
@@ -643,6 +652,7 @@ class SupplierPayablePageController extends Controller
             $ledgerRows = SupplierLedger::query()
                 ->forSupplier((int) $selectedSupplier->id)
                 ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->when($selectedMonth !== null, fn($query) => $query->whereMonth('entry_date', $selectedMonth))
                 ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
                 ->orderByDate()
                 ->limit(500)
@@ -708,6 +718,7 @@ class SupplierPayablePageController extends Controller
             'selectedSupplierId',
             'ledgerRows',
             'selectedYear',
+            'selectedMonth',
             'search',
             'supplierPaymentAdminEditedMap',
             'outgoingTransactionAdminEditedMap',
@@ -723,6 +734,8 @@ class SupplierPayablePageController extends Controller
      * @return array{
      *   search:string,
      *   selectedYear:?string,
+     *   selectedMonth:?int,
+     *   selectedMonthLabel:?string,
      *   selectedSupplierId:?int,
      *   selectedSupplier:?Supplier,
      *   summarySuppliers:Collection<int,Supplier>,
@@ -737,6 +750,7 @@ class SupplierPayablePageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $selectedYear = $this->semesterBookService->normalizeYear((string) $request->string('year', ''));
+        $selectedMonth = $this->normalizeMonth((string) $request->string('month', ''));
         $selectedSupplierId = $request->integer('supplier_id') ?: null;
 
         $summarySuppliers = Supplier::query()
@@ -756,6 +770,7 @@ class SupplierPayablePageController extends Controller
             $ledgerAggregateRows = SupplierLedger::query()
                 ->whereIn('supplier_id', $supplierIds)
                 ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->when($selectedMonth !== null, fn($query) => $query->whereMonth('entry_date', $selectedMonth))
                 ->selectRaw('supplier_id, COALESCE(SUM(debit), 0) as total_debit, COALESCE(SUM(credit), 0) as total_credit')
                 ->groupBy('supplier_id')
                 ->get();
@@ -782,15 +797,20 @@ class SupplierPayablePageController extends Controller
             $ledgerRows = SupplierLedger::query()
                 ->forSupplier((int) $selectedSupplier->id)
                 ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->when($selectedMonth !== null, fn($query) => $query->whereMonth('entry_date', $selectedMonth))
                 ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
                 ->orderByDate()
                 ->limit(500)
                 ->get();
         }
 
+        $selectedMonthLabel = $selectedMonth !== null ? ($this->monthOptions()[$selectedMonth] ?? null) : null;
+
         return compact(
             'search',
             'selectedYear',
+            'selectedMonth',
+            'selectedMonthLabel',
             'selectedSupplierId',
             'selectedSupplier',
             'summarySuppliers',
@@ -811,7 +831,37 @@ class SupplierPayablePageController extends Controller
             ? preg_replace('/[^A-Za-z0-9\-]+/', '-', strtolower((string) $data['selectedSupplier']->name))
             : 'semua-supplier';
         $yearPart = $data['selectedYear'] ?: 'semua-tahun';
+        $monthPart = isset($data['selectedMonth']) && $data['selectedMonth'] !== null
+            ? sprintf('bulan-%02d', (int) $data['selectedMonth'])
+            : 'semua-bulan';
 
-        return 'hutang-supplier-'.$supplierPart.'-'.$yearPart;
+        return 'hutang-supplier-'.$supplierPart.'-'.$yearPart.'-'.$monthPart;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function monthOptions(): array
+    {
+        return [
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember',
+        ];
+    }
+
+    private function normalizeMonth(string $value): ?int
+    {
+        $month = (int) trim($value);
+        return $month >= 1 && $month <= 12 ? $month : null;
     }
 }

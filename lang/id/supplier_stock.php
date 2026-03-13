@@ -2,6 +2,9 @@
 
 return [
     'title' => 'Kartu Stok Supplier',
+    'report_title' => 'Laporan Kartu Stok Supplier',
+    'report_subtitle' => 'Ringkasan dan Mutasi Kartu Stok Supplier',
+    'all_suppliers' => 'Semua Supplier',
     'select_supplier' => 'Pilih supplier',
     'search_placeholder' => 'Cari no dokumen / kode / nama barang...',
     'pick_supplier_hint' => 'Pilih supplier terlebih dahulu untuk melihat kartu stok.',

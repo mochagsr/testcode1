@@ -23,7 +23,7 @@
         }
         .suppliers-toolbar .toolbar-right {
             justify-content: flex-end;
-            flex: 1 1 460px;
+            flex: 1 1 620px;
         }
         .suppliers-toolbar .search-form,
         .suppliers-toolbar .import-form {
@@ -34,10 +34,6 @@
             margin: 0;
         }
         .suppliers-toolbar .search-form input[type="text"],
-        .suppliers-toolbar .import-form input[type="file"] {
-            width: 320px;
-            max-width: min(320px, 100%);
-        }
         .suppliers-toolbar .search-form {
             width: 100%;
             max-width: 420px;
@@ -46,9 +42,34 @@
             flex: 1 1 260px;
             min-width: 0;
         }
-        .suppliers-toolbar .import-form input[type="file"] {
-            flex: 0 1 260px;
-            min-width: 220px;
+        .suppliers-toolbar .import-form {
+            justify-content: flex-end;
+            width: 100%;
+            max-width: 100%;
+            gap: 12px;
+        }
+        .suppliers-toolbar .import-file-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
+            flex: 0 1 320px;
+            min-width: 280px;
+        }
+        .suppliers-toolbar .import-file-wrap input[type="file"] {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+        .suppliers-toolbar .import-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         .suppliers-table-wrap {
             overflow-x: auto;
@@ -64,6 +85,12 @@
             .suppliers-toolbar .toolbar-right {
                 justify-content: flex-start;
             }
+            .suppliers-toolbar .import-form {
+                justify-content: flex-start;
+            }
+            .suppliers-toolbar .import-file-wrap {
+                flex-basis: 300px;
+            }
         }
         @media (max-width: 1280px) {
             .suppliers-toolbar .search-form,
@@ -71,9 +98,12 @@
                 width: 100%;
             }
             .suppliers-toolbar .search-form input[type="text"],
-            .suppliers-toolbar .import-form input[type="file"] {
+            .suppliers-toolbar .import-file-wrap {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
+            }
+            .suppliers-toolbar .import-actions {
+                flex: 1 1 100%;
             }
         }
     </style>
@@ -95,9 +125,13 @@
             <div class="toolbar-right">
                 <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="import-form">
                     @csrf
-                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                    <button type="submit" class="btn process-btn">Import</button>
-                    <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
+                    <div class="import-file-wrap">
+                        <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    </div>
+                    <div class="import-actions">
+                        <button type="submit" class="btn process-btn">Import</button>
+                        <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
+                    </div>
                 </form>
             </div>
         </div>

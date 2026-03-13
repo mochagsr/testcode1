@@ -23,7 +23,7 @@
         }
         .products-toolbar .toolbar-right {
             justify-content: flex-end;
-            flex: 1 1 460px;
+            flex: 1 1 640px;
         }
         .products-toolbar .search-form,
         .products-toolbar .import-form {
@@ -47,11 +47,33 @@
             min-width: 0;
         }
         .products-toolbar .import-form {
-            justify-content: flex-start;
+            justify-content: flex-end;
+            width: 100%;
+            max-width: 100%;
+            gap: 12px;
         }
-        .products-toolbar .import-form input[type="file"] {
-            flex: 0 1 260px;
-            min-width: 220px;
+        .products-toolbar .import-file-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
+            flex: 0 1 320px;
+            min-width: 280px;
+        }
+        .products-toolbar .import-file-wrap input[type="file"] {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+        .products-toolbar .import-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         .products-table-wrap {
             overflow-x: auto;
@@ -116,9 +138,11 @@
             .products-toolbar .toolbar-right {
                 justify-content: flex-start;
             }
-            .products-toolbar .import-form input[type="file"] {
-                width: 260px;
-                max-width: 260px;
+            .products-toolbar .import-form {
+                justify-content: flex-start;
+            }
+            .products-toolbar .import-file-wrap {
+                flex-basis: 300px;
             }
         }
         @media (max-width: 1280px) {
@@ -130,9 +154,12 @@
                 width: 100%;
             }
             .products-toolbar .search-form input[type="text"],
-            .products-toolbar .import-form input[type="file"] {
+            .products-toolbar .import-file-wrap {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
+            }
+            .products-toolbar .import-actions {
+                flex: 1 1 100%;
             }
         }
     </style>
@@ -152,10 +179,16 @@
             <div class="toolbar-right">
                 <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="import-form">
                     @csrf
-                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                    <button type="submit" class="btn process-btn product-action-btn">Import</button>
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">Export Excel</a>
+                    <div class="import-file-wrap">
+                        <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    </div>
+                    <div class="import-actions">
+                        <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search]) }}" target="_blank">{{ __('txn.print') }}</a>
+                        <a class="btn info-btn product-action-btn" href="{{ route('products.export.pdf', ['search' => $search]) }}">Export PDF</a>
+                        <button type="submit" class="btn process-btn product-action-btn">Import</button>
+                        <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
+                        <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">Export Excel</a>
+                    </div>
                 </form>
             </div>
         </div>

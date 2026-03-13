@@ -130,10 +130,16 @@
                     <option value="{{ $option }}" @selected($selectedYear === $option)>{{ $option }}</option>
                 @endforeach
             </select>
+            <select name="month" id="supplier-payable-month" style="max-width:170px;">
+                <option value="">{{ __('supplier_payable.all_months') }}</option>
+                @foreach($monthOptions as $monthValue => $monthLabel)
+                    <option value="{{ $monthValue }}" @selected((int) ($selectedMonth ?? 0) === (int) $monthValue)>{{ $monthLabel }}</option>
+                @endforeach
+            </select>
             <button type="submit">{{ __('txn.search') }}</button>
-            <a class="btn info-btn" href="{{ route('supplier-payables.print', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear]) }}" target="_blank">{{ __('txn.print') }}</a>
-            <a class="btn info-btn" href="{{ route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear]) }}">{{ __('txn.pdf') }}</a>
-            <a class="btn info-btn" href="{{ route('supplier-payables.export.excel', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear]) }}">{{ __('txn.excel') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.print', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}" target="_blank">{{ __('txn.print') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">{{ __('txn.pdf') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-payables.export.excel', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">Export Excel</a>
             <a class="btn payment-btn" href="{{ route('supplier-payables.create') }}">{{ __('supplier_payable.add_payment') }}</a>
         </form>
     </div>
@@ -156,6 +162,7 @@
                                     @csrf
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplier->id }}">
                                     <input type="hidden" name="year" value="{{ $selectedYear }}">
+                                    <input type="hidden" name="month" value="{{ $selectedMonth }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
                                     <button type="submit" class="btn payment-btn">{{ __('supplier_payable.open_year_action') }}</button>
                                 </form>
@@ -165,6 +172,7 @@
                                     @csrf
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplier->id }}">
                                     <input type="hidden" name="year" value="{{ $selectedYear }}">
+                                    <input type="hidden" name="month" value="{{ $selectedMonth }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
                                     <button type="submit" class="btn warning-btn">{{ __('supplier_payable.close_year_action') }}</button>
                                 </form>
@@ -202,7 +210,7 @@
                             <td class="num">Rp {{ number_format((int) ($supplier->outstanding_payable ?? 0), 0, ',', '.') }}</td>
                             <td class="action">
                                 <div class="supplier-payable-actions">
-                                    <a class="btn orange-btn" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'year' => $selectedYear]) }}">
+                                    <a class="btn orange-btn" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">
                                         {{ __('supplier_payable.mutation') }}
                                     </a>
                                     <a class="btn process-btn" href="{{ route('supplier-stock-cards.index', ['supplier_id' => $supplier->id]) }}">
@@ -322,7 +330,8 @@
             const searchInput = document.getElementById('supplier-payable-search');
             const supplierSelect = document.getElementById('supplier-payable-supplier');
             const yearSelect = document.getElementById('supplier-payable-year');
-            if (!form || !searchInput || !supplierSelect || !yearSelect) return;
+            const monthSelect = document.getElementById('supplier-payable-month');
+            if (!form || !searchInput || !supplierSelect || !yearSelect || !monthSelect) return;
             const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
                 ? window.PgposAutoSearch.debounce
                 : (fn, wait = 100) => { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), wait); }; };
@@ -333,6 +342,7 @@
             searchInput.addEventListener('input', onSearch);
             supplierSelect.addEventListener('change', () => form.requestSubmit());
             yearSelect.addEventListener('change', () => form.requestSubmit());
+            monthSelect.addEventListener('change', () => form.requestSubmit());
         })();
     </script>
 @endsection

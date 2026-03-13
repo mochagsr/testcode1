@@ -533,4 +533,56 @@ class SupplierStockCardTest extends TestCase
         $this->assertNotNull($summaryRow);
         $this->assertSame(35, (int) ($summaryRow['balance'] ?? 0));
     }
+
+    public function test_supplier_stock_card_print_report_is_available(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Cetak',
+            'company_name' => 'PT Cetak',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-PRN',
+            'name' => 'Kategori Cetak',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'BRG-PRN-01',
+            'name' => 'Barang Cetak',
+            'unit' => 'exp',
+            'stock' => 0,
+            'price_agent' => 1000,
+            'price_sales' => 1200,
+            'price_general' => 1500,
+            'is_active' => true,
+        ]);
+
+        $trx = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-13032026-0001',
+            'transaction_date' => '2026-03-12',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'total' => 5000,
+            'created_by_user_id' => $user->id,
+        ]);
+        OutgoingTransactionItem::query()->create([
+            'outgoing_transaction_id' => $trx->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'unit' => 'exp',
+            'quantity' => 5,
+            'unit_cost' => 1000,
+            'line_total' => 5000,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('supplier-stock-cards.print', [
+            'supplier_id' => $supplier->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('supplier_stock.report_title'));
+        $response->assertSee('Supplier Cetak');
+        $response->assertSee('Barang Cetak');
+    }
 }

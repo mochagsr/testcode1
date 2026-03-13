@@ -62,6 +62,7 @@
         <div class="doc-meta-right">
             <div class="meta-line"><div class="meta-label">{{ __('txn.supplier') }}</div><div>:</div><div class="meta-value">{{ $selectedSupplier?->name ?: __('supplier_payable.all_suppliers') }}</div></div>
             <div class="meta-line"><div class="meta-label">{{ __('supplier_payable.year_label') }}</div><div>:</div><div class="meta-value">{{ $selectedYear ?: __('supplier_payable.all_years') }}</div></div>
+            <div class="meta-line"><div class="meta-label">{{ __('supplier_payable.month_label') }}</div><div>:</div><div class="meta-value">{{ $selectedMonthLabel ?: __('supplier_payable.all_months') }}</div></div>
             <div class="meta-line"><div class="meta-label">{{ __('txn.date') }}</div><div>:</div><div class="meta-value">{{ now()->format('d-m-Y H:i:s') }}</div></div>
         </div>
     </div>

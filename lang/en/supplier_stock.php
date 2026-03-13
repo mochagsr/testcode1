@@ -2,6 +2,9 @@
 
 return [
     'title' => 'Supplier Stock Card',
+    'report_title' => 'Supplier Stock Card Report',
+    'report_subtitle' => 'Supplier Stock Card Summary and Mutation',
+    'all_suppliers' => 'All Suppliers',
     'select_supplier' => 'Select supplier',
     'search_placeholder' => 'Search document no / code / product...',
     'pick_supplier_hint' => 'Select a supplier first to view stock card movements.',

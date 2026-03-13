@@ -70,6 +70,9 @@
             <input type="date" name="date_from" value="{{ $dateFrom }}" style="max-width:180px;">
             <input type="date" name="date_to" value="{{ $dateTo }}" style="max-width:180px;">
             <button type="submit">{{ __('txn.search') }}</button>
+            <a class="btn info-btn" href="{{ route('supplier-stock-cards.print', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}" target="_blank">{{ __('txn.print') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-stock-cards.export.pdf', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">{{ __('txn.pdf') }}</a>
+            <a class="btn info-btn" href="{{ route('supplier-stock-cards.export.excel', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">Export Excel</a>
             <a class="btn secondary" href="{{ route('supplier-stock-cards.index') }}">{{ __('txn.all') }}</a>
         </form>
     </div>

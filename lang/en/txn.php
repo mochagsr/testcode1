@@ -50,6 +50,8 @@ return [
     'action' => 'Action',
     'action_menu' => 'Select Menu',
     'date' => 'Date',
+    'date_from' => 'Date From',
+    'date_to' => 'Date To',
     'customer' => 'Customer',
     'city' => 'City',
     'phone' => 'Phone',

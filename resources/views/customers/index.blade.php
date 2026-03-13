@@ -23,7 +23,7 @@
         }
         .customers-toolbar .toolbar-right {
             justify-content: flex-end;
-            flex: 1 1 460px;
+            flex: 1 1 640px;
         }
         .customers-toolbar .search-form,
         .customers-toolbar .import-form {
@@ -48,11 +48,34 @@
             max-width: min(250px, 100%);
             margin-left: 0;
         }
-        .customers-toolbar .import-form input[type="file"] {
-            width: 320px;
-            max-width: min(320px, 100%);
-            flex: 0 1 260px;
-            min-width: 220px;
+        .customers-toolbar .import-form {
+            justify-content: flex-end;
+            width: 100%;
+            max-width: 100%;
+            gap: 12px;
+        }
+        .customers-toolbar .import-file-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
+            flex: 0 1 320px;
+            min-width: 280px;
+        }
+        .customers-toolbar .import-file-wrap input[type="file"] {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+        .customers-toolbar .import-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         .customers-table-wrap {
             overflow-x: auto;
@@ -68,6 +91,12 @@
             .customers-toolbar .toolbar-right {
                 justify-content: flex-start;
             }
+            .customers-toolbar .import-form {
+                justify-content: flex-start;
+            }
+            .customers-toolbar .import-file-wrap {
+                flex-basis: 300px;
+            }
         }
         @media (max-width: 1280px) {
             .customers-toolbar .search-form,
@@ -75,9 +104,12 @@
                 width: 100%;
             }
             .customers-toolbar .search-form input[type="text"],
-            .customers-toolbar .import-form input[type="file"] {
+            .customers-toolbar .import-file-wrap {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
+            }
+            .customers-toolbar .import-actions {
+                flex: 1 1 100%;
             }
         }
     </style>
@@ -103,10 +135,14 @@
             <div class="toolbar-right">
                 <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data" class="import-form">
                     @csrf
-                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                    <button type="submit" class="btn process-btn">Import</button>
-                    <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
-                    <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">Export Excel</a>
+                    <div class="import-file-wrap">
+                        <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    </div>
+                    <div class="import-actions">
+                        <button type="submit" class="btn process-btn">Import</button>
+                        <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
+                        <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">Export Excel</a>
+                    </div>
                 </form>
             </div>
         </div>

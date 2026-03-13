@@ -50,6 +50,8 @@ return [
     'action' => 'Aksi',
     'action_menu' => 'Pilih Menu',
     'date' => 'Tanggal',
+    'date_from' => 'Tanggal Dari',
+    'date_to' => 'Tanggal Sampai',
     'customer' => 'Customer',
     'city' => 'Kota',
     'phone' => 'Telepon',

@@ -241,6 +241,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/supplier-payables/pdf', [SupplierPayablePageController::class, 'exportReportPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export.pdf');
     Route::get('/supplier-payables/excel', [SupplierPayablePageController::class, 'exportReportExcel'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export.excel');
     Route::get('/supplier-stock-cards', [SupplierStockCardPageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.index');
+    Route::get('/supplier-stock-cards/print', [SupplierStockCardPageController::class, 'printReport'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.print');
+    Route::get('/supplier-stock-cards/pdf', [SupplierStockCardPageController::class, 'exportPdf'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.export.pdf');
+    Route::get('/supplier-stock-cards/excel', [SupplierStockCardPageController::class, 'exportExcel'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.export.excel');
     Route::post('/supplier-stock-cards/update-stock', [SupplierStockCardPageController::class, 'updateStock'])->middleware('perm:supplier_payables.view')->name('supplier-stock-cards.update-stock');
     Route::get('/supplier-payables/create', [SupplierPayablePageController::class, 'create'])->middleware('perm:supplier_payables.pay')->name('supplier-payables.create');
     Route::post('/supplier-payables', [SupplierPayablePageController::class, 'store'])
@@ -269,6 +272,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
         Route::delete('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'destroy'])->name('item-categories.destroy');
 
         Route::get('/products', [ProductPageController::class, 'index'])->middleware('perm:masters.products.view')->name('products.index');
+        Route::get('/products/print', [ProductPageController::class, 'printReport'])->middleware('perm:masters.products.view')->name('products.print');
+        Route::get('/products/pdf', [ProductPageController::class, 'exportPdf'])->middleware('perm:masters.products.view')->name('products.export.pdf');
         Route::get('/products/export.csv', [ProductPageController::class, 'exportCsv'])->middleware('perm:masters.products.view')->name('products.export.csv');
         Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:masters.products.manage')->name('products.import.template');
         Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:masters.products.manage')->name('products.import');

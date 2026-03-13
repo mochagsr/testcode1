@@ -9,7 +9,11 @@ use App\Models\Product;
 use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Services\AuditLogService;
+use App\Support\AppSetting;
+use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
+use App\Support\PrintTextFormatter;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +22,10 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupplierStockCardPageController extends Controller
 {
@@ -28,76 +36,122 @@ class SupplierStockCardPageController extends Controller
 
     public function index(Request $request): View
     {
-        $search = trim((string) $request->string('search', ''));
-        $selectedSupplierId = max(0, (int) $request->integer('supplier_id'));
-        $selectedProductId = max(0, (int) $request->integer('product_id'));
-        $dateFrom = $this->normalizeDate((string) $request->string('date_from', ''));
-        $dateTo = $this->normalizeDate((string) $request->string('date_to', ''));
+        return view('supplier_stock_cards.index', $this->buildPageData($request));
+    }
 
-        $suppliers = Supplier::query()
-            ->onlyOptionColumns()
-            ->orderBy('name')
-            ->get();
+    public function printReport(Request $request): View
+    {
+        return view('supplier_stock_cards.report', $this->buildReportData($request) + ['isPdf' => false]);
+    }
 
-        $selectedSupplier = $selectedSupplierId > 0
-            ? Supplier::query()->onlyListColumns()->find($selectedSupplierId)
-            : null;
-        $selectedSupplierIdOrNull = $selectedSupplier?->id !== null ? (int) $selectedSupplier->id : null;
+    public function exportPdf(Request $request)
+    {
+        $data = $this->buildReportData($request);
+        $pdf = Pdf::loadView('supplier_stock_cards.report', $data + ['isPdf' => true])->setPaper('a4', 'portrait');
 
-        [$movements, $summaryRows] = $this->buildStockCardData(
-            $selectedSupplierIdOrNull,
-            $selectedProductId > 0 ? $selectedProductId : null,
-            $search,
-            $dateFrom,
-            $dateTo
-        );
+        return $pdf->download($this->buildReportFileName($data).'.pdf');
+    }
 
-        $supplierNameMap = $suppliers->pluck('name', 'id');
-        $summaryRows = $summaryRows
-            ->map(function (array $row) use ($supplierNameMap): array {
-                $supplierId = (int) ($row['supplier_id'] ?? 0);
-                $row['supplier_name'] = (string) ($supplierNameMap->get($supplierId) ?? '-');
-                $row['sort_key'] = mb_strtolower($row['supplier_name'] . '|' . (string) ($row['product_name'] ?? ''));
+    public function exportExcel(Request $request): StreamedResponse
+    {
+        $data = $this->buildReportData($request);
+        $filename = $this->buildReportFileName($data).'.xlsx';
 
-                return $row;
-            })
-            ->values();
-        $summaryRows = $this->attachEditableProductIds($summaryRows);
-        [$summaryRows, $movements] = $this->attachCategoryLabels($summaryRows, $movements);
+        return response()->streamDownload(function () use ($data): void {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Kartu Stok Supplier');
 
-        $totals = [
-            'qty_in' => $summaryRows->sum('qty_in'),
-            'qty_out' => $summaryRows->sum('qty_out'),
-            'balance' => $summaryRows->sum('balance'),
-        ];
+            $sheet->mergeCells('A1:G1');
+            $sheet->setCellValue('A1', __('supplier_stock.report_title'));
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(15);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $summaryPaginator = $this->paginateCollection(
-            $summaryRows->sortBy('sort_key'),
-            (int) config('pagination.default_per_page', 20),
-            'summary_page',
-            $request
-        );
+            $metaRows = [
+                [__('txn.supplier'), $data['selectedSupplier']?->name ?: __('supplier_stock.all_suppliers')],
+                [__('txn.product'), $data['selectedProductLabel']],
+                [__('txn.date_from'), $data['dateFrom'] ? date('d-m-Y', strtotime($data['dateFrom'])) : '-'],
+                [__('txn.date_to'), $data['dateTo'] ? date('d-m-Y', strtotime($data['dateTo'])) : '-'],
+                [__('txn.date'), now()->format('d-m-Y H:i:s')],
+            ];
+            $metaStartRow = 3;
+            foreach ($metaRows as $offset => [$label, $value]) {
+                $row = $metaStartRow + $offset;
+                $sheet->setCellValue('A'.$row, $label);
+                $sheet->setCellValue('B'.$row, $value);
+            }
+            $sheet->getStyle('A'.$metaStartRow.':A'.($metaStartRow + count($metaRows) - 1))->getFont()->setBold(true);
 
-        $movementPaginator = $selectedSupplierIdOrNull !== null
-            ? $this->paginateCollection(
-                $movements->sortByDesc(fn(array $row): string => $row['sort_key']),
-                (int) config('pagination.default_per_page', 20),
-                'movement_page',
-                $request
-            )
-            : $this->emptyPaginator($request, 'movement_page');
+            $summaryHeaderRow = 9;
+            $sheet->fromArray([[
+                __('txn.supplier'),
+                __('ui.category'),
+                __('txn.name'),
+                __('supplier_stock.total_in'),
+                __('supplier_stock.total_out'),
+                __('supplier_stock.total_balance'),
+            ]], null, 'A'.$summaryHeaderRow);
+            $summaryRows = $data['summaryRows']->map(fn(array $row): array => [
+                (string) ($row['supplier_name'] ?? '-'),
+                (string) ($row['category_name'] ?? '-'),
+                (string) ($row['product_name'] ?? '-'),
+                number_format((int) ($row['qty_in'] ?? 0), 0, ',', '.'),
+                number_format((int) ($row['qty_out'] ?? 0), 0, ',', '.'),
+                number_format((int) ($row['balance'] ?? 0), 0, ',', '.'),
+            ])->all();
+            if ($summaryRows !== []) {
+                $sheet->fromArray($summaryRows, null, 'A'.($summaryHeaderRow + 1));
+            }
+            ExcelExportStyler::styleTable($sheet, $summaryHeaderRow, 6, count($summaryRows), true);
+            $sheet->fromArray([[
+                __('txn.total'),
+                '',
+                '',
+                number_format((int) ($data['totals']['qty_in'] ?? 0), 0, ',', '.'),
+                number_format((int) ($data['totals']['qty_out'] ?? 0), 0, ',', '.'),
+                number_format((int) ($data['totals']['balance'] ?? 0), 0, ',', '.'),
+            ]], null, 'A'.($summaryHeaderRow + count($summaryRows) + 1));
+            $sheet->getStyle('A'.($summaryHeaderRow + count($summaryRows) + 1).':F'.($summaryHeaderRow + count($summaryRows) + 1))->getFont()->setBold(true);
 
-        return view('supplier_stock_cards.index', [
-            'suppliers' => $suppliers,
-            'selectedSupplierId' => $selectedSupplierIdOrNull,
-            'selectedSupplier' => $selectedSupplier,
-            'selectedProductId' => $selectedProductId > 0 ? $selectedProductId : null,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
-            'search' => $search,
-            'movementPaginator' => $movementPaginator,
-            'summaryPaginator' => $summaryPaginator,
-            'totals' => $totals,
+            if ($data['selectedSupplier'] !== null && $data['movements']->isNotEmpty()) {
+                $movementTitleRow = $summaryHeaderRow + count($summaryRows) + 4;
+                $sheet->mergeCells('A'.$movementTitleRow.':G'.$movementTitleRow);
+                $sheet->setCellValue('A'.$movementTitleRow, __('supplier_stock.mutation_title'));
+                $sheet->getStyle('A'.$movementTitleRow)->getFont()->setBold(true);
+
+                $movementHeaderRow = $movementTitleRow + 1;
+                $sheet->fromArray([[
+                    __('txn.date'),
+                    __('ui.category'),
+                    __('txn.product'),
+                    __('supplier_stock.description'),
+                    __('supplier_stock.in'),
+                    __('supplier_stock.out'),
+                    __('supplier_stock.balance'),
+                ]], null, 'A'.$movementHeaderRow);
+                $movementRows = $data['movements']->map(fn(array $row): array => [
+                    date('d-m-Y', strtotime((string) $row['event_date'])),
+                    (string) ($row['category_name'] ?? '-'),
+                    trim(((string) ($row['product_code'] ?? '')) !== '' ? ((string) $row['product_code'].' - '.(string) $row['product_name']) : (string) ($row['product_name'] ?? '-')),
+                    (string) ($row['description'] ?? '-'),
+                    (int) ($row['qty_in'] ?? 0) > 0 ? number_format((int) $row['qty_in'], 0, ',', '.') : '-',
+                    (int) ($row['qty_out'] ?? 0) > 0 ? number_format((int) $row['qty_out'], 0, ',', '.') : '-',
+                    number_format((int) ($row['balance_after'] ?? 0), 0, ',', '.'),
+                ])->all();
+                $sheet->fromArray($movementRows, null, 'A'.($movementHeaderRow + 1));
+                ExcelExportStyler::styleTable($sheet, $movementHeaderRow, 7, count($movementRows), true);
+            }
+
+            foreach (range('A', 'G') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
@@ -584,6 +638,159 @@ class SupplierStockCardPageController extends Controller
         $normalized = preg_replace('/[^a-z0-9]+/u', '', $normalized) ?? $normalized;
 
         return $normalized;
+    }
+
+    /**
+     * @return array{
+     *   suppliers:Collection<int, Supplier>,
+     *   selectedSupplierId:?int,
+     *   selectedSupplier:?Supplier,
+     *   selectedProductId:?int,
+     *   selectedProductLabel:string,
+     *   dateFrom:?string,
+     *   dateTo:?string,
+     *   search:string,
+     *   movements:Collection<int, array<string, mixed>>,
+     *   summaryRows:Collection<int, array<string, mixed>>,
+     *   movementPaginator:LengthAwarePaginator,
+     *   summaryPaginator:LengthAwarePaginator,
+     *   totals:array{qty_in:mixed, qty_out:mixed, balance:mixed}
+     * }
+     */
+    private function buildPageData(Request $request): array
+    {
+        $search = trim((string) $request->string('search', ''));
+        $selectedSupplierId = max(0, (int) $request->integer('supplier_id'));
+        $selectedProductId = max(0, (int) $request->integer('product_id'));
+        $dateFrom = $this->normalizeDate((string) $request->string('date_from', ''));
+        $dateTo = $this->normalizeDate((string) $request->string('date_to', ''));
+
+        $suppliers = Supplier::query()
+            ->onlyOptionColumns()
+            ->orderBy('name')
+            ->get();
+
+        $selectedSupplier = $selectedSupplierId > 0
+            ? Supplier::query()->onlyListColumns()->find($selectedSupplierId)
+            : null;
+        $selectedSupplierIdOrNull = $selectedSupplier?->id !== null ? (int) $selectedSupplier->id : null;
+
+        [$movements, $summaryRows] = $this->buildStockCardData(
+            $selectedSupplierIdOrNull,
+            $selectedProductId > 0 ? $selectedProductId : null,
+            $search,
+            $dateFrom,
+            $dateTo
+        );
+
+        $supplierNameMap = $suppliers->pluck('name', 'id');
+        $summaryRows = $summaryRows
+            ->map(function (array $row) use ($supplierNameMap): array {
+                $supplierId = (int) ($row['supplier_id'] ?? 0);
+                $row['supplier_name'] = (string) ($supplierNameMap->get($supplierId) ?? '-');
+                $row['sort_key'] = mb_strtolower($row['supplier_name'] . '|' . (string) ($row['product_name'] ?? ''));
+
+                return $row;
+            })
+            ->values();
+        $summaryRows = $this->attachEditableProductIds($summaryRows);
+        [$summaryRows, $movements] = $this->attachCategoryLabels($summaryRows, $movements);
+
+        $totals = [
+            'qty_in' => $summaryRows->sum('qty_in'),
+            'qty_out' => $summaryRows->sum('qty_out'),
+            'balance' => $summaryRows->sum('balance'),
+        ];
+
+        $summaryPaginator = $this->paginateCollection(
+            $summaryRows->sortBy('sort_key'),
+            (int) config('pagination.default_per_page', 20),
+            'summary_page',
+            $request
+        );
+
+        $movementPaginator = $selectedSupplierIdOrNull !== null
+            ? $this->paginateCollection(
+                $movements->sortByDesc(fn(array $row): string => $row['sort_key']),
+                (int) config('pagination.default_per_page', 20),
+                'movement_page',
+                $request
+            )
+            : $this->emptyPaginator($request, 'movement_page');
+
+        $selectedProductLabel = '-';
+        if ($selectedProductId > 0) {
+            $selectedProduct = Product::query()->select(['id', 'code', 'name'])->find($selectedProductId);
+            if ($selectedProduct instanceof Product) {
+                $selectedProductLabel = trim(((string) ($selectedProduct->code ?? '')) !== '' ? ((string) $selectedProduct->code.' - '.(string) $selectedProduct->name) : (string) $selectedProduct->name);
+            }
+        }
+
+        return [
+            'suppliers' => $suppliers,
+            'selectedSupplierId' => $selectedSupplierIdOrNull,
+            'selectedSupplier' => $selectedSupplier,
+            'selectedProductId' => $selectedProductId > 0 ? $selectedProductId : null,
+            'selectedProductLabel' => $selectedProductLabel,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'search' => $search,
+            'movements' => $movements,
+            'summaryRows' => $summaryRows,
+            'movementPaginator' => $movementPaginator,
+            'summaryPaginator' => $summaryPaginator,
+            'totals' => $totals,
+        ];
+    }
+
+    /**
+     * @return array{
+     *   selectedSupplier:?Supplier,
+     *   selectedProductLabel:string,
+     *   dateFrom:?string,
+     *   dateTo:?string,
+     *   search:string,
+     *   movements:Collection<int, array<string, mixed>>,
+     *   summaryRows:Collection<int, array<string, mixed>>,
+     *   totals:array{qty_in:mixed, qty_out:mixed, balance:mixed}
+     * }
+     */
+    private function buildReportData(Request $request): array
+    {
+        $pageData = $this->buildPageData($request);
+
+        return [
+            'selectedSupplier' => $pageData['selectedSupplier'],
+            'selectedProductLabel' => $pageData['selectedProductLabel'],
+            'dateFrom' => $pageData['dateFrom'],
+            'dateTo' => $pageData['dateTo'],
+            'search' => $pageData['search'],
+            'movements' => $pageData['movements']->sortByDesc(fn(array $row): string => $row['sort_key'])->values(),
+            'summaryRows' => $pageData['summaryRows']->sortBy('sort_key')->values(),
+            'totals' => $pageData['totals'],
+        ];
+    }
+
+    /**
+     * @param array{selectedSupplier:?Supplier,selectedProductLabel:string,dateFrom:?string,dateTo:?string} $data
+     */
+    private function buildReportFileName(array $data): string
+    {
+        $supplierPart = $data['selectedSupplier']?->name
+            ? preg_replace('/[^A-Za-z0-9\-]+/', '-', strtolower((string) $data['selectedSupplier']->name))
+            : 'semua-supplier';
+        $productPart = $data['selectedProductLabel'] !== '-'
+            ? preg_replace('/[^A-Za-z0-9\-]+/', '-', strtolower((string) $data['selectedProductLabel']))
+            : 'semua-barang';
+        $datePart = ($data['dateFrom'] ?? null) || ($data['dateTo'] ?? null)
+            ? sprintf(
+                '%s-%s',
+                $data['dateFrom'] ? date('dmY', strtotime((string) $data['dateFrom'])) : 'awal',
+                $data['dateTo'] ? date('dmY', strtotime((string) $data['dateTo'])) : 'akhir'
+            )
+            : 'semua-tanggal';
+
+        return 'kartu-stok-supplier-'.$supplierPart.'-'.$productPart.'-'.$datePart;
     }
 
     /**

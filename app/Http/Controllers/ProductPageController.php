@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ResolvesProductUnits;
 use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
+use App\Models\AppSetting;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\StockMutation;
@@ -15,6 +16,7 @@ use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -62,11 +64,7 @@ class ProductPageController extends Controller
         $printedAt = $this->nowWib();
         $filename = 'products-' . $printedAt->format('Ymd-His') . '.xlsx';
 
-        $productQuery = Product::query()
-            ->active()
-            ->select(['id', 'code', 'name', 'stock'])
-            ->searchKeyword($search)
-            ->orderBy('id');
+        $productQuery = $this->reportProductQuery($search);
 
         $productCount = (clone $productQuery)->count();
 
@@ -109,9 +107,58 @@ class ProductPageController extends Controller
         ]);
     }
 
+    public function printReport(Request $request): View
+    {
+        return view('products.report', $this->reportViewData($request));
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $data = $this->reportViewData($request) + ['isPdf' => true];
+        $pdf = Pdf::loadView('products.report', $data)->setPaper('a4', 'portrait');
+
+        return $pdf->download('products-'.$data['printedAt']->format('Ymd-His').'.pdf');
+    }
+
     private function nowWib(): Carbon
     {
         return now('Asia/Jakarta');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<Product>
+     */
+    private function reportProductQuery(string $search)
+    {
+        return Product::query()
+            ->active()
+            ->withCategoryInfo()
+            ->select(['id', 'item_category_id', 'code', 'name', 'stock'])
+            ->searchKeyword($search)
+            ->orderBy('id');
+    }
+
+    /**
+     * @return array{products:\Illuminate\Support\Collection<int,Product>,printedAt:Carbon,settings:array<string,string>,search:string}
+     */
+    private function reportViewData(Request $request): array
+    {
+        $search = trim((string) $request->string('search', ''));
+        $printedAt = $this->nowWib();
+        $products = $this->reportProductQuery($search)->get();
+        $settings = AppSetting::getValues([
+            'company_name' => '',
+            'company_address' => '',
+            'company_phone' => '',
+            'company_email' => '',
+        ]);
+
+        return [
+            'products' => $products,
+            'printedAt' => $printedAt,
+            'settings' => $settings,
+            'search' => $search,
+        ];
     }
 
     public function create(): View
