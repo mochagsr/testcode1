@@ -25,6 +25,9 @@
             justify-content: flex-end;
             flex: 1 1 640px;
         }
+        .products-toolbar .toolbar-right {
+            gap: 18px;
+        }
         .products-toolbar .search-form,
         .products-toolbar .import-form {
             display: flex;
@@ -48,9 +51,10 @@
         }
         .products-toolbar .import-form {
             justify-content: flex-end;
-            width: 100%;
+            width: auto;
             max-width: 100%;
-            gap: 12px;
+            gap: 10px;
+            flex: 0 1 auto;
         }
         .products-toolbar .import-file-wrap {
             display: flex;
@@ -62,6 +66,15 @@
             background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
             flex: 0 1 320px;
             min-width: 280px;
+        }
+        .products-toolbar .report-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-left: 6px;
+            border-left: 1px solid var(--border);
+            flex: 0 1 auto;
         }
         .products-toolbar .import-file-wrap input[type="file"] {
             width: 100%;
@@ -140,9 +153,14 @@
             }
             .products-toolbar .import-form {
                 justify-content: flex-start;
+                width: auto;
             }
             .products-toolbar .import-file-wrap {
                 flex-basis: 300px;
+            }
+            .products-toolbar .report-actions {
+                border-left: none;
+                padding-left: 0;
             }
         }
         @media (max-width: 1280px) {
@@ -158,8 +176,18 @@
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
             }
+            .products-toolbar .toolbar-right,
+            .products-toolbar .import-form,
+            .products-toolbar .report-actions,
             .products-toolbar .import-actions {
                 flex: 1 1 100%;
+            }
+            .products-toolbar .toolbar-right {
+                gap: 12px;
+            }
+            .products-toolbar .report-actions {
+                border-left: none;
+                padding-left: 0;
             }
         }
     </style>
@@ -183,13 +211,15 @@
                         <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
                     </div>
                     <div class="import-actions">
-                        <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search]) }}" target="_blank">{{ __('txn.print') }}</a>
-                        <a class="btn info-btn product-action-btn" href="{{ route('products.export.pdf', ['search' => $search]) }}">Export PDF</a>
                         <button type="submit" class="btn process-btn product-action-btn">Import</button>
                         <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
-                        <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">Export Excel</a>
                     </div>
                 </form>
+                <div class="report-actions">
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search]) }}" target="_blank">{{ __('txn.print') }}</a>
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.pdf', ['search' => $search]) }}">Export PDF</a>
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">Export Excel</a>
+                </div>
             </div>
         </div>
         @if(session('import_errors'))
