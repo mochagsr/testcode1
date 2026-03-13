@@ -197,6 +197,26 @@ Command ini:
 - menyalin semua data lokal ke MySQL
 - menghasilkan dump SQL MySQL siap import untuk env `tes`
 
+## 7C. Regenerate bootstrap `prod` dari migrasi + seeder terbaru
+
+Kalau schema atau seed berubah dan kamu ingin menyiapkan ulang file SQL production:
+
+```bash
+php artisan app:mysql-prod-bootstrap
+```
+
+Output default:
+
+- `database/sql/tespgpos_mysql_prod_bootstrap.sql`
+- `database/sql/tespgpos_mysql_bootstrap.sql`
+
+Command ini:
+
+- membuat database MySQL sementara
+- menjalankan `migrate:fresh`
+- menjalankan `db:seed`
+- menghasilkan dump SQL MySQL bersih untuk env `prod`
+
 ## 8. Jalankan optimasi production
 
 ```bash

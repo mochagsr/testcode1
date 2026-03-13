@@ -643,6 +643,92 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
     return 0;
 })->purpose('Build a MySQL SQL snapshot from the current SQLite database for test deployment');
 
+Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-host=} {--mysql-port=} {--mysql-user=} {--mysql-password=}', function () {
+    $target = (string) ($this->option('target') ?: database_path('sql/tespgpos_mysql_prod_bootstrap.sql'));
+    File::ensureDirectoryExists(dirname($target));
+
+    $mysqlConfig = config('database.connections.mysql', []);
+    $host = (string) ($this->option('mysql-host') ?: ($mysqlConfig['host'] ?? '127.0.0.1'));
+    $port = (string) ($this->option('mysql-port') ?: ($mysqlConfig['port'] ?? '3306'));
+    $username = (string) ($this->option('mysql-user') ?: ($mysqlConfig['username'] ?? 'root'));
+    $password = (string) ($this->option('mysql-password') ?: ($mysqlConfig['password'] ?? ''));
+    $tempDb = (string) ($this->option('temp-db') ?: 'tespgpos_prod_bootstrap');
+
+    $this->line('Preparing temporary MySQL database: ' . $tempDb);
+
+    try {
+        $adminPdo = new PDO(
+            sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port),
+            $username,
+            $password,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]
+        );
+        $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
+        $adminPdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', str_replace('`', '``', $tempDb)));
+    } catch (Throwable $e) {
+        $this->error('Failed preparing temporary MySQL database: ' . $e->getMessage());
+        return 1;
+    }
+
+    config([
+        'database.connections.mysql.host' => $host,
+        'database.connections.mysql.port' => $port,
+        'database.connections.mysql.database' => $tempDb,
+        'database.connections.mysql.username' => $username,
+        'database.connections.mysql.password' => $password,
+        'database.connections.mysql.charset' => 'utf8mb4',
+        'database.connections.mysql.collation' => 'utf8mb4_unicode_ci',
+        'database.connections.mysql.strict' => true,
+    ]);
+    DB::purge('mysql');
+
+    $migrateExit = Artisan::call('migrate:fresh', [
+        '--database' => 'mysql',
+        '--force' => true,
+    ]);
+    $this->output->write(Artisan::output());
+    if ($migrateExit !== 0) {
+        $this->error('MySQL migrate:fresh failed.');
+        return 1;
+    }
+
+    $seedExit = Artisan::call('db:seed', [
+        '--database' => 'mysql',
+        '--force' => true,
+    ]);
+    $this->output->write(Artisan::output());
+    if ($seedExit !== 0) {
+        $this->error('MySQL db:seed failed.');
+        return 1;
+    }
+
+    $dumpCommand = sprintf(
+        'mysqldump --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false --default-character-set=utf8mb4 %s > "%s"',
+        escapeshellarg($host),
+        escapeshellarg($port),
+        escapeshellarg($username),
+        escapeshellarg($password),
+        escapeshellarg($tempDb),
+        $target
+    );
+    exec($dumpCommand, $dumpOutput, $dumpExitCode);
+    if ($dumpExitCode !== 0 || ! File::exists($target)) {
+        $this->error('mysqldump failed. Ensure mysqldump is available in PATH.');
+        return 1;
+    }
+
+    $legacyTarget = database_path('sql/tespgpos_mysql_bootstrap.sql');
+    if ($legacyTarget !== $target) {
+        File::copy($target, $legacyTarget);
+    }
+
+    $this->info('MySQL production bootstrap created: ' . $target);
+    return 0;
+})->purpose('Build a clean MySQL production bootstrap SQL from current migrations and seeders');
+
 Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
     $startedAt = microtime(true);
     $connection = config('database.default');

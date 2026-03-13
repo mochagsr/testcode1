@@ -24,6 +24,12 @@ File di folder ini dipakai untuk bantu inisialisasi MySQL saat deploy `tes` dan 
 php artisan app:sqlite-to-mysql-snapshot
 ```
 
+- untuk regenerate bootstrap `prod` dari migrasi + seed terbaru, jalankan:
+
+```bash
+php artisan app:mysql-prod-bootstrap
+```
+
 - setelah import SQL, tetap jalankan:
 
 ```bash

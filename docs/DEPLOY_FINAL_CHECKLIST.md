@@ -57,6 +57,8 @@ Contoh:
 - import `database/sql/tespgpos_mysql_test_snapshot.sql`
 - lalu jalankan:
   - `php artisan db:seed --force`
+- kalau snapshot `tes` ingin disegarkan lagi dari data lokal terbaru:
+  - jalankan lokal `php artisan app:sqlite-to-mysql-snapshot`
 
 ### 5. Optimasi
 
@@ -117,6 +119,8 @@ Pilih salah satu:
   - `php artisan db:seed --force`
 - atau import:
   - `database/sql/tespgpos_mysql_prod_bootstrap.sql`
+- kalau bootstrap `prod` ingin disegarkan lagi dari migrasi + seeder terbaru:
+  - jalankan lokal `php artisan app:mysql-prod-bootstrap`
 
 ### 5. Optimasi
 

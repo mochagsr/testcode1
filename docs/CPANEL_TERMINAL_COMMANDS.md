@@ -149,3 +149,11 @@ Command ini dijalankan di mesin lokal sebelum upload/push hasil snapshot:
 ```bash
 php artisan app:sqlite-to-mysql-snapshot
 ```
+
+## H. Regenerate SQL `prod` bootstrap dari lokal
+
+Command ini dijalankan di mesin lokal sebelum upload/push hasil bootstrap production:
+
+```bash
+php artisan app:mysql-prod-bootstrap
+```
