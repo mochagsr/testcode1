@@ -112,6 +112,47 @@ php artisan event:cache
 php artisan view:cache
 ```
 
+### Update kecil
+
+```bash
+cd /home/CPANEL_USERNAME/repositories/tespgpos
+git pull origin master
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+### Update dengan migration
+
+```bash
+cd /home/CPANEL_USERNAME/repositories/tespgpos
+git pull origin master
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+```
+
+### Update dengan frontend build
+
+```bash
+cd /home/CPANEL_USERNAME/repositories/tespgpos
+git pull origin master
+composer install --no-dev --optimize-autoloader
+npm install
+npm run build
+php artisan migrate --force
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+```
+
 ## E. Cron cPanel
 
 ### Scheduler
