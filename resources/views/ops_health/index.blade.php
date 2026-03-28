@@ -26,6 +26,13 @@
             font-size: 11px;
             background: color-mix(in srgb, var(--surface) 92%, var(--border) 8%);
         }
+        .ops-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .ops-list li + li {
+            margin-top: 6px;
+        }
     </style>
 
     <div class="ops-grid">
@@ -126,6 +133,27 @@
         @else
             <div class="muted">Belum ada log perf probe. Jalankan `php artisan app:load-test-light --loops=80 --search=ang`.</div>
         @endif
+    </div>
+
+    <div class="card ops-col-6">
+        <h3 style="margin-top:0;">Quick Commands</h3>
+        <ul class="ops-list">
+            <li><code>php artisan app:db-backup --gzip</code></li>
+            <li><code>php artisan app:db-restore-test</code></li>
+            <li><code>php artisan app:integrity-check</code></li>
+            <li><code>php artisan app:load-test-light --loops=80 --search=ang</code></li>
+        </ul>
+    </div>
+
+    <div class="card ops-col-6">
+        <h3 style="margin-top:0;">Next Actions Setelah Deploy</h3>
+        <ul class="ops-list">
+            <li>Pastikan <code>schedule:run</code> dan queue worker aktif.</li>
+            <li>Jalankan backup manual pertama lalu cek file backup masuk.</li>
+            <li>Uji print/PDF/Excel dari modul transaksi utama.</li>
+            <li>Jalankan integrity check sebelum user mulai transaksi banyak.</li>
+            <li>Uji restore drill minimal 1 kali di environment tes.</li>
+        </ul>
     </div>
     </div>
 @endsection

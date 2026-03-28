@@ -5,24 +5,35 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\ApprovalRequest;
+use App\Models\IntegrityCheckLog;
 use App\Models\OrderNote;
 use App\Models\OutgoingTransaction;
+use App\Models\PerformanceProbeLog;
 use App\Models\Product;
+use App\Models\ReportExportTask;
 use App\Models\SalesInvoice;
 use App\Models\Supplier;
 use App\Support\AppCache;
+use App\Support\SemesterBookService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private readonly SemesterBookService $semesterBookService
+    ) {}
+
     public function index(): View
     {
         $now = now();
+        $user = request()->user();
         $currentPath = request()->url();
         $currentQuery = request()->query();
         $uncollectedPerPage = 20;
@@ -40,14 +51,23 @@ class DashboardController extends Controller
                     'total_products' => 0,
                     'total_customers' => 0,
                     'total_receivable' => 0,
-                    'total_supplier_payable' => 0,
-                    'invoice_this_month' => 0,
-                    'outgoing_this_month' => 0,
-                ],
+                'total_supplier_payable' => 0,
+                'invoice_this_month' => 0,
+                'outgoing_this_month' => 0,
+                'pending_approvals' => 0,
+                'pending_report_tasks' => 0,
+                'active_semesters' => 0,
+                'closed_semesters' => 0,
+                'locked_customer_semesters' => 0,
+                'locked_supplier_years' => 0,
+                'backup_files' => 0,
+            ],
+                'opsSnapshot' => $this->defaultOpsSnapshot(),
                 'uncollectedCustomers' => $this->emptyPaginator($uncollectedPerPage, $currentPath, $currentQuery, $uncollectedPageName),
                 'pendingOrderNotes' => $this->emptyPaginator($pendingOrderNotesPerPage, $currentPath, $currentQuery, $pendingOrderNotesPageName),
                 'supplierExpenseRecap' => $this->emptyPaginator($supplierExpensePerPage, $currentPath, $currentQuery, $supplierExpensePageName),
                 'lowStockProducts' => $this->emptyPaginator($lowStockPerPage, $currentPath, $currentQuery, $lowStockPageName),
+                'quickLinks' => collect(),
             ]);
         }
 
@@ -60,6 +80,9 @@ class DashboardController extends Controller
             'mode' => $hasOutgoingTable ? 'with_outgoing' : 'without_outgoing',
         ]);
         $summary = Cache::remember($summaryCacheKey, $now->copy()->addSeconds(60), function () use ($hasOutgoingTable, $now): array {
+            $backupFiles = collect(Storage::disk('local')->files('backups'))
+                ->merge(Storage::disk('local')->files('backups/db'));
+
             return [
                 'total_products' => Product::count(),
                 'total_customers' => Customer::count(),
@@ -75,8 +98,56 @@ class DashboardController extends Controller
                     ->whereMonth('transaction_date', $now->month)
                     ->sum('total')
                     : 0,
+                'pending_approvals' => ApprovalRequest::query()->pending()->count(),
+                'pending_report_tasks' => ReportExportTask::query()
+                    ->whereIn('status', ['queued', 'processing'])
+                    ->count(),
+                'active_semesters' => count($this->semesterBookService->activeSemesters()),
+                'closed_semesters' => count($this->semesterBookService->closedSemesters()),
+                'locked_customer_semesters' => count($this->semesterBookService->closedCustomerSemesters()),
+                'locked_supplier_years' => count($this->semesterBookService->closedSupplierYears()),
+                'backup_files' => $backupFiles->count(),
             ];
         });
+        $opsSnapshot = $this->opsSnapshot();
+        $quickLinks = collect([
+            [
+                'allowed' => $user?->canAccess('receivables.view') ?? false,
+                'title' => __('menu.receivable_global'),
+                'note' => __('ui.dashboard_quick_receivable_global_note'),
+                'route' => route('receivables.global.index'),
+            ],
+            [
+                'allowed' => $user?->canAccess('receivables.view') ?? false,
+                'title' => __('menu.receivable_semester'),
+                'note' => __('ui.dashboard_quick_receivable_semester_note'),
+                'route' => route('receivables.semester.index'),
+            ],
+            [
+                'allowed' => $user?->canAccess('supplier_payables.view') ?? false,
+                'title' => __('menu.supplier_payables'),
+                'note' => __('ui.dashboard_quick_supplier_payable_note'),
+                'route' => route('supplier-payables.index'),
+            ],
+            [
+                'allowed' => $user?->canAccess('audit_logs.view') ?? false,
+                'title' => __('ui.audit_logs_title'),
+                'note' => __('ui.dashboard_quick_audit_note'),
+                'route' => route('audit-logs.index'),
+            ],
+            [
+                'allowed' => $user?->canAccess('settings.admin') ?? false,
+                'title' => 'Ops Health',
+                'note' => __('ui.dashboard_quick_ops_note'),
+                'route' => route('ops-health.index'),
+            ],
+            [
+                'allowed' => $user?->canAccess('reports.view') ?? false,
+                'title' => __('menu.reports'),
+                'note' => __('ui.dashboard_quick_reports_note'),
+                'route' => route('reports.index'),
+            ],
+        ])->filter(fn (array $item): bool => (bool) ($item['allowed'] ?? false))->values();
 
         $uncollectedCustomers = Customer::query()
             ->onlyOutstandingColumns()
@@ -114,7 +185,63 @@ class DashboardController extends Controller
             'pendingOrderNotes' => $pendingOrderNotes,
             'supplierExpenseRecap' => $supplierExpenseRecap,
             'lowStockProducts' => $lowStockProducts,
+            'opsSnapshot' => $opsSnapshot,
+            'quickLinks' => $quickLinks,
         ]);
+    }
+
+    /**
+     * @return array{latestBackup:string,latestRestoreStatus:string,latestRestoreAt:string,latestIntegrityStatus:string,latestIntegrityAt:string,latestProbeAt:string}
+     */
+    private function opsSnapshot(): array
+    {
+        $backupFiles = collect(Storage::disk('local')->files('backups'))
+            ->merge(Storage::disk('local')->files('backups/db'))
+            ->sort()
+            ->values();
+        $latestBackup = $backupFiles->last();
+
+        $latestRestoreDrill = Schema::hasTable('restore_drill_logs')
+            ? DB::table('restore_drill_logs')->latest('checked_at')->latest('id')->first()
+            : null;
+        $latestIntegrityLog = Schema::hasTable('integrity_check_logs')
+            ? IntegrityCheckLog::query()->latest('checked_at')->latest('id')->first()
+            : null;
+        $latestPerformanceProbe = Schema::hasTable('performance_probe_logs')
+            ? PerformanceProbeLog::query()->latest('probed_at')->latest('id')->first()
+            : null;
+
+        return [
+            'latestBackup' => $latestBackup ?: '-',
+            'latestRestoreStatus' => strtoupper((string) ($latestRestoreDrill->status ?? '-')),
+            'latestRestoreAt' => $latestRestoreDrill?->checked_at
+                ? (string) \Carbon\Carbon::parse((string) $latestRestoreDrill->checked_at, 'Asia/Jakarta')->format('d-m-Y H:i')
+                : '-',
+            'latestIntegrityStatus' => $latestIntegrityLog === null
+                ? '-'
+                : ((bool) $latestIntegrityLog->is_ok ? 'OK' : 'ANOMALI'),
+            'latestIntegrityAt' => $latestIntegrityLog?->checked_at
+                ? (string) $latestIntegrityLog->checked_at->format('d-m-Y H:i')
+                : '-',
+            'latestProbeAt' => $latestPerformanceProbe?->probed_at
+                ? (string) $latestPerformanceProbe->probed_at->format('d-m-Y H:i')
+                : '-',
+        ];
+    }
+
+    /**
+     * @return array{latestBackup:string,latestRestoreStatus:string,latestRestoreAt:string,latestIntegrityStatus:string,latestIntegrityAt:string,latestProbeAt:string}
+     */
+    private function defaultOpsSnapshot(): array
+    {
+        return [
+            'latestBackup' => '-',
+            'latestRestoreStatus' => '-',
+            'latestRestoreAt' => '-',
+            'latestIntegrityStatus' => '-',
+            'latestIntegrityAt' => '-',
+            'latestProbeAt' => '-',
+        ];
     }
 
     private function pendingOrderNotesPaginator(int $perPage, string $pageName): LengthAwarePaginator

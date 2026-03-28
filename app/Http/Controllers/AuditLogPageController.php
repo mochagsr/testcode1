@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -80,7 +81,7 @@ class AuditLogPageController extends Controller
 
                 $sheet->setCellValue('A'.$row, (string) optional($log->created_at)->timezone('Asia/Jakarta')->format('d-m-Y H:i:s'));
                 $sheet->setCellValue('B'.$row, (string) ($log->user?->name ?? '-'));
-                $sheet->setCellValue('C'.$row, (string) $log->action);
+                $sheet->setCellValue('C'.$row, $this->actionLabelFor((string) $log->action));
                 $sheet->setCellValue('D'.$row, $subject);
                 $sheet->setCellValue('E'.$row, (string) ($log->description ?: '-'));
                 $sheet->setCellValue('F'.$row, (string) ($log->ip_address ?: '-'));
@@ -103,7 +104,7 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @return array{search:string,documentCode:string,selectedModule:string,actionPrefix:?string,dateFrom:string,dateTo:string}
+     * @return array{search:string,documentCode:string,selectedModule:string,dateFrom:string,dateTo:string}
      */
     private function resolveFilters(Request $request): array
     {
@@ -118,9 +119,14 @@ class AuditLogPageController extends Controller
             'sales_return' => 'sales.return.',
             'delivery_note' => 'delivery.note.',
             'order_note' => 'order.note.',
+            'receivable_payment' => 'receivable_payment',
+            'supplier_payment' => 'supplier_payment',
+            'outgoing_transaction' => 'outgoing_transaction',
+            'delivery_trip' => 'delivery_trip',
+            'school_bulk' => 'school_bulk',
+            'master' => 'master',
         ];
         $selectedModule = array_key_exists($module, $moduleMap) ? $module : '';
-        $actionPrefix = $selectedModule !== '' ? $moduleMap[$selectedModule] : null;
         $dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFromInput) === 1 ? $dateFromInput : '';
         $dateTo = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateToInput) === 1 ? $dateToInput : '';
 
@@ -128,20 +134,19 @@ class AuditLogPageController extends Controller
             'search' => $search,
             'documentCode' => $documentCode,
             'selectedModule' => $selectedModule,
-            'actionPrefix' => $actionPrefix,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
         ];
     }
 
     /**
-     * @param array{search:string,documentCode:string,selectedModule:string,actionPrefix:?string,dateFrom:string,dateTo:string} $filters
+     * @param array{search:string,documentCode:string,selectedModule:string,dateFrom:string,dateTo:string} $filters
      */
     private function buildFilteredLogsQuery(array $filters)
     {
         $search = $filters['search'];
         $documentCode = $filters['documentCode'];
-        $actionPrefix = $filters['actionPrefix'];
+        $selectedModule = $filters['selectedModule'];
         $dateFrom = $filters['dateFrom'];
         $dateTo = $filters['dateTo'];
         $dateFromStart = $dateFrom !== '' ? Carbon::parse($dateFrom)->startOfDay()->toDateTimeString() : null;
@@ -162,8 +167,30 @@ class AuditLogPageController extends Controller
                 'created_at',
             ])
             ->with('user:id,name,email')
-            ->when($actionPrefix !== null, function ($query) use ($actionPrefix): void {
-                $query->where('action', 'like', $actionPrefix.'%');
+            ->when($selectedModule !== '', function ($query) use ($selectedModule): void {
+                $query->where(function ($moduleQuery) use ($selectedModule): void {
+                    match ($selectedModule) {
+                        'sales_invoice' => $moduleQuery->where('action', 'like', 'sales.invoice.%')
+                            ->orWhere('subject_type', SalesInvoice::class),
+                        'sales_return' => $moduleQuery->where('action', 'like', 'sales.return.%')
+                            ->orWhere('subject_type', SalesReturn::class),
+                        'delivery_note' => $moduleQuery->where('action', 'like', 'delivery.note.%')
+                            ->orWhere('subject_type', DeliveryNote::class),
+                        'order_note' => $moduleQuery->where('action', 'like', 'order.note.%')
+                            ->orWhere('subject_type', OrderNote::class),
+                        'receivable_payment' => $moduleQuery->where('action', 'like', 'receivable.payment.%')
+                            ->orWhere('subject_type', ReceivablePayment::class),
+                        'supplier_payment' => $moduleQuery->where('action', 'like', 'supplier.payment.%')
+                            ->orWhere('subject_type', SupplierPayment::class),
+                        'outgoing_transaction' => $moduleQuery->where('action', 'like', 'outgoing.transaction.%')
+                            ->orWhere('action', 'like', 'supplier.payable.debit.%'),
+                        'delivery_trip' => $moduleQuery->where('action', 'like', 'delivery.trip.%'),
+                        'school_bulk' => $moduleQuery->where('action', 'like', 'school.bulk.%'),
+                        'master' => $moduleQuery->where('action', 'like', 'master.%')
+                            ->orWhereIn('subject_type', [Customer::class]),
+                        default => null,
+                    };
+                });
             })
             ->when($dateFromStart !== null, function ($query) use ($dateFromStart): void {
                 $query->where('created_at', '>=', $dateFromStart);
@@ -556,7 +583,7 @@ class AuditLogPageController extends Controller
             return (string) __($translationKey);
         }
 
-        return $normalized;
+        return Str::headline(str_replace(['.', '_', '-'], ' ', $normalized));
     }
 
     /**

@@ -431,6 +431,12 @@ Saran operasional:
    - Excel
 3. kalau aman, baru update `prod`
 
+## 20. Dokumen pendamping yang dipakai saat live
+
+- `docs/UAT_AAPANEL_POST_DEPLOY.md`
+- `docs/STRESS_TEST_GUIDE.md`
+- `docs/GO_LIVE_RUNBOOK.md`
+
 ## 18. Saran praktik
 
 - deploy `tes` dulu, jangan langsung `prod`

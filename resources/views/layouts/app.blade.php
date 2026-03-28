@@ -685,87 +685,160 @@
 <div class="wrap">
     <aside class="sidebar">
         <div class="brand">PgPOS ERP</div>
+        @php
+            $authUser = auth()->user();
+            $canDashboard = $authUser?->canAccess('dashboard.view') ?? false;
+            $canTransactionsView = $authUser?->canAccess('transactions.view') ?? false;
+            $canTransactionsCreate = $authUser?->canAccess('transactions.create') ?? false;
+            $canTransactionsExport = $authUser?->canAccess('transactions.export') ?? false;
+            $canCorrectionApprove = $authUser?->canAccess('transactions.correction.approve') ?? false;
+            $canReceivablesView = $authUser?->canAccess('receivables.view') ?? false;
+            $canReceivablesPay = $authUser?->canAccess('receivables.pay') ?? false;
+            $canSupplierPayablesView = $authUser?->canAccess('supplier_payables.view') ?? false;
+            $canReportsView = $authUser?->canAccess('reports.view') ?? false;
+            $canProductsView = $authUser?->canAccess('masters.products.view') ?? false;
+            $canProductsManage = $authUser?->canAccess('masters.products.manage') ?? false;
+            $canCustomersView = $authUser?->canAccess('masters.customers.view') ?? false;
+            $canCustomersManage = $authUser?->canAccess('masters.customers.manage') ?? false;
+            $canSuppliersView = $authUser?->canAccess('masters.suppliers.view') ?? false;
+            $canSuppliersEdit = $authUser?->canAccess('masters.suppliers.edit') ?? false;
+            $canSettingsProfile = $authUser?->canAccess('settings.profile') ?? false;
+            $canSettingsAdmin = $authUser?->canAccess('settings.admin') ?? false;
+            $canSemesterBulk = $authUser?->canAccess('semester.bulk') ?? false;
+            $canUsersManage = $authUser?->canAccess('users.manage') ?? false;
+            $canAuditLogsView = $authUser?->canAccess('audit_logs.view') ?? false;
+            $showItemsGroup = $canProductsView || $canProductsManage;
+            $showCustomersGroup = $canCustomersView || $canCustomersManage;
+            $showSuppliersGroup = $canSuppliersView || $canSuppliersEdit || $canSupplierPayablesView || $canTransactionsView || $canTransactionsCreate;
+            $showSchoolDistributionGroup = $canTransactionsView || $canTransactionsCreate;
+            $showTransactionsGroup = $canTransactionsView || $canTransactionsCreate || $canTransactionsExport;
+            $showReceivablesGroup = $canReceivablesView || $canReceivablesPay;
+            $showReportsGroup = $canReportsView;
+            $showSystemGroup = $canUsersManage || $canAuditLogsView || $canCorrectionApprove || $canSettingsAdmin || $canSettingsProfile || $canSemesterBulk;
+        @endphp
         <nav class="nav">
-            <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">{{ __('menu.dashboard') }}</a>
+            @if($canDashboard)
+                <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">{{ __('menu.dashboard') }}</a>
+            @endif
             @auth
-                @if(auth()->user()->role === 'admin')
+                @if($showItemsGroup)
                     <div class="nav-group {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-group>
                         <button type="button" class="nav-group-title {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_items_group') }}</button>
                         <div class="nav-sub">
-                            <a href="{{ route('item-categories.index') }}" class="{{ request()->routeIs('item-categories.*') ? 'active' : '' }}">{{ __('menu.item_categories') }}</a>
-                            <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'active' : '' }}">{{ __('menu.items') }}</a>
+                            @if($canProductsManage)
+                                <a href="{{ route('item-categories.index') }}" class="{{ request()->routeIs('item-categories.*') ? 'active' : '' }}">{{ __('menu.item_categories') }}</a>
+                            @endif
+                            @if($canProductsView)
+                                <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'active' : '' }}">{{ __('menu.items') }}</a>
+                            @endif
                         </div>
                     </div>
+                @endif
+                @if($showCustomersGroup)
                     <div class="nav-group {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}" data-nav-group>
                         <button type="button" class="nav-group-title {{ request()->routeIs('customer-levels-web.*') || request()->routeIs('customers-web.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_customers_group') }}</button>
                         <div class="nav-sub">
-                            <a href="{{ route('customer-levels-web.index') }}" class="{{ request()->routeIs('customer-levels-web.*') ? 'active' : '' }}">{{ __('menu.customer_levels') }}</a>
-                            <a href="{{ route('customers-web.index') }}" class="{{ request()->routeIs('customers-web.*') ? 'active' : '' }}">{{ __('menu.customers') }}</a>
+                            @if($canCustomersManage)
+                                <a href="{{ route('customer-levels-web.index') }}" class="{{ request()->routeIs('customer-levels-web.*') ? 'active' : '' }}">{{ __('menu.customer_levels') }}</a>
+                            @endif
+                            @if($canCustomersView)
+                                <a href="{{ route('customers-web.index') }}" class="{{ request()->routeIs('customers-web.*') ? 'active' : '' }}">{{ __('menu.customers') }}</a>
+                            @endif
                         </div>
                     </div>
                 @endif
             @endauth
             @auth
+                @if($showSuppliersGroup)
                 <div class="nav-group {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}" data-nav-group>
                     <button type="button" class="nav-group-title {{ request()->routeIs('suppliers.*') || request()->routeIs('outgoing-transactions.*') || request()->routeIs('supplier-payables.*') || request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}" data-nav-toggle>{{ __('menu.suppliers') }}</button>
                     <div class="nav-sub">
-                        @if(auth()->user()->role === 'admin')
+                        @if($canSuppliersView)
                             <a href="{{ route('suppliers.index') }}" class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</a>
                         @endif
-                        <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
-                        <a href="{{ route('supplier-payables.index') }}" class="{{ request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.supplier_payables') }}</a>
-                        <a href="{{ route('supplier-stock-cards.index') }}" class="{{ request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}">{{ __('menu.supplier_stock_cards') }}</a>
+                        @if($canTransactionsView || $canTransactionsCreate)
+                            <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
+                        @endif
+                        @if($canSupplierPayablesView)
+                            <a href="{{ route('supplier-payables.index') }}" class="{{ request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.supplier_payables') }}</a>
+                            <a href="{{ route('supplier-stock-cards.index') }}" class="{{ request()->routeIs('supplier-stock-cards.*') ? 'active' : '' }}">{{ __('menu.supplier_stock_cards') }}</a>
+                        @endif
                     </div>
                 </div>
+                @endif
             @endauth
             @auth
+                @if($showSchoolDistributionGroup)
                 <div class="nav-group {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}" data-nav-group>
                     <button type="button" class="nav-group-title {{ request()->routeIs('customer-ship-locations.*') || request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}" data-nav-toggle>{{ __('menu.school_distribution') }}</button>
                     <div class="nav-sub">
-                        <a href="{{ route('customer-ship-locations.index') }}" class="{{ request()->routeIs('customer-ship-locations.*') ? 'active' : '' }}">{{ __('menu.ship_locations') }}</a>
-                        <a href="{{ route('school-bulk-transactions.index') }}" class="{{ request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">{{ __('menu.school_bulk_transactions') }}</a>
+                        @if($canTransactionsView || $canTransactionsCreate)
+                            <a href="{{ route('customer-ship-locations.index') }}" class="{{ request()->routeIs('customer-ship-locations.*') ? 'active' : '' }}">{{ __('menu.ship_locations') }}</a>
+                            <a href="{{ route('school-bulk-transactions.index') }}" class="{{ request()->routeIs('school-bulk-transactions.*') ? 'active' : '' }}">{{ __('menu.school_bulk_transactions') }}</a>
+                        @endif
                     </div>
                 </div>
+                @endif
             @endauth
-            <div class="nav-group {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-group>
-                <button type="button" class="nav-group-title {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_transactions') }}</button>
-                <div class="nav-sub">
-                    <a href="{{ route('sales-invoices.index') }}" class="{{ request()->routeIs('sales-invoices.*') ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
-                    <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
-                    <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
-                    <a href="{{ route('delivery-trips.index') }}" class="{{ request()->routeIs('delivery-trips.*') ? 'active' : '' }}">{{ __('menu.delivery_trip_logs') }}</a>
-                    <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
-                </div>
-            </div>
-            <div class="nav-group {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}" data-nav-group>
-                <button type="button" class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}" data-nav-toggle>{{ __('menu.receivables') }}</button>
-                <div class="nav-sub">
-                    <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.index') || request()->routeIs('receivables.customer-*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
-                    <a href="{{ route('receivables.global.index') }}" class="{{ request()->routeIs('receivables.global.*') ? 'active' : '' }}">{{ __('menu.receivable_global') }}</a>
-                    <a href="{{ route('receivables.semester.index') }}" class="{{ request()->routeIs('receivables.semester.*') ? 'active' : '' }}">{{ __('menu.receivable_semester') }}</a>
-                    <a href="{{ route('receivable-payments.index') }}" class="{{ request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivable_payments') }}</a>
-                </div>
-            </div>
-            <div class="nav-group {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-nav-group>
-                <button type="button" class="nav-group-title {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_reports') }}</button>
-                <div class="nav-sub">
-                    <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('menu.reports') }}</a>
-                </div>
-            </div>
-            @auth
-                <div class="nav-group {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-group>
-                    <button type="button" class="nav-group-title {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_system') }}</button>
+            @if($showTransactionsGroup)
+                <div class="nav-group {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-group>
+                    <button type="button" class="nav-group-title {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_transactions') }}</button>
                     <div class="nav-sub">
-                    @if(auth()->user()->role === 'admin')
-                        <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'active' : '' }}">{{ __('menu.users') }}</a>
-                        <a href="{{ route('audit-logs.index') }}" class="{{ request()->routeIs('audit-logs.*') ? 'active' : '' }}">{{ __('ui.audit_logs') }}</a>
-                        <a href="{{ route('approvals.index') }}" class="{{ request()->routeIs('approvals.*') ? 'active' : '' }}">Approval</a>
-                        <a href="{{ route('semester-transactions.index') }}" class="{{ request()->routeIs('semester-transactions.*') ? 'active' : '' }}">{{ __('menu.semester_transactions') }}</a>
-                        <a href="{{ route('ops-health.index') }}" class="{{ request()->routeIs('ops-health.*') ? 'active' : '' }}">Ops Health</a>
-                    @endif
-                    <a href="{{ route('settings.edit') }}" class="{{ request()->routeIs('settings.*') ? 'active' : '' }}">{{ __('menu.settings') }}</a>
+                        <a href="{{ route('sales-invoices.index') }}" class="{{ request()->routeIs('sales-invoices.*') ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
+                        <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
+                        <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
+                        <a href="{{ route('delivery-trips.index') }}" class="{{ request()->routeIs('delivery-trips.*') ? 'active' : '' }}">{{ __('menu.delivery_trip_logs') }}</a>
+                        <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
                     </div>
                 </div>
+            @endif
+            @if($showReceivablesGroup)
+                <div class="nav-group {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}" data-nav-group>
+                    <button type="button" class="nav-group-title {{ request()->routeIs('receivables.*') || request()->routeIs('receivable-payments.*') ? 'active' : '' }}" data-nav-toggle>{{ __('menu.receivables') }}</button>
+                    <div class="nav-sub">
+                        @if($canReceivablesView)
+                            <a href="{{ route('receivables.index') }}" class="{{ request()->routeIs('receivables.index') || request()->routeIs('receivables.customer-*') ? 'active' : '' }}">{{ __('menu.receivable_ledger') }}</a>
+                            <a href="{{ route('receivables.global.index') }}" class="{{ request()->routeIs('receivables.global.*') ? 'active' : '' }}">{{ __('menu.receivable_global') }}</a>
+                            <a href="{{ route('receivables.semester.index') }}" class="{{ request()->routeIs('receivables.semester.*') ? 'active' : '' }}">{{ __('menu.receivable_semester') }}</a>
+                            <a href="{{ route('receivable-payments.index') }}" class="{{ request()->routeIs('receivable-payments.*') ? 'active' : '' }}">{{ __('menu.receivable_payments') }}</a>
+                        @endif
+                    </div>
+                </div>
+            @endif
+            @if($showReportsGroup)
+                <div class="nav-group {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-nav-group>
+                    <button type="button" class="nav-group-title {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_reports') }}</button>
+                    <div class="nav-sub">
+                        <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('menu.reports') }}</a>
+                    </div>
+                </div>
+            @endif
+            @auth
+                @if($showSystemGroup)
+                    <div class="nav-group {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-group>
+                        <button type="button" class="nav-group-title {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_system') }}</button>
+                        <div class="nav-sub">
+                        @if($canUsersManage)
+                            <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'active' : '' }}">{{ __('menu.users') }}</a>
+                        @endif
+                        @if($canAuditLogsView)
+                            <a href="{{ route('audit-logs.index') }}" class="{{ request()->routeIs('audit-logs.*') ? 'active' : '' }}">{{ __('ui.audit_logs') }}</a>
+                        @endif
+                        @if($canCorrectionApprove)
+                            <a href="{{ route('approvals.index') }}" class="{{ request()->routeIs('approvals.*') ? 'active' : '' }}">Approval</a>
+                        @endif
+                        @if($canSettingsAdmin || $canSemesterBulk)
+                            <a href="{{ route('semester-transactions.index') }}" class="{{ request()->routeIs('semester-transactions.*') ? 'active' : '' }}">{{ __('menu.semester_transactions') }}</a>
+                        @endif
+                        @if($canSettingsAdmin)
+                            <a href="{{ route('ops-health.index') }}" class="{{ request()->routeIs('ops-health.*') ? 'active' : '' }}">Ops Health</a>
+                        @endif
+                        @if($canSettingsProfile)
+                            <a href="{{ route('settings.edit') }}" class="{{ request()->routeIs('settings.*') ? 'active' : '' }}">{{ __('menu.settings') }}</a>
+                        @endif
+                        </div>
+                    </div>
+                @endif
                 <div style="margin-top: 14px; font-size: 12px; color: #d1d1d1;">
                     {{ __('ui.login') }}: {{ auth()->user()->name }} ({{ auth()->user()->role }})
                 </div>

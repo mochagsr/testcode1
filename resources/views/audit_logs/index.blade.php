@@ -13,6 +13,12 @@
                 <option value="sales_return" @selected($selectedModule === 'sales_return')>{{ __('ui.audit_module_sales_return') }}</option>
                 <option value="delivery_note" @selected($selectedModule === 'delivery_note')>{{ __('ui.audit_module_delivery_note') }}</option>
                 <option value="order_note" @selected($selectedModule === 'order_note')>{{ __('ui.audit_module_order_note') }}</option>
+                <option value="receivable_payment" @selected($selectedModule === 'receivable_payment')>{{ __('ui.audit_module_receivable_payment') }}</option>
+                <option value="supplier_payment" @selected($selectedModule === 'supplier_payment')>{{ __('ui.audit_module_supplier_payment') }}</option>
+                <option value="outgoing_transaction" @selected($selectedModule === 'outgoing_transaction')>{{ __('ui.audit_module_outgoing_transaction') }}</option>
+                <option value="delivery_trip" @selected($selectedModule === 'delivery_trip')>{{ __('ui.audit_module_delivery_trip') }}</option>
+                <option value="school_bulk" @selected($selectedModule === 'school_bulk')>{{ __('ui.audit_module_school_bulk') }}</option>
+                <option value="master" @selected($selectedModule === 'master')>{{ __('ui.audit_module_master') }}</option>
             </select>
             <input id="audit-logs-date-from-input" type="date" name="date_from" value="{{ $selectedDateFrom }}" style="max-width: 180px;">
             <input id="audit-logs-date-to-input" type="date" name="date_to" value="{{ $selectedDateTo }}" style="max-width: 180px;">

@@ -84,6 +84,33 @@ class User extends Authenticatable
             ->all();
     }
 
+    public function canAccess(string $permission): bool
+    {
+        $requiredPermission = strtolower(trim($permission));
+        if ($requiredPermission === '') {
+            return false;
+        }
+
+        $resolvedPermissions = $this->resolvedPermissions();
+
+        return in_array('*', $resolvedPermissions, true)
+            || in_array($requiredPermission, $resolvedPermissions, true);
+    }
+
+    /**
+     * @param  iterable<int, string>  $permissions
+     */
+    public function canAccessAny(iterable $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->canAccess((string) $permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Scope: columns for user list/report screens.
      *

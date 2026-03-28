@@ -3,6 +3,29 @@
 @section('title', __('ui.dashboard_title').' - PgPOS ERP')
 
 @section('content')
+    <style>
+        .dashboard-quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+        .dashboard-quick-link {
+            display: block;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: color-mix(in srgb, var(--surface) 94%, var(--border) 6%);
+            text-decoration: none;
+            color: inherit;
+        }
+        .dashboard-quick-link strong {
+            display: block;
+            margin-bottom: 6px;
+        }
+        .dashboard-quick-link small {
+            color: var(--muted);
+        }
+    </style>
     <h1 class="page-title">{{ __('ui.dashboard_title') }}</h1>
 
     <div class="grid">
@@ -26,6 +49,102 @@
             <div class="stat-label">{{ __('ui.dashboard_invoice_this_month') }}</div>
             <div class="stat-value">Rp {{ number_format((int) round($summary['invoice_this_month']), 0, ',', '.') }}</div>
         </div>
+        <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_pending_approvals') }}</div>
+            <div class="stat-value">{{ number_format((int) ($summary['pending_approvals'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_pending_report_tasks') }}</div>
+            <div class="stat-value">{{ number_format((int) ($summary['pending_report_tasks'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_active_semesters') }}</div>
+            <div class="stat-value">{{ number_format((int) ($summary['active_semesters'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_closed_semesters') }}</div>
+            <div class="stat-value">{{ number_format((int) ($summary['closed_semesters'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_locked_customer_semesters') }}</div>
+            <div class="stat-value">{{ number_format((int) ($summary['locked_customer_semesters'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_locked_supplier_years') }}</div>
+            <div class="stat-value">{{ number_format((int) ($summary['locked_supplier_years'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">{{ __('ui.dashboard_backup_files') }}</div>
+            <div class="stat-value">{{ number_format((int) ($summary['backup_files'] ?? 0), 0, ',', '.') }}</div>
+        </div>
+    </div>
+
+    <div class="row" style="margin-top: 8px;">
+        <div class="col-6">
+            <div class="card">
+                <h3>{{ __('ui.dashboard_ops_snapshot') }}</h3>
+                <table>
+                    <tbody>
+                    <tr>
+                        <th>{{ __('ui.dashboard_latest_backup') }}</th>
+                        <td>{{ $opsSnapshot['latestBackup'] ?? '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>{{ __('ui.dashboard_latest_restore_drill') }}</th>
+                        <td>{{ ($opsSnapshot['latestRestoreStatus'] ?? '-') }} @if(($opsSnapshot['latestRestoreAt'] ?? '-') !== '-')<span class="muted">({{ $opsSnapshot['latestRestoreAt'] }})</span>@endif</td>
+                    </tr>
+                    <tr>
+                        <th>{{ __('ui.dashboard_latest_integrity_check') }}</th>
+                        <td>{{ ($opsSnapshot['latestIntegrityStatus'] ?? '-') }} @if(($opsSnapshot['latestIntegrityAt'] ?? '-') !== '-')<span class="muted">({{ $opsSnapshot['latestIntegrityAt'] }})</span>@endif</td>
+                    </tr>
+                    <tr>
+                        <th>{{ __('ui.dashboard_latest_performance_probe') }}</th>
+                        <td>{{ $opsSnapshot['latestProbeAt'] ?? '-' }}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card">
+                <h3>{{ __('ui.dashboard_quick_actions') }}</h3>
+                <div class="dashboard-quick-links">
+                    @forelse($quickLinks as $quickLink)
+                        <a class="dashboard-quick-link" href="{{ $quickLink['route'] }}">
+                            <strong>{{ $quickLink['title'] }}</strong>
+                            <small>{{ $quickLink['note'] }}</small>
+                        </a>
+                    @empty
+                        <div class="muted">{{ __('ui.no_data') }}</div>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 8px;">
+        <h3 style="margin-top:0;">{{ __('ui.dashboard_post_deploy_check_title') }}</h3>
+        <div class="muted" style="margin-bottom:8px;">{{ __('ui.dashboard_post_deploy_check_note') }}</div>
+        <table>
+            <tbody>
+            <tr>
+                <th>{{ __('ui.dashboard_post_deploy_backup') }}</th>
+                <td>{{ __('ui.dashboard_post_deploy_backup_note') }}</td>
+            </tr>
+            <tr>
+                <th>{{ __('ui.dashboard_post_deploy_restore') }}</th>
+                <td>{{ __('ui.dashboard_post_deploy_restore_note') }}</td>
+            </tr>
+            <tr>
+                <th>{{ __('ui.dashboard_post_deploy_export') }}</th>
+                <td>{{ __('ui.dashboard_post_deploy_export_note') }}</td>
+            </tr>
+            <tr>
+                <th>{{ __('ui.dashboard_post_deploy_queue') }}</th>
+                <td>{{ __('ui.dashboard_post_deploy_queue_note') }}</td>
+            </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="row" style="margin-top: 8px;">
