@@ -27,6 +27,7 @@ Checklist singkat saat pindah dari `tes` ke `prod`.
 - buat 1 transaksi uji
 - cek print/PDF/Excel
 - cek audit log
+- kalau perlu import data, gunakan `docs/IMPORT_MASSAL_PLAYBOOK.md`
 
 ## Rollback minimum
 - restore DB backup terakhir

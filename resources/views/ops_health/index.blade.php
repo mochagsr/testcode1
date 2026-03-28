@@ -155,5 +155,15 @@
             <li>Uji restore drill minimal 1 kali di environment tes.</li>
         </ul>
     </div>
+
+    <div class="card ops-col-6">
+        <h3 style="margin-top:0;">Dokumen Pendamping</h3>
+        <ul class="ops-list">
+            <li><code>docs/UAT_AAPANEL_POST_DEPLOY.md</code> untuk checklist sesudah deploy tes.</li>
+            <li><code>docs/IMPORT_MASSAL_PLAYBOOK.md</code> untuk import master/transaksi dalam jumlah besar.</li>
+            <li><code>docs/STRESS_TEST_GUIDE.md</code> untuk uji beban ringan sebelum live.</li>
+            <li><code>docs/GO_LIVE_RUNBOOK.md</code> untuk langkah pindah dari tes ke prod.</li>
+        </ul>
+    </div>
     </div>
 @endsection

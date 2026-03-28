@@ -33,3 +33,4 @@
 - Isi sesuai kolom template.
 - Import file.
 - Jika ada error, cek daftar error per baris lalu perbaiki dan import ulang.
+- Gunakan `docs/IMPORT_MASSAL_PLAYBOOK.md` saat import besar atau import transaksi.

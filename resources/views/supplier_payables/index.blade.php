@@ -154,6 +154,7 @@
                         <div>
                             <strong>{{ $selectedSupplier->name }}</strong>
                             <div class="muted">{{ __('supplier_payable.year_label') }}: {{ $selectedYear }}</div>
+                            <div class="muted" style="margin-top: 4px;">{{ __('supplier_payable.year_book_note') }}</div>
                         </div>
                         <div class="flex" style="align-items:center; gap:8px;">
                             @if($selectedSupplierYearClosed)

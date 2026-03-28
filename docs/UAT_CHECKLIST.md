@@ -64,6 +64,12 @@
 - Audit log record IDs.
 - Exported files attached.
 
+## Dokumen pendamping
+- `docs/UAT_AAPANEL_POST_DEPLOY.md`
+- `docs/IMPORT_MASSAL_PLAYBOOK.md`
+- `docs/STRESS_TEST_GUIDE.md`
+- `docs/GO_LIVE_RUNBOOK.md`
+
 ## Exit Criteria
 - No critical/major issue open.
 - Data integrity checks pass (stock and ledger balanced).

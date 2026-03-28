@@ -377,6 +377,21 @@
             <input id="receivable-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('receivable.search_placeholder') }}" style="max-width: 320px;">
             <button type="submit">{{ __('txn.search') }}</button>
         </form>
+        @if($selectedSemester)
+            <div class="muted" style="margin-top: 10px;">
+                {{ __('receivable.semester_filter_status_note') }}
+                <strong style="margin-left: 6px;">{{ $selectedSemester }}</strong>
+                <span style="margin-left: 6px;">|</span>
+                <span style="margin-left: 6px;">
+                    {{ __('receivable.customer_semester_status') }} global:
+                    <strong>{{ $selectedSemesterGlobalClosed ? __('receivable.customer_semester_closed') : __('receivable.customer_semester_open') }}</strong>
+                </span>
+                @if($selectedSemesterActive)
+                    <span style="margin-left: 6px;">|</span>
+                    <span style="margin-left: 6px;" class="badge success">Aktif</span>
+                @endif
+            </div>
+        @endif
 
         @if((auth()->user()?->role ?? '') === 'admin' && $selectedCustomerId > 0 && $selectedSemester)
             <div style="margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-color, #d0d7de); border-radius: 8px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
@@ -384,8 +399,8 @@
                     <strong>{{ __('receivable.customer_semester_book_title') }}</strong><br>
                     <span class="muted">
                         {{ ($selectedCustomerName ?? null) ?: __('receivable.customer_id').' '.$selectedCustomerId }}
-                        • {{ $selectedSemester }}
-                        •
+                        | {{ $selectedSemester }}
+                        |
                         @if($selectedCustomerSemesterClosed)
                             @if(($customerSemesterAutoClosedMap[$selectedCustomerId] ?? false) === true)
                                 {{ __('receivable.customer_semester_locked_auto') }}
@@ -398,6 +413,9 @@
                             {{ __('receivable.customer_semester_unlocked') }}
                         @endif
                     </span>
+                    <div class="muted" style="margin-top: 4px;">
+                        {{ __('receivable.customer_semester_lock_help') }}
+                    </div>
                 </div>
                 <div>
                     @if($selectedCustomerSemesterClosed)
@@ -1195,3 +1213,4 @@
         })();
     </script>
 @endsection
+
