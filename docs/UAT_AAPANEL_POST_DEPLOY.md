@@ -13,6 +13,7 @@ Gunakan checklist ini setiap selesai deploy ke environment `tes` sebelum update 
 - Queue worker aktif.
 - `Ops Health` menampilkan environment dan DB yang benar.
 - `Debug Mode` harus `OFF`.
+- Jalankan `php artisan app:smoke-test` dan pastikan tidak ada status `FAIL`.
 
 ## 3. Master data
 - Buka `Barang`, `Customer`, `Supplier`, `Kategori Barang`.

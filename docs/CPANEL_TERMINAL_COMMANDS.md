@@ -183,6 +183,13 @@ cd /home/CPANEL_USERNAME/repositories/tespgpos
 php artisan app:db-restore-test
 ```
 
+### Smoke test
+
+```bash
+cd /home/CPANEL_USERNAME/repositories/tespgpos
+php artisan app:smoke-test
+```
+
 ## G. Regenerate SQL `tes` dari lokal
 
 Command ini dijalankan di mesin lokal sebelum upload/push hasil snapshot:

@@ -229,6 +229,24 @@ php artisan event:cache
 php artisan view:cache
 ```
 
+## 12A. Smoke test sesudah deploy
+
+Setelah setup awal selesai, jalankan:
+
+```bash
+php artisan app:smoke-test
+```
+
+Command ini membantu cek cepat:
+
+- environment aktif
+- debug mode
+- koneksi DB/queue/session/cache
+- tabel penting
+- storage link
+- backup file
+- log restore drill / integrity / performance probe
+
 ## 13. Permission folder
 
 ```bash

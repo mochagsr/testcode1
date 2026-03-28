@@ -1137,6 +1137,104 @@ Artisan::command('app:query-profile', function () {
     return 0;
 })->purpose('Run quick EXPLAIN profiling for high-frequency list/search queries');
 
+Artisan::command('app:smoke-test', function () {
+    $rows = [];
+    $failures = 0;
+    $warnings = 0;
+
+    $pushRow = function (string $check, string $status, string $detail) use (&$rows, &$failures, &$warnings): void {
+        $rows[] = [$check, $status, $detail];
+        if ($status === 'FAIL') {
+            $failures++;
+        } elseif ($status === 'WARN') {
+            $warnings++;
+        }
+    };
+
+    $pushRow('APP_ENV', strtoupper((string) config('app.env')), 'Current environment');
+    $pushRow('APP_DEBUG', (bool) config('app.debug') ? 'WARN' : 'OK', (bool) config('app.debug') ? 'Debug mode masih ON.' : 'Debug mode sudah OFF.');
+    $pushRow('DB_CONNECTION', strtoupper((string) config('database.default')), 'Database connection aktif');
+    $pushRow('QUEUE_CONNECTION', strtoupper((string) config('queue.default')), 'Queue driver aktif');
+    $pushRow('SESSION_DRIVER', strtoupper((string) config('session.driver')), 'Session driver aktif');
+    $pushRow('CACHE_STORE', strtoupper((string) config('cache.default')), 'Cache store aktif');
+
+    $requiredTables = [
+        'users',
+        'products',
+        'customers',
+        'suppliers',
+        'sales_invoices',
+        'receivable_ledgers',
+        'supplier_ledgers',
+        'report_export_tasks',
+        'jobs',
+    ];
+
+    foreach ($requiredTables as $table) {
+        $pushRow(
+            'TABLE: '.$table,
+            Schema::hasTable($table) ? 'OK' : 'FAIL',
+            Schema::hasTable($table) ? 'Tabel tersedia.' : 'Tabel belum ada.'
+        );
+    }
+
+    $storageLinkPath = public_path('storage');
+    $pushRow(
+        'STORAGE_LINK',
+        File::exists($storageLinkPath) ? 'OK' : 'WARN',
+        File::exists($storageLinkPath) ? 'storage link tersedia.' : 'storage link belum dibuat / tidak terbaca.'
+    );
+
+    $backupFiles = collect(Storage::disk('local')->files('backups'))
+        ->merge(Storage::disk('local')->files('backups/db'));
+    $pushRow(
+        'BACKUP_FILES',
+        $backupFiles->isNotEmpty() ? 'OK' : 'WARN',
+        $backupFiles->isNotEmpty() ? 'Backup ditemukan: '.$backupFiles->sort()->last() : 'Belum ada file backup.'
+    );
+
+    if (Schema::hasTable('restore_drill_logs')) {
+        $latestRestoreDrill = DB::table('restore_drill_logs')->latest('checked_at')->latest('id')->first();
+        $pushRow(
+            'RESTORE_DRILL',
+            $latestRestoreDrill !== null ? 'OK' : 'WARN',
+            $latestRestoreDrill !== null
+                ? 'Terakhir: '.Carbon::parse((string) $latestRestoreDrill->checked_at, 'Asia/Jakarta')->format('d-m-Y H:i:s').' / '.strtoupper((string) $latestRestoreDrill->status)
+                : 'Belum ada restore drill log.'
+        );
+    }
+
+    if (Schema::hasTable('integrity_check_logs')) {
+        $latestIntegrityLog = IntegrityCheckLog::query()->latest('checked_at')->latest('id')->first();
+        $pushRow(
+            'INTEGRITY_CHECK',
+            $latestIntegrityLog !== null && (bool) $latestIntegrityLog->is_ok ? 'OK' : ($latestIntegrityLog === null ? 'WARN' : 'FAIL'),
+            $latestIntegrityLog !== null
+                ? 'Terakhir: '.optional($latestIntegrityLog->checked_at)->format('d-m-Y H:i:s').' / '.((bool) $latestIntegrityLog->is_ok ? 'OK' : 'ANOMALI')
+                : 'Belum ada integrity check log.'
+        );
+    }
+
+    if (Schema::hasTable('performance_probe_logs')) {
+        $latestProbe = PerformanceProbeLog::query()->latest('probed_at')->latest('id')->first();
+        $pushRow(
+            'PERFORMANCE_PROBE',
+            $latestProbe !== null ? 'OK' : 'WARN',
+            $latestProbe !== null
+                ? 'Terakhir: '.optional($latestProbe->probed_at)->format('d-m-Y H:i:s').' / avg '.number_format((int) $latestProbe->avg_loop_ms, 0, ',', '.').' ms'
+                : 'Belum ada performance probe log.'
+        );
+    }
+
+    $this->table(['Check', 'Status', 'Detail'], $rows);
+    $this->newLine();
+    $this->line('Summary: OK/WARN/FAIL -> '.count($rows).' check(s)');
+    $this->line('Warnings: '.$warnings);
+    $this->line('Failures: '.$failures);
+
+    return $failures === 0 ? 0 : 1;
+})->purpose('Run lightweight smoke test for deploy readiness and key operational checks');
+
 Artisan::command('app:restore-document {type} {id}', function () {
     $type = strtolower(trim((string) $this->argument('type')));
     $id = (int) $this->argument('id');

@@ -32,6 +32,46 @@
                 {{ __('ui.export_audit_csv') }}
             </a>
         </form>
+        <div class="muted" style="margin-top: 10px;">
+            <strong>{{ __('ui.audit_help_title') }}:</strong>
+            {{ __('ui.audit_help_note') }}
+        </div>
+        @if($search !== '' || ($selectedDocumentCode ?? '') !== '' || $selectedModule !== '' || $selectedDateFrom !== '' || $selectedDateTo !== '')
+            @php
+                $moduleLabels = [
+                    'sales_invoice' => __('ui.audit_module_sales_invoice'),
+                    'sales_return' => __('ui.audit_module_sales_return'),
+                    'delivery_note' => __('ui.audit_module_delivery_note'),
+                    'order_note' => __('ui.audit_module_order_note'),
+                    'receivable_payment' => __('ui.audit_module_receivable_payment'),
+                    'supplier_payment' => __('ui.audit_module_supplier_payment'),
+                    'outgoing_transaction' => __('ui.audit_module_outgoing_transaction'),
+                    'delivery_trip' => __('ui.audit_module_delivery_trip'),
+                    'school_bulk' => __('ui.audit_module_school_bulk'),
+                    'master' => __('ui.audit_module_master'),
+                ];
+            @endphp
+            <div style="margin-top: 10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                <span class="muted">{{ __('ui.audit_filter_summary') }}:</span>
+                @if($selectedModule !== '')
+                    <span class="badge info">{{ $moduleLabels[$selectedModule] ?? $selectedModule }}</span>
+                @endif
+                @if($search !== '')
+                    <span class="badge neutral">{{ __('ui.audit_filter_search') }}: {{ $search }}</span>
+                @endif
+                @if(($selectedDocumentCode ?? '') !== '')
+                    <span class="badge neutral">{{ __('ui.audit_filter_doc_code') }}: {{ $selectedDocumentCode }}</span>
+                @endif
+                @if($selectedDateFrom !== '' || $selectedDateTo !== '')
+                    <span class="badge neutral">
+                        {{ __('ui.audit_filter_period') }}:
+                        {{ $selectedDateFrom !== '' ? \Illuminate\Support\Carbon::parse($selectedDateFrom)->format('d-m-Y') : '...' }}
+                        -
+                        {{ $selectedDateTo !== '' ? \Illuminate\Support\Carbon::parse($selectedDateTo)->format('d-m-Y') : '...' }}
+                    </span>
+                @endif
+            </div>
+        @endif
     </div>
 
     <div class="card">

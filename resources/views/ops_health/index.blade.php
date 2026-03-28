@@ -142,6 +142,7 @@
             <li><code>php artisan app:db-restore-test</code></li>
             <li><code>php artisan app:integrity-check</code></li>
             <li><code>php artisan app:load-test-light --loops=80 --search=ang</code></li>
+            <li><code>php artisan app:smoke-test</code></li>
         </ul>
     </div>
 
