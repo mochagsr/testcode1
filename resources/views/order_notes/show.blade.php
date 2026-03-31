@@ -3,6 +3,10 @@
 @section('title', __('txn.order_notes_title').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
+        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+    @endphp
     <style>
         #admin-order-items-table input[type=number].qty-input::-webkit-outer-spin-button,
         #admin-order-items-table input[type=number].qty-input::-webkit-inner-spin-button {
@@ -75,7 +79,9 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }} {{ $note->note_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.back') }}</a>
-            <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+            @if($canEditTransactions)
+                <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+            @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('order-notes.print', $note) }}">{{ __('txn.print') }}</option>
@@ -140,6 +146,7 @@
         </div>
     </div>
 
+    @if($canEditTransactions)
     <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
         <div id="admin-edit-transaction" class="card txn-modal-card">
             <div class="form-section">
@@ -147,7 +154,7 @@
                     <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
                     <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
                 </div>
-                <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
+                <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
                 <form id="admin-order-edit-form" method="post" action="{{ route('order-notes.admin-update', $note) }}" class="row" style="margin-bottom: 12px;">
                     @csrf
                     @method('PUT')
@@ -166,6 +173,13 @@
                     <div class="col-4">
                         <label>{{ __('txn.city') }}</label>
                         <input type="text" name="city" value="{{ old('city', $note->city) }}">
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.transaction_type') }}</label>
+                        <select name="transaction_type">
+                            <option value="product" @selected(old('transaction_type', $note->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
+                            <option value="printing" @selected(old('transaction_type', $note->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
+                        </select>
                     </div>
                     <div class="col-12">
                         <label>{{ __('txn.address') }}</label>
@@ -213,7 +227,7 @@
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if((auth()->user()?->role ?? '') === 'admin' && !$note->is_canceled)
+                @if($isAdminUser && !$note->is_canceled)
                     <form method="post" action="{{ route('order-notes.cancel', $note) }}" class="row">
                         @csrf
                         <div class="col-12">
@@ -228,6 +242,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <script>
         (function () {

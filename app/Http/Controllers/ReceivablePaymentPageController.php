@@ -212,7 +212,8 @@ class ReceivablePaymentPageController extends Controller
                     description: __('receivable.receivable_payment_for_invoice', [
                         'payment' => $payment->payment_number,
                         'invoice' => $invoice->invoice_number,
-                    ])
+                    ]),
+                    transactionType: (string) $invoice->transaction_type
                 );
 
                 $remaining -= $payAmount;
@@ -231,7 +232,8 @@ class ReceivablePaymentPageController extends Controller
                     entryDate: $paymentDate,
                     amount: $remaining,
                     periodCode: null,
-                    description: __('receivable.receivable_payment', ['payment' => $payment->payment_number])
+                    description: __('receivable.receivable_payment', ['payment' => $payment->payment_number]),
+                    transactionType: null
                 );
             }
 
@@ -354,6 +356,7 @@ class ReceivablePaymentPageController extends Controller
                         'payment' => $payment->payment_number,
                         'invoice' => $invoice->invoice_number,
                     ]),
+                    transactionType: (string) $invoice->transaction_type,
                 );
 
                 $invoicePayment->delete();
@@ -374,6 +377,7 @@ class ReceivablePaymentPageController extends Controller
                     description: __('txn.cancel_receivable_payment_balance_ledger_note', [
                         'payment' => $payment->payment_number,
                     ]),
+                    transactionType: null,
                 );
             }
 

@@ -93,25 +93,29 @@
                 @endphp
                 <tr>
                     <td>
-                        <a href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a>
-                        @if($invoice->orderNote)
-                            <div class="muted" style="margin-top: 2px;">
-                                {{ __('txn.linked_order_note') }}:
-                                <a href="{{ route('order-notes.show', $invoice->orderNote) }}">{{ $invoice->orderNote->note_number }}</a>
-                            </div>
-                        @endif
-                        @if((bool) ($lockState['auto'] ?? false))
-                            <span class="badge danger" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_auto') }}</span>
-                        @endif
-                        @if((bool) ($lockState['manual'] ?? false))
-                            <span class="badge warning" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_manual') }}</span>
-                        @endif
-                        @if((bool) ($adminAction['edited'] ?? false))
-                            <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
-                        @endif
-                        @if((bool) ($adminAction['canceled'] ?? false))
-                            <span class="badge danger" style="margin-left: 6px;">{{ __('txn.admin_badge_cancel') }}</span>
-                        @endif
+                        <div class="list-doc-cell">
+                            <a class="list-doc-link" href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a>
+                            @if($invoice->orderNote)
+                                <span class="list-doc-meta">
+                                    <span class="list-doc-meta-label">{{ __('txn.linked_order_note') }}:</span>
+                                    <a href="{{ route('order-notes.show', $invoice->orderNote) }}">{{ $invoice->orderNote->note_number }}</a>
+                                </span>
+                            @endif
+                            <span class="list-doc-badges">
+                                @if((bool) ($lockState['auto'] ?? false))
+                                    <span class="badge danger">{{ __('receivable.customer_semester_locked_auto') }}</span>
+                                @endif
+                                @if((bool) ($lockState['manual'] ?? false))
+                                    <span class="badge warning">{{ __('receivable.customer_semester_locked_manual') }}</span>
+                                @endif
+                                @if((bool) ($adminAction['edited'] ?? false))
+                                    <span class="badge warning">{{ __('txn.admin_badge_edit') }}</span>
+                                @endif
+                                @if((bool) ($adminAction['canceled'] ?? false))
+                                    <span class="badge danger">{{ __('txn.admin_badge_cancel') }}</span>
+                                @endif
+                            </span>
+                        </div>
                     </td>
                     <td>{{ $invoice->invoice_date->format('d-m-Y') }}</td>
                     <td>

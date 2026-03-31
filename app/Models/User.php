@@ -22,6 +22,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
         'role',
@@ -119,11 +120,11 @@ class User extends Authenticatable
      */
     public function scopeOnlyListColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'name', 'email', 'role', 'locale', 'theme', 'finance_locked', 'created_at']);
+        return $query->select(['id', 'name', 'username', 'email', 'role', 'locale', 'theme', 'finance_locked', 'created_at']);
     }
 
     /**
-     * Scope: search by name/email/role.
+     * Scope: search by name/username/email/role.
      *
      * @param  Builder<User>  $query
      * @return Builder<User>
@@ -137,6 +138,7 @@ class User extends Authenticatable
 
         return $query->where(function (Builder $subQuery) use ($search): void {
             $subQuery->where('name', 'like', "%{$search}%")
+                ->orWhere('username', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
                 ->orWhere('role', 'like', "%{$search}%");
         });

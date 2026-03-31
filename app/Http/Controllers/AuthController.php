@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AuditLogService;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,13 +29,28 @@ class AuthController extends Controller
     public function login(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
+            'login' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        $loginInput = trim((string) ($credentials['login'] ?? ''));
+        $password = (string) ($credentials['password'] ?? '');
+
+        $user = User::query()
+            ->where(function ($query) use ($loginInput): void {
+                $query->where('email', $loginInput)
+                    ->orWhere('username', $loginInput);
+            })
+            ->first();
+
+        $attemptCredentials = [
+            'email' => $user?->email ?? $loginInput,
+            'password' => $password,
+        ];
+
+        if (! Auth::attempt($attemptCredentials, $request->boolean('remember'))) {
             throw ValidationException::withMessages([
-                'email' => 'Invalid login credentials.',
+                'login' => __('ui.invalid_login_credentials'),
             ]);
         }
 
@@ -42,7 +58,7 @@ class AuthController extends Controller
         $this->auditLogService->log(
             'auth.login',
             null,
-            __('ui.audit_desc_user_logged_in', ['email' => (string) $request->input('email')]),
+            __('ui.audit_desc_user_logged_in', ['email' => (string) ($user?->email ?? $loginInput)]),
             $request
         );
 

@@ -294,6 +294,7 @@ class SettingsController extends Controller
         $data = $request->validate([
             'semester_period' => ['required', 'string', 'max:30'],
             'semester_book_page' => ['nullable', 'integer', 'min:1'],
+            'return_to' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester_period'] ?? ''));
@@ -310,9 +311,11 @@ class SettingsController extends Controller
             $routeParams['semester_book_page'] = (int) $data['semester_book_page'];
         }
 
-        return redirect()
-            ->route('settings.edit', $routeParams)
-            ->with('success', __('ui.semester_closed_success', ['semester' => $semester]));
+        return $this->settingsRedirectResponse(
+            $data['return_to'] ?? null,
+            $routeParams,
+            __('ui.semester_closed_success', ['semester' => $semester])
+        );
     }
 
     public function openSemester(Request $request): RedirectResponse
@@ -320,6 +323,7 @@ class SettingsController extends Controller
         $data = $request->validate([
             'semester_period' => ['required', 'string', 'max:30'],
             'semester_book_page' => ['nullable', 'integer', 'min:1'],
+            'return_to' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester_period'] ?? ''));
@@ -336,9 +340,23 @@ class SettingsController extends Controller
             $routeParams['semester_book_page'] = (int) $data['semester_book_page'];
         }
 
+        return $this->settingsRedirectResponse(
+            $data['return_to'] ?? null,
+            $routeParams,
+            __('ui.semester_opened_success', ['semester' => $semester])
+        );
+    }
+
+    private function settingsRedirectResponse(?string $returnTo, array $routeParams, string $message): RedirectResponse
+    {
+        $target = trim((string) $returnTo);
+        if ($target !== '' && str_starts_with($target, '/')) {
+            return redirect($target)->with('success', $message);
+        }
+
         return redirect()
             ->route('settings.edit', $routeParams)
-            ->with('success', __('ui.semester_opened_success', ['semester' => $semester]));
+            ->with('success', $message);
     }
 
     private function normalizeUnitOptions(string $raw): \Illuminate\Support\Collection

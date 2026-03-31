@@ -21,6 +21,7 @@ class ReceivableLedger extends Model
         'sales_invoice_id',
         'entry_date',
         'period_code',
+        'transaction_type',
         'description',
         'debit',
         'credit',

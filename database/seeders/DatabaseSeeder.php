@@ -16,26 +16,36 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::query()->firstOrCreate([
+        $admin = User::query()->firstOrCreate([
             'email' => 'admin@pgpos.local',
         ], [
             'name' => 'Admin PgPOS',
-            'password' => Hash::make('admin12345'),
+            'username' => 'admin',
+            'password' => Hash::make('@Passwordadmin123#'),
             'role' => 'admin',
             'locale' => 'id',
             'theme' => 'light',
             'finance_locked' => false,
         ]);
 
-        User::query()->firstOrCreate([
+        if (blank($admin->username)) {
+            $admin->forceFill(['username' => 'admin'])->save();
+        }
+
+        $user = User::query()->firstOrCreate([
             'email' => 'user@pgpos.local',
         ], [
             'name' => 'User PgPOS',
-            'password' => Hash::make('user12345'),
+            'username' => 'user',
+            'password' => Hash::make('@Passworduser123#'),
             'role' => 'user',
             'locale' => 'id',
             'theme' => 'light',
             'finance_locked' => false,
         ]);
+
+        if (blank($user->username)) {
+            $user->forceFill(['username' => 'user'])->save();
+        }
     }
 }

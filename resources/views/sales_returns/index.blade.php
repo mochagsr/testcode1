@@ -78,19 +78,23 @@
                 @endphp
                 <tr>
                     <td>
-                        <a href="{{ route('sales-returns.show', $row) }}">{{ $row->return_number }}</a>
-                        @if((bool) ($lockState['auto'] ?? false))
-                            <span class="badge danger" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_auto') }}</span>
-                        @endif
-                        @if((bool) ($lockState['manual'] ?? false))
-                            <span class="badge warning" style="margin-left: 6px;">{{ __('receivable.customer_semester_locked_manual') }}</span>
-                        @endif
-                        @if((bool) ($adminAction['edited'] ?? false))
-                            <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
-                        @endif
-                        @if((bool) ($adminAction['canceled'] ?? false))
-                            <span class="badge danger" style="margin-left: 6px;">{{ __('txn.admin_badge_cancel') }}</span>
-                        @endif
+                        <div class="list-doc-cell">
+                            <a class="list-doc-link" href="{{ route('sales-returns.show', $row) }}">{{ $row->return_number }}</a>
+                            <span class="list-doc-badges">
+                                @if((bool) ($lockState['auto'] ?? false))
+                                    <span class="badge danger">{{ __('receivable.customer_semester_locked_auto') }}</span>
+                                @endif
+                                @if((bool) ($lockState['manual'] ?? false))
+                                    <span class="badge warning">{{ __('receivable.customer_semester_locked_manual') }}</span>
+                                @endif
+                                @if((bool) ($adminAction['edited'] ?? false))
+                                    <span class="badge warning">{{ __('txn.admin_badge_edit') }}</span>
+                                @endif
+                                @if((bool) ($adminAction['canceled'] ?? false))
+                                    <span class="badge danger">{{ __('txn.admin_badge_cancel') }}</span>
+                                @endif
+                            </span>
+                        </div>
                     </td>
                     <td>{{ $row->return_date->format('d-m-Y') }}</td>
                     <td>

@@ -64,6 +64,14 @@
                     </select>
                 </div>
                 <div>
+                    <label>{{ __('receivable.transaction_type') }}</label>
+                    <select name="transaction_type" style="max-width: 180px;">
+                        <option value="">{{ __('txn.all') }}</option>
+                        <option value="product" @selected(($selectedTransactionType ?? '') === 'product')>{{ __('receivable.transaction_type_product') }}</option>
+                        <option value="printing" @selected(($selectedTransactionType ?? '') === 'printing')>{{ __('receivable.transaction_type_printing') }}</option>
+                    </select>
+                </div>
+                <div>
                     <label>{{ __('txn.search') }}</label>
                     <input type="text" name="search" value="{{ $search }}" placeholder="{{ __('receivable.semester_search_placeholder') }}" style="max-width: 280px;">
                 </div>
@@ -107,7 +115,7 @@
                 @forelse($rows as $index => $row)
                     <tr>
                         <td>{{ (($paginator?->firstItem()) ?? 1) + $index }}</td>
-                        <td><a href="{{ route('receivables.index', ['customer_id' => $row['id'], 'semester' => $selectedSemester]) }}">{{ $row['name'] }}</a></td>
+                        <td><a href="{{ route('receivables.index', ['customer_id' => $row['id'], 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ $row['name'] }}</a></td>
                         <td>{{ $row['city'] }}</td>
                         <td>{{ $row['address'] }}</td>
                         <td class="num">Rp {{ number_format((int) $row['sales_total'], 0, ',', '.') }}</td>

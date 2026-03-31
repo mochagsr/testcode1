@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\ReceivableLedger;
+use App\Support\TransactionType;
 use Carbon\CarbonInterface;
 
 final class ReceivableLedgerService
@@ -27,7 +28,8 @@ final class ReceivableLedgerService
         CarbonInterface $entryDate,
         float $amount,
         ?string $periodCode,
-        ?string $description
+        ?string $description,
+        ?string $transactionType = null
     ): ReceivableLedger {
         $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
         $current = $this->currentOutstandingFromLedger($customerId);
@@ -40,6 +42,7 @@ final class ReceivableLedgerService
             'sales_invoice_id' => $invoiceId,
             'entry_date' => $entryDate->toDateString(),
             'period_code' => $periodCode,
+            'transaction_type' => $transactionType !== null ? TransactionType::normalize($transactionType) : null,
             'description' => $description,
             'debit' => $amount,
             'credit' => 0,
@@ -68,7 +71,8 @@ final class ReceivableLedgerService
         CarbonInterface $entryDate,
         float $amount,
         ?string $periodCode,
-        ?string $description
+        ?string $description,
+        ?string $transactionType = null
     ): ReceivableLedger {
         $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
         $current = $this->currentOutstandingFromLedger($customerId);
@@ -81,6 +85,7 @@ final class ReceivableLedgerService
             'sales_invoice_id' => $invoiceId,
             'entry_date' => $entryDate->toDateString(),
             'period_code' => $periodCode,
+            'transaction_type' => $transactionType !== null ? TransactionType::normalize($transactionType) : null,
             'description' => $description,
             'debit' => 0,
             'credit' => $amount,

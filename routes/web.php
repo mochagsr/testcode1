@@ -63,7 +63,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/sales-invoices/{salesInvoice}/pdf', [SalesInvoicePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('sales-invoices.export.pdf');
     Route::get('/sales-invoices/{salesInvoice}/excel', [SalesInvoicePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('sales-invoices.export.excel');
     Route::put('/sales-invoices/{salesInvoice}/admin-update', [SalesInvoicePageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('sales-invoices.admin-update');
     Route::post('/sales-invoices/{salesInvoice}/cancel', [SalesInvoicePageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
@@ -77,7 +77,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/sales-returns/{salesReturn}/pdf', [SalesReturnPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('sales-returns.export.pdf');
     Route::get('/sales-returns/{salesReturn}/excel', [SalesReturnPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('sales-returns.export.excel');
     Route::put('/sales-returns/{salesReturn}/admin-update', [SalesReturnPageController::class, 'adminUpdate'])
-        ->middleware(['semester.open'])
+        ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('sales-returns.admin-update');
     Route::post('/sales-returns/{salesReturn}/cancel', [SalesReturnPageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
@@ -91,7 +91,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/delivery-notes/{deliveryNote}/pdf', [DeliveryNotePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('delivery-notes.export.pdf');
     Route::get('/delivery-notes/{deliveryNote}/excel', [DeliveryNotePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('delivery-notes.export.excel');
     Route::put('/delivery-notes/{deliveryNote}/admin-update', [DeliveryNotePageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('delivery-notes.admin-update');
     Route::post('/delivery-notes/{deliveryNote}/cancel', [DeliveryNotePageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
@@ -105,7 +105,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/order-notes/{orderNote}/pdf', [OrderNotePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('order-notes.export.pdf');
     Route::get('/order-notes/{orderNote}/excel', [OrderNotePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('order-notes.export.excel');
     Route::put('/order-notes/{orderNote}/admin-update', [OrderNotePageController::class, 'adminUpdate'])
-        ->middleware(['semester.open'])
+        ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('order-notes.admin-update');
     Route::post('/order-notes/{orderNote}/cancel', [OrderNotePageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
@@ -115,8 +115,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/delivery-trips/create', [DeliveryTripPageController::class, 'create'])->middleware('perm:transactions.create')->name('delivery-trips.create');
     Route::post('/delivery-trips', [DeliveryTripPageController::class, 'store'])->middleware(['finance.unlocked', 'idempotent'])->name('delivery-trips.store');
     Route::get('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'show'])->middleware('perm:transactions.view')->name('delivery-trips.show');
-    Route::get('/delivery-trips/{deliveryTrip}/edit', [DeliveryTripPageController::class, 'edit'])->middleware('perm:transactions.create')->name('delivery-trips.edit');
-    Route::put('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'update'])->middleware(['finance.unlocked', 'perm:transactions.create'])->name('delivery-trips.update');
+    Route::get('/delivery-trips/{deliveryTrip}/edit', [DeliveryTripPageController::class, 'edit'])->middleware('perm:transactions.edit')->name('delivery-trips.edit');
+    Route::put('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'update'])->middleware(['finance.unlocked', 'perm:transactions.edit'])->name('delivery-trips.update');
     Route::get('/delivery-trips/{deliveryTrip}/print', [DeliveryTripPageController::class, 'print'])->middleware('perm:transactions.export')->name('delivery-trips.print');
     Route::get('/delivery-trips/{deliveryTrip}/pdf', [DeliveryTripPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('delivery-trips.export.pdf');
     Route::get('/delivery-trips/{deliveryTrip}/excel', [DeliveryTripPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('delivery-trips.export.excel');
@@ -131,7 +131,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/outgoing-transactions/{outgoingTransaction}/pdf', [OutgoingTransactionPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.pdf');
     Route::get('/outgoing-transactions/{outgoingTransaction}/excel', [OutgoingTransactionPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.excel');
     Route::put('/outgoing-transactions/{outgoingTransaction}/admin-update', [OutgoingTransactionPageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('outgoing-transactions.admin-update');
     Route::post('/outgoing-transactions/supplier/{supplier}/semester-close', [OutgoingTransactionPageController::class, 'closeSupplierSemester'])
         ->middleware('admin')
@@ -180,7 +180,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/receivable-payments/{receivablePayment}/pdf', [ReceivablePaymentPageController::class, 'exportPdf'])->middleware('perm:receivables.view')->name('receivable-payments.export.pdf');
     Route::get('/receivable-payments/{receivablePayment}/excel', [ReceivablePaymentPageController::class, 'exportExcel'])->middleware('perm:receivables.view')->name('receivable-payments.export.excel');
     Route::put('/receivable-payments/{receivablePayment}/admin-update', [ReceivablePaymentPageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('receivable-payments.admin-update');
     Route::post('/receivable-payments/{receivablePayment}/cancel', [ReceivablePaymentPageController::class, 'cancel'])
         ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
@@ -260,7 +260,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/supplier-payables/payment/{supplierPayment}/pdf', [SupplierPayablePageController::class, 'exportPaymentPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-pdf');
     Route::get('/supplier-payables/payment/{supplierPayment}/excel', [SupplierPayablePageController::class, 'exportPaymentExcel'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-excel');
     Route::put('/supplier-payables/payment/{supplierPayment}/admin-update', [SupplierPayablePageController::class, 'adminUpdate'])
-        ->middleware(['admin', 'perm:transactions.correction.approve', 'semester.open'])
+        ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('supplier-payables.admin-update');
 
     Route::middleware('admin')->group(function (): void {

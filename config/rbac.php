@@ -33,6 +33,7 @@ return [
         'dashboard.view',
         'transactions.view',
         'transactions.create',
+        'transactions.edit',
         'transactions.export',
         'transactions.cancel',
         'transactions.correction.request',

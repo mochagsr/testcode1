@@ -16,6 +16,7 @@ use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
+use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -195,6 +196,7 @@ class DeliveryNotePageController extends Controller
             'note_date' => ['required', 'date'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'recipient_name' => ['required', 'string', 'max:150'],
             'recipient_phone' => ['nullable', 'string', 'max:30'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -255,6 +257,7 @@ class DeliveryNotePageController extends Controller
                 'note_date' => $noteDate,
                 'customer_id' => $customerId,
                 'customer_ship_location_id' => $shipLocation?->id,
+                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT)),
                 'recipient_name' => $recipientName,
                 'recipient_phone' => $recipientPhone !== '' ? $recipientPhone : null,
                 'city' => $city !== '' ? $city : null,
@@ -393,6 +396,7 @@ class DeliveryNotePageController extends Controller
             'note_date' => ['required', 'date'],
             'recipient_name' => ['required', 'string', 'max:150'],
             'recipient_phone' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'city' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
@@ -521,6 +525,7 @@ class DeliveryNotePageController extends Controller
 
             $note->update([
                 'note_date' => $data['note_date'],
+                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $note->transaction_type)),
                 'recipient_name' => $data['recipient_name'],
                 'recipient_phone' => $data['recipient_phone'] ?? null,
                 'city' => $data['city'] ?? null,

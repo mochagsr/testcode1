@@ -34,8 +34,8 @@
             </div>
         @endif
 
-        <label>{{ __('ui.email') }} <span class="label-required">*</span></label>
-        <input type="email" name="email" value="{{ old('email') }}" required>
+        <label>{{ __('ui.login_identifier') }} <span class="label-required">*</span></label>
+        <input type="text" name="login" value="{{ old('login') }}" required>
 
         <label>{{ __('ui.password') }} <span class="label-required">*</span></label>
         <div class="password-wrap">

@@ -41,6 +41,7 @@ class UserManagementController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
             'role' => ['required', 'in:admin,user'],
@@ -53,6 +54,7 @@ class UserManagementController extends Controller
 
         User::create([
             'name' => $data['name'],
+            'username' => strtolower(trim((string) $data['username'])),
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'role' => $data['role'],
@@ -77,6 +79,7 @@ class UserManagementController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:6'],
             'role' => ['required', 'in:admin,user'],
@@ -89,6 +92,7 @@ class UserManagementController extends Controller
 
         $payload = [
             'name' => $data['name'],
+            'username' => strtolower(trim((string) $data['username'])),
             'email' => $data['email'],
             'role' => $data['role'],
             'permissions' => $data['role'] === 'admin' ? ['*'] : array_values(array_unique((array) ($data['permissions'] ?? []))),

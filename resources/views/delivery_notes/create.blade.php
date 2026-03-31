@@ -77,6 +77,13 @@
                         <label>{{ __('txn.city') }}</label>
                         <input id="city" type="text" name="city" value="{{ old('city') }}">
                     </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.transaction_type') }}</label>
+                        <select name="transaction_type">
+                            <option value="product" @selected(old('transaction_type', 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
+                            <option value="printing" @selected(old('transaction_type') === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
+                        </select>
+                    </div>
                     <div class="col-12">
                         <label>{{ __('txn.address') }}</label>
                         <textarea id="address" name="address" rows="2">{{ old('address') }}</textarea>

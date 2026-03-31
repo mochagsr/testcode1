@@ -25,6 +25,7 @@ class SalesReturn extends Model
         'sales_invoice_id',
         'return_date',
         'semester_period',
+        'transaction_type',
         'total',
         'reason',
         'is_canceled',
@@ -86,6 +87,7 @@ class SalesReturn extends Model
             'sales_invoice_id',
             'return_date',
             'semester_period',
+            'transaction_type',
             'total',
             'is_canceled',
         ]);

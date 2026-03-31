@@ -474,6 +474,62 @@ class SemesterBookService
         return $states;
     }
 
+    /**
+     * @return array{
+     *     semester:string|null,
+     *     customer_count:int,
+     *     paid_customer_count:int,
+     *     open_customer_count:int,
+     *     total_outstanding:int,
+     *     ready_to_close:bool,
+     *     already_closed:bool
+     * }
+     */
+    public function receivableSemesterClosingState(?string $semester): array
+    {
+        $normalizedSemester = $this->normalizeSemester((string) $semester);
+        if ($normalizedSemester === null) {
+            return [
+                'semester' => null,
+                'customer_count' => 0,
+                'paid_customer_count' => 0,
+                'open_customer_count' => 0,
+                'total_outstanding' => 0,
+                'ready_to_close' => false,
+                'already_closed' => false,
+            ];
+        }
+
+        $aggregates = SalesInvoice::query()
+            ->select('customer_id')
+            ->selectRaw('COUNT(*) as invoice_count, COALESCE(SUM(balance), 0) as outstanding')
+            ->where('is_canceled', false)
+            ->where('semester_period', $normalizedSemester)
+            ->groupBy('customer_id')
+            ->get();
+
+        $customerCount = $aggregates->count();
+        $paidCustomerCount = $aggregates
+            ->filter(fn ($row): bool => (int) round((float) ($row->outstanding ?? 0)) <= 0)
+            ->count();
+        $openCustomerCount = max(0, $customerCount - $paidCustomerCount);
+        $totalOutstanding = (int) round(
+            (float) $aggregates->sum(fn ($row): float => max(0, (float) ($row->outstanding ?? 0)))
+        );
+        $alreadyClosed = $this->isClosed($normalizedSemester);
+        $readyToClose = $customerCount > 0 && $openCustomerCount === 0 && ! $alreadyClosed;
+
+        return [
+            'semester' => $normalizedSemester,
+            'customer_count' => $customerCount,
+            'paid_customer_count' => $paidCustomerCount,
+            'open_customer_count' => $openCustomerCount,
+            'total_outstanding' => $totalOutstanding,
+            'ready_to_close' => $readyToClose,
+            'already_closed' => $alreadyClosed,
+        ];
+    }
+
     public function closeCustomerSemester(int $customerId, string $semester): void
     {
         $normalizedSemester = $this->normalizeSemester($semester);
@@ -564,6 +620,36 @@ class SemesterBookService
             ->filter(fn (string $item): bool => $activeSemesters->contains($item))
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  iterable<int, string>  $options
+     * @return array<int, string>
+     */
+    public function filterToOpenSemesters(iterable $options, bool $activeOnly = false): array
+    {
+        $normalizedOptions = collect($options)
+            ->map(fn (string $item): ?string => $this->normalizeSemester($item))
+            ->filter(fn (?string $item): bool => $item !== null)
+            ->values();
+
+        if ($activeOnly) {
+            $activeSemesters = collect($this->activeSemesters());
+            if ($activeSemesters->isNotEmpty()) {
+                $normalizedOptions = $normalizedOptions
+                    ->filter(fn (string $item): bool => $activeSemesters->contains($item))
+                    ->values();
+            }
+        }
+
+        $closedSemesters = collect($this->closedSemesters());
+        if ($closedSemesters->isNotEmpty()) {
+            $normalizedOptions = $normalizedOptions
+                ->reject(fn (string $item): bool => $closedSemesters->contains($item))
+                ->values();
+        }
+
+        return $normalizedOptions->all();
     }
 
     /**

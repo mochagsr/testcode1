@@ -18,6 +18,7 @@ use App\Models\SalesReturn;
 use App\Models\SalesReturnItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class ReceivableFlowsTest extends TestCase
@@ -34,6 +35,50 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee(__('receivable.title'));
         $response->assertSee(__('receivable.all_semesters'));
         $response->assertSee(__('receivable.all_customers'));
+    }
+
+    public function test_receivable_index_hides_closed_semester_from_dropdown(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        AppSetting::setValue('closed_semester_periods', 'S2-2526');
+        Cache::flush();
+
+        $customer = Customer::query()->create([
+            'code' => 'CUST-INDEX-CLOSED-001',
+            'name' => 'Receivable Index Customer',
+            'city' => 'Malang',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'entry_date' => '2026-02-10',
+            'description' => 'Invoice INV-INDEX-CLOSED-001',
+            'debit' => 70000,
+            'credit' => 0,
+            'balance_after' => 70000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'entry_date' => '2026-01-10',
+            'description' => 'Invoice INV-INDEX-OPEN-001',
+            'debit' => 50000,
+            'credit' => 0,
+            'balance_after' => 50000,
+            'period_code' => 'S1-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.index', [
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertDontSee('value="S2-2526"', false);
+        $response->assertSee('value="S1-2526"', false);
+
+        AppSetting::setValue('closed_semester_periods', '');
+        Cache::flush();
     }
 
     public function test_receivable_report_print_respects_semester_and_customer_filters(): void
@@ -1187,6 +1232,38 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('Rp 70.000');
     }
 
+    public function test_admin_receivable_index_shows_semester_ready_to_close_notice_when_all_customers_paid(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-READY-001',
+            'name' => 'Customer Ready Lock',
+            'city' => 'Malang',
+        ]);
+
+        SalesInvoice::query()->create([
+            'invoice_number' => 'INV-READY-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-03-10',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 100000,
+            'total' => 100000,
+            'total_paid' => 100000,
+            'balance' => 0,
+            'payment_status' => 'paid',
+            'is_canceled' => false,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('receivables.index', [
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.semester_lock_readiness_title'));
+        $response->assertSee(__('receivable.semester_lock_ready_badge'));
+        $response->assertSee(__('ui.semester_close_button'));
+    }
+
     public function test_receivable_semester_print_renders_totals(): void
     {
         $user = User::factory()->create();
@@ -1227,6 +1304,49 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('Rp 50.000');
         $response->assertSee('Rp 10.000');
         $response->assertSee('Rp 40.000');
+    }
+
+    public function test_receivable_semester_page_hides_closed_semester_from_dropdown(): void
+    {
+        $user = User::factory()->create();
+        AppSetting::setValue('closed_semester_periods', 'S2-2526');
+
+        $customer = Customer::query()->create([
+            'code' => 'CUST-SMT-CLOSED-001',
+            'name' => 'Closed Semester Customer',
+            'city' => 'Malang',
+            'address' => 'Jl Mawar',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => null,
+            'entry_date' => '2026-02-10',
+            'description' => 'Invoice INV-CLOSED-001',
+            'debit' => 70000,
+            'credit' => 0,
+            'balance_after' => 70000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => null,
+            'entry_date' => '2026-01-10',
+            'description' => 'Invoice INV-OPEN-001',
+            'debit' => 50000,
+            'credit' => 0,
+            'balance_after' => 50000,
+            'period_code' => 'S1-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.semester.index', [
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertDontSee('value="S2-2526"', false);
+        $response->assertSee('value="S1-2526"', false);
     }
 
     public function test_receivable_global_page_shows_only_active_semester_columns(): void

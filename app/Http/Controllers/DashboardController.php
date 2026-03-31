@@ -149,6 +149,19 @@ class DashboardController extends Controller
             ],
         ])->filter(fn (array $item): bool => (bool) ($item['allowed'] ?? false))->values();
 
+        $readyToCloseSemesters = collect();
+        if (($user?->canAccess('settings.admin') ?? false) || ((string) ($user?->role ?? '') === 'admin')) {
+            $readyToCloseSemesters = collect($this->semesterBookService->activeSemesters())
+                ->when(
+                    collect($this->semesterBookService->activeSemesters())->isEmpty(),
+                    fn ($items) => collect($this->semesterBookService->configuredSemesterOptions()->all())
+                )
+                ->pipe(fn ($items) => collect($this->semesterBookService->filterToOpenSemesters($items->all(), false)))
+                ->map(fn (string $semester): array => $this->semesterBookService->receivableSemesterClosingState($semester))
+                ->filter(fn (array $state): bool => (bool) ($state['ready_to_close'] ?? false))
+                ->values();
+        }
+
         $uncollectedCustomers = Customer::query()
             ->onlyOutstandingColumns()
             ->withOutstanding()
@@ -187,6 +200,7 @@ class DashboardController extends Controller
             'lowStockProducts' => $lowStockProducts,
             'opsSnapshot' => $opsSnapshot,
             'quickLinks' => $quickLinks,
+            'readyToCloseSemesters' => $readyToCloseSemesters,
         ]);
     }
 

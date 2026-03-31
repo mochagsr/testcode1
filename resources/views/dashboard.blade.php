@@ -3,6 +3,10 @@
 @section('title', __('ui.dashboard_title').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $showAdminDashboard = (auth()->user()?->canAccess('settings.admin') ?? false)
+            || ((string) (auth()->user()?->role ?? '') === 'admin');
+    @endphp
     <style>
         .dashboard-quick-links {
             display: grid;
@@ -49,37 +53,40 @@
             <div class="stat-label">{{ __('ui.dashboard_invoice_this_month') }}</div>
             <div class="stat-value">Rp {{ number_format((int) round($summary['invoice_this_month']), 0, ',', '.') }}</div>
         </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_pending_approvals') }}</div>
-            <div class="stat-value">{{ number_format((int) ($summary['pending_approvals'] ?? 0), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_pending_report_tasks') }}</div>
-            <div class="stat-value">{{ number_format((int) ($summary['pending_report_tasks'] ?? 0), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_active_semesters') }}</div>
-            <div class="stat-value">{{ number_format((int) ($summary['active_semesters'] ?? 0), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_closed_semesters') }}</div>
-            <div class="stat-value">{{ number_format((int) ($summary['closed_semesters'] ?? 0), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_locked_customer_semesters') }}</div>
-            <div class="stat-value">{{ number_format((int) ($summary['locked_customer_semesters'] ?? 0), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_locked_supplier_years') }}</div>
-            <div class="stat-value">{{ number_format((int) ($summary['locked_supplier_years'] ?? 0), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_backup_files') }}</div>
-            <div class="stat-value">{{ number_format((int) ($summary['backup_files'] ?? 0), 0, ',', '.') }}</div>
-        </div>
+        @if($showAdminDashboard)
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_pending_approvals') }}</div>
+                <div class="stat-value">{{ number_format((int) ($summary['pending_approvals'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_pending_report_tasks') }}</div>
+                <div class="stat-value">{{ number_format((int) ($summary['pending_report_tasks'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_active_semesters') }}</div>
+                <div class="stat-value">{{ number_format((int) ($summary['active_semesters'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_closed_semesters') }}</div>
+                <div class="stat-value">{{ number_format((int) ($summary['closed_semesters'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_locked_customer_semesters') }}</div>
+                <div class="stat-value">{{ number_format((int) ($summary['locked_customer_semesters'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_locked_supplier_years') }}</div>
+                <div class="stat-value">{{ number_format((int) ($summary['locked_supplier_years'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_backup_files') }}</div>
+                <div class="stat-value">{{ number_format((int) ($summary['backup_files'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+        @endif
     </div>
 
     <div class="row" style="margin-top: 8px;">
+        @if($showAdminDashboard)
         <div class="col-6">
             <div class="card">
                 <h3>{{ __('ui.dashboard_ops_snapshot') }}</h3>
@@ -105,7 +112,8 @@
                 </table>
             </div>
         </div>
-        <div class="col-6">
+        @endif
+        <div class="{{ $showAdminDashboard ? 'col-6' : 'col-12' }}">
             <div class="card">
                 <h3>{{ __('ui.dashboard_quick_actions') }}</h3>
                 <div class="dashboard-quick-links">
@@ -122,30 +130,65 @@
         </div>
     </div>
 
-    <div class="card" style="margin-top: 8px;">
-        <h3 style="margin-top:0;">{{ __('ui.dashboard_post_deploy_check_title') }}</h3>
-        <div class="muted" style="margin-bottom:8px;">{{ __('ui.dashboard_post_deploy_check_note') }}</div>
-        <table>
-            <tbody>
-            <tr>
-                <th>{{ __('ui.dashboard_post_deploy_backup') }}</th>
-                <td>{{ __('ui.dashboard_post_deploy_backup_note') }}</td>
-            </tr>
-            <tr>
-                <th>{{ __('ui.dashboard_post_deploy_restore') }}</th>
-                <td>{{ __('ui.dashboard_post_deploy_restore_note') }}</td>
-            </tr>
-            <tr>
-                <th>{{ __('ui.dashboard_post_deploy_export') }}</th>
-                <td>{{ __('ui.dashboard_post_deploy_export_note') }}</td>
-            </tr>
-            <tr>
-                <th>{{ __('ui.dashboard_post_deploy_queue') }}</th>
-                <td>{{ __('ui.dashboard_post_deploy_queue_note') }}</td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
+    @if($showAdminDashboard)
+        <div class="card" style="margin-top: 8px;">
+            <h3 style="margin-top:0;">{{ __('ui.dashboard_post_deploy_check_title') }}</h3>
+            <div class="muted" style="margin-bottom:8px;">{{ __('ui.dashboard_post_deploy_check_note') }}</div>
+            <table>
+                <tbody>
+                <tr>
+                    <th>{{ __('ui.dashboard_post_deploy_backup') }}</th>
+                    <td>{{ __('ui.dashboard_post_deploy_backup_note') }}</td>
+                </tr>
+                <tr>
+                    <th>{{ __('ui.dashboard_post_deploy_restore') }}</th>
+                    <td>{{ __('ui.dashboard_post_deploy_restore_note') }}</td>
+                </tr>
+                <tr>
+                    <th>{{ __('ui.dashboard_post_deploy_export') }}</th>
+                    <td>{{ __('ui.dashboard_post_deploy_export_note') }}</td>
+                </tr>
+                <tr>
+                    <th>{{ __('ui.dashboard_post_deploy_queue') }}</th>
+                    <td>{{ __('ui.dashboard_post_deploy_queue_note') }}</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if($showAdminDashboard && isset($readyToCloseSemesters) && $readyToCloseSemesters->isNotEmpty())
+        <div class="card" style="margin-top: 8px;">
+            <h3 style="margin-top:0;">{{ __('receivable.semester_lock_readiness_title') }}</h3>
+            <table>
+                <thead>
+                <tr>
+                    <th>{{ __('receivable.semester_filter') }}</th>
+                    <th>{{ __('receivable.customer') }}</th>
+                    <th>{{ __('receivable.outstanding') }}</th>
+                    <th>{{ __('txn.action') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach($readyToCloseSemesters as $semesterState)
+                    <tr>
+                        <td>{{ $semesterState['semester'] ?? '-' }}</td>
+                        <td>{{ (int) ($semesterState['paid_customer_count'] ?? 0) }}/{{ (int) ($semesterState['customer_count'] ?? 0) }} {{ __('receivable.customer') }}</td>
+                        <td>Rp {{ number_format((int) ($semesterState['total_outstanding'] ?? 0), 0, ',', '.') }}</td>
+                        <td>
+                            <form method="post" action="{{ route('settings.semester.close') }}">
+                                @csrf
+                                <input type="hidden" name="semester_period" value="{{ $semesterState['semester'] ?? '' }}">
+                                <input type="hidden" name="return_to" value="{{ request()->getRequestUri() }}">
+                                <button type="submit" class="btn">{{ __('ui.semester_close_button') }}</button>
+                            </form>
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 
     <div class="row" style="margin-top: 8px;">
         <div class="col-6">

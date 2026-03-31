@@ -18,6 +18,7 @@ use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
+use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -248,6 +249,7 @@ class SalesReturnPageController extends Controller
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'return_date' => ['required', 'date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'reason' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -256,8 +258,9 @@ class SalesReturnPageController extends Controller
         $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
         $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['return_date']);
         $selectedSemester = $normalizedSemester ?? $semesterFromDate ?? $this->defaultSemesterPeriod();
+        $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
 
-        $salesReturn = DB::transaction(function () use ($data, $selectedSemester): SalesReturn {
+        $salesReturn = DB::transaction(function () use ($data, $selectedSemester, $selectedTransactionType): SalesReturn {
             $returnDate = Carbon::parse($data['return_date']);
             $returnNumber = $this->generateReturnNumber($returnDate->toDateString());
             $rows = collect($data['items']);
@@ -301,6 +304,7 @@ class SalesReturnPageController extends Controller
                 'customer_id' => $data['customer_id'],
                 'return_date' => $returnDate->toDateString(),
                 'semester_period' => $selectedSemester,
+                'transaction_type' => $selectedTransactionType,
                 'total' => (float) round($total),
                 'reason' => $data['reason'] ?? null,
             ]);
@@ -338,7 +342,8 @@ class SalesReturnPageController extends Controller
                 entryDate: $returnDate,
                 amount: $total,
                 periodCode: $salesReturn->semester_period,
-                description: __('txn.return') . ' ' . $salesReturn->return_number
+                description: __('txn.return') . ' ' . $salesReturn->return_number,
+                transactionType: (string) $salesReturn->transaction_type
             );
 
             $this->accountingService->postSalesReturn(
@@ -375,12 +380,7 @@ class SalesReturnPageController extends Controller
             'sales_returns.index.semester_options.base',
             SalesReturn::class
         );
-        $semesterOptions = $this->semesterOptionsForForm(
-            $semesterOptionsBase->push((string) $salesReturn->semester_period)
-        );
-        if (! $semesterOptions->contains((string) $salesReturn->semester_period)) {
-            $semesterOptions = $semesterOptions->push((string) $salesReturn->semester_period)->unique()->values();
-        }
+        $semesterOptions = $this->semesterOptionsForForm($semesterOptionsBase);
         $customerSemesterLockState = ['locked' => false, 'manual' => false, 'auto' => false];
         $returnSemester = trim((string) $salesReturn->semester_period);
         if ((int) $salesReturn->customer_id > 0 && $returnSemester !== '') {
@@ -423,6 +423,7 @@ class SalesReturnPageController extends Controller
         $data = $request->validate([
             'return_date' => ['required', 'date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'reason' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -582,6 +583,7 @@ class SalesReturnPageController extends Controller
             $return->update([
                 'return_date' => $data['return_date'],
                 'semester_period' => $data['semester_period'] ?? null,
+                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $return->transaction_type)),
                 'reason' => $data['reason'] ?? null,
                 'total' => (float) round($total),
             ]);
@@ -596,6 +598,7 @@ class SalesReturnPageController extends Controller
                     periodCode: $return->semester_period,
                     description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " +] "
                         . __('txn.return') . ' ' . $return->return_number,
+                    transactionType: (string) $return->transaction_type,
                 );
             } elseif ($difference < 0) {
                 $this->receivableLedgerService->addDebit(
@@ -606,6 +609,7 @@ class SalesReturnPageController extends Controller
                     periodCode: $return->semester_period,
                     description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " -] "
                         . __('txn.return') . ' ' . $return->return_number,
+                    transactionType: (string) $return->transaction_type,
                 );
             }
         });
@@ -687,6 +691,7 @@ class SalesReturnPageController extends Controller
                     amount: $returnTotal,
                     periodCode: $return->semester_period,
                     description: __('txn.cancel_return_ledger_note', ['number' => $return->return_number]),
+                    transactionType: (string) $return->transaction_type,
                 );
             }
 

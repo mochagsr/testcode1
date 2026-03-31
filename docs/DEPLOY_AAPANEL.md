@@ -1,8 +1,36 @@
-# Deploy PgPOS ERP di aaPanel
+# Deploy PgPOS ERP di aaPanel v8.0.1
 
-Dokumen ini untuk deploy aplikasi ke server Linux yang memakai aaPanel.
+Dokumen ini disiapkan untuk deploy aplikasi ke server Linux yang memakai `aaPanel v8.0.1`.
 
-## 1. Stack yang dipakai aplikasi
+Istilah menu yang dipakai di dokumen ini mengikuti aaPanel `v8.0.1`:
+- `Website`
+- `App Store`
+- `Databases`
+- `Cron`
+- `Terminal`
+- `Files`
+
+Catatan:
+- di dokumentasi resmi aaPanel, website PHP kadang disebut `PHP Project`
+- di panel harian kamu biasanya tetap bekerja lewat menu `Website`
+
+## Akun default setelah seed
+- Admin
+  - username: `admin`
+  - email: `admin@pgpos.local`
+  - password: `@Passwordadmin123#`
+- User
+  - username: `user`
+  - email: `user@pgpos.local`
+  - password: `@Passworduser123#`
+
+Login app mendukung:
+- username + password
+- atau email + password
+
+Kalau sesudah deploy kamu masih login dengan akun default, segera simpan password final internal perusahaan di tempat aman.
+
+## 1. Stack aplikasi
 
 - PHP `8.3`
 - Laravel `12`
@@ -15,31 +43,37 @@ Dokumen ini untuk deploy aplikasi ke server Linux yang memakai aaPanel.
 
 ## 2. Minimum server yang layak
 
-Untuk app ini:
-
+Minimum:
 - `2 vCPU`
 - `2 GB RAM`
 - `40 GB SSD`
 
-Rekomendasi lebih aman:
-
+Rekomendasi:
 - `4 vCPU`
 - `4-8 GB RAM`
 - `60-100 GB NVMe`
 
-## 3. Paket yang perlu di-install di aaPanel
+## 3. Paket yang perlu di-install di aaPanel v8.0.1
 
-Di aaPanel:
+Buka menu `App Store`, lalu install:
 
-1. Install `Nginx`
-2. Install `MySQL` atau `MariaDB`
-3. Install `PHP 8.3`
-4. Install `phpMyAdmin` kalau mau import SQL via browser
+1. `Nginx`
+2. `MySQL` atau `MariaDB`
+3. `PHP 8.3`
+4. `phpMyAdmin` kalau mau import SQL via browser
+
+Tambahan yang saya sarankan:
+5. `Redis` opsional
+6. `Node.js` kalau mau build langsung di server
 
 ## 4. Extension PHP yang wajib aktif
 
-Di menu PHP 8.3 -> Install Extensions:
+Di aaPanel `v8.0.1`:
+- buka `App Store`
+- buka `PHP 8.3`
+- masuk `Extensions`
 
+Aktifkan:
 - `bcmath`
 - `ctype`
 - `curl`
@@ -57,13 +91,12 @@ Di menu PHP 8.3 -> Install Extensions:
 - `zip`
 
 Opsional tapi bagus:
-
 - `intl`
 - `opcache`
 
 ## 5. Software tambahan di server
 
-Install via terminal server:
+Jalankan via `Terminal`:
 
 ```bash
 apt update
@@ -82,19 +115,168 @@ composer --version
 ## 6. Struktur folder yang disarankan
 
 Contoh:
-
-- app test:
+- env `tes`:
   - `/www/wwwroot/pgpos-tes`
-- app prod:
+- env `prod`:
   - `/www/wwwroot/pgpos-prod`
 
-Document root website harus ke:
-
+Running directory website harus ke:
 - `/www/wwwroot/pgpos-tes/public`
-- atau
 - `/www/wwwroot/pgpos-prod/public`
 
-## 7. Clone code dari GitHub
+## 7. Metode deploy yang tersedia di aaPanel v8.0.1
+
+Ada 2 jalur yang layak dipakai:
+
+1. `Terminal + git clone`
+2. `Website -> Add site -> Create for Git`
+
+Rekomendasi:
+- **deploy pertama**: pakai `Terminal + git clone`
+- **deploy berikutnya / update rutin**: boleh tetap manual, atau pakai `Create for Git`
+
+Kenapa `Terminal + git clone` saya jadikan default saat first deploy:
+- lebih mudah kontrol folder `tes` dan `prod`
+- lebih mudah lihat error `composer`, `artisan`, dan `npm build`
+- lebih mudah pastikan `.env`, DB, cache, queue, dan cron benar
+
+Kenapa `Create for Git` tetap layak:
+- clone repo jadi lebih cepat dari UI
+- cocok kalau tim ingin semua site dibuat langsung dari menu `Website`
+- bisa dipakai untuk update `pull` berikutnya dari panel
+
+Catatan penting:
+- **`Create for Git` tidak membuat app Laravel langsung siap pakai**
+- setelah clone, kamu tetap harus menjalankan:
+  - `composer install`
+  - isi `.env`
+  - `php artisan key:generate`
+  - import DB / `migrate`
+  - `npm run build`
+  - `storage:link`
+  - cache
+  - cron / queue
+
+## 7A. Opsi A - Rekomendasi: `Terminal + git clone`
+
+Pakai ini kalau:
+- ini deploy pertama
+- kamu ingin kontrol penuh path project
+- kamu ingin minim kejutan saat debug
+
+Alur:
+1. buat site di `Website`
+2. arahkan path ke folder project
+3. clone repo via `Terminal`
+4. lanjut setup Laravel
+
+Contoh:
+- `tes` -> `/www/wwwroot/pgpos-tes`
+- `prod` -> `/www/wwwroot/pgpos-prod`
+
+## 7B. Opsi B - `Website -> Add site -> Create for Git`
+
+Pakai ini kalau:
+- kamu nyaman membuat site sekaligus clone repo dari UI aaPanel
+- kamu tetap siap masuk `Terminal` untuk langkah Laravel sesudah clone
+
+Langkah di aaPanel `v8.0.1`:
+1. buka `Website`
+2. klik `Add site`
+3. pilih opsi `Create for Git`
+4. isi:
+   - `Domain`
+   - `Project path`
+   - `PHP Version` = `PHP 8.3`
+   - `Git Repository URL`
+   - branch, biasanya `master`
+5. simpan
+
+Contoh isian:
+- `Domain`:
+  - `tes.domainkamu.com`
+- `Project path`:
+  - `/www/wwwroot/pgpos-tes`
+- `Git Repository URL`:
+  - `https://github.com/mochagsr/testcode1.git`
+- `Branch`:
+  - `master`
+
+Setelah site berhasil dibuat lewat `Create for Git`, lanjutkan:
+1. buka detail site
+2. masuk `Site directory`
+3. set `Running directory = public`
+4. masuk `Terminal`
+5. jalankan langkah Laravel seperti biasa
+
+Contoh untuk env `tes` setelah `Create for Git`:
+
+```bash
+cd /www/wwwroot/pgpos-tes
+composer install --no-dev --optimize-autoloader
+cp .env.cpanel.test.example .env
+php artisan key:generate
+mysql -u TES_DB_USER -p TES_DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
+php artisan db:seed --force
+npm install
+npm run build
+php artisan storage:link
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+Contoh untuk env `prod` setelah `Create for Git`:
+
+```bash
+cd /www/wwwroot/pgpos-prod
+composer install --no-dev --optimize-autoloader
+cp .env.cpanel.prod.example .env
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed --force
+npm install
+npm run build
+php artisan storage:link
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+Ringkasnya:
+- `Create for Git` hanya menggantikan langkah clone repo
+- semua langkah Laravel setelah itu **tetap wajib**
+
+## 8A. Buat website di aaPanel untuk Opsi A
+
+Ikuti ini kalau kamu memilih `Terminal + git clone`.
+
+Langkah:
+1. buka `Website`
+2. klik `Add site`
+3. isi domain / subdomain
+4. pilih `PHP 8.3`
+5. set path:
+   - `/www/wwwroot/pgpos-tes`
+   - atau `/www/wwwroot/pgpos-prod`
+6. simpan
+
+Setelah site dibuat:
+1. buka site tersebut
+2. masuk `Site directory`
+3. set `Running directory = public`
+
+## 9A. Clone code dari GitHub untuk Opsi A
 
 ### Env tes
 
@@ -114,25 +296,24 @@ cd /www/wwwroot/pgpos-prod
 composer install --no-dev --optimize-autoloader
 ```
 
-## 8. Buat database
+## 10A. Buat database untuk Opsi A
 
-Di aaPanel:
-
-1. Database -> Add DB
-2. buat database `tes`
-3. buat database `prod`
-4. simpan:
+Di aaPanel `v8.0.1`:
+1. buka `Databases`
+2. klik `Add DB`
+3. buat database `tes`
+4. buat database `prod`
+5. simpan:
    - host
    - db name
    - username
    - password
 
 Biasanya host:
-
 - `127.0.0.1`
 - atau `localhost`
 
-## 9. Siapkan `.env`
+## 11A. Siapkan `.env` untuk Opsi A
 
 ### Tes
 
@@ -171,27 +352,16 @@ SESSION_DRIVER=database
 FILESYSTEM_DISK=public
 ```
 
-## 10. Inisialisasi database
+## 12A. Inisialisasi database untuk Opsi A
 
-### Tes
-
-Pakai snapshot lokal terbaru:
-
-- `database/sql/tespgpos_mysql_test_snapshot.sql`
-
-Import via terminal:
+### Env tes
 
 ```bash
 mysql -u DB_USER -p DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
-```
-
-Lalu:
-
-```bash
 php artisan db:seed --force
 ```
 
-### Prod
+### Env prod
 
 Pilihan aman:
 
@@ -207,18 +377,14 @@ mysql -u DB_USER -p DB_NAME < database/sql/tespgpos_mysql_prod_bootstrap.sql
 php artisan db:seed --force
 ```
 
-## 11. Build asset frontend
-
-App ini mayoritas tetap jalan tanpa Vite build di fitur utama, tapi untuk deploy aman tetap jalankan build sekali:
+## 13A. Build asset frontend untuk Opsi A
 
 ```bash
 npm install
 npm run build
 ```
 
-Kalau build gagal karena Node terlalu lama/outdated, upgrade Node dulu.
-
-## 12. Link storage dan cache production
+## 14A. Link storage dan cache production untuk Opsi A
 
 ```bash
 php artisan storage:link
@@ -229,103 +395,273 @@ php artisan event:cache
 php artisan view:cache
 ```
 
-## 12A. Smoke test sesudah deploy
+## 15A. Scheduler dan queue untuk Opsi A
 
-Setelah setup awal selesai, jalankan:
+Di aaPanel `v8.0.1`:
+- buka `Cron`
+- tambah task baru
+- type: `Shell Script`
 
-```bash
-php artisan app:smoke-test
-```
-
-Command ini membantu cek cepat:
-
-- environment aktif
-- debug mode
-- koneksi DB/queue/session/cache
-- tabel penting
-- storage link
-- backup file
-- log restore drill / integrity / performance probe
-
-## 13. Permission folder
-
-```bash
-chown -R www:www /www/wwwroot/pgpos-tes
-chown -R www:www /www/wwwroot/pgpos-prod
-chmod -R 755 /www/wwwroot/pgpos-tes
-chmod -R 755 /www/wwwroot/pgpos-prod
-chmod -R 775 /www/wwwroot/pgpos-tes/storage /www/wwwroot/pgpos-tes/bootstrap/cache
-chmod -R 775 /www/wwwroot/pgpos-prod/storage /www/wwwroot/pgpos-prod/bootstrap/cache
-```
-
-Kalau user web server bukan `www`, sesuaikan.
-
-## 14. Site config di aaPanel
-
-### Root
-
-Set site root ke folder:
-
-- `/www/wwwroot/pgpos-tes/public`
-- atau
-- `/www/wwwroot/pgpos-prod/public`
-
-### Rewrite
-
-Pakai rewrite Laravel standar:
-
-```nginx
-location / {
-    try_files $uri $uri/ /index.php?$query_string;
-}
-```
-
-### SSL
-
-Aktifkan SSL setelah domain/subdomain sudah mengarah.
-
-## 15. Scheduler dan queue di aaPanel
-
-Di Cron aaPanel, buat task:
-
-### Scheduler
-
-- Type: Shell Script
-- Every minute
+Scheduler `prod`:
 
 ```bash
 cd /www/wwwroot/pgpos-prod && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Untuk `tes`, ganti path ke folder test.
-
-### Queue worker
-
-Kalau belum pakai supervisor, buat cron juga:
+Queue `prod`:
 
 ```bash
 cd /www/wwwroot/pgpos-prod && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
 ```
 
-Kalau bisa, lebih baik pakai Supervisor:
+## 16A. Backup awal dan smoke test untuk Opsi A
 
-```ini
-[program:pgpos-prod-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /www/wwwroot/pgpos-prod/artisan queue:work --sleep=1 --tries=1 --timeout=120
-autostart=true
-autorestart=true
-user=www
-numprocs=1
-redirect_stderr=true
-stdout_logfile=/www/wwwlogs/pgpos-prod-worker.log
-stopwaitsecs=3600
+### Env tes
+
+```bash
+cd /www/wwwroot/pgpos-tes
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
 ```
 
-## 16. Langkah uji setelah deploy
+### Env prod
+
+```bash
+cd /www/wwwroot/pgpos-prod
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+Catatan:
+- backup awal lebih aman **tanpa `--gzip`**
+- restore drill otomatis mencari file `.sql`
+
+## 17A. Contoh alur lengkap Opsi A
+
+### Env tes
+
+```bash
+cd /www/wwwroot
+git clone https://github.com/mochagsr/testcode1.git pgpos-tes
+cd /www/wwwroot/pgpos-tes
+composer install --no-dev --optimize-autoloader
+cp .env.cpanel.test.example .env
+php artisan key:generate
+mysql -u TES_DB_USER -p TES_DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
+php artisan db:seed --force
+npm install
+npm run build
+php artisan storage:link
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+### Env prod
+
+```bash
+cd /www/wwwroot
+git clone https://github.com/mochagsr/testcode1.git pgpos-prod
+cd /www/wwwroot/pgpos-prod
+composer install --no-dev --optimize-autoloader
+cp .env.cpanel.prod.example .env
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed --force
+npm install
+npm run build
+php artisan storage:link
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+## 8B. Buat website lewat `Create for Git` untuk Opsi B
+
+Ikuti ini kalau kamu memilih `Website -> Add site -> Create for Git`.
+
+Langkah:
+1. buka `Website`
+2. klik `Add site`
+3. pilih `Create for Git`
+4. isi:
+   - `Domain`
+   - `Project path`
+   - `PHP Version` = `PHP 8.3`
+   - `Git Repository URL`
+   - `Branch` = `master`
+5. simpan
+
+Contoh:
+- `tes.domainkamu.com`
+- path `/www/wwwroot/pgpos-tes`
+- repo `https://github.com/mochagsr/testcode1.git`
+
+## 9B. Cek running directory untuk Opsi B
+
+Setelah site selesai dibuat:
+1. buka detail site
+2. masuk `Site directory`
+3. set `Running directory = public`
+
+## 10B. Buat database untuk Opsi B
+
+Di aaPanel `v8.0.1`:
+1. buka `Databases`
+2. klik `Add DB`
+3. buat database `tes`
+4. buat database `prod`
+5. simpan host, db name, username, dan password
+
+## 11B. Siapkan `.env` untuk Opsi B
+
+### Tes
+
+```bash
+cd /www/wwwroot/pgpos-tes
+cp .env.cpanel.test.example .env
+php artisan key:generate
+```
+
+### Prod
+
+```bash
+cd /www/wwwroot/pgpos-prod
+cp .env.cpanel.prod.example .env
+php artisan key:generate
+```
+
+Field minimal yang harus diisi sama seperti `11A`.
+
+## 12B. Inisialisasi database untuk Opsi B
+
+### Env tes
+
+```bash
+mysql -u DB_USER -p DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
+php artisan db:seed --force
+```
+
+### Env prod
+
+```bash
+php artisan migrate --force
+php artisan db:seed --force
+```
+
+## 13B. Build asset frontend untuk Opsi B
+
+```bash
+npm install
+npm run build
+```
+
+## 14B. Link storage dan cache production untuk Opsi B
+
+```bash
+php artisan storage:link
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+```
+
+## 15B. Scheduler dan queue untuk Opsi B
+
+Scheduler `prod`:
+
+```bash
+cd /www/wwwroot/pgpos-prod && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Queue `prod`:
+
+```bash
+cd /www/wwwroot/pgpos-prod && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
+```
+
+## 16B. Backup awal dan smoke test untuk Opsi B
+
+### Env tes
+
+```bash
+cd /www/wwwroot/pgpos-tes
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+### Env prod
+
+```bash
+cd /www/wwwroot/pgpos-prod
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+## 17B. Contoh alur lengkap Opsi B
+
+### Env tes
+
+```bash
+cd /www/wwwroot/pgpos-tes
+composer install --no-dev --optimize-autoloader
+cp .env.cpanel.test.example .env
+php artisan key:generate
+mysql -u TES_DB_USER -p TES_DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
+php artisan db:seed --force
+npm install
+npm run build
+php artisan storage:link
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+### Env prod
+
+```bash
+cd /www/wwwroot/pgpos-prod
+composer install --no-dev --optimize-autoloader
+cp .env.cpanel.prod.example .env
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed --force
+npm install
+npm run build
+php artisan storage:link
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:smoke-test
+```
+
+## 18. Langkah uji setelah deploy
 
 Uji minimal:
-
 1. login admin
 2. buka dashboard
 3. buka barang
@@ -338,49 +674,17 @@ Uji minimal:
 10. upload logo / file
 11. cek queue export
 
-## 17. Update dari GitHub
-
-```bash
-cd /www/wwwroot/pgpos-prod
-git pull origin master
-composer install --no-dev --optimize-autoloader
-npm install
-npm run build
-php artisan migrate --force
-php artisan optimize:clear
-php artisan config:cache
-php artisan route:cache
-php artisan event:cache
-php artisan view:cache
-```
-
 ## 19. Cara update aplikasi yang benar
 
-Jangan upload file satu-satu lewat File Manager. Itu rawan:
-
-- file tertinggal
-- versi campur
-- migration lupa dijalankan
-- cache lama tidak bersih
+Jangan upload file satu-satu lewat `Files`.
 
 Pola update yang benar:
-
 1. push perubahan dari lokal ke GitHub
 2. masuk server aaPanel
 3. `git pull`
 4. jalankan command update sesuai jenis perubahan
 
-### A. Update kecil
-
-Contoh:
-
-- Blade
-- controller
-- route
-- translation
-- CSS inline
-
-Command:
+### Update kecil
 
 ```bash
 cd /www/wwwroot/pgpos-prod
@@ -391,15 +695,7 @@ php artisan route:cache
 php artisan view:cache
 ```
 
-### B. Update yang ada migration database
-
-Contoh:
-
-- tambah kolom
-- ubah tabel
-- tambah index
-
-Command:
+### Update dengan migration
 
 ```bash
 cd /www/wwwroot/pgpos-prod
@@ -413,14 +709,7 @@ php artisan event:cache
 php artisan view:cache
 ```
 
-### C. Update yang ada perubahan frontend
-
-Contoh:
-
-- Vite build
-- resource CSS/JS berubah
-
-Command:
+### Update dengan frontend build
 
 ```bash
 cd /www/wwwroot/pgpos-prod
@@ -436,25 +725,19 @@ php artisan event:cache
 php artisan view:cache
 ```
 
-### D. Pola aman untuk `tes` lalu `prod`
-
-Saran operasional:
+### Pola aman `tes` lalu `prod`
 
 1. update dulu `tes`
-2. uji:
-   - login
-   - transaksi
-   - print
-   - PDF
-   - Excel
+2. uji login, transaksi, print, PDF, dan Excel
 3. kalau aman, baru update `prod`
 
-## 20. Dokumen pendamping yang dipakai saat live
+## 20. Dokumen pendamping
 
 - `docs/UAT_AAPANEL_POST_DEPLOY.md`
 - `docs/IMPORT_MASSAL_PLAYBOOK.md`
 - `docs/STRESS_TEST_GUIDE.md`
 - `docs/GO_LIVE_RUNBOOK.md`
+- `docs/BACKUP_OPS_HEALTH_README.md`
 
 ## 21. Saran praktik
 

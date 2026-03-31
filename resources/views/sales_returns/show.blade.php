@@ -3,6 +3,10 @@
 @section('title', __('txn.return').' '.__('txn.detail').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
+        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+    @endphp
     <style>
         .txn-modal {
             position: fixed;
@@ -34,7 +38,9 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.return') }} {{ $salesReturn->return_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('sales-returns.index') }}">{{ __('txn.back') }}</a>
-            <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+            @if($canEditTransactions)
+                <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+            @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('sales-returns.print', $salesReturn) }}">{{ __('txn.print') }}</option>
@@ -108,6 +114,7 @@
         </div>
     </div>
 
+    @if($canEditTransactions)
     <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
         <div id="admin-edit-transaction" class="card txn-modal-card">
             <div class="form-section">
@@ -115,7 +122,7 @@
                     <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
                     <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
                 </div>
-                <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
+                <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
                 <form id="admin-return-edit-form" method="post" action="{{ route('sales-returns.admin-update', $salesReturn) }}" class="row" style="margin-bottom: 12px;">
                     @csrf
                     @method('PUT')
@@ -129,6 +136,13 @@
                             @foreach($semesterOptions as $semester)
                                 <option value="{{ $semester }}" @selected(old('semester_period', $salesReturn->semester_period) === $semester)>{{ $semester }}</option>
                             @endforeach
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.transaction_type') }}</label>
+                        <select name="transaction_type">
+                            <option value="product" @selected(old('transaction_type', $salesReturn->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
+                            <option value="printing" @selected(old('transaction_type', $salesReturn->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
                         </select>
                     </div>
                     <div class="col-12">
@@ -181,7 +195,7 @@
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if((auth()->user()?->role ?? '') === 'admin' && !$salesReturn->is_canceled)
+                @if($isAdminUser && !$salesReturn->is_canceled)
                     <form method="post" action="{{ route('sales-returns.cancel', $salesReturn) }}" class="row">
                         @csrf
                         <div class="col-12">
@@ -196,6 +210,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <script>
         (function () {

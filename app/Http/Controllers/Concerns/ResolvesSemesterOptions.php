@@ -65,14 +65,16 @@ trait ResolvesSemesterOptions
 
     protected function semesterOptionsForIndex(Collection $baseOptions, bool $isAdminUser): Collection
     {
+        $semesterBookService = $this->resolveSemesterBookService();
+
         return $isAdminUser
-            ? $baseOptions->values()
-            : $this->resolveSemesterBookService()->buildSemesterOptionCollection($baseOptions->all(), true, false);
+            ? collect($semesterBookService->filterToOpenSemesters($baseOptions->all(), false))->values()
+            : collect($semesterBookService->filterToOpenSemesters($baseOptions->all(), true))->values();
     }
 
     protected function semesterOptionsForForm(Collection $baseOptions): Collection
     {
-        return $this->resolveSemesterBookService()->buildSemesterOptionCollection($baseOptions->all(), true, true);
+        return collect($this->resolveSemesterBookService()->filterToOpenSemesters($baseOptions->all(), true))->values();
     }
 
     protected function selectedSemesterIfAvailable(?string $selectedSemester, Collection $semesterOptions): ?string

@@ -173,10 +173,14 @@
                         @endphp
                         <tr>
                             <td>
-                                <a href="{{ route('outgoing-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a>
-                                @if((bool) ($adminAction['edited'] ?? false))
-                                    <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
-                                @endif
+                                <div class="list-doc-cell">
+                                    <a class="list-doc-link" href="{{ route('outgoing-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a>
+                                    <span class="list-doc-badges">
+                                        @if((bool) ($adminAction['edited'] ?? false))
+                                            <span class="badge warning">{{ __('txn.admin_badge_edit') }}</span>
+                                        @endif
+                                    </span>
+                                </div>
                             </td>
                             <td>{{ optional($transaction->transaction_date)->format('d-m-Y') }}</td>
                             <td class="supplier-col">{{ $transaction->supplier?->name ?: '-' }}</td>

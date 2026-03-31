@@ -21,11 +21,13 @@ use App\Services\AccountingService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
+use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -257,6 +259,7 @@ class SalesInvoicePageController extends Controller
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'notes' => ['nullable', 'string'],
             'payment_method' => ['required', 'in:tunai,kredit'],
             'items' => ['required', 'array', 'min:1'],
@@ -269,8 +272,9 @@ class SalesInvoicePageController extends Controller
         $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
         $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['invoice_date']);
         $selectedSemester = $normalizedSemester ?? $semesterFromDate ?? $this->defaultSemesterPeriod();
+        $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
 
-        $invoice = DB::transaction(function () use ($data, $selectedSemester): SalesInvoice {
+        $invoice = DB::transaction(function () use ($data, $selectedSemester, $selectedTransactionType): SalesInvoice {
             $invoiceDate = Carbon::parse($data['invoice_date']);
             $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
             $rows = collect($data['items']);
@@ -393,6 +397,7 @@ class SalesInvoicePageController extends Controller
                 'invoice_date' => $invoiceDate->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $selectedSemester,
+                'transaction_type' => $selectedTransactionType,
                 'subtotal' => $subtotal,
                 'total' => $subtotal,
                 'total_paid' => 0,
@@ -440,7 +445,8 @@ class SalesInvoicePageController extends Controller
                 entryDate: $invoiceDate,
                 amount: $subtotal,
                 periodCode: $invoice->semester_period,
-                description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number
+                description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number,
+                transactionType: (string) $invoice->transaction_type
             );
 
             $initialPayment = $data['payment_method'] === 'tunai' ? (float) $invoice->total : 0.0;
@@ -468,7 +474,8 @@ class SalesInvoicePageController extends Controller
                     periodCode: $invoice->semester_period,
                     description: __('receivable.payment_for_invoice', [
                         'invoice' => $invoice->invoice_number,
-                    ])
+                    ]),
+                    transactionType: (string) $invoice->transaction_type
                 );
             }
 
@@ -508,7 +515,8 @@ class SalesInvoicePageController extends Controller
                     periodCode: $invoice->semester_period,
                     description: __('txn.customer_balance_applied_for_invoice', [
                         'invoice' => $invoice->invoice_number,
-                    ])
+                    ]),
+                    transactionType: (string) $invoice->transaction_type
                 );
             }
 
@@ -571,12 +579,7 @@ class SalesInvoicePageController extends Controller
             'sales_invoices.index.semester_options.base',
             SalesInvoice::class
         );
-        $semesterOptions = $this->semesterOptionsForForm(
-            $semesterOptionsBase->push((string) $salesInvoice->semester_period)
-        );
-        if (! $semesterOptions->contains((string) $salesInvoice->semester_period)) {
-            $semesterOptions = $semesterOptions->push((string) $salesInvoice->semester_period)->unique()->values();
-        }
+        $semesterOptions = $this->semesterOptionsForForm($semesterOptionsBase);
         $customerSemesterLockState = ['locked' => false, 'manual' => false, 'auto' => false];
         $invoiceSemester = trim((string) $salesInvoice->semester_period);
         if ((int) $salesInvoice->customer_id > 0 && $invoiceSemester !== '') {
@@ -621,6 +624,7 @@ class SalesInvoicePageController extends Controller
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'payment_method' => ['nullable', 'in:tunai,kredit'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -677,6 +681,7 @@ class SalesInvoicePageController extends Controller
                             && (float) $payment->amount >= (float) $invoice->total;
                     }) ? 'tunai' : 'kredit'
                 );
+            $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $invoice->transaction_type));
             $auditBefore = $invoice->items
                 ->map(fn(SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
                 ->implode(' | ');
@@ -754,7 +759,7 @@ class SalesInvoicePageController extends Controller
                         'mutation_type' => 'in',
                         'quantity' => $delta,
                         'notes' => "Admin edit invoice {$invoice->invoice_number}",
-                        'created_by_user_id' => auth()->id(),
+                        'created_by_user_id' => Auth::id(),
                     ]);
                 } else {
                     $outQty = abs($delta);
@@ -766,7 +771,7 @@ class SalesInvoicePageController extends Controller
                         'mutation_type' => 'out',
                         'quantity' => $outQty,
                         'notes' => "Admin edit invoice {$invoice->invoice_number}",
-                        'created_by_user_id' => auth()->id(),
+                        'created_by_user_id' => Auth::id(),
                     ]);
                 }
             }
@@ -901,6 +906,7 @@ class SalesInvoicePageController extends Controller
                 'invoice_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $data['semester_period'] ?? null,
+                'transaction_type' => $selectedTransactionType,
                 'notes' => $data['notes'] ?? null,
                 'subtotal' => $subtotal,
                 'total' => $subtotal,
@@ -918,6 +924,7 @@ class SalesInvoicePageController extends Controller
                     amount: $balanceDifference,
                     periodCode: $invoice->semester_period,
                     description: __('txn.admin_invoice_edit_ledger_increase', ['invoice' => $invoice->invoice_number]),
+                    transactionType: (string) $invoice->transaction_type,
                 );
             } elseif ($balanceDifference < 0) {
                 $this->receivableLedgerService->addCredit(
@@ -927,6 +934,7 @@ class SalesInvoicePageController extends Controller
                     amount: abs($balanceDifference),
                     periodCode: $invoice->semester_period,
                     description: __('txn.admin_invoice_edit_ledger_decrease', ['invoice' => $invoice->invoice_number]),
+                    transactionType: (string) $invoice->transaction_type,
                 );
             }
         });
@@ -989,7 +997,7 @@ class SalesInvoicePageController extends Controller
                     'mutation_type' => 'in',
                     'quantity' => (int) $item->quantity,
                     'notes' => "Cancel invoice {$invoice->invoice_number}",
-                    'created_by_user_id' => auth()->id(),
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
 
@@ -1002,6 +1010,7 @@ class SalesInvoicePageController extends Controller
                     amount: $openBalance,
                     periodCode: $invoice->semester_period,
                     description: __('txn.admin_invoice_cancel_ledger_note', ['invoice' => $invoice->invoice_number]),
+                    transactionType: (string) $invoice->transaction_type,
                 );
             }
 
@@ -1010,7 +1019,7 @@ class SalesInvoicePageController extends Controller
                 'payment_status' => 'paid',
                 'is_canceled' => true,
                 'canceled_at' => now(),
-                'canceled_by_user_id' => auth()->id(),
+                'canceled_by_user_id' => Auth::id(),
                 'cancel_reason' => $data['cancel_reason'],
             ]);
         });

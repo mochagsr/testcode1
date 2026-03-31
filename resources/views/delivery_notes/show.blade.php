@@ -3,6 +3,10 @@
 @section('title', __('txn.delivery_notes_title').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
+        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+    @endphp
     <style>
         .txn-modal {
             position: fixed;
@@ -47,7 +51,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.delivery_notes_title') }} {{ $note->note_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('delivery-notes.index') }}">{{ __('txn.back') }}</a>
-            @if((auth()->user()?->role ?? '') === 'admin')
+            @if($canEditTransactions)
                 <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
@@ -110,7 +114,7 @@
         </div>
     </div>
 
-    @if((auth()->user()?->role ?? '') === 'admin')
+    @if($canEditTransactions)
         <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
             <div id="admin-edit-transaction" class="card txn-modal-card">
                 <div class="form-section">
@@ -118,7 +122,7 @@
                         <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
                         <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
                     </div>
-                    <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
+                    <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
                 <form id="admin-delivery-edit-form" method="post" action="{{ route('delivery-notes.admin-update', $note) }}" class="row" style="margin-bottom: 12px;">
                     @csrf
                     @method('PUT')
@@ -137,6 +141,13 @@
                     <div class="col-4">
                         <label>{{ __('txn.city') }}</label>
                         <input type="text" name="city" value="{{ old('city', $note->city) }}">
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('txn.transaction_type') }}</label>
+                        <select name="transaction_type">
+                            <option value="product" @selected(old('transaction_type', $note->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
+                            <option value="printing" @selected(old('transaction_type', $note->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
+                        </select>
                     </div>
                     <div class="col-12">
                         <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
@@ -188,7 +199,7 @@
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if(!$note->is_canceled)
+                @if($isAdminUser && !$note->is_canceled)
                     <form method="post" action="{{ route('delivery-notes.cancel', $note) }}" class="row">
                         @csrf
                         <div class="col-12">

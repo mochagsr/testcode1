@@ -66,6 +66,14 @@
                     </select>
                 </div>
                 <div>
+                    <label>{{ __('receivable.transaction_type') }}</label>
+                    <select name="transaction_type" style="max-width: 180px;">
+                        <option value="">{{ __('txn.all') }}</option>
+                        <option value="product" @selected(($selectedTransactionType ?? '') === 'product')>{{ __('receivable.transaction_type_product') }}</option>
+                        <option value="printing" @selected(($selectedTransactionType ?? '') === 'printing')>{{ __('receivable.transaction_type_printing') }}</option>
+                    </select>
+                </div>
+                <div>
                     <label>{{ __('txn.search') }}</label>
                     <input type="text" name="search" value="{{ $search }}" placeholder="{{ __('receivable.global_search_placeholder') }}" style="max-width: 280px;">
                 </div>
@@ -117,7 +125,7 @@
                 @forelse($rows as $index => $row)
                     <tr>
                         <td>{{ (($paginator?->firstItem()) ?? 1) + $index }}</td>
-                        <td><a href="{{ route('receivables.index', ['customer_id' => $row['id']]) }}">{{ strtoupper($row['name']) }}</a></td>
+                        <td><a href="{{ route('receivables.index', ['customer_id' => $row['id'], 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ strtoupper($row['name']) }}</a></td>
                         <td>{{ strtoupper($row['city']) }}</td>
                         <td>{{ $row['address'] }}</td>
                         @foreach($semesterCodes as $semesterCode)

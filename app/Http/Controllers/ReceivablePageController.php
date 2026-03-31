@@ -16,6 +16,7 @@ use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
+use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -45,12 +46,16 @@ class ReceivablePageController extends Controller
         $isAdminUser = (string) ($request->user()?->role ?? '') === 'admin';
         $search = trim((string) $request->string('search', ''));
         $customerId = $request->integer('customer_id');
+        $selectedTransactionType = trim((string) $request->string('transaction_type', ''));
+        if ($selectedTransactionType !== '' && ! in_array($selectedTransactionType, TransactionType::values(), true)) {
+            $selectedTransactionType = '';
+        }
         $semester = trim((string) $request->string('semester', ''));
         $selectedSemester = $semester !== '' ? $this->semesterBookService->normalizeSemester($semester) : null;
         $currentSemester = $this->currentSemesterPeriod();
         $previousSemester = $this->previousSemesterPeriod($currentSemester);
 
-        $semesterOptions = Cache::remember(
+        $baseSemesterOptions = Cache::remember(
             AppCache::lookupCacheKey('receivables.index.semester_options.base'),
             now()->addSeconds(60),
             fn() => $this->semesterBookService->buildSemesterOptionCollection(
@@ -65,9 +70,12 @@ class ReceivablePageController extends Controller
                 true
             )
         );
-        $semesterOptions = $isAdminUser
-            ? $semesterOptions->values()
-            : $this->semesterBookService->buildSemesterOptionCollection($semesterOptions->all(), true, false);
+        $semesterOptions = collect(
+            $this->semesterBookService->filterToOpenSemesters(
+                $baseSemesterOptions->all(),
+                ! $isAdminUser
+            )
+        )->values();
         if ($selectedSemester !== null && ! $semesterOptions->contains($selectedSemester)) {
             $selectedSemester = null;
         }
@@ -138,8 +146,12 @@ class ReceivablePageController extends Controller
         $ledgerOutstandingTotal = null;
         $customerOutstandingTotal = null;
         $selectedCustomerSemesterClosed = false;
+        $semesterClosingState = null;
         $paymentRefsWithAlloc = [];
         $salesReturnLinkMap = [];
+        if ($isAdminUser && $selectedSemester !== null) {
+            $semesterClosingState = $this->semesterBookService->receivableSemesterClosingState($selectedSemester);
+        }
         if ($customerId > 0) {
             $selectedCustomer = Customer::query()
                 ->select(['id', 'name', 'city'])
@@ -160,6 +172,9 @@ class ReceivablePageController extends Controller
                 ->forCustomer($customerId)
                 ->active()
                 ->withOpenBalance()
+                ->when($selectedTransactionType !== '', function ($query) use ($selectedTransactionType): void {
+                    $query->where('transaction_type', $selectedTransactionType);
+                })
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                     $query->forSemester($selectedSemester);
                 });
@@ -171,6 +186,9 @@ class ReceivablePageController extends Controller
 
             $ledgerBaseQuery = ReceivableLedger::query()
                 ->forCustomer($customerId)
+                ->when($selectedTransactionType !== '', function ($query) use ($selectedTransactionType): void {
+                    $query->where('transaction_type', $selectedTransactionType);
+                })
                 ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                     $query->forSemester($selectedSemester);
                 });
@@ -182,6 +200,7 @@ class ReceivablePageController extends Controller
                     'customer_id',
                     'sales_invoice_id',
                     'entry_date',
+                    'transaction_type',
                     'description',
                     'debit',
                     'credit',
@@ -221,7 +240,11 @@ class ReceivablePageController extends Controller
             }
 
             if ($selectedCustomer) {
-                $statementData = $this->cachedCustomerBillStatement((int) $selectedCustomer->id, $selectedSemester);
+                $statementData = $this->cachedCustomerBillStatement(
+                    (int) $selectedCustomer->id,
+                    $selectedSemester,
+                    $selectedTransactionType !== '' ? $selectedTransactionType : null
+                );
                 $billStatementRows = $statementData['rows'];
                 $billStatementTotals = $statementData['totals'];
             }
@@ -232,6 +255,7 @@ class ReceivablePageController extends Controller
             'ledgerRows' => $ledgerRows,
             'search' => $search,
             'selectedCustomerId' => $customerId,
+            'selectedTransactionType' => $selectedTransactionType,
             'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
             'currentSemester' => $currentSemester,
@@ -243,6 +267,7 @@ class ReceivablePageController extends Controller
             'billStatementRows' => $billStatementRows,
             'billStatementTotals' => $billStatementTotals,
             'selectedCustomerSemesterClosed' => $selectedCustomerSemesterClosed,
+            'semesterClosingState' => $semesterClosingState,
             'selectedSemesterGlobalClosed' => $selectedSemesterGlobalClosed,
             'selectedSemesterActive' => $selectedSemesterActive,
             'customerSemesterClosedMap' => $customerSemesterClosedMap,
@@ -658,6 +683,10 @@ class ReceivablePageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $status = strtolower(trim((string) $request->string('status', 'all')));
         $selectedCustomerId = max(0, (int) $request->integer('customer_id'));
+        $selectedTransactionType = trim((string) $request->string('transaction_type', ''));
+        if ($selectedTransactionType !== '' && ! in_array($selectedTransactionType, TransactionType::values(), true)) {
+            $selectedTransactionType = '';
+        }
         if (! in_array($status, ['all', 'outstanding', 'paid', 'credit'], true)) {
             $status = 'all';
         }
@@ -711,6 +740,9 @@ class ReceivablePageController extends Controller
         $ledgerRows = ReceivableLedger::query()
             ->selectRaw('customer_id, period_code, COALESCE(SUM(debit - credit), 0) as outstanding_total')
             ->whereIn('period_code', $activeSemesterCodes->all())
+            ->when($selectedTransactionType !== '', function ($query) use ($selectedTransactionType): void {
+                $query->where('transaction_type', $selectedTransactionType);
+            })
             ->groupBy('customer_id', 'period_code')
             ->get();
 
@@ -726,6 +758,9 @@ class ReceivablePageController extends Controller
         $totalAggregate = ReceivableLedger::query()
             ->selectRaw('customer_id, COALESCE(SUM(debit - credit), 0) as total_outstanding')
             ->whereIn('period_code', $activeSemesterCodes->all())
+            ->when($selectedTransactionType !== '', function ($query) use ($selectedTransactionType): void {
+                $query->where('transaction_type', $selectedTransactionType);
+            })
             ->groupBy('customer_id');
 
         $customerQuery = Customer::query()
@@ -796,14 +831,32 @@ class ReceivablePageController extends Controller
         $companySettings = [];
 
         if ($selectedCustomer instanceof Customer) {
-            $customerInvoiceRows = collect($activeSemesterCodes)
-                ->map(function (string $semesterCode) use ($selectedCustomer, $balanceMap): array {
-                    $nominal = (int) ($balanceMap[(int) $selectedCustomer->id][$semesterCode] ?? 0);
+            $customerInvoiceRows = ReceivableLedger::query()
+                ->selectRaw('period_code, transaction_type, COALESCE(SUM(debit - credit), 0) as outstanding_total')
+                ->where('customer_id', (int) $selectedCustomer->id)
+                ->whereIn('period_code', $activeSemesterCodes->all())
+                ->when($selectedTransactionType !== '', function ($query) use ($selectedTransactionType): void {
+                    $query->where('transaction_type', $selectedTransactionType);
+                })
+                ->groupBy('period_code', 'transaction_type')
+                ->orderBy('period_code')
+                ->get()
+                ->map(function ($row): array {
+                    $transactionType = trim((string) ($row->transaction_type ?? '')) !== ''
+                        ? TransactionType::normalize((string) $row->transaction_type)
+                        : '';
+
+                    $typeLabel = match ($transactionType) {
+                        TransactionType::PRINTING => __('receivable.transaction_type_printing'),
+                        TransactionType::PRODUCT => __('receivable.transaction_type_product'),
+                        default => __('receivable.transaction_type_none'),
+                    };
 
                     return [
-                        'semester_code' => $semesterCode,
-                        'description' => $this->semesterDescriptionLabel($semesterCode),
-                        'nominal' => $nominal,
+                        'semester_code' => (string) ($row->period_code ?? ''),
+                        'transaction_type' => $transactionType !== '' ? $transactionType : null,
+                        'description' => $this->semesterDescriptionLabel((string) ($row->period_code ?? '')) . ($transactionType !== '' ? ' - ' . strtoupper($typeLabel) : ''),
+                        'nominal' => (int) round((float) ($row->outstanding_total ?? 0)),
                     ];
                 })
                 ->filter(fn (array $row): bool => (int) $row['nominal'] !== 0)
@@ -817,13 +870,14 @@ class ReceivablePageController extends Controller
             'title' => __('receivable.global_page_title'),
             'printTitle' => $selectedCustomer instanceof Customer
                 ? 'Invoice'
-                : strtoupper(__('receivable.global_page_title')),
+                : strtoupper(__('receivable.global_page_title')) . ($selectedTransactionType !== '' ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType)) : ''),
             'rows' => $rows,
             'paginator' => $paginate ? $customers : null,
             'totalItems' => $paginate ? $customers->total() : $rows->count(),
             'search' => $search,
             'selectedStatus' => $status,
             'selectedCustomerId' => $selectedCustomerId,
+            'selectedTransactionType' => $selectedTransactionType,
             'selectedCustomer' => $selectedCustomer,
             'customerOptions' => $customerOptions,
             'semesterHeaders' => $activeSemesterCodes->map(fn (string $code): string => $this->semesterDescriptionLabel($code))->all(),
@@ -1002,7 +1056,7 @@ class ReceivablePageController extends Controller
             $customerAddress = PrintTextFormatter::wrapWords(trim((string) ($data['customer']->address ?? '')), 5);
             $notesText = PrintTextFormatter::wrapWords(trim((string) ($data['companyInvoiceNotes'] ?? '')), 4);
 
-            $sheet->mergeCells('A1:F1');
+            $sheet->mergeCells('A1:G1');
             $sheet->setCellValue('A1', (string) ($data['reportTitle'] ?? __('receivable.customer_bill_title')));
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -1030,9 +1084,10 @@ class ReceivablePageController extends Controller
             $sheet->getStyle('E2:E7')->getFont()->setBold(true);
             $sheet->getStyle('F2:F7')->getAlignment()->setWrapText(true);
 
-            $rowsOut = [[
+        $rowsOut = [[
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
+                __('receivable.transaction_type'),
                 __('receivable.bill_credit_sales'),
                 __('receivable.bill_installment_payment'),
                 __('receivable.bill_sales_return'),
@@ -1052,6 +1107,7 @@ class ReceivablePageController extends Controller
                 $rowsOut[] = [
                     (string) ($row['date_label'] ?? ''),
                     $proofNumber,
+                    (string) ($row['transaction_type_label'] ?? __('receivable.transaction_type_none')),
                     number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.'),
@@ -1063,6 +1119,7 @@ class ReceivablePageController extends Controller
             $rowsOut[] = [
                 '',
                 __('receivable.bill_total'),
+                '',
                 number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['installment_payment'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.'),
@@ -1073,15 +1130,16 @@ class ReceivablePageController extends Controller
                 '',
                 '',
                 '',
+                '',
                 __('receivable.bill_total_receivable'),
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
             ];
 
             $tableStartRow = 10;
             $sheet->fromArray($rowsOut, null, 'A' . $tableStartRow);
-            ExcelExportStyler::styleTable($sheet, $tableStartRow, 6, count($rowsOut) - 1, true);
-            $sheet->getStyle('A' . $tableStartRow . ':F' . ($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
-            $sheet->getStyle('C' . ($tableStartRow + 1) . ':F' . ($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            ExcelExportStyler::styleTable($sheet, $tableStartRow, 7, count($rowsOut) - 1, true);
+            $sheet->getStyle('A' . $tableStartRow . ':G' . ($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
+            $sheet->getStyle('D' . ($tableStartRow + 1) . ':G' . ($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             $rowCursor = $tableStartRow + count($rowsOut) + 2;
 
@@ -1147,10 +1205,10 @@ class ReceivablePageController extends Controller
             if ($notesText !== '') {
                 $sheet->setCellValue('A' . $rowCursor, __('receivable.note_label'));
                 $sheet->getStyle('A' . $rowCursor)->getFont()->setBold(true);
-                $sheet->mergeCells('B' . $rowCursor . ':F' . ($rowCursor + 2));
+                $sheet->mergeCells('B' . $rowCursor . ':G' . ($rowCursor + 2));
                 $sheet->setCellValue('B' . $rowCursor, $notesText);
-                $sheet->getStyle('B' . $rowCursor . ':F' . ($rowCursor + 2))->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
-                $sheet->getStyle('A' . $rowCursor . ':F' . ($rowCursor + 2))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('B' . $rowCursor . ':G' . ($rowCursor + 2))->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->getStyle('A' . $rowCursor . ':G' . ($rowCursor + 2))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
                 $rowCursor += 4;
             }
 
@@ -1259,7 +1317,8 @@ class ReceivablePageController extends Controller
                     description: match ($method) {
                         'writeoff' => __('receivable.writeoff_for_invoice', ['invoice' => $invoice->invoice_number]),
                         default => __('receivable.discount_for_invoice', ['invoice' => $invoice->invoice_number]),
-                    }
+                    },
+                    transactionType: (string) $invoice->transaction_type
                 );
 
                 $remaining -= $applied;
@@ -1284,6 +1343,10 @@ class ReceivablePageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $status = strtolower(trim((string) $request->string('status', 'all')));
+        $selectedTransactionType = trim((string) $request->string('transaction_type', ''));
+        if ($selectedTransactionType !== '' && ! in_array($selectedTransactionType, TransactionType::values(), true)) {
+            $selectedTransactionType = '';
+        }
         if (! in_array($status, ['all', 'outstanding', 'paid', 'credit'], true)) {
             $status = 'all';
         }
@@ -1291,16 +1354,21 @@ class ReceivablePageController extends Controller
         $semesterOptions = Cache::remember(
             AppCache::lookupCacheKey('receivables.semester_page.options'),
             now()->addSeconds(60),
-            fn() => $this->semesterBookService->buildSemesterOptionCollection(
-                ReceivableLedger::query()
-                    ->whereNotNull('period_code')
-                    ->where('period_code', '!=', '')
-                    ->distinct()
-                    ->pluck('period_code')
-                    ->merge($this->semesterBookService->configuredSemesterOptions()),
-                false,
-                true
-            )->values()
+            function () {
+                $baseOptions = $this->semesterBookService->buildSemesterOptionCollection(
+                    ReceivableLedger::query()
+                        ->whereNotNull('period_code')
+                        ->where('period_code', '!=', '')
+                        ->distinct()
+                        ->pluck('period_code')
+                        ->merge($this->semesterBookService->configuredSemesterOptions()),
+                    false,
+                    true
+                );
+
+                return collect($this->semesterBookService->filterToOpenSemesters($baseOptions->all(), false))
+                    ->values();
+            }
         );
 
         $selectedSemester = trim((string) $request->string('semester', ''));
@@ -1320,6 +1388,9 @@ class ReceivablePageController extends Controller
                 COALESCE(SUM(debit - credit), 0) as outstanding_total
             ")
             ->where('period_code', $selectedSemester)
+            ->when($selectedTransactionType !== '', function ($query) use ($selectedTransactionType): void {
+                $query->where('transaction_type', $selectedTransactionType);
+            })
             ->groupBy('customer_id');
 
         $query = Customer::query()
@@ -1379,6 +1450,7 @@ class ReceivablePageController extends Controller
             'selectedSemester' => $selectedSemester,
             'selectedSemesterLabel' => $this->semesterDescriptionLabel($selectedSemester),
             'selectedStatus' => $status,
+            'selectedTransactionType' => $selectedTransactionType,
             'selectedStatusLabel' => match ($status) {
                 'outstanding' => __('receivable.semester_status_outstanding'),
                 'paid' => __('receivable.semester_status_paid'),
@@ -1408,7 +1480,7 @@ class ReceivablePageController extends Controller
                 'return_total' => (int) round((float) ($totalsRow->return_total ?? 0)),
                 'outstanding_total' => (int) round((float) ($totalsRow->outstanding_total ?? 0)),
             ],
-            'printTitle' => 'DAFTAR PIUTANG ' . strtoupper($this->semesterDescriptionLabel($selectedSemester)),
+            'printTitle' => 'DAFTAR PIUTANG ' . strtoupper($this->semesterDescriptionLabel($selectedSemester)) . ($selectedTransactionType !== '' ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType)) : ''),
             'totalItems' => $paginate ? (int) $rows->total() : (int) $rowCollection->count(),
         ];
     }
@@ -1431,20 +1503,34 @@ class ReceivablePageController extends Controller
     private function customerBillViewData(Request $request, Customer $customer): array
     {
         $selectedSemester = $this->normalizeSemester((string) $request->string('semester', ''));
-        $statementData = $this->cachedCustomerBillStatement((int) $customer->id, $selectedSemester !== '' ? $selectedSemester : null);
+        $selectedTransactionType = trim((string) $request->string('transaction_type', ''));
+        if ($selectedTransactionType !== '' && ! in_array($selectedTransactionType, TransactionType::values(), true)) {
+            $selectedTransactionType = '';
+        }
+        $statementData = $this->cachedCustomerBillStatement(
+            (int) $customer->id,
+            $selectedSemester !== '' ? $selectedSemester : null,
+            $selectedTransactionType !== '' ? $selectedTransactionType : null
+        );
         $statementRows = $statementData['rows'];
         $totals = $statementData['totals'];
         $schoolBreakdown = $this->buildCustomerBillSchoolBreakdown(
             (int) $customer->id,
-            $selectedSemester !== '' ? $selectedSemester : null
+            $selectedSemester !== '' ? $selectedSemester : null,
+            $selectedTransactionType !== '' ? $selectedTransactionType : null
         );
         $settings = $this->companyPrintSettings();
 
         return [
             'customer' => $customer,
             'selectedSemester' => $selectedSemester !== '' ? $selectedSemester : null,
+            'selectedTransactionType' => $selectedTransactionType !== '' ? $selectedTransactionType : null,
             'selectedSemesterLabel' => $selectedSemester !== '' ? $this->semesterDescriptionLabel($selectedSemester) : null,
-            'reportTitle' => $this->customerBillReportTitle($customer, $selectedSemester !== '' ? $selectedSemester : null),
+            'reportTitle' => $this->customerBillReportTitle(
+                $customer,
+                $selectedSemester !== '' ? $selectedSemester : null,
+                $selectedTransactionType !== '' ? $selectedTransactionType : null
+            ),
             'rows' => $statementRows,
             'totalOutstanding' => (int) round((float) $totals['running_balance']),
             'totals' => $totals,
@@ -1485,16 +1571,19 @@ class ReceivablePageController extends Controller
         ];
     }
 
-    private function customerBillReportTitle(Customer $customer, ?string $selectedSemester): string
+    private function customerBillReportTitle(Customer $customer, ?string $selectedSemester, ?string $selectedTransactionType = null): string
     {
         $customerName = trim((string) $customer->name);
         $namePart = $customerName !== '' ? $customerName : 'Customer';
+        $typeSuffix = $selectedTransactionType !== null && trim($selectedTransactionType) !== ''
+            ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType))
+            : '';
 
         if ($selectedSemester !== null) {
-            return sprintf('Rekap Piutang %s %s', $namePart, strtoupper($selectedSemester));
+            return sprintf('Rekap Piutang %s %s%s', $namePart, strtoupper($selectedSemester), $typeSuffix);
         }
 
-        return sprintf('Rekap Piutang %s', $namePart);
+        return sprintf('Rekap Piutang %s%s', $namePart, $typeSuffix);
     }
 
     private function normalizeSemester(string $semester): string
@@ -1515,31 +1604,39 @@ class ReceivablePageController extends Controller
     /**
      * @return array{rows:Collection<int, array<string, int|string|null>>, totals:array<string, int>}
      */
-    private function cachedCustomerBillStatement(int $customerId, ?string $selectedSemester): array
+    private function cachedCustomerBillStatement(int $customerId, ?string $selectedSemester, ?string $selectedTransactionType = null): array
     {
         $normalizedSemester = $selectedSemester !== null
             ? $this->semesterBookService->normalizeSemester($selectedSemester)
+            : null;
+        $normalizedTransactionType = $selectedTransactionType !== null && trim($selectedTransactionType) !== ''
+            ? TransactionType::normalize($selectedTransactionType)
             : null;
 
         return Cache::remember(
             AppCache::lookupCacheKey('receivables.bill_statement', [
                 'customer_id' => $customerId,
                 'semester' => (string) ($normalizedSemester ?? ''),
+                'transaction_type' => (string) ($normalizedTransactionType ?? ''),
             ]),
             now()->addSeconds(45),
-            fn() => $this->buildCustomerBillStatement($customerId, $normalizedSemester)
+            fn() => $this->buildCustomerBillStatement($customerId, $normalizedSemester, $normalizedTransactionType)
         );
     }
 
     /**
      * @return array{rows:Collection<int, array<string, int|string|null>>, totals:array<string, int>}
      */
-    private function buildCustomerBillStatement(int $customerId, ?string $selectedSemester): array
+    private function buildCustomerBillStatement(int $customerId, ?string $selectedSemester, ?string $selectedTransactionType = null): array
     {
         $semester = $selectedSemester ?? '';
+        $transactionType = $selectedTransactionType ?? '';
         $ledgerRows = ReceivableLedger::query()
             ->with('invoice:id,invoice_number,invoice_date')
             ->forCustomer($customerId)
+            ->when($transactionType !== '', function ($query) use ($transactionType): void {
+                $query->where('transaction_type', $transactionType);
+            })
             ->when($semester !== '', function ($query) use ($semester): void {
                 $query->forSemester($semester);
             })
@@ -1554,6 +1651,9 @@ class ReceivablePageController extends Controller
                 ->forCustomer($customerId)
                 ->active()
                 ->withOpenBalance()
+                ->when($transactionType !== '', function ($query) use ($transactionType): void {
+                    $query->where('transaction_type', $transactionType);
+                })
                 ->when($semester !== '', function ($query) use ($semester): void {
                     $query->forSemester($semester);
                 })
@@ -1566,6 +1666,8 @@ class ReceivablePageController extends Controller
                 'invoice_id' => null,
                 'proof_number' => '',
                 'entry_type' => 'opening',
+                'transaction_type' => null,
+                'transaction_type_label' => __('receivable.transaction_type_none'),
                 'adjustment_amount' => 0,
                 'credit_sales' => 0,
                 'installment_payment' => 0,
@@ -1586,6 +1688,11 @@ class ReceivablePageController extends Controller
         foreach ($ledgerRows as $ledgerRow) {
             $debit = (int) round((float) $ledgerRow->debit);
             $credit = (int) round((float) $ledgerRow->credit);
+            $transactionType = $ledgerRow->transaction_type !== null && trim((string) $ledgerRow->transaction_type) !== ''
+                ? TransactionType::normalize((string) $ledgerRow->transaction_type)
+                : ($ledgerRow->invoice?->transaction_type
+                    ? TransactionType::normalize((string) $ledgerRow->invoice->transaction_type)
+                    : null);
             $description = strtolower((string) ($ledgerRow->description ?? ''));
             $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
             $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
@@ -1620,11 +1727,12 @@ class ReceivablePageController extends Controller
                 default => $baseProofNumber,
             };
             $invoiceId = $ledgerRow->invoice?->id;
+            $typeKey = $transactionType ?? 'none';
             $groupKey = $isAdminInvoiceAdjustment
-                ? 'ledger:' . (int) $ledgerRow->id . ':adjustment'
+                ? 'ledger:' . (int) $ledgerRow->id . ':adjustment:' . $typeKey
                 : ($invoiceId !== null
-                ? 'invoice:' . $invoiceId . ':' . $entryType
-                : 'text:' . $baseProofNumber . ':' . $entryType);
+                ? 'invoice:' . $invoiceId . ':' . $entryType . ':' . $typeKey
+                : 'text:' . $baseProofNumber . ':' . $entryType . ':' . $typeKey);
             $dateValue = $debit > 0
                 ? ($ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date)
                 : $ledgerRow->entry_date;
@@ -1636,6 +1744,7 @@ class ReceivablePageController extends Controller
                     'invoice_id' => $invoiceId,
                     'proof_number' => $proofNumber,
                     'entry_type' => $entryType,
+                    'transaction_type' => $transactionType,
                     'adjustment_amount' => 0,
                     'credit_sales' => 0,
                     'installment_payment' => 0,
@@ -1675,6 +1784,8 @@ class ReceivablePageController extends Controller
                 'invoice_id' => $groupedRow['invoice_id'],
                 'proof_number' => $groupedRow['proof_number'],
                 'entry_type' => (string) ($groupedRow['entry_type'] ?? 'payment'),
+                'transaction_type' => $groupedRow['transaction_type'] ?? null,
+                'transaction_type_label' => $this->transactionTypeLabel($groupedRow['transaction_type'] ?? null),
                 'adjustment_amount' => (int) ($groupedRow['adjustment_amount'] ?? 0),
                 'credit_sales' => (int) $groupedRow['credit_sales'],
                 'installment_payment' => (int) $groupedRow['installment_payment'],
@@ -1695,6 +1806,19 @@ class ReceivablePageController extends Controller
         ];
     }
 
+    private function transactionTypeLabel(?string $transactionType): string
+    {
+        $normalized = $transactionType !== null && trim($transactionType) !== ''
+            ? TransactionType::normalize($transactionType)
+            : '';
+
+        return match ($normalized) {
+            TransactionType::PRINTING => __('receivable.transaction_type_printing'),
+            TransactionType::PRODUCT => __('receivable.transaction_type_product'),
+            default => __('receivable.transaction_type_none'),
+        };
+    }
+
     /**
      * @return Collection<int, array{
      *     school_name:string,
@@ -1710,9 +1834,10 @@ class ReceivablePageController extends Controller
      *     totals:array{invoice_total:int,paid_total:int,balance_total:int}
      * }>
      */
-    private function buildCustomerBillSchoolBreakdown(int $customerId, ?string $selectedSemester): Collection
+    private function buildCustomerBillSchoolBreakdown(int $customerId, ?string $selectedSemester, ?string $selectedTransactionType = null): Collection
     {
         $semester = $selectedSemester ?? '';
+        $transactionType = $selectedTransactionType ?? '';
         $rows = SalesInvoice::query()
             ->select([
                 'id',
@@ -1729,6 +1854,9 @@ class ReceivablePageController extends Controller
             ->with(['shipLocation:id,school_name,city'])
             ->forCustomer($customerId)
             ->active()
+            ->when($transactionType !== '', function ($query) use ($transactionType): void {
+                $query->where('transaction_type', $transactionType);
+            })
             ->when($semester !== '', function ($query) use ($semester): void {
                 $query->forSemester($semester);
             })

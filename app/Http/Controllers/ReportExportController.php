@@ -1202,7 +1202,7 @@ class ReportExportController extends Controller
             return null;
         }
 
-        return $this->semesterBookService()->isActive($normalized) ? $normalized : null;
+        return $this->semesterBookService()->isClosed($normalized) ? null : $normalized;
     }
 
     private function selectedCustomerId(Request $request): ?int
@@ -1884,7 +1884,7 @@ class ReportExportController extends Controller
     {
         $now = now();
         return Cache::remember(AppCache::lookupCacheKey('reports.semester_options'), $now->copy()->addSeconds(60), function (): array {
-            return $this->semesterBookService()->buildSemesterOptionCollection(
+            $allOptions = $this->semesterBookService()->buildSemesterOptionCollection(
                 SalesInvoice::query()
                     ->whereNotNull('semester_period')
                     ->where('semester_period', '!=', '')
@@ -1905,9 +1905,13 @@ class ReportExportController extends Controller
                             ->pluck('semester_period')
                     )
                     ->merge($this->semesterBookService()->configuredSemesterOptions()),
-                true,
+                false,
                 true
-            )->all();
+            );
+
+            return collect($this->semesterBookService()->filterToOpenSemesters($allOptions->all(), false))
+                ->values()
+                ->all();
         });
     }
 

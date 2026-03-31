@@ -3,6 +3,10 @@
 @section('title', __('receivable.payment_menu').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
+        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('receivable.payment_menu') }} {{ $payment->payment_number }}</h1>
         <div class="flex">
@@ -38,7 +42,7 @@
         </div>
     </div>
 
-    @if((auth()->user()?->role ?? '') === 'admin')
+    @if($canEditTransactions)
         <div class="card">
             <div class="form-section">
                 <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
@@ -69,7 +73,7 @@
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if(!$payment->is_canceled)
+                @if($isAdminUser && !$payment->is_canceled)
                     <form method="post" action="{{ route('receivable-payments.cancel', $payment) }}" class="row">
                         @csrf
                         <div class="col-12">
@@ -85,7 +89,6 @@
         </div>
     @endif
 @endsection
-
 
 
 

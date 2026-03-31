@@ -43,7 +43,9 @@
                         <select class="action-menu action-menu-sm" onchange="if(this.value){window.location.href=this.value; this.selectedIndex=0;}">
                             <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                             <option value="{{ route('delivery-trips.show', $trip) }}">{{ __('txn.detail') }}</option>
-                            <option value="{{ route('delivery-trips.edit', $trip) }}">{{ __('ui.edit') }}</option>
+                            @if(auth()->user()?->canAccess('transactions.edit'))
+                                <option value="{{ route('delivery-trips.edit', $trip) }}">{{ __('ui.edit') }}</option>
+                            @endif
                             <option value="{{ route('delivery-trips.print', $trip) }}">{{ __('txn.print') }}</option>
                             <option value="{{ route('delivery-trips.export.pdf', $trip) }}">{{ __('txn.pdf') }}</option>
                             <option value="{{ route('delivery-trips.export.excel', $trip) }}">{{ __('txn.excel') }}</option>

@@ -38,7 +38,11 @@
             <tbody>
             @forelse($transactions as $transaction)
                 <tr>
-                    <td><a href="{{ route('school-bulk-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a></td>
+                    <td>
+                        <div class="list-doc-cell">
+                            <a class="list-doc-link" href="{{ route('school-bulk-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a>
+                        </div>
+                    </td>
                     <td>{{ optional($transaction->transaction_date)->format('d-m-Y') ?: '-' }}</td>
                     <td>{{ $transaction->customer?->name ?: '-' }}</td>
                     <td>{{ $transaction->semester_period ?: '-' }}</td>

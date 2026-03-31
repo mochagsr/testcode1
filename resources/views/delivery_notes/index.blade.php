@@ -80,7 +80,11 @@
             <tbody>
             @forelse($notes as $note)
                 <tr>
-                    <td><a href="{{ route('delivery-notes.show', $note) }}">{{ $note->note_number }}</a></td>
+                    <td>
+                        <div class="list-doc-cell">
+                            <a class="list-doc-link" href="{{ route('delivery-notes.show', $note) }}">{{ $note->note_number }}</a>
+                        </div>
+                    </td>
                     <td>{{ $note->note_date->format('d-m-Y') }}</td>
                     <td>{{ $note->recipient_name }}</td>
                     <td>{{ $note->city ?: '-' }}</td>

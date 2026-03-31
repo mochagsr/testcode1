@@ -89,10 +89,14 @@
                 @endphp
                 <tr>
                     <td>
-                        <a href="{{ route('order-notes.show', $note) }}">{{ $note->note_number }}</a>
-                        @if($note->is_canceled)
-                            <span class="badge danger" style="margin-left:6px;">{{ __('txn.status_canceled') }}</span>
-                        @endif
+                        <div class="list-doc-cell">
+                            <a class="list-doc-link" href="{{ route('order-notes.show', $note) }}">{{ $note->note_number }}</a>
+                            <span class="list-doc-badges">
+                                @if($note->is_canceled)
+                                    <span class="badge danger">{{ __('txn.status_canceled') }}</span>
+                                @endif
+                            </span>
+                        </div>
                     </td>
                     <td>{{ $note->note_date->format('d-m-Y') }}</td>
                     <td>{{ $note->customer_name }}</td>

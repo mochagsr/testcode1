@@ -36,7 +36,11 @@
             <tbody>
             @forelse($payments as $payment)
                 <tr>
-                    <td><a href="{{ route('receivable-payments.show', $payment) }}">{{ $payment->payment_number }}</a></td>
+                    <td>
+                        <div class="list-doc-cell">
+                            <a class="list-doc-link" href="{{ route('receivable-payments.show', $payment) }}">{{ $payment->payment_number }}</a>
+                        </div>
+                    </td>
                     <td>{{ $payment->payment_date?->format('d-m-Y') }}</td>
                     <td>{{ $payment->customer?->name }} <span class="muted">({{ $payment->customer?->city }})</span></td>
                     <td>Rp {{ number_format((int) round($payment->amount), 0, ',', '.') }}</td>

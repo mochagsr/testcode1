@@ -81,6 +81,13 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <div class="col-6">
+                                <label>{{ __('txn.transaction_type') }}</label>
+                                <select name="transaction_type">
+                                    <option value="product" @selected(old('transaction_type', 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
+                                    <option value="printing" @selected(old('transaction_type') === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>

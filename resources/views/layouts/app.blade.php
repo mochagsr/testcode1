@@ -229,6 +229,34 @@
         .main a:not(.btn):focus {
             color: var(--link-hover);
         }
+        .list-doc-cell {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px 8px;
+            line-height: 1.35;
+        }
+        .list-doc-link {
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        .list-doc-meta {
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px 6px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .list-doc-meta-label {
+            white-space: nowrap;
+        }
+        .list-doc-badges {
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
         .page-title {
             margin: 0 0 16px;
             font-size: 24px;

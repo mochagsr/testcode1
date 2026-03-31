@@ -21,6 +21,7 @@
         'dashboard.view' => 'Lihat dashboard',
         'transactions.view' => 'Lihat transaksi',
         'transactions.create' => 'Buat transaksi',
+        'transactions.edit' => 'Edit transaksi',
         'transactions.export' => 'Export transaksi',
         'transactions.cancel' => 'Batalkan transaksi',
         'transactions.correction.request' => 'Ajukan koreksi transaksi',
@@ -182,6 +183,11 @@
                 <div class="col-12">
                     <label>{{ __('ui.name') }} <span class="label-required">*</span></label>
                     <input type="text" name="name" value="{{ old('name', $user?->name) }}" required>
+                </div>
+                <div class="col-12">
+                    <label>{{ __('ui.username') }} <span class="label-required">*</span></label>
+                    <input type="text" name="username" value="{{ old('username', $user?->username) }}" required>
+                    <div class="hint">{{ __('ui.username_hint') }}</div>
                 </div>
                 <div class="col-12">
                     <label>{{ __('ui.email') }} <span class="label-required">*</span></label>

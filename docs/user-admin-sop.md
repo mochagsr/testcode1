@@ -1,36 +1,63 @@
 # SOP User & Admin
 
-## User
-- Buat transaksi sesuai semester aktif.
-- Jika transaksi terkunci, hubungi admin (tidak bypass).
-- Gunakan pembayaran piutang lewat menu bayar piutang agar kwitansi tercatat.
-- Untuk pencarian besar, gunakan minimal 3 huruf.
-- Untuk print piutang global/semester, gunakan menu `Piutang Global` dan `Piutang Semester`.
-- Untuk hutang supplier, gunakan filter `supplier + tahun + bulan` agar laporan lebih tepat.
+Dokumen ringkas ini menjadi penghubung ke panduan yang lebih detail.
 
-## Admin
-- Kelola permission user detail di menu Users (RBAC per aksi).
-- Lakukan koreksi transaksi hanya saat diperlukan, semua perubahan akan tercatat di audit log.
-- Gunakan filter `No dokumen` di audit log untuk telusur cepat per invoice/kwitansi/retur.
-- Tutup buku semester setelah verifikasi data akhir.
-- Tutup tahun supplier dari menu `Hutang Supplier`, bukan dari semester global.
-- Pantau `Ops Health` setelah deploy, restore drill, dan stress test.
+## Panduan yang dipakai
 
-## Koreksi transaksi aman
-1. Buka detail transaksi.
-2. Edit/batalkan (admin only).
-3. Cek mutasi piutang/hutang supplier.
-4. Cek audit log sebelum/sesudah.
-5. Jalankan integrity check bila koreksi besar.
+- User operasional:
+  - `docs/USER_TRANSACTION_GUIDE.md`
+- Admin / supervisor:
+  - `docs/ADMIN_TRANSACTION_GUIDE.md`
+- Import massal:
+  - `docs/IMPORT_MASSAL_PLAYBOOK.md`
+- Backup / Ops Health:
+  - `docs/BACKUP_OPS_HEALTH_README.md`
+- Recovery:
+  - `docs/RECOVERY_SOP.md`
 
-## Import massal
-- Download template dari modul masing-masing:
-  - Barang
-  - Customer
-  - Supplier
-  - Kategori Barang
-  - Lokasi Kirim Customer
-- Isi sesuai kolom template.
-- Import file.
-- Jika ada error, cek daftar error per baris lalu perbaiki dan import ulang.
-- Gunakan `docs/IMPORT_MASSAL_PLAYBOOK.md` saat import besar atau import transaksi.
+## Akun default setelah seed
+- Admin
+  - username: `admin`
+  - email: `admin@pgpos.local`
+  - password: `@Passwordadmin123#`
+- User
+  - username: `user`
+  - email: `user@pgpos.local`
+  - password: `@Passworduser123#`
+
+Login bisa memakai username atau email.
+
+## Ringkasan aturan user
+
+- Buat transaksi sesuai semester yang aktif.
+- Jika semester customer terkunci, jangan paksa edit. Hubungi admin.
+- Bayar piutang lewat menu `Bayar Piutang`, jangan dicatat manual di luar sistem.
+- Untuk print rekap piutang:
+  - gunakan `Piutang Global`
+  - gunakan `Piutang Semester`
+- Untuk hutang supplier, gunakan filter:
+  - `supplier`
+  - `tahun`
+  - `bulan`
+
+## Ringkasan aturan admin
+
+- Kelola hak akses user di menu `Pengguna`.
+- Koreksi transaksi sensitif lewat jalur resmi.
+- Tutup semester customer hanya setelah data diverifikasi.
+- Tutup tahun supplier dari menu `Hutang Supplier`.
+- Pantau `Ops Health`, `Audit Log`, dan backup secara rutin.
+
+## Ringkasan cepat peran
+
+### User
+- input transaksi harian
+- print/export sesuai hak akses
+- ajukan koreksi bila ada salah input
+
+### Admin
+- review data
+- koreksi / cancel transaksi
+- lock semester customer
+- lock tahun supplier
+- pantau audit, backup, dan kesehatan sistem

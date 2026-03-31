@@ -203,10 +203,10 @@
             table-layout: fixed;
         }
         .receivable-scroll-wrap.ledger table {
-            min-width: 1120px;
+            min-width: 1240px;
         }
         .receivable-scroll-wrap.bill table {
-            min-width: 1040px;
+            min-width: 1160px;
         }
         .receivable-scroll-wrap.outstanding table {
             min-width: 1120px;
@@ -361,6 +361,11 @@
                     <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
                 @endforeach
             </select>
+            <select id="receivable-transaction-type" name="transaction_type" style="max-width: 180px;">
+                <option value="">{{ __('txn.all') }}</option>
+                <option value="product" @selected(($selectedTransactionType ?? '') === 'product')>{{ __('receivable.transaction_type_product') }}</option>
+                <option value="printing" @selected(($selectedTransactionType ?? '') === 'printing')>{{ __('receivable.transaction_type_printing') }}</option>
+            </select>
             <select id="receivable-customer-id" name="customer_id" style="max-width: 180px;">
                 <option value="">{{ __('receivable.all_customers') }}</option>
                 @if($selectedCustomerId > 0 && isset($selectedCustomerOption) && $selectedCustomerOption && !$customers->contains('id', $selectedCustomerId))
@@ -390,6 +395,93 @@
                     <span style="margin-left: 6px;">|</span>
                     <span style="margin-left: 6px;" class="badge success">Aktif</span>
                 @endif
+            </div>
+        @endif
+
+        @if((auth()->user()?->role ?? '') === 'admin' && $selectedSemester && isset($semesterClosingState) && is_array($semesterClosingState))
+            <div style="margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-color, #d0d7de); border-radius: 8px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+                <div>
+                    <strong>{{ __('receivable.semester_lock_readiness_title') }}</strong><br>
+                    <span class="muted">
+                        {{ __('receivable.semester_lock_readiness_summary', [
+                            'semester' => $selectedSemester,
+                            'paid' => (int) ($semesterClosingState['paid_customer_count'] ?? 0),
+                            'total' => (int) ($semesterClosingState['customer_count'] ?? 0),
+                            'open' => (int) ($semesterClosingState['open_customer_count'] ?? 0),
+                        ]) }}
+                    </span>
+                    <div class="muted" style="margin-top: 4px;">
+                        {{ __('receivable.semester_lock_readiness_total_outstanding') }}:
+                        <strong>Rp {{ number_format((int) ($semesterClosingState['total_outstanding'] ?? 0), 0, ',', '.') }}</strong>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    @if(($semesterClosingState['ready_to_close'] ?? false) === true)
+                        <span class="badge success">{{ __('receivable.semester_lock_ready_badge') }}</span>
+                        <form method="post" action="{{ route('settings.semester.close') }}">
+                            @csrf
+                            <input type="hidden" name="semester_period" value="{{ $selectedSemester }}">
+                            <input type="hidden" name="return_to" value="{{ request()->getRequestUri() }}">
+                            <button type="submit" class="btn">{{ __('ui.semester_close_button') }}</button>
+                        </form>
+                    @elseif(($semesterClosingState['already_closed'] ?? false) === true)
+                        <span class="badge danger">{{ __('receivable.semester_lock_already_closed_badge') }}</span>
+                    @else
+                        <span class="badge warning">{{ __('receivable.semester_lock_waiting_badge') }}</span>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        @if($selectedCustomerId > 0)
+            @php
+                $selectedCustomerLabel = trim((string) ($selectedCustomerName ?? '')) !== ''
+                    ? (string) $selectedCustomerName
+                    : (($selectedCustomerOption['name'] ?? null) ?: __('receivable.customer_id').' '.$selectedCustomerId);
+            @endphp
+            <div style="margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-color, #d0d7de); border-radius: 8px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+                <div>
+                    <strong>{{ __('receivable.customer_bill_title') }}</strong><br>
+                    <span class="muted">
+                        {{ $selectedCustomerLabel }}
+                        @if($selectedSemester)
+                            | {{ $selectedSemester }}
+                        @endif
+                        @if(($selectedTransactionType ?? '') === 'product')
+                            | {{ __('receivable.transaction_type_product') }}
+                        @elseif(($selectedTransactionType ?? '') === 'printing')
+                            | {{ __('receivable.transaction_type_printing') }}
+                        @else
+                            | {{ __('txn.all') }}
+                        @endif
+                    </span>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <a
+                        class="btn info-btn"
+                        href="{{ route('receivables.print-customer-bill', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        {{ __('receivable.print_customer_bill') }}
+                    </a>
+                    <a
+                        class="btn info-btn"
+                        href="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        {{ __('receivable.save_pdf') }}
+                    </a>
+                    <a
+                        class="btn info-btn"
+                        href="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        {{ __('receivable.save_excel') }}
+                    </a>
+                </div>
             </div>
         @endif
 
@@ -494,6 +586,7 @@
                                         'customer_id' => $customer->id,
                                         'search' => $search,
                                         'semester' => $selectedSemester,
+                                        'transaction_type' => ($selectedTransactionType ?? ''),
                                     ]);
                                     $paymentUrl = route('receivable-payments.create', [
                                         'customer_id' => $customer->id,
@@ -523,7 +616,17 @@
         </div>
         <div class="col-8 receivable-col-ledger">
             <div class="card">
-                <h3>{{ __('receivable.ledger_entries') }} @if($selectedCustomerId > 0) ({{ __('receivable.customer_id') }}: {{ $selectedCustomerId }}) @endif</h3>
+                <h3>
+                    {{ __('receivable.ledger_entries') }}
+                    @if($selectedCustomerId > 0)
+                        @php
+                            $selectedCustomerLedgerLabel = trim((string) ($selectedCustomerName ?? '')) !== ''
+                                ? (string) $selectedCustomerName
+                                : (($selectedCustomerOption['name'] ?? null) ?: __('receivable.customer_id').' '.$selectedCustomerId);
+                        @endphp
+                        ({{ $selectedCustomerLedgerLabel }})
+                    @endif
+                </h3>
                 <div class="receivable-subcard">
                 
                 @if($selectedCustomerId > 0 && $ledgerRows->isNotEmpty())
@@ -546,16 +649,18 @@
                     <table class="receivable-ledger-table">
                         <colgroup>
                             <col style="width: 11%;">
-                            <col style="width: 33%;">
-                            <col style="width: 16%;">
-                            <col style="width: 16%;">
-                            <col style="width: 16%;">
+                            <col style="width: 28%;">
+                            <col style="width: 13%;">
+                            <col style="width: 14%;">
+                            <col style="width: 13%;">
+                            <col style="width: 13%;">
                             <col style="width: 8%;">
                         </colgroup>
                         <thead>
                         <tr>
                             <th>{{ __('receivable.date') }}</th>
                             <th>{{ __('receivable.description') }}</th>
+                            <th>{{ __('receivable.transaction_type') }}</th>
                             <th class="num">{{ __('receivable.debit') }}</th>
                             <th class="num">{{ __('receivable.credit') }}</th>
                             <th class="num">{{ __('receivable.balance') }}</th>
@@ -564,7 +669,7 @@
                         </thead>
                         <tbody>
                         @if($ledgerRows->isEmpty())
-                            <tr><td colspan="6" class="muted">{{ __('receivable.select_customer') }}</td></tr>
+                            <tr><td colspan="7" class="muted">{{ __('receivable.select_customer') }}</td></tr>
                         @else
                             <?php $shownPayInvoices = []; ?>
                             @foreach($ledgerRows as $row)
@@ -626,6 +731,18 @@
                                             </a>
                                         @else
                                             {{ $descriptionText !== '' ? $descriptionText : '-' }}
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @php
+                                            $rowTransactionType = trim((string) ($row->transaction_type ?? '')) !== '' ? (string) $row->transaction_type : (string) ($row->invoice?->transaction_type ?? '');
+                                        @endphp
+                                        @if($rowTransactionType === 'printing')
+                                            {{ __('receivable.transaction_type_printing') }}
+                                        @elseif($rowTransactionType === 'product')
+                                            {{ __('receivable.transaction_type_product') }}
+                                        @else
+                                            {{ __('receivable.transaction_type_none') }}
                                         @endif
                                     </td>
                                     <td class="num">
@@ -694,9 +811,9 @@
                         <div style="text-align: right;">
                         <select class="action-menu action-menu-lg" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                             <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                            <option value="{{ route('receivables.print-customer-bill', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('receivable.print_customer_bill') }}</option>
-                            <option value="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('receivable.save_pdf') }}</option>
-                            <option value="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester]) }}">{{ __('receivable.save_excel') }}</option>
+                            <option value="{{ route('receivables.print-customer-bill', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ __('receivable.print_customer_bill') }}</option>
+                            <option value="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ __('receivable.save_pdf') }}</option>
+                            <option value="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ __('receivable.save_excel') }}</option>
                         </select>
                     </div>
                     </div>
@@ -706,16 +823,18 @@
                             <table class="receivable-bill-table">
                                 <colgroup>
                                     <col style="width: 11%;">
-                                    <col style="width: 27%;">
-                                    <col style="width: 16%;">
-                                    <col style="width: 16%;">
-                                    <col style="width: 14%;">
-                                    <col style="width: 16%;">
+                                    <col style="width: 24%;">
+                                    <col style="width: 15%;">
+                                    <col style="width: 13%;">
+                                    <col style="width: 13%;">
+                                    <col style="width: 12%;">
+                                    <col style="width: 12%;">
                                 </colgroup>
                                 <thead>
                                 <tr>
                                     <th>{{ __('receivable.bill_date') }}</th>
                                     <th>{{ __('receivable.bill_proof_number') }}</th>
+                                    <th>{{ __('receivable.transaction_type') }}</th>
                                     <th class="num">{{ __('receivable.bill_credit_sales') }}</th>
                                     <th class="num">{{ __('receivable.bill_installment_payment') }}</th>
                                     <th class="num">{{ __('receivable.bill_sales_return') }}</th>
@@ -728,7 +847,7 @@
                                     @if($isOpening)
                                         <tr>
                                             <td>{{ $billRow['date_label'] ?? '' }}</td>
-                                            <td colspan="4"></td>
+                                            <td colspan="5"></td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                                         </tr>
                                     @else
@@ -748,6 +867,7 @@
                                                     </span>
                                                 @endif
                                             </td>
+                                            <td>{{ $billRow['transaction_type_label'] ?? __('receivable.transaction_type_none') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['sales_return'] ?? 0)), 0, ',', '.') }}</td>
@@ -756,14 +876,14 @@
                                     @endif
                                 @endforeach
                                 <tr style="font-weight:700;">
-                                    <td colspan="2" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
+                                    <td colspan="3" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['credit_sales'] ?? 0))), 0, ',', '.') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['installment_payment'] ?? 0))), 0, ',', '.') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['sales_return'] ?? 0))), 0, ',', '.') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>
                                 <tr style="font-weight:700;">
-                                    <td colspan="3"></td>
+                                    <td colspan="4"></td>
                                     <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>

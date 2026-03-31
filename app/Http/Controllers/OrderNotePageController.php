@@ -14,6 +14,7 @@ use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
+use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -400,6 +401,7 @@ class OrderNotePageController extends Controller
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'address' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
@@ -419,6 +421,7 @@ class OrderNotePageController extends Controller
                 'note_number' => $noteNumber,
                 'note_date' => $noteDate,
                 'customer_id' => $data['customer_id'] ?? null,
+                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT)),
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'address' => $data['address'] ?? null,
@@ -514,6 +517,7 @@ class OrderNotePageController extends Controller
             'note_date' => ['required', 'date'],
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:product,printing'],
             'address' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
@@ -533,6 +537,7 @@ class OrderNotePageController extends Controller
 
             $note->update([
                 'note_date' => $data['note_date'],
+                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $note->transaction_type)),
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'address' => $data['address'] ?? null,

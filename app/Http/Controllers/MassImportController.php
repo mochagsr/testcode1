@@ -19,6 +19,7 @@ use App\Services\AccountingService;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
+use App\Support\TransactionType;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -83,8 +84,8 @@ class MassImportController extends Controller
     public function templateSalesInvoices(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-sales-invoices.xlsx', [
-            ['customer', 'invoice_date', 'due_date', 'semester_period', 'payment_method', 'product', 'quantity', 'unit_price', 'discount', 'notes'],
-            ['Toko Sumber Ilmu', '2026-02-20', '2026-02-27', 'S2-2526', 'kredit', 'MAT1E5S12526', 10, 50000, 0, 'Import transaksi awal'],
+            ['customer', 'invoice_date', 'due_date', 'semester_period', 'transaction_type', 'payment_method', 'product', 'quantity', 'unit_price', 'discount', 'notes'],
+            ['Toko Sumber Ilmu', '2026-02-20', '2026-02-27', 'S2-2526', 'product', 'kredit', 'MAT1E5S12526', 10, 50000, 0, 'Import transaksi awal'],
         ], 'SalesInvoices');
     }
 
@@ -533,6 +534,7 @@ class MassImportController extends Controller
                     'invoice_date' => ['required', 'date'],
                     'due_date' => ['nullable', 'date'],
                     'semester_period' => ['nullable', 'string', 'max:30'],
+                    'transaction_type' => ['nullable', 'in:product,printing'],
                     'payment_method' => ['required', 'in:tunai,kredit'],
                     'product' => ['required', 'string', 'max:200'],
                     'quantity' => ['required', 'integer', 'min:1'],
@@ -584,6 +586,7 @@ class MassImportController extends Controller
                     'invoice_date' => $invoiceDate->toDateString(),
                     'due_date' => $data['due_date'] ?? null,
                     'semester_period' => (string) ($data['semester_period'] ?? ''),
+                    'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT)),
                     'subtotal' => $lineTotal,
                     'total' => $lineTotal,
                     'total_paid' => 0,
@@ -620,7 +623,8 @@ class MassImportController extends Controller
                     entryDate: $invoiceDate,
                     amount: $lineTotal,
                     periodCode: $invoice->semester_period,
-                    description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number
+                    description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number,
+                    transactionType: (string) $invoice->transaction_type
                 );
 
                 if ((string) $data['payment_method'] === 'tunai') {
@@ -642,7 +646,8 @@ class MassImportController extends Controller
                         entryDate: $invoiceDate,
                         amount: $lineTotal,
                         periodCode: $invoice->semester_period,
-                        description: __('receivable.payment_for_invoice', ['invoice' => $invoice->invoice_number])
+                        description: __('receivable.payment_for_invoice', ['invoice' => $invoice->invoice_number]),
+                        transactionType: (string) $invoice->transaction_type
                     );
                 }
 

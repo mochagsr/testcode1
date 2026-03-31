@@ -20,6 +20,7 @@
             <thead>
             <tr>
                 <th>{{ __('ui.name') }}</th>
+                <th>{{ __('ui.username') }}</th>
                 <th>{{ __('ui.email') }}</th>
                 <th>{{ __('ui.role') }}</th>
                 <th>{{ __('ui.language') }}</th>
@@ -32,6 +33,7 @@
             @forelse($users as $user)
                 <tr>
                     <td>{{ $user->name }}</td>
+                    <td>{{ $user->username }}</td>
                     <td>{{ $user->email }}</td>
                     <td>{{ strtoupper($user->role) }}</td>
                     <td>{{ strtoupper($user->locale) }}</td>
@@ -49,7 +51,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="muted">{{ __('ui.no_users') }}</td></tr>
+                <tr><td colspan="8" class="muted">{{ __('ui.no_users') }}</td></tr>
             @endforelse
             </tbody>
         </table>

@@ -23,6 +23,7 @@ class AuthFlowTest extends TestCase
     public function test_login_ignores_login_as_intended_destination_and_redirects_to_dashboard(): void
     {
         $user = User::factory()->create([
+            'username' => 'admin-example',
             'email' => 'admin@example.com',
             'password' => Hash::make('secret123'),
         ]);
@@ -30,7 +31,24 @@ class AuthFlowTest extends TestCase
         $response = $this->withSession([
             'url.intended' => route('login'),
         ])->post(route('login.post'), [
-            'email' => $user->email,
+            'login' => $user->email,
+            'password' => 'secret123',
+        ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_login_accepts_username_as_identifier(): void
+    {
+        $user = User::factory()->create([
+            'username' => 'operator-user',
+            'email' => 'operator@example.com',
+            'password' => Hash::make('secret123'),
+        ]);
+
+        $response = $this->post(route('login.post'), [
+            'login' => 'operator-user',
             'password' => 'secret123',
         ]);
 
@@ -38,4 +56,3 @@ class AuthFlowTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 }
-

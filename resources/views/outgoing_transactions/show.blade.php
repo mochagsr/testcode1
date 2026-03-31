@@ -9,6 +9,7 @@
         $canRequestCorrection = in_array('*', $resolvedPermissions, true)
             || in_array('transactions.correction.request', $resolvedPermissions, true);
         $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ $transaction->transaction_number }}</h1>
@@ -105,11 +106,11 @@
         </div>
     </div>
 
-    @if($isAdminUser)
+    @if($canEditTransactions)
         <div class="card">
             <div class="form-section">
-                <h3 class="form-section-title">{{ __('txn.admin_edit_outgoing_title') }}</h3>
-                <p class="form-section-note">Gunakan Wizard Koreksi untuk jejak approval. Edit langsung ini khusus admin untuk koreksi cepat.</p>
+                <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
+                <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
                 <form method="post" action="{{ route('outgoing-transactions.admin-update', $transaction) }}">
                     @csrf
                     @method('PUT')
@@ -231,7 +232,7 @@
         })();
     </script>
 
-    @if((auth()->user()?->role ?? '') === 'admin')
+    @if($canEditTransactions)
         <datalist id="admin-outgoing-products-list">
             @foreach($products as $product)
                 <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>

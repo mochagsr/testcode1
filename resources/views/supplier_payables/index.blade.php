@@ -284,20 +284,24 @@
                                 {{ $row->description ?: '-' }}
                                 @if($row->outgoingTransaction)
                                     @php($isOutgoingEdited = (bool) ($outgoingTransactionAdminEditedMap[(int) $row->outgoing_transaction_id] ?? false))
-                                    <div>
-                                        <a href="{{ route('outgoing-transactions.show', $row->outgoingTransaction) }}" target="_blank">{{ $row->outgoingTransaction->transaction_number }}</a>
-                                        @if($isOutgoingEdited)
-                                            <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
-                                        @endif
+                                    <div class="list-doc-cell" style="margin-top: 4px;">
+                                        <a class="list-doc-link" href="{{ route('outgoing-transactions.show', $row->outgoingTransaction) }}" target="_blank">{{ $row->outgoingTransaction->transaction_number }}</a>
+                                        <span class="list-doc-badges">
+                                            @if($isOutgoingEdited)
+                                                <span class="badge warning">{{ __('txn.admin_badge_edit') }}</span>
+                                            @endif
+                                        </span>
                                     </div>
                                 @endif
                                 @if($row->supplierPayment)
                                     @php($isPaymentEdited = (bool) ($supplierPaymentAdminEditedMap[(int) $row->supplier_payment_id] ?? false))
-                                    <div>
-                                        <a href="{{ route('supplier-payables.show-payment', $row->supplierPayment) }}" target="_blank">{{ $row->supplierPayment->payment_number }}</a>
-                                        @if($isPaymentEdited)
-                                            <span class="badge warning" style="margin-left: 6px;">{{ __('txn.admin_badge_edit') }}</span>
-                                        @endif
+                                    <div class="list-doc-cell" style="margin-top: 4px;">
+                                        <a class="list-doc-link" href="{{ route('supplier-payables.show-payment', $row->supplierPayment) }}" target="_blank">{{ $row->supplierPayment->payment_number }}</a>
+                                        <span class="list-doc-badges">
+                                            @if($isPaymentEdited)
+                                                <span class="badge warning">{{ __('txn.admin_badge_edit') }}</span>
+                                            @endif
+                                        </span>
                                     </div>
                                 @endif
                             </td>

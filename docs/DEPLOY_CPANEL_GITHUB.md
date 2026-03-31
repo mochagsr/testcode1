@@ -300,10 +300,14 @@ php artisan optimize:clear
 Jika kamu menjalankan `db:seed`, user awal:
 
 - admin:
+  - username: `admin`
   - email: `admin@pgpos.local`
-  - password: `admin12345`
+  - password: `@Passwordadmin123#`
 - user:
+  - username: `user`
   - email: `user@pgpos.local`
-  - password: `user12345`
+  - password: `@Passworduser123#`
+
+Login bisa memakai username atau email.
 
 Sebaiknya langsung ganti password setelah login pertama.

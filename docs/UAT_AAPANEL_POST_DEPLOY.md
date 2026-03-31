@@ -1,6 +1,27 @@
-# UAT aaPanel Post-Deploy
+# UAT aaPanel v8.0.1 Post-Deploy
 
 Gunakan checklist ini setiap selesai deploy ke environment `tes` sebelum update diteruskan ke `prod`.
+
+Menu aaPanel yang paling sering dipakai saat UAT:
+- `Website`
+- `Terminal`
+- `Cron`
+- `Databases`
+- `Files`
+
+## Akun default untuk uji login
+- Admin
+  - username: `admin`
+  - email: `admin@pgpos.local`
+  - password: `@Passwordadmin123#`
+- User
+  - username: `user`
+  - email: `user@pgpos.local`
+  - password: `@Passworduser123#`
+
+Gunakan salah satu:
+- username + password
+- atau email + password
 
 ## 1. Sanity check awal
 - Buka halaman login.
@@ -14,6 +35,10 @@ Gunakan checklist ini setiap selesai deploy ke environment `tes` sebelum update 
 - `Ops Health` menampilkan environment dan DB yang benar.
 - `Debug Mode` harus `OFF`.
 - Jalankan `php artisan app:smoke-test` dan pastikan tidak ada status `FAIL`.
+- Di aaPanel, cek juga:
+  - site aktif di `Website`
+  - `PHP 8.3` aktif
+  - `Running directory = public`
 
 ## 3. Master data
 - Buka `Barang`, `Customer`, `Supplier`, `Kategori Barang`.
@@ -70,10 +95,22 @@ Gunakan checklist ini setiap selesai deploy ke environment `tes` sebelum update 
 
 ## 10. Backup dan guardrail
 - Jalankan:
-  - `php artisan app:db-backup --gzip`
+  - `php artisan app:db-backup`
+  - `php artisan app:db-restore-test`
   - `php artisan app:integrity-check`
   - `php artisan app:load-test-light --loops=80 --search=ang`
 - Cek hasilnya di `Ops Health`.
+
+## 11. Contoh command UAT singkat
+
+```bash
+cd /www/wwwroot/pgpos-tes
+php artisan app:smoke-test
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
+```
 
 ## Exit criteria
 - Tidak ada error besar.

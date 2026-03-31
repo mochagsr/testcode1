@@ -26,6 +26,7 @@
         $isCreditSemesterLocked = $isCreditReceivableTransaction && $isCustomerSemesterLocked;
         $requiresAdminToEdit = $isPaidTransactionLocked || $isCreditSemesterLocked;
         $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
         $adminProducts = $products->map(function ($product): array {
             return [
                 'id' => (int) $product->id,
@@ -69,7 +70,7 @@
         <div class="flex">
             <a class="btn secondary" href="{{ route('sales-invoices.index') }}">{{ __('txn.back') }}</a>
             <a class="btn warning-btn" href="{{ route('transaction-corrections.create', ['type' => 'sales_invoice', 'id' => $invoice->id]) }}">Wizard Koreksi</a>
-            @if($isAdminUser)
+            @if($canEditTransactions)
                 <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @elseif($requiresAdminToEdit)
                 <button type="button" class="btn warning-btn" onclick="alert(@js(__('txn.contact_admin_to_edit_locked')))">{{ __('txn.edit_transaction') }}</button>
@@ -221,7 +222,7 @@
         </div>
     </div>
 
-    @if($isAdminUser)
+    @if($canEditTransactions)
         <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
             <div class="card txn-modal-card" id="admin-edit-transaction">
                 <div class="form-section">
@@ -229,7 +230,7 @@
                         <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
                         <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
                     </div>
-                    <p class="form-section-note">{{ __('txn.edit_transaction') }}</p>
+                    <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
                     @if($invoice->is_canceled)
                         <p class="muted">{{ __('txn.canceled_info') }}: {{ $invoice->cancel_reason ?: '-' }}</p>
                     @endif
@@ -257,6 +258,13 @@
                             <select name="payment_method">
                                 <option value="tunai" @selected(old('payment_method', $currentPaymentMethod) === 'tunai')>{{ __('txn.cash') }}</option>
                                 <option value="kredit" @selected(old('payment_method', $currentPaymentMethod) === 'kredit')>{{ __('txn.credit') }}</option>
+                            </select>
+                        </div>
+                        <div class="col-3">
+                            <label>{{ __('txn.transaction_type') }}</label>
+                            <select name="transaction_type">
+                                <option value="product" @selected(old('transaction_type', $invoice->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
+                                <option value="printing" @selected(old('transaction_type', $invoice->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
                             </select>
                         </div>
                         <div class="col-12">
