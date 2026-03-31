@@ -30,6 +30,8 @@ class SalesInvoice extends Model
         'due_date',
         'semester_period',
         'transaction_type',
+        'customer_printing_subtype_id',
+        'printing_subtype_name',
         'subtotal',
         'total',
         'total_paid',
@@ -104,6 +106,11 @@ class SalesInvoice extends Model
         return $this->belongsTo(OrderNote::class, 'order_note_id');
     }
 
+    public function printingSubtype(): BelongsTo
+    {
+        return $this->belongsTo(CustomerPrintingSubtype::class, 'customer_printing_subtype_id');
+    }
+
     /**
      * @return HasMany<SalesInvoiceItem, $this>
      */
@@ -136,6 +143,7 @@ class SalesInvoice extends Model
             'invoice_date',
             'semester_period',
             'transaction_type',
+            'printing_subtype_name',
             'total',
             'total_paid',
             'balance',

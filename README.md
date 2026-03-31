@@ -10,10 +10,20 @@ ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
 ## Tipe transaksi customer
 - Ada field baru: `Tipe Transaksi`
 - Opsi:
-  - `Produk Toko`
-  - `Cetakan`
+  - `Produk`
+  - `Cetak`
 - Default:
-  - `Produk Toko`
+  - `Produk`
+- Kalau pilih `Cetak`, muncul field tambahan:
+  - `Subjenis Cetak`
+- Contoh `Subjenis Cetak`:
+  - `LKS`
+  - `KBR`
+  - `Buku Cerita`
+- `Subjenis Cetak` dikunci per customer
+  - jadi daftar customer A bisa berbeda dengan customer B
+  - list dropdown tetap pendek dan tidak tercampur semua customer
+- jika subjenis belum ada, bisa tambah langsung saat input transaksi
 - Dipakai di:
   - `Surat Pesanan`
   - `Faktur Penjualan`
@@ -23,7 +33,8 @@ ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
 - Catatan:
   - field ini dipilih di form transaksi
   - field ini tidak ditampilkan di header print dokumen transaksi
-  - field ini dipakai untuk memisahkan analisa transaksi customer antara penjualan produk toko dan pekerjaan cetak
+  - field ini dipakai untuk memisahkan analisa transaksi customer antara penjualan produk dan pekerjaan cetak
+  - di menu `Piutang`, `Subjenis Cetak` ikut tampil di mutasi, tagihan, print, PDF, dan Excel
 
 ## Quick start
 1. `composer install`

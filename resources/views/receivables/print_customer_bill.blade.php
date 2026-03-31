@@ -115,18 +115,19 @@
         <thead>
         <tr>
             <th style="width: 12%;">{{ __('receivable.bill_date') }}</th>
-            <th style="width: 26%;">{{ __('receivable.bill_proof_number') }}</th>
+            <th style="width: 24%;">{{ __('receivable.bill_proof_number') }}</th>
             <th style="width: 12%;">{{ __('receivable.transaction_type') }}</th>
-            <th style="width: 12%;">{{ __('receivable.bill_credit_sales') }}</th>
-            <th style="width: 12%;">{{ __('receivable.bill_installment_payment') }}</th>
-            <th style="width: 12%;">{{ __('receivable.bill_sales_return') }}</th>
-            <th style="width: 14%;">{{ __('receivable.bill_running_balance') }}</th>
+            <th style="width: 12%;">{{ __('receivable.printing_subtype') }}</th>
+            <th style="width: 10%;">{{ __('receivable.bill_credit_sales') }}</th>
+            <th style="width: 10%;">{{ __('receivable.bill_installment_payment') }}</th>
+            <th style="width: 10%;">{{ __('receivable.bill_sales_return') }}</th>
+            <th style="width: 10%;">{{ __('receivable.bill_running_balance') }}</th>
         </tr>
         </thead>
         <tbody>
         @if($rows->isEmpty())
             <tr>
-                <td colspan="7">{{ __('receivable.no_outstanding_invoices') }}</td>
+                <td colspan="8">{{ __('receivable.no_outstanding_invoices') }}</td>
             </tr>
         @else
             @foreach($rows as $row)
@@ -134,7 +135,7 @@
                 @if($isOpening)
                     <tr>
                         <td>{{ $row['date_label'] ?? '' }}</td>
-                        <td colspan="5"></td>
+                        <td colspan="6"></td>
                         <td class="num">Rp {{ number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                     </tr>
                 @else
@@ -150,6 +151,7 @@
                             @endif
                         </td>
                         <td>{{ $row['transaction_type_label'] ?? __('receivable.transaction_type_none') }}</td>
+                        <td>{{ ($row['printing_subtype_name'] ?? null) ? $row['printing_subtype_name'] : __('receivable.printing_subtype_none') }}</td>
                         <td class="num">Rp {{ number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
                         <td class="num">Rp {{ number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
                         <td class="num">Rp {{ number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.') }}</td>
@@ -163,6 +165,7 @@
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
+                <td>&nbsp;</td>
                 <td class="num">&nbsp;</td>
                 <td class="num">&nbsp;</td>
                 <td class="num">&nbsp;</td>
@@ -170,14 +173,14 @@
             </tr>
         @endfor
         <tr class="total-row">
-            <td colspan="3" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
+            <td colspan="4" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
             <td class="num">Rp {{ number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
             <td class="num">Rp {{ number_format((int) round((float) ($totals['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
             <td class="num">Rp {{ number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.') }}</td>
             <td class="num">Rp {{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
         </tr>
         <tr class="total-balance-row">
-            <td colspan="4"></td>
+            <td colspan="5"></td>
             <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
             <td class="num">Rp {{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
         </tr>

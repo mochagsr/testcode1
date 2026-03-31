@@ -48,8 +48,16 @@ return [
     'report' => 'Report',
     'type' => 'Type',
     'transaction_type' => 'Transaction Type',
-    'transaction_type_product' => 'Retail Product',
-    'transaction_type_printing' => 'Printing',
+    'transaction_type_product' => 'Product',
+    'transaction_type_printing' => 'Print',
+    'printing_subtype' => 'Print Subtype',
+    'printing_subtype_select' => 'Select print subtype',
+    'printing_subtype_add' => 'Add Subtype',
+    'printing_subtype_add_prompt' => 'Enter a new print subtype name',
+    'printing_subtype_add_failed' => 'Failed to add print subtype.',
+    'printing_subtype_customer_first' => 'Select a customer first to see available print subtypes.',
+    'printing_subtype_only_for_print' => 'Print subtype is only used when transaction type = Print.',
+    'invalid_printing_subtype' => 'Print subtype does not match the selected customer.',
     'action' => 'Action',
     'action_menu' => 'Select Menu',
     'date' => 'Date',
@@ -254,4 +262,5 @@ return [
     'supplier_semester_opened_success' => 'Year :semester for supplier :supplier has been reopened.',
     'supplier_semester_closed_error' => 'Year :semester for this supplier is closed. New goods receipts are not allowed.',
 ];
+
 

@@ -49,11 +49,19 @@
                     </div>
                     <div class="col-4">
                         <label>{{ __('txn.transaction_type') }}</label>
-                        <select name="transaction_type">
+                        <select id="return-transaction-type" name="transaction_type">
                             <option value="product" @selected(old('transaction_type', 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
                             <option value="printing" @selected(old('transaction_type') === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
                         </select>
                     </div>
+                    @include('partials.printing_subtype_fields', [
+                        'customerFieldId' => 'customer-id',
+                        'transactionTypeFieldId' => 'return-transaction-type',
+                        'subtypeFieldId' => 'return-printing-subtype-id',
+                        'selectedSubtypeId' => old('customer_printing_subtype_id'),
+                        'selectedSubtypeName' => old('printing_subtype_name'),
+                        'colClass' => 'col-4',
+                    ])
                     <div class="col-12">
                         <label>{{ __('txn.reason') }}</label>
                         <textarea name="reason" rows="2">{{ old('reason') }}</textarea>
@@ -499,4 +507,5 @@
             <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
         @endforeach
     </datalist>
+    @include('partials.printing_subtype_script')
 @endsection

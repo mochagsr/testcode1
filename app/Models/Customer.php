@@ -97,6 +97,11 @@ class Customer extends Model
         return $this->hasMany(CustomerShipLocation::class)->orderBy('school_name');
     }
 
+    public function printingSubtypes(): HasMany
+    {
+        return $this->hasMany(CustomerPrintingSubtype::class)->orderBy('name');
+    }
+
     /**
      * @return HasMany<SchoolBulkTransaction, $this>
      */

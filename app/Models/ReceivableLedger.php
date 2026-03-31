@@ -22,6 +22,8 @@ class ReceivableLedger extends Model
         'entry_date',
         'period_code',
         'transaction_type',
+        'customer_printing_subtype_id',
+        'printing_subtype_name',
         'description',
         'debit',
         'credit',
@@ -57,6 +59,11 @@ class ReceivableLedger extends Model
         return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id');
     }
 
+    public function printingSubtype(): BelongsTo
+    {
+        return $this->belongsTo(CustomerPrintingSubtype::class, 'customer_printing_subtype_id');
+    }
+
     /**
      * Scope: Order by date (newest first by default).
      *
@@ -88,7 +95,7 @@ class ReceivableLedger extends Model
      */
     public function scopeWithInvoiceInfo(Builder $query): Builder
     {
-        return $query->with('invoice:id,invoice_number,customer_id,balance,total');
+        return $query->with('invoice:id,invoice_number,customer_id,balance,total,transaction_type,printing_subtype_name');
     }
 
     /**

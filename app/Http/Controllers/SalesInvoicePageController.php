@@ -19,6 +19,7 @@ use App\Services\ReceivableLedgerService;
 use App\Services\AuditLogService;
 use App\Services\AccountingService;
 use App\Support\AppCache;
+use App\Support\CustomerPrintingSubtypeResolver;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use App\Support\TransactionType;
@@ -260,6 +261,7 @@ class SalesInvoicePageController extends Controller
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
             'transaction_type' => ['nullable', 'in:product,printing'],
+            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
             'notes' => ['nullable', 'string'],
             'payment_method' => ['required', 'in:tunai,kredit'],
             'items' => ['required', 'array', 'min:1'],
@@ -273,8 +275,13 @@ class SalesInvoicePageController extends Controller
         $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['invoice_date']);
         $selectedSemester = $normalizedSemester ?? $semesterFromDate ?? $this->defaultSemesterPeriod();
         $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
+        $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
+            customerId: (int) $data['customer_id'],
+            transactionType: $selectedTransactionType,
+            subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
+        );
 
-        $invoice = DB::transaction(function () use ($data, $selectedSemester, $selectedTransactionType): SalesInvoice {
+        $invoice = DB::transaction(function () use ($data, $selectedSemester, $selectedTransactionType, $printingSubtype): SalesInvoice {
             $invoiceDate = Carbon::parse($data['invoice_date']);
             $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
             $rows = collect($data['items']);
@@ -398,6 +405,8 @@ class SalesInvoicePageController extends Controller
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $selectedSemester,
                 'transaction_type' => $selectedTransactionType,
+                'customer_printing_subtype_id' => $printingSubtype['id'],
+                'printing_subtype_name' => $printingSubtype['name'],
                 'subtotal' => $subtotal,
                 'total' => $subtotal,
                 'total_paid' => 0,
@@ -446,7 +455,9 @@ class SalesInvoicePageController extends Controller
                 amount: $subtotal,
                 periodCode: $invoice->semester_period,
                 description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number,
-                transactionType: (string) $invoice->transaction_type
+                transactionType: (string) $invoice->transaction_type,
+                printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                printingSubtypeName: $invoice->printing_subtype_name,
             );
 
             $initialPayment = $data['payment_method'] === 'tunai' ? (float) $invoice->total : 0.0;
@@ -475,7 +486,9 @@ class SalesInvoicePageController extends Controller
                     description: __('receivable.payment_for_invoice', [
                         'invoice' => $invoice->invoice_number,
                     ]),
-                    transactionType: (string) $invoice->transaction_type
+                    transactionType: (string) $invoice->transaction_type,
+                    printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                    printingSubtypeName: $invoice->printing_subtype_name,
                 );
             }
 
@@ -516,7 +529,9 @@ class SalesInvoicePageController extends Controller
                     description: __('txn.customer_balance_applied_for_invoice', [
                         'invoice' => $invoice->invoice_number,
                     ]),
-                    transactionType: (string) $invoice->transaction_type
+                    transactionType: (string) $invoice->transaction_type,
+                    printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                    printingSubtypeName: $invoice->printing_subtype_name,
                 );
             }
 
@@ -625,6 +640,7 @@ class SalesInvoicePageController extends Controller
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
             'transaction_type' => ['nullable', 'in:product,printing'],
+            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
             'payment_method' => ['nullable', 'in:tunai,kredit'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -682,6 +698,11 @@ class SalesInvoicePageController extends Controller
                     }) ? 'tunai' : 'kredit'
                 );
             $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $invoice->transaction_type));
+            $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
+                customerId: (int) $invoice->customer_id,
+                transactionType: $selectedTransactionType,
+                subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
+            );
             $auditBefore = $invoice->items
                 ->map(fn(SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
                 ->implode(' | ');
@@ -907,6 +928,8 @@ class SalesInvoicePageController extends Controller
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $data['semester_period'] ?? null,
                 'transaction_type' => $selectedTransactionType,
+                'customer_printing_subtype_id' => $printingSubtype['id'],
+                'printing_subtype_name' => $printingSubtype['name'],
                 'notes' => $data['notes'] ?? null,
                 'subtotal' => $subtotal,
                 'total' => $subtotal,
@@ -925,6 +948,8 @@ class SalesInvoicePageController extends Controller
                     periodCode: $invoice->semester_period,
                     description: __('txn.admin_invoice_edit_ledger_increase', ['invoice' => $invoice->invoice_number]),
                     transactionType: (string) $invoice->transaction_type,
+                    printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                    printingSubtypeName: $invoice->printing_subtype_name,
                 );
             } elseif ($balanceDifference < 0) {
                 $this->receivableLedgerService->addCredit(
@@ -935,6 +960,8 @@ class SalesInvoicePageController extends Controller
                     periodCode: $invoice->semester_period,
                     description: __('txn.admin_invoice_edit_ledger_decrease', ['invoice' => $invoice->invoice_number]),
                     transactionType: (string) $invoice->transaction_type,
+                    printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                    printingSubtypeName: $invoice->printing_subtype_name,
                 );
             }
         });
@@ -1002,7 +1029,7 @@ class SalesInvoicePageController extends Controller
             }
 
             $openBalance = max(0, (float) $invoice->balance);
-            if ($openBalance > 0) {
+                if ($openBalance > 0) {
                 $this->receivableLedgerService->addCredit(
                     customerId: (int) $invoice->customer_id,
                     invoiceId: (int) $invoice->id,
@@ -1011,6 +1038,8 @@ class SalesInvoicePageController extends Controller
                     periodCode: $invoice->semester_period,
                     description: __('txn.admin_invoice_cancel_ledger_note', ['invoice' => $invoice->invoice_number]),
                     transactionType: (string) $invoice->transaction_type,
+                    printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                    printingSubtypeName: $invoice->printing_subtype_name,
                 );
             }
 

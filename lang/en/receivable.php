@@ -18,9 +18,11 @@ return [
     'date' => 'Date',
     'description' => 'Description',
     'transaction_type' => 'Transaction Type',
+    'printing_subtype' => 'Print Subtype',
+    'printing_subtype_none' => '-',
     'transaction_type_none' => '-',
-    'transaction_type_product' => 'Retail Product',
-    'transaction_type_printing' => 'Printing',
+    'transaction_type_product' => 'Product',
+    'transaction_type_printing' => 'Print',
     'debit' => 'Debit',
     'credit' => 'Credit',
     'total_debit' => 'Total Debit',
@@ -160,3 +162,4 @@ return [
     'default_billing_note' => "For orders and complaints, please contact the company number directly.\nReturns are limited to 10% of total delivery.",
     'default_transfer_accounts' => "BCA : 0110989806 a/n Marimin\nBRI : 124701000187568 a/n Marimin\nMANDIRI : 144.00.1327809.5 a/n Sumarni",
 ];
+

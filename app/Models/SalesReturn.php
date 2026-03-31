@@ -26,6 +26,8 @@ class SalesReturn extends Model
         'return_date',
         'semester_period',
         'transaction_type',
+        'customer_printing_subtype_id',
+        'printing_subtype_name',
         'total',
         'reason',
         'is_canceled',
@@ -64,6 +66,11 @@ class SalesReturn extends Model
         return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id');
     }
 
+    public function printingSubtype(): BelongsTo
+    {
+        return $this->belongsTo(CustomerPrintingSubtype::class, 'customer_printing_subtype_id');
+    }
+
     /**
      * @return HasMany<SalesReturnItem, $this>
      */
@@ -88,6 +95,7 @@ class SalesReturn extends Model
             'return_date',
             'semester_period',
             'transaction_type',
+            'printing_subtype_name',
             'total',
             'is_canceled',
         ]);

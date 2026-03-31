@@ -29,7 +29,9 @@ final class ReceivableLedgerService
         float $amount,
         ?string $periodCode,
         ?string $description,
-        ?string $transactionType = null
+        ?string $transactionType = null,
+        ?int $printingSubtypeId = null,
+        ?string $printingSubtypeName = null
     ): ReceivableLedger {
         $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
         $current = $this->currentOutstandingFromLedger($customerId);
@@ -43,6 +45,8 @@ final class ReceivableLedgerService
             'entry_date' => $entryDate->toDateString(),
             'period_code' => $periodCode,
             'transaction_type' => $transactionType !== null ? TransactionType::normalize($transactionType) : null,
+            'customer_printing_subtype_id' => $printingSubtypeId,
+            'printing_subtype_name' => $printingSubtypeName !== null ? trim($printingSubtypeName) : null,
             'description' => $description,
             'debit' => $amount,
             'credit' => 0,
@@ -72,7 +76,9 @@ final class ReceivableLedgerService
         float $amount,
         ?string $periodCode,
         ?string $description,
-        ?string $transactionType = null
+        ?string $transactionType = null,
+        ?int $printingSubtypeId = null,
+        ?string $printingSubtypeName = null
     ): ReceivableLedger {
         $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
         $current = $this->currentOutstandingFromLedger($customerId);
@@ -86,6 +92,8 @@ final class ReceivableLedgerService
             'entry_date' => $entryDate->toDateString(),
             'period_code' => $periodCode,
             'transaction_type' => $transactionType !== null ? TransactionType::normalize($transactionType) : null,
+            'customer_printing_subtype_id' => $printingSubtypeId,
+            'printing_subtype_name' => $printingSubtypeName !== null ? trim($printingSubtypeName) : null,
             'description' => $description,
             'debit' => 0,
             'credit' => $amount,

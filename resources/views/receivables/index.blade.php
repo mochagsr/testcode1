@@ -649,11 +649,12 @@
                     <table class="receivable-ledger-table">
                         <colgroup>
                             <col style="width: 11%;">
-                            <col style="width: 28%;">
-                            <col style="width: 13%;">
-                            <col style="width: 14%;">
-                            <col style="width: 13%;">
-                            <col style="width: 13%;">
+                            <col style="width: 24%;">
+                            <col style="width: 11%;">
+                            <col style="width: 12%;">
+                            <col style="width: 12%;">
+                            <col style="width: 11%;">
+                            <col style="width: 11%;">
                             <col style="width: 8%;">
                         </colgroup>
                         <thead>
@@ -661,6 +662,7 @@
                             <th>{{ __('receivable.date') }}</th>
                             <th>{{ __('receivable.description') }}</th>
                             <th>{{ __('receivable.transaction_type') }}</th>
+                            <th>{{ __('receivable.printing_subtype') }}</th>
                             <th class="num">{{ __('receivable.debit') }}</th>
                             <th class="num">{{ __('receivable.credit') }}</th>
                             <th class="num">{{ __('receivable.balance') }}</th>
@@ -669,7 +671,7 @@
                         </thead>
                         <tbody>
                         @if($ledgerRows->isEmpty())
-                            <tr><td colspan="7" class="muted">{{ __('receivable.select_customer') }}</td></tr>
+                            <tr><td colspan="8" class="muted">{{ __('receivable.select_customer') }}</td></tr>
                         @else
                             <?php $shownPayInvoices = []; ?>
                             @foreach($ledgerRows as $row)
@@ -736,6 +738,7 @@
                                     <td>
                                         @php
                                             $rowTransactionType = trim((string) ($row->transaction_type ?? '')) !== '' ? (string) $row->transaction_type : (string) ($row->invoice?->transaction_type ?? '');
+                                            $rowPrintingSubtype = trim((string) ($row->printing_subtype_name ?? '')) !== '' ? trim((string) $row->printing_subtype_name) : trim((string) ($row->invoice?->printing_subtype_name ?? ''));
                                         @endphp
                                         @if($rowTransactionType === 'printing')
                                             {{ __('receivable.transaction_type_printing') }}
@@ -745,6 +748,7 @@
                                             {{ __('receivable.transaction_type_none') }}
                                         @endif
                                     </td>
+                                    <td>{{ $rowPrintingSubtype !== '' ? $rowPrintingSubtype : __('receivable.printing_subtype_none') }}</td>
                                     <td class="num">
                                         @if($row->debit > 0)
                                             Rp {{ number_format((int) round($row->debit), 0, ',', '.') }}
@@ -823,18 +827,20 @@
                             <table class="receivable-bill-table">
                                 <colgroup>
                                     <col style="width: 11%;">
-                                    <col style="width: 24%;">
-                                    <col style="width: 15%;">
+                                    <col style="width: 22%;">
                                     <col style="width: 13%;">
                                     <col style="width: 13%;">
                                     <col style="width: 12%;">
-                                    <col style="width: 12%;">
+                                    <col style="width: 10%;">
+                                    <col style="width: 10%;">
+                                    <col style="width: 9%;">
                                 </colgroup>
                                 <thead>
                                 <tr>
                                     <th>{{ __('receivable.bill_date') }}</th>
                                     <th>{{ __('receivable.bill_proof_number') }}</th>
                                     <th>{{ __('receivable.transaction_type') }}</th>
+                                    <th>{{ __('receivable.printing_subtype') }}</th>
                                     <th class="num">{{ __('receivable.bill_credit_sales') }}</th>
                                     <th class="num">{{ __('receivable.bill_installment_payment') }}</th>
                                     <th class="num">{{ __('receivable.bill_sales_return') }}</th>
@@ -847,7 +853,7 @@
                                     @if($isOpening)
                                         <tr>
                                             <td>{{ $billRow['date_label'] ?? '' }}</td>
-                                            <td colspan="5"></td>
+                                            <td colspan="6"></td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                                         </tr>
                                     @else
@@ -868,6 +874,7 @@
                                                 @endif
                                             </td>
                                             <td>{{ $billRow['transaction_type_label'] ?? __('receivable.transaction_type_none') }}</td>
+                                            <td>{{ ($billRow['printing_subtype_name'] ?? null) ? $billRow['printing_subtype_name'] : __('receivable.printing_subtype_none') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['sales_return'] ?? 0)), 0, ',', '.') }}</td>
@@ -876,14 +883,14 @@
                                     @endif
                                 @endforeach
                                 <tr style="font-weight:700;">
-                                    <td colspan="3" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
+                                    <td colspan="4" style="text-align:center;">{{ __('receivable.bill_total') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['credit_sales'] ?? 0))), 0, ',', '.') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['installment_payment'] ?? 0))), 0, ',', '.') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['sales_return'] ?? 0))), 0, ',', '.') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>
                                 <tr style="font-weight:700;">
-                                    <td colspan="4"></td>
+                                    <td colspan="5"></td>
                                     <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>

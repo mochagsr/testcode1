@@ -144,11 +144,20 @@
                     </div>
                     <div class="col-4">
                         <label>{{ __('txn.transaction_type') }}</label>
-                        <select name="transaction_type">
+                        <select id="admin-delivery-note-transaction-type" name="transaction_type">
                             <option value="product" @selected(old('transaction_type', $note->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
                             <option value="printing" @selected(old('transaction_type', $note->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
                         </select>
                     </div>
+                    <input type="hidden" id="admin-delivery-note-customer-id" value="{{ (int) $note->customer_id }}">
+                    @include('partials.printing_subtype_fields', [
+                        'customerFieldId' => 'admin-delivery-note-customer-id',
+                        'transactionTypeFieldId' => 'admin-delivery-note-transaction-type',
+                        'subtypeFieldId' => 'admin-delivery-note-printing-subtype-id',
+                        'selectedSubtypeId' => old('customer_printing_subtype_id', $note->customer_printing_subtype_id),
+                        'selectedSubtypeName' => old('printing_subtype_name', $note->printing_subtype_name),
+                        'colClass' => 'col-4',
+                    ])
                     <div class="col-12">
                         <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
                             <strong>{{ __('txn.items') }}</strong>
@@ -526,5 +535,6 @@
                 });
             })();
         </script>
+        @include('partials.printing_subtype_script')
     @endif
 @endsection

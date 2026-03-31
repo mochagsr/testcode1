@@ -16,6 +16,7 @@ use App\Services\AuditLogService;
 use App\Services\AccountingService;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
+use App\Support\CustomerPrintingSubtypeResolver;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use App\Support\TransactionType;
@@ -250,6 +251,7 @@ class SalesReturnPageController extends Controller
             'return_date' => ['required', 'date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
             'transaction_type' => ['nullable', 'in:product,printing'],
+            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
             'reason' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -259,8 +261,13 @@ class SalesReturnPageController extends Controller
         $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['return_date']);
         $selectedSemester = $normalizedSemester ?? $semesterFromDate ?? $this->defaultSemesterPeriod();
         $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
+        $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
+            customerId: (int) $data['customer_id'],
+            transactionType: $selectedTransactionType,
+            subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
+        );
 
-        $salesReturn = DB::transaction(function () use ($data, $selectedSemester, $selectedTransactionType): SalesReturn {
+        $salesReturn = DB::transaction(function () use ($data, $selectedSemester, $selectedTransactionType, $printingSubtype): SalesReturn {
             $returnDate = Carbon::parse($data['return_date']);
             $returnNumber = $this->generateReturnNumber($returnDate->toDateString());
             $rows = collect($data['items']);
@@ -305,6 +312,8 @@ class SalesReturnPageController extends Controller
                 'return_date' => $returnDate->toDateString(),
                 'semester_period' => $selectedSemester,
                 'transaction_type' => $selectedTransactionType,
+                'customer_printing_subtype_id' => $printingSubtype['id'],
+                'printing_subtype_name' => $printingSubtype['name'],
                 'total' => (float) round($total),
                 'reason' => $data['reason'] ?? null,
             ]);
@@ -343,7 +352,9 @@ class SalesReturnPageController extends Controller
                 amount: $total,
                 periodCode: $salesReturn->semester_period,
                 description: __('txn.return') . ' ' . $salesReturn->return_number,
-                transactionType: (string) $salesReturn->transaction_type
+                transactionType: (string) $salesReturn->transaction_type,
+                printingSubtypeId: $salesReturn->customer_printing_subtype_id ? (int) $salesReturn->customer_printing_subtype_id : null,
+                printingSubtypeName: $salesReturn->printing_subtype_name,
             );
 
             $this->accountingService->postSalesReturn(
@@ -424,6 +435,7 @@ class SalesReturnPageController extends Controller
             'return_date' => ['required', 'date'],
             'semester_period' => ['nullable', 'string', 'max:30'],
             'transaction_type' => ['nullable', 'in:product,printing'],
+            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
             'reason' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -449,6 +461,12 @@ class SalesReturnPageController extends Controller
 
             $rows = collect($data['items'] ?? []);
             $oldTotal = (float) $return->total;
+            $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $return->transaction_type));
+            $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
+                customerId: (int) $return->customer_id,
+                transactionType: $selectedTransactionType,
+                subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
+            );
             $auditBefore = $return->items
                 ->map(fn(SalesReturnItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
                 ->implode(' | ');
@@ -583,7 +601,9 @@ class SalesReturnPageController extends Controller
             $return->update([
                 'return_date' => $data['return_date'],
                 'semester_period' => $data['semester_period'] ?? null,
-                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $return->transaction_type)),
+                'transaction_type' => $selectedTransactionType,
+                'customer_printing_subtype_id' => $printingSubtype['id'],
+                'printing_subtype_name' => $printingSubtype['name'],
                 'reason' => $data['reason'] ?? null,
                 'total' => (float) round($total),
             ]);
@@ -599,6 +619,8 @@ class SalesReturnPageController extends Controller
                     description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " +] "
                         . __('txn.return') . ' ' . $return->return_number,
                     transactionType: (string) $return->transaction_type,
+                    printingSubtypeId: $return->customer_printing_subtype_id ? (int) $return->customer_printing_subtype_id : null,
+                    printingSubtypeName: $return->printing_subtype_name,
                 );
             } elseif ($difference < 0) {
                 $this->receivableLedgerService->addDebit(
@@ -610,6 +632,8 @@ class SalesReturnPageController extends Controller
                     description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " -] "
                         . __('txn.return') . ' ' . $return->return_number,
                     transactionType: (string) $return->transaction_type,
+                    printingSubtypeId: $return->customer_printing_subtype_id ? (int) $return->customer_printing_subtype_id : null,
+                    printingSubtypeName: $return->printing_subtype_name,
                 );
             }
         });
@@ -692,6 +716,8 @@ class SalesReturnPageController extends Controller
                     periodCode: $return->semester_period,
                     description: __('txn.cancel_return_ledger_note', ['number' => $return->return_number]),
                     transactionType: (string) $return->transaction_type,
+                    printingSubtypeId: $return->customer_printing_subtype_id ? (int) $return->customer_printing_subtype_id : null,
+                    printingSubtypeName: $return->printing_subtype_name,
                 );
             }
 

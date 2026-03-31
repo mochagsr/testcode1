@@ -12,6 +12,7 @@ use App\Models\OrderNoteItem;
 use App\Models\Product;
 use App\Services\AuditLogService;
 use App\Support\AppCache;
+use App\Support\CustomerPrintingSubtypeResolver;
 use App\Support\ExcelExportStyler;
 use App\Support\SemesterBookService;
 use App\Support\TransactionType;
@@ -402,6 +403,7 @@ class OrderNotePageController extends Controller
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
             'transaction_type' => ['nullable', 'in:product,printing'],
+            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
             'address' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
@@ -413,7 +415,14 @@ class OrderNotePageController extends Controller
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
-        $note = DB::transaction(function () use ($data): OrderNote {
+        $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
+        $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
+            customerId: isset($data['customer_id']) ? (int) $data['customer_id'] : null,
+            transactionType: $selectedTransactionType,
+            subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
+        );
+
+        $note = DB::transaction(function () use ($data, $selectedTransactionType, $printingSubtype): OrderNote {
             $noteDate = $data['note_date'];
             $noteNumber = $this->generateNoteNumber($noteDate);
 
@@ -421,7 +430,9 @@ class OrderNotePageController extends Controller
                 'note_number' => $noteNumber,
                 'note_date' => $noteDate,
                 'customer_id' => $data['customer_id'] ?? null,
-                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT)),
+                'transaction_type' => $selectedTransactionType,
+                'customer_printing_subtype_id' => $printingSubtype['id'],
+                'printing_subtype_name' => $printingSubtype['name'],
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'address' => $data['address'] ?? null,
@@ -518,6 +529,7 @@ class OrderNotePageController extends Controller
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
             'transaction_type' => ['nullable', 'in:product,printing'],
+            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
             'address' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
@@ -534,10 +546,18 @@ class OrderNotePageController extends Controller
                 ->whereKey($orderNote->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+            $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $note->transaction_type));
+            $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
+                customerId: (int) ($note->customer_id ?? 0),
+                transactionType: $selectedTransactionType,
+                subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
+            );
 
             $note->update([
                 'note_date' => $data['note_date'],
-                'transaction_type' => TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $note->transaction_type)),
+                'transaction_type' => $selectedTransactionType,
+                'customer_printing_subtype_id' => $printingSubtype['id'],
+                'printing_subtype_name' => $printingSubtype['name'],
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'address' => $data['address'] ?? null,

@@ -22,6 +22,8 @@ class OrderNote extends Model
         'note_date',
         'customer_id',
         'transaction_type',
+        'customer_printing_subtype_id',
+        'printing_subtype_name',
         'customer_name',
         'customer_phone',
         'address',
@@ -54,6 +56,11 @@ class OrderNote extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function printingSubtype(): BelongsTo
+    {
+        return $this->belongsTo(CustomerPrintingSubtype::class, 'customer_printing_subtype_id');
+    }
+
     /**
      * @return HasMany<OrderNoteItem, $this>
      */
@@ -84,6 +91,7 @@ class OrderNote extends Model
             'note_date',
             'customer_id',
             'transaction_type',
+            'printing_subtype_name',
             'customer_name',
             'customer_phone',
             'city',

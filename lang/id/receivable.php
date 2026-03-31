@@ -18,9 +18,11 @@ return [
     'date' => 'Tanggal',
     'description' => 'Keterangan',
     'transaction_type' => 'Tipe Transaksi',
+    'printing_subtype' => 'Subjenis Cetak',
+    'printing_subtype_none' => '-',
     'transaction_type_none' => '-',
-    'transaction_type_product' => 'Produk Toko',
-    'transaction_type_printing' => 'Cetakan',
+    'transaction_type_product' => 'Produk',
+    'transaction_type_printing' => 'Cetak',
     'debit' => 'Debit',
     'credit' => 'Kredit',
     'total_debit' => 'Total Debit',
@@ -163,3 +165,4 @@ return [
     'default_billing_note' => "Untuk pesanan dan komplain bisa langsung hubungi nomor perusahaan.\nRetur maksimal 10% dari total pengambilan.",
     'default_transfer_accounts' => "BCA : 0110989806 a/n Marimin\nBRI : 124701000187568 a/n Marimin\nMANDIRI : 144.00.1327809.5 a/n Sumarni",
 ];
+

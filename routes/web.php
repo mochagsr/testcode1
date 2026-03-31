@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditLogPageController;
 use App\Http\Controllers\ApprovalRequestController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerPrintingSubtypeController;
 use App\Http\Controllers\CustomerPageController;
 use App\Http\Controllers\CustomerShipLocationPageController;
 use App\Http\Controllers\CustomerLevelController;
@@ -54,6 +55,12 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/api/order-notes/lookup', [OrderNotePageController::class, 'lookup'])
         ->middleware('perm:transactions.create')
         ->name('api.order-notes.lookup');
+    Route::get('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubtypeController::class, 'index'])
+        ->middleware('perm:transactions.view')
+        ->name('api.customers.printing-subtypes.index');
+Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubtypeController::class, 'store'])
+    ->middleware('perm:transactions.view')
+    ->name('api.customers.printing-subtypes.store');
 
     Route::get('/sales-invoices', [SalesInvoicePageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-invoices.index');
     Route::get('/sales-invoices/create', [SalesInvoicePageController::class, 'create'])->middleware('perm:transactions.create')->name('sales-invoices.create');

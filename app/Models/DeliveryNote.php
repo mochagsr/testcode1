@@ -23,6 +23,8 @@ class DeliveryNote extends Model
         'customer_id',
         'customer_ship_location_id',
         'transaction_type',
+        'customer_printing_subtype_id',
+        'printing_subtype_name',
         'recipient_name',
         'recipient_phone',
         'city',
@@ -63,6 +65,11 @@ class DeliveryNote extends Model
         return $this->belongsTo(CustomerShipLocation::class, 'customer_ship_location_id');
     }
 
+    public function printingSubtype(): BelongsTo
+    {
+        return $this->belongsTo(CustomerPrintingSubtype::class, 'customer_printing_subtype_id');
+    }
+
     /**
      * @return HasMany<DeliveryNoteItem, $this>
      */
@@ -85,6 +92,7 @@ class DeliveryNote extends Model
             'note_date',
             'customer_id',
             'transaction_type',
+            'printing_subtype_name',
             'recipient_name',
             'recipient_phone',
             'city',

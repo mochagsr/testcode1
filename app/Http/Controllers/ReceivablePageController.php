@@ -201,6 +201,7 @@ class ReceivablePageController extends Controller
                     'sales_invoice_id',
                     'entry_date',
                     'transaction_type',
+                    'printing_subtype_name',
                     'description',
                     'debit',
                     'credit',
@@ -1088,6 +1089,7 @@ class ReceivablePageController extends Controller
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
                 __('receivable.transaction_type'),
+                __('receivable.printing_subtype'),
                 __('receivable.bill_credit_sales'),
                 __('receivable.bill_installment_payment'),
                 __('receivable.bill_sales_return'),
@@ -1108,6 +1110,7 @@ class ReceivablePageController extends Controller
                     (string) ($row['date_label'] ?? ''),
                     $proofNumber,
                     (string) ($row['transaction_type_label'] ?? __('receivable.transaction_type_none')),
+                    (string) (($row['printing_subtype_name'] ?? null) ?: __('receivable.printing_subtype_none')),
                     number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.'),
@@ -1119,6 +1122,7 @@ class ReceivablePageController extends Controller
             $rowsOut[] = [
                 '',
                 __('receivable.bill_total'),
+                '',
                 '',
                 number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['installment_payment'] ?? 0)), 0, ',', '.'),
@@ -1132,14 +1136,15 @@ class ReceivablePageController extends Controller
                 '',
                 '',
                 __('receivable.bill_total_receivable'),
+                '',
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
             ];
 
             $tableStartRow = 10;
             $sheet->fromArray($rowsOut, null, 'A' . $tableStartRow);
-            ExcelExportStyler::styleTable($sheet, $tableStartRow, 7, count($rowsOut) - 1, true);
-            $sheet->getStyle('A' . $tableStartRow . ':G' . ($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
-            $sheet->getStyle('D' . ($tableStartRow + 1) . ':G' . ($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            ExcelExportStyler::styleTable($sheet, $tableStartRow, 8, count($rowsOut) - 1, true);
+            $sheet->getStyle('A' . $tableStartRow . ':H' . ($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
+            $sheet->getStyle('E' . ($tableStartRow + 1) . ':H' . ($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             $rowCursor = $tableStartRow + count($rowsOut) + 2;
 
@@ -1632,7 +1637,7 @@ class ReceivablePageController extends Controller
         $semester = $selectedSemester ?? '';
         $transactionType = $selectedTransactionType ?? '';
         $ledgerRows = ReceivableLedger::query()
-            ->with('invoice:id,invoice_number,invoice_date')
+            ->with('invoice:id,invoice_number,invoice_date,transaction_type,printing_subtype_name')
             ->forCustomer($customerId)
             ->when($transactionType !== '', function ($query) use ($transactionType): void {
                 $query->where('transaction_type', $transactionType);
@@ -1668,6 +1673,7 @@ class ReceivablePageController extends Controller
                 'entry_type' => 'opening',
                 'transaction_type' => null,
                 'transaction_type_label' => __('receivable.transaction_type_none'),
+                'printing_subtype_name' => null,
                 'adjustment_amount' => 0,
                 'credit_sales' => 0,
                 'installment_payment' => 0,
@@ -1693,6 +1699,10 @@ class ReceivablePageController extends Controller
                 : ($ledgerRow->invoice?->transaction_type
                     ? TransactionType::normalize((string) $ledgerRow->invoice->transaction_type)
                     : null);
+            $printingSubtypeName = trim((string) ($ledgerRow->printing_subtype_name ?? ''));
+            if ($printingSubtypeName === '') {
+                $printingSubtypeName = trim((string) ($ledgerRow->invoice?->printing_subtype_name ?? ''));
+            }
             $description = strtolower((string) ($ledgerRow->description ?? ''));
             $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
             $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
@@ -1728,11 +1738,12 @@ class ReceivablePageController extends Controller
             };
             $invoiceId = $ledgerRow->invoice?->id;
             $typeKey = $transactionType ?? 'none';
+            $subtypeKey = $printingSubtypeName !== '' ? mb_strtolower($printingSubtypeName, 'UTF-8') : 'none';
             $groupKey = $isAdminInvoiceAdjustment
-                ? 'ledger:' . (int) $ledgerRow->id . ':adjustment:' . $typeKey
+                ? 'ledger:' . (int) $ledgerRow->id . ':adjustment:' . $typeKey . ':' . $subtypeKey
                 : ($invoiceId !== null
-                ? 'invoice:' . $invoiceId . ':' . $entryType . ':' . $typeKey
-                : 'text:' . $baseProofNumber . ':' . $entryType . ':' . $typeKey);
+                ? 'invoice:' . $invoiceId . ':' . $entryType . ':' . $typeKey . ':' . $subtypeKey
+                : 'text:' . $baseProofNumber . ':' . $entryType . ':' . $typeKey . ':' . $subtypeKey);
             $dateValue = $debit > 0
                 ? ($ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date)
                 : $ledgerRow->entry_date;
@@ -1745,6 +1756,7 @@ class ReceivablePageController extends Controller
                     'proof_number' => $proofNumber,
                     'entry_type' => $entryType,
                     'transaction_type' => $transactionType,
+                    'printing_subtype_name' => $printingSubtypeName !== '' ? $printingSubtypeName : null,
                     'adjustment_amount' => 0,
                     'credit_sales' => 0,
                     'installment_payment' => 0,
@@ -1786,6 +1798,7 @@ class ReceivablePageController extends Controller
                 'entry_type' => (string) ($groupedRow['entry_type'] ?? 'payment'),
                 'transaction_type' => $groupedRow['transaction_type'] ?? null,
                 'transaction_type_label' => $this->transactionTypeLabel($groupedRow['transaction_type'] ?? null),
+                'printing_subtype_name' => $groupedRow['printing_subtype_name'] ?? null,
                 'adjustment_amount' => (int) ($groupedRow['adjustment_amount'] ?? 0),
                 'credit_sales' => (int) $groupedRow['credit_sales'],
                 'installment_payment' => (int) $groupedRow['installment_payment'],

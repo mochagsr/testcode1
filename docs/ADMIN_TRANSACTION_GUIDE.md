@@ -1,4 +1,4 @@
-﻿# Panduan Admin - Semua Jenis Transaksi
+# Panduan Admin - Semua Jenis Transaksi
 
 Dokumen ini ditujukan untuk admin, supervisor, atau pemilik usaha yang mengawasi transaksi.
 
@@ -76,13 +76,21 @@ User buat faktur
 ### Tipe transaksi
 Di form admin sekarang ada field:
 - `Tipe Transaksi`
+- `Subjenis Cetak` (muncul saat tipe = `Cetak`)
 
 Opsi:
-- `Produk Toko`
-- `Cetakan`
+- `Produk`
+- `Cetak`
 
 Default:
-- `Produk Toko`
+- `Produk`
+
+Aturan `Subjenis Cetak`:
+- dikunci per customer
+- customer A bisa punya `LKS`, `KBR`
+- customer B bisa punya `Buku Cerita`, `Majalah`
+- admin tidak perlu membuat daftar global panjang
+- jika subjenis belum ada, bisa ditambah langsung dari form transaksi
 
 ### Contoh
 - user salah pilih metode pembayaran `Tunai`, harusnya `Kredit`
@@ -127,11 +135,12 @@ Ini penting agar piutang tidak langsung nol kalau ternyata yang dikembalikan han
 
 ### Tipe transaksi retur
 - retur juga sekarang punya field `Tipe Transaksi`
+- dan `Subjenis Cetak` saat tipe = `Cetak`
 - opsi:
-  - `Produk Toko`
-  - `Cetakan`
+  - `Produk`
+  - `Cetak`
 - default:
-  - `Produk Toko`
+  - `Produk`
 
 ## 5. Surat Jalan
 
@@ -268,10 +277,12 @@ Invoice kredit dibuat
 ### Kolom tipe transaksi di mutasi piutang
 Sekarang mutasi piutang customer punya kolom:
 - `Tipe Transaksi`
+- `Subjenis Cetak`
 
 Fungsinya:
-- memisahkan mutasi yang berasal dari `Produk Toko`
-- dan mutasi yang berasal dari `Cetakan`
+- memisahkan mutasi yang berasal dari `Produk`
+- dan mutasi yang berasal dari `Cetak`
+- untuk transaksi cetak, admin bisa tahu ini piutang `LKS`, `KBR`, `Buku Cerita`, atau subjenis lain milik customer itu
 
 ### Contoh
 - semester customer `S2 2526` selesai
@@ -350,8 +361,8 @@ Jadi admin jangan mencampur:
 
 Opsi yang tersedia:
 - semua tipe transaksi
-- hanya `Produk Toko`
-- hanya `Cetakan`
+- hanya `Produk`
+- hanya `Cetak`
 
 Filter ini berlaku untuk:
 - tampilan layar
@@ -361,8 +372,8 @@ Filter ini berlaku untuk:
 
 ### Kegunaan filter tipe transaksi
 Kalau satu customer punya:
-- transaksi `Produk Toko`
-- dan transaksi `Cetakan`
+- transaksi `Produk`
+- dan transaksi `Cetak`
 
 maka admin bisa pakai filter `Tipe Transaksi` di `Piutang Global` untuk memisahkan analisa global per jenis transaksi.
 
@@ -394,8 +405,8 @@ Admin perlu pastikan:
 
 Opsi filter semester:
 - semua tipe transaksi
-- hanya `Produk Toko`
-- hanya `Cetakan`
+- hanya `Produk`
+- hanya `Cetak`
 
 ### Contoh
 - admin ingin lihat rekap `S2 2526` saja
@@ -657,5 +668,6 @@ Sebelum import besar:
 3. cek integrity check
 4. cek performa list/export
 5. cek periode yang siap ditutup
+
 
 

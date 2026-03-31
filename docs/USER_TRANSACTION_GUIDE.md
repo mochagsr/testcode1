@@ -1,4 +1,4 @@
-﻿# Panduan User - Semua Jenis Transaksi
+# Panduan User - Semua Jenis Transaksi
 
 Dokumen ini ditujukan untuk user operasional harian.
 
@@ -47,17 +47,31 @@ Login bisa memakai:
 - catatan bila perlu
 
 ### Tipe transaksi
-- `Produk Toko`
+- `Produk`
   - dipakai untuk penjualan barang biasa
-- `Cetakan`
+- `Cetak`
   - dipakai untuk pekerjaan atau pesanan cetak
 
 Default di form:
-- `Produk Toko`
+- `Produk`
 
 Catatan:
 - `Tipe Transaksi` tidak ditampilkan di header print dokumen transaksi
 - field ini dipakai untuk pencatatan dan analisa mutasi piutang customer
+
+### Subjenis cetak
+Kalau `Tipe Transaksi = Cetak`, akan muncul field tambahan:
+- `Subjenis Cetak`
+
+Contoh:
+- `LKS`
+- `KBR`
+- `Buku Cerita`
+
+Aturannya:
+- daftar `Subjenis Cetak` berbeda per customer
+- dropdown customer lain tidak ikut bercampur
+- kalau subjenis belum ada, user bisa klik tombol tambah lalu isi nama subjenis baru
 
 ### Hasil transaksi
 - stok barang berkurang
@@ -121,9 +135,10 @@ Maka:
 Jadi retur tidak harus seluruh qty. Bisa sebagian, asalkan sesuai barang yang benar-benar dikembalikan.
 
 ### Catatan tipe transaksi retur
-- pilih `Cetakan` kalau retur berasal dari transaksi cetakan
-- pilih `Produk Toko` kalau retur berasal dari penjualan barang biasa
-- default tetap `Produk Toko`
+- pilih `Cetak` kalau retur berasal dari transaksi cetakan
+- pilih `Produk` kalau retur berasal dari penjualan barang biasa
+- default tetap `Produk`
+- kalau pilih `Cetak`, isi juga `Subjenis Cetak` yang sesuai customer
 
 ## 4. Surat Jalan
 
@@ -234,11 +249,12 @@ Maka yang perlu dicek:
 - surat pesanan belum selesai
 
 ### Catatan tipe transaksi surat pesanan
-- `Produk Toko`
+- `Produk`
   - untuk pesanan barang biasa
-- `Cetakan`
+- `Cetak`
   - untuk pesanan pekerjaan cetak
-- default tetap `Produk Toko`
+- default tetap `Produk`
+- kalau pilih `Cetak`, isi juga `Subjenis Cetak` customer tersebut
 
 ## 6. Catatan Perjalanan
 
@@ -348,14 +364,16 @@ Faktur Penjualan kredit dibuat
 ### Kolom baru di mutasi piutang
 Sekarang di mutasi piutang customer ada kolom:
 - `Tipe Transaksi`
+- `Subjenis Cetak`
 
 Isi kolom itu bisa:
-- `Produk Toko`
-- `Cetakan`
+- `Produk`
+- `Cetak`
 
 Tujuannya:
 - memisahkan piutang yang berasal dari penjualan barang biasa
 - dan piutang yang berasal dari pekerjaan cetak
+- untuk transaksi cetak, user bisa tahu ini piutang `LKS`, `KBR`, `Buku Cerita`, atau subjenis lain
 
 ### Contoh
 - pilih `Angga`
@@ -415,8 +433,8 @@ Jadi:
 ### Filter tipe transaksi
 Di `Piutang Global`, sekarang user juga bisa memfilter:
 - semua tipe transaksi
-- `Produk Toko`
-- `Cetakan`
+- `Produk`
+- `Cetak`
 
 Kalau customer yang sama punya dua jenis transaksi, filter ini membantu melihat rekap global yang lebih fokus.
 
@@ -462,8 +480,8 @@ Kalau ditotal:
 ### Filter tipe transaksi
 Di `Piutang Semester`, user bisa memilih:
 - semua tipe transaksi
-- `Produk Toko`
-- `Cetakan`
+- `Produk`
+- `Cetak`
 
 Jadi rekap semester bisa dilihat atau dicetak:
 - gabungan semua transaksi
@@ -675,5 +693,6 @@ Supaya tidak bingung, ini hubungan sederhananya:
   - dipakai saat barang diterima dari supplier
 - `Hutang Supplier`
   - dipakai untuk melihat sisa hutang ke supplier
+
 
 

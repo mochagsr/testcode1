@@ -176,11 +176,20 @@
                     </div>
                     <div class="col-4">
                         <label>{{ __('txn.transaction_type') }}</label>
-                        <select name="transaction_type">
+                        <select id="admin-order-note-transaction-type" name="transaction_type">
                             <option value="product" @selected(old('transaction_type', $note->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
                             <option value="printing" @selected(old('transaction_type', $note->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
                         </select>
                     </div>
+                    <input type="hidden" id="admin-order-note-customer-id" value="{{ (int) $note->customer_id }}">
+                    @include('partials.printing_subtype_fields', [
+                        'customerFieldId' => 'admin-order-note-customer-id',
+                        'transactionTypeFieldId' => 'admin-order-note-transaction-type',
+                        'subtypeFieldId' => 'admin-order-note-printing-subtype-id',
+                        'selectedSubtypeId' => old('customer_printing_subtype_id', $note->customer_printing_subtype_id),
+                        'selectedSubtypeName' => old('printing_subtype_name', $note->printing_subtype_name),
+                        'colClass' => 'col-4',
+                    ])
                     <div class="col-12">
                         <label>{{ __('txn.address') }}</label>
                         <textarea name="address" rows="2">{{ old('address', $note->address ?: $note->customer?->address) }}</textarea>
@@ -515,4 +524,5 @@
                 });
         })();
     </script>
+    @include('partials.printing_subtype_script')
 @endsection

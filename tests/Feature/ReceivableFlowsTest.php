@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AppSetting;
 use App\Models\Customer;
+use App\Models\CustomerPrintingSubtype;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\InvoicePayment;
@@ -79,6 +80,95 @@ class ReceivableFlowsTest extends TestCase
 
         AppSetting::setValue('closed_semester_periods', '');
         Cache::flush();
+    }
+
+    public function test_customer_printing_subtype_api_is_scoped_per_customer(): void
+    {
+        $user = User::factory()->create();
+        $customerA = Customer::query()->create([
+            'code' => 'CUST-PRINT-001',
+            'name' => 'Customer Printing A',
+            'city' => 'Malang',
+        ]);
+        $customerB = Customer::query()->create([
+            'code' => 'CUST-PRINT-002',
+            'name' => 'Customer Printing B',
+            'city' => 'Surabaya',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('api.customers.printing-subtypes.store', $customerA), [
+                'name' => 'LKS',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'LKS');
+
+        CustomerPrintingSubtype::query()->create([
+            'customer_id' => $customerB->id,
+            'name' => 'KBR',
+            'normalized_name' => CustomerPrintingSubtype::normalizeName('KBR'),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('api.customers.printing-subtypes.index', $customerA));
+
+        $response->assertOk();
+        $response->assertSee('LKS');
+        $response->assertDontSee('KBR');
+    }
+
+    public function test_receivable_index_shows_printing_subtype_in_ledger_and_bill_tables(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-PRINT-LEDGER-001',
+            'name' => 'Customer Printing Ledger',
+            'city' => 'Malang',
+        ]);
+        $subtype = CustomerPrintingSubtype::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Buku Cerita',
+            'normalized_name' => CustomerPrintingSubtype::normalizeName('Buku Cerita'),
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-PRINT-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-03-01',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'printing',
+            'customer_printing_subtype_id' => $subtype->id,
+            'printing_subtype_name' => $subtype->name,
+            'subtotal' => 120000,
+            'total' => 120000,
+            'total_paid' => 0,
+            'balance' => 120000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-03-01',
+            'transaction_type' => 'printing',
+            'customer_printing_subtype_id' => $subtype->id,
+            'printing_subtype_name' => $subtype->name,
+            'description' => 'Invoice ' . $invoice->invoice_number,
+            'debit' => 120000,
+            'credit' => 0,
+            'balance_after' => 120000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+            'semester' => 'S2-2526',
+            'transaction_type' => 'printing',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Buku Cerita');
+        $response->assertSee(__('receivable.printing_subtype'));
     }
 
     public function test_receivable_report_print_respects_semester_and_customer_filters(): void

@@ -48,8 +48,16 @@ return [
     'report' => 'Laporan',
     'type' => 'Tipe',
     'transaction_type' => 'Tipe Transaksi',
-    'transaction_type_product' => 'Produk Toko',
-    'transaction_type_printing' => 'Cetakan',
+    'transaction_type_product' => 'Produk',
+    'transaction_type_printing' => 'Cetak',
+    'printing_subtype' => 'Subjenis Cetak',
+    'printing_subtype_select' => 'Pilih subjenis cetak',
+    'printing_subtype_add' => 'Tambah Subjenis',
+    'printing_subtype_add_prompt' => 'Masukkan nama subjenis cetak baru',
+    'printing_subtype_add_failed' => 'Gagal menambah subjenis cetak.',
+    'printing_subtype_customer_first' => 'Pilih customer dulu untuk melihat subjenis cetak.',
+    'printing_subtype_only_for_print' => 'Subjenis cetak hanya dipakai saat tipe transaksi = Cetak.',
+    'invalid_printing_subtype' => 'Subjenis cetak tidak sesuai dengan customer yang dipilih.',
     'action' => 'Aksi',
     'action_menu' => 'Pilih Menu',
     'date' => 'Tanggal',
@@ -254,4 +262,5 @@ return [
     'supplier_semester_opened_success' => 'Tahun :semester untuk supplier :supplier berhasil dibuka.',
     'supplier_semester_closed_error' => 'Tahun :semester untuk supplier ini sedang ditutup. Transaksi keluar baru tidak diizinkan.',
 ];
+
 
