@@ -13,6 +13,9 @@ Istilah menu yang dipakai di dokumen ini mengikuti aaPanel `v8.0.1`:
 Catatan:
 - di dokumentasi resmi aaPanel, website PHP kadang disebut `PHP Project`
 - di panel harian kamu biasanya tetap bekerja lewat menu `Website`
+- untuk env aaPanel, dokumen ini sekarang memakai file contoh:
+  - `.env.aapanel.test.example`
+  - `.env.aapanel.prod.example`
 
 ## Akun default setelah seed
 - Admin
@@ -114,15 +117,153 @@ composer --version
 
 ## 6. Struktur folder yang disarankan
 
-Contoh:
+Contoh yang dipakai di dokumen ini:
 - env `tes`:
-  - `/www/wwwroot/pgpos-tes`
+  - website: `teserpos.mitrasejatiberkah.com`
+  - folder: `/www/wwwroot/teserpos.mitrasejatiberkah.com`
 - env `prod`:
-  - `/www/wwwroot/pgpos-prod`
+  - website: `erpos.mitrasejaitberkah.com`
+  - folder: `/www/wwwroot/erpos.mitrasejaitberkah.com`
 
 Running directory website harus ke:
-- `/www/wwwroot/pgpos-tes/public`
-- `/www/wwwroot/pgpos-prod/public`
+- `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
+- `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
+
+## 6.1. Setup subdomain: DomaiNesia + VPS aaPanel di IDCloudHost
+
+Bagian ini penting kalau:
+- domain kamu ada di `DomaiNesia`
+- VPS Linux + `aaPanel` ada di `IDCloudHost`
+
+Contoh target:
+- `teserpos.mitrasejatiberkah.com` untuk env `tes`
+- `erpos.mitrasejaitberkah.com` untuk env `prod`
+
+Alurnya:
+1. ambil IP public VPS dari `IDCloudHost`
+2. arahkan subdomain ke IP VPS itu
+3. kalau DNS dikelola di `DomaiNesia`, buat record di `DomaiNesia`
+4. kalau DNS dikelola di `Cloudflare`, buat record di `Cloudflare`
+5. baru buat site di `aaPanel`
+
+### 6.1A. Ambil IP public VPS di IDCloudHost
+
+Di panel `IDCloudHost`, cari detail VM/VPS kamu lalu catat:
+- `Public IPv4`
+
+Contoh:
+- `103.123.45.67`
+
+IP ini yang nanti dipakai di record DNS domain.
+
+### 6.1B. Opsi DNS 1 - Buat record subdomain di DomaiNesia langsung
+
+Di panel `DomaiNesia`, biasanya alurnya:
+1. buka `Domains`
+2. pilih domain kamu
+3. buka `DNS Management`
+4. tambah `A Record`
+
+Contoh record:
+
+#### Untuk env tes
+- `Type`: `A`
+- `Name / Host`: `teserpos`
+- `Value / Points to`: `103.123.45.67`
+- `TTL`: default
+
+#### Untuk env prod
+- `Type`: `A`
+- `Name / Host`: `erpos`
+- `Value / Points to`: `103.123.45.67`
+- `TTL`: default
+
+Kalau kamu ingin domain utama dipakai untuk prod:
+- `Type`: `A`
+- `Name / Host`: `@`
+- `Value / Points to`: `103.123.45.67`
+
+Kalau butuh `www`:
+- `Type`: `CNAME`
+- `Name / Host`: `www`
+- `Value / Points to`: `erpos.mitrasejaitberkah.com`
+
+### 6.1C. Opsi DNS 2 - Buat record subdomain di Cloudflare
+
+Pakai bagian ini kalau:
+- nameserver domain kamu sudah diarahkan ke `Cloudflare`
+- jadi pengelolaan DNS **bukan lagi** di panel DNS DomaiNesia
+
+Langkah di `Cloudflare`:
+1. buka domain kamu di dashboard `Cloudflare`
+2. buka menu `DNS`
+3. klik `Add record`
+4. tambah `A Record`
+
+Contoh record:
+
+#### Untuk env tes
+- `Type`: `A`
+- `Name`: `teserpos`
+- `IPv4 address`: `103.123.45.67`
+- `Proxy status`: mulai dari `DNS only`
+- `TTL`: `Auto`
+
+#### Untuk env prod
+- `Type`: `A`
+- `Name`: `erpos`
+- `IPv4 address`: `103.123.45.67`
+- `Proxy status`: mulai dari `DNS only`
+- `TTL`: `Auto`
+
+Kalau prod mau pakai root domain:
+- `Type`: `A`
+- `Name`: `@`
+- `IPv4 address`: `103.123.45.67`
+- `Proxy status`: `DNS only`
+
+Saran awal:
+- pakai `DNS only` dulu saat setup awal
+- setelah website dan SSL sudah normal, baru pertimbangkan ubah ke `Proxied`
+
+Catatan Cloudflare:
+- kalau pakai `Proxied`, IP origin VPS akan disembunyikan
+- tapi saat debugging awal, `DNS only` biasanya lebih sederhana
+- kalau nanti pakai SSL Cloudflare, pastikan mode SSL tidak bentrok dengan SSL di server
+
+### 6.1D. Tunggu propagasi DNS
+
+Biasanya:
+- cepat: `1-10 menit`
+- normal: `30 menit - 2 jam`
+- kadang bisa lebih lama tergantung resolver
+
+Cara cek di server:
+
+```bash
+ping teserpos.mitrasejatiberkah.com
+ping erpos.mitrasejaitberkah.com
+```
+
+Atau cek dengan:
+
+```bash
+nslookup teserpos.mitrasejatiberkah.com
+nslookup erpos.mitrasejaitberkah.com
+```
+
+Kalau hasil IP sudah sama dengan IP VPS `IDCloudHost`, berarti DNS sudah benar.
+
+### 6.1E. Baru lanjut buat site di aaPanel
+
+Setelah DNS benar:
+- buat site `teserpos.mitrasejatiberkah.com` di aaPanel untuk env `tes`
+- buat site `erpos.mitrasejaitberkah.com` di aaPanel untuk env `prod`
+
+Catatan penting:
+- jangan buat site dulu lalu berharap subdomain otomatis hidup
+- DNS di `DomaiNesia` dan site di `aaPanel` adalah 2 langkah yang berbeda
+- `aaPanel` hanya melayani domain yang sudah diarahkan ke IP VPS
 
 ## 7. Metode deploy yang tersedia di aaPanel v8.0.1
 
@@ -171,8 +312,8 @@ Alur:
 4. lanjut setup Laravel
 
 Contoh:
-- `tes` -> `/www/wwwroot/pgpos-tes`
-- `prod` -> `/www/wwwroot/pgpos-prod`
+- `teserpos` -> `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+- `erpos` -> `/www/wwwroot/erpos.mitrasejaitberkah.com`
 
 ## 7B. Opsi B - `Website -> Add site -> Create for Git`
 
@@ -192,11 +333,25 @@ Langkah di aaPanel `v8.0.1`:
    - branch, biasanya `master`
 5. simpan
 
+Catatan autentikasi Git:
+- kalau repo GitHub kamu `public`:
+  - **tidak perlu** SSH key
+  - cukup pakai URL `HTTPS`
+  - contoh:
+    - `https://github.com/mochagsr/testcode1.git`
+- kalau repo GitHub kamu `private`:
+  - biasanya perlu autentikasi
+  - opsi yang umum:
+    - `SSH key`
+    - atau token/credential lain
+- untuk deploy pertama yang sederhana:
+  - repo `public` + `HTTPS` adalah jalur paling mudah
+
 Contoh isian:
 - `Domain`:
-  - `tes.domainkamu.com`
+  - `teserpos.mitrasejatiberkah.com`
 - `Project path`:
-  - `/www/wwwroot/pgpos-tes`
+  - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
 - `Git Repository URL`:
   - `https://github.com/mochagsr/testcode1.git`
 - `Branch`:
@@ -212,9 +367,9 @@ Setelah site berhasil dibuat lewat `Create for Git`, lanjutkan:
 Contoh untuk env `tes` setelah `Create for Git`:
 
 ```bash
-cd /www/wwwroot/pgpos-tes
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 composer install --no-dev --optimize-autoloader
-cp .env.cpanel.test.example .env
+cp .env.aapanel.test.example .env
 php artisan key:generate
 mysql -u TES_DB_USER -p TES_DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
 php artisan db:seed --force
@@ -234,9 +389,9 @@ php artisan app:smoke-test
 Contoh untuk env `prod` setelah `Create for Git`:
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 composer install --no-dev --optimize-autoloader
-cp .env.cpanel.prod.example .env
+cp .env.aapanel.prod.example .env
 php artisan key:generate
 php artisan migrate --force
 php artisan db:seed --force
@@ -267,8 +422,8 @@ Langkah:
 3. isi domain / subdomain
 4. pilih `PHP 8.3`
 5. set path:
-   - `/www/wwwroot/pgpos-tes`
-   - atau `/www/wwwroot/pgpos-prod`
+   - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+   - atau `/www/wwwroot/erpos.mitrasejaitberkah.com`
 6. simpan
 
 Setelah site dibuat:
@@ -282,8 +437,8 @@ Setelah site dibuat:
 
 ```bash
 cd /www/wwwroot
-git clone https://github.com/mochagsr/testcode1.git pgpos-tes
-cd /www/wwwroot/pgpos-tes
+git clone https://github.com/mochagsr/testcode1.git teserpos.mitrasejatiberkah.com
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 composer install --no-dev --optimize-autoloader
 ```
 
@@ -291,8 +446,8 @@ composer install --no-dev --optimize-autoloader
 
 ```bash
 cd /www/wwwroot
-git clone https://github.com/mochagsr/testcode1.git pgpos-prod
-cd /www/wwwroot/pgpos-prod
+git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 composer install --no-dev --optimize-autoloader
 ```
 
@@ -318,16 +473,16 @@ Biasanya host:
 ### Tes
 
 ```bash
-cd /www/wwwroot/pgpos-tes
-cp .env.cpanel.test.example .env
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+cp .env.aapanel.test.example .env
 php artisan key:generate
 ```
 
 ### Prod
 
 ```bash
-cd /www/wwwroot/pgpos-prod
-cp .env.cpanel.prod.example .env
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cp .env.aapanel.prod.example .env
 php artisan key:generate
 ```
 
@@ -337,7 +492,7 @@ Field minimal yang harus diisi:
 APP_NAME="PgPOS ERP"
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://domain-kamu.com
+APP_URL=https://teserpos.mitrasejatiberkah.com
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -405,13 +560,13 @@ Di aaPanel `v8.0.1`:
 Scheduler `prod`:
 
 ```bash
-cd /www/wwwroot/pgpos-prod && php artisan schedule:run >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Queue `prod`:
 
 ```bash
-cd /www/wwwroot/pgpos-prod && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
 ```
 
 ## 16A. Backup awal dan smoke test untuk Opsi A
@@ -419,7 +574,7 @@ cd /www/wwwroot/pgpos-prod && php artisan queue:work --stop-when-empty --tries=1
 ### Env tes
 
 ```bash
-cd /www/wwwroot/pgpos-tes
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:smoke-test
@@ -428,7 +583,7 @@ php artisan app:smoke-test
 ### Env prod
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:smoke-test
@@ -444,10 +599,10 @@ Catatan:
 
 ```bash
 cd /www/wwwroot
-git clone https://github.com/mochagsr/testcode1.git pgpos-tes
-cd /www/wwwroot/pgpos-tes
+git clone https://github.com/mochagsr/testcode1.git teserpos.mitrasejatiberkah.com
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 composer install --no-dev --optimize-autoloader
-cp .env.cpanel.test.example .env
+cp .env.aapanel.test.example .env
 php artisan key:generate
 mysql -u TES_DB_USER -p TES_DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
 php artisan db:seed --force
@@ -468,10 +623,10 @@ php artisan app:smoke-test
 
 ```bash
 cd /www/wwwroot
-git clone https://github.com/mochagsr/testcode1.git pgpos-prod
-cd /www/wwwroot/pgpos-prod
+git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 composer install --no-dev --optimize-autoloader
-cp .env.cpanel.prod.example .env
+cp .env.aapanel.prod.example .env
 php artisan key:generate
 php artisan migrate --force
 php artisan db:seed --force
@@ -505,8 +660,8 @@ Langkah:
 5. simpan
 
 Contoh:
-- `tes.domainkamu.com`
-- path `/www/wwwroot/pgpos-tes`
+- `teserpos.mitrasejatiberkah.com`
+- path `/www/wwwroot/teserpos.mitrasejatiberkah.com`
 - repo `https://github.com/mochagsr/testcode1.git`
 
 ## 9B. Cek running directory untuk Opsi B
@@ -530,16 +685,16 @@ Di aaPanel `v8.0.1`:
 ### Tes
 
 ```bash
-cd /www/wwwroot/pgpos-tes
-cp .env.cpanel.test.example .env
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+cp .env.aapanel.test.example .env
 php artisan key:generate
 ```
 
 ### Prod
 
 ```bash
-cd /www/wwwroot/pgpos-prod
-cp .env.cpanel.prod.example .env
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cp .env.aapanel.prod.example .env
 php artisan key:generate
 ```
 
@@ -584,13 +739,13 @@ php artisan view:cache
 Scheduler `prod`:
 
 ```bash
-cd /www/wwwroot/pgpos-prod && php artisan schedule:run >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Queue `prod`:
 
 ```bash
-cd /www/wwwroot/pgpos-prod && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
 ```
 
 ## 16B. Backup awal dan smoke test untuk Opsi B
@@ -598,7 +753,7 @@ cd /www/wwwroot/pgpos-prod && php artisan queue:work --stop-when-empty --tries=1
 ### Env tes
 
 ```bash
-cd /www/wwwroot/pgpos-tes
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:smoke-test
@@ -607,7 +762,7 @@ php artisan app:smoke-test
 ### Env prod
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:smoke-test
@@ -618,9 +773,9 @@ php artisan app:smoke-test
 ### Env tes
 
 ```bash
-cd /www/wwwroot/pgpos-tes
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 composer install --no-dev --optimize-autoloader
-cp .env.cpanel.test.example .env
+cp .env.aapanel.test.example .env
 php artisan key:generate
 mysql -u TES_DB_USER -p TES_DB_NAME < database/sql/tespgpos_mysql_test_snapshot.sql
 php artisan db:seed --force
@@ -640,9 +795,9 @@ php artisan app:smoke-test
 ### Env prod
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 composer install --no-dev --optimize-autoloader
-cp .env.cpanel.prod.example .env
+cp .env.aapanel.prod.example .env
 php artisan key:generate
 php artisan migrate --force
 php artisan db:seed --force
@@ -674,7 +829,60 @@ Uji minimal:
 10. upload logo / file
 11. cek queue export
 
-## 19. Cara update aplikasi yang benar
+## 19. Update program / upgrade aplikasi
+
+Bagian ini dipakai kalau:
+- aplikasi di server sudah jalan
+- kamu push update baru ke GitHub
+- kamu ingin upgrade code di env `tes` atau `prod`
+
+Aturan utama:
+- **jangan upload file satu-satu** lewat `Files`
+- update yang benar tetap:
+  1. push perubahan ke GitHub
+  2. masuk server
+  3. jalankan `git pull`
+  4. lanjutkan command Laravel sesuai jenis perubahan
+
+### 19A. Jika site dibuat dengan `Create for Git`
+
+Kalau site pertama kali dibuat dari:
+- `Website -> Add site -> Create for Git`
+
+maka untuk update berikutnya:
+- kamu **tetap bisa** pull update terbaru
+- jalur paling aman tetap lewat `Terminal`
+
+Contoh:
+
+```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+git pull origin master
+```
+
+Sesudah itu lanjutkan:
+- update kecil
+- update migration
+- atau update frontend build
+
+sesuai jenis perubahan di bawah.
+
+### 19B. Jika site dibuat manual dengan `git clone`
+
+Kalau site pertama kali dibuat manual:
+- `Website` dibuat biasa
+- lalu code di-clone dari `Terminal`
+
+maka pola update juga sama:
+
+```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+git pull origin master
+```
+
+Jadi kesimpulannya:
+- beda metode deploy awal **tidak mengubah** cara update harian
+- baik `Create for Git` maupun `git clone`, update tetap paling aman lewat `Terminal`
 
 Jangan upload file satu-satu lewat `Files`.
 
@@ -687,7 +895,7 @@ Pola update yang benar:
 ### Update kecil
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 git pull origin master
 php artisan optimize:clear
 php artisan config:cache
@@ -698,7 +906,7 @@ php artisan view:cache
 ### Update dengan migration
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 git pull origin master
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
@@ -712,7 +920,7 @@ php artisan view:cache
 ### Update dengan frontend build
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 git pull origin master
 composer install --no-dev --optimize-autoloader
 npm install
@@ -730,6 +938,24 @@ php artisan view:cache
 1. update dulu `tes`
 2. uji login, transaksi, print, PDF, dan Excel
 3. kalau aman, baru update `prod`
+
+### 19C. Rollback singkat kalau update gagal
+
+Kalau sesudah update muncul error dan kamu perlu rollback cepat:
+
+```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+git log --oneline -5
+git reset --hard <commit-sebelumnya>
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+Catatan:
+- rollback `hard` hanya aman kalau server deployment memang mengikuti Git dan tidak ada edit manual lokal
+- sebelum rollback, idealnya backup DB dulu
 
 ## 20. Dokumen pendamping
 

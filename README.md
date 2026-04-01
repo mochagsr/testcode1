@@ -103,6 +103,17 @@ Catatan aaPanel:
 - dokumentasi deploy sekarang mencakup 2 metode:
   - `Terminal + git clone`
   - `Website -> Add site -> Create for Git`
+  - dan section khusus `Update program / upgrade aplikasi`
+- dokumentasi juga sudah mencakup setup subdomain untuk skenario:
+  - domain di `DomaiNesia`
+  - VPS `aaPanel` di `IDCloudHost`
+  - DNS dikelola langsung di `DomaiNesia` atau lewat `Cloudflare`
+- file env contoh untuk aaPanel:
+  - `.env.aapanel.test.example`
+  - `.env.aapanel.prod.example`
+- contoh nama website yang dipakai di dokumen:
+  - `teserpos.mitrasejatiberkah.com` untuk `tes`
+  - `erpos.mitrasejaitberkah.com` untuk `prod`
 - untuk first deploy, tetap disarankan mulai dari `Terminal + git clone`
 - `Create for Git` aman dipakai juga, tapi tetap harus dilanjutkan dengan setup Laravel lengkap
 
