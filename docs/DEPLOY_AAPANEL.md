@@ -583,6 +583,53 @@ Biasanya host:
 
 ## 11A. Siapkan `.env` untuk Opsi A
 
+Cara edit `.env` di aaPanel:
+
+### Opsi 1 - lewat menu `Files`
+1. buka `Files`
+2. masuk ke folder project:
+   - `tes`: `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+   - `prod`: `/www/wwwroot/erpos.mitrasejaitberkah.com`
+3. kalau file `.env` belum ada:
+   - copy dari file contoh
+4. klik file `.env`
+5. pilih `Edit`
+6. ubah nilai yang diperlukan
+7. simpan
+
+### Opsi 2 - lewat `Terminal`
+Contoh untuk `tes`:
+
+```bash
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+cp .env.aapanel.test.example .env
+nano .env
+```
+
+Contoh untuk `prod`:
+
+```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cp .env.aapanel.prod.example .env
+nano .env
+```
+
+Kalau `nano` tidak tersedia, bisa pakai:
+
+```bash
+vi .env
+```
+
+Catatan penting:
+- `.env` adalah file lokal di server
+- `.env` **tidak perlu** dan **jangan** dipush ke GitHub
+- yang disimpan di repo hanya file contoh:
+  - `.env.aapanel.test.example`
+  - `.env.aapanel.prod.example`
+- karena itu, walaupun `FTP` diset `Not create`, kamu tetap bisa edit `.env` lewat:
+  - `Files`
+  - atau `Terminal`
+
 ### Tes
 
 ```bash
@@ -618,6 +665,77 @@ CACHE_STORE=database
 QUEUE_CONNECTION=database
 SESSION_DRIVER=database
 FILESYSTEM_DISK=public
+```
+
+### Contoh `.env` final untuk env `tes`
+
+Silakan sesuaikan hanya bagian:
+- `DB_DATABASE`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+
+```env
+APP_NAME="PgPOS ERP TES"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://teserpos.mitrasejatiberkah.com
+
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_LEVEL=debug
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sql_teserpos_mitrasejatiberkah_com
+DB_USERNAME=sql_teserpos_mitrasejatiberkah_com
+DB_PASSWORD=password_dari_aapanel
+
+BROADCAST_CONNECTION=log
+CACHE_STORE=database
+FILESYSTEM_DISK=public
+QUEUE_CONNECTION=database
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+```
+
+### Contoh `.env` final untuk env `prod`
+
+Silakan sesuaikan hanya bagian:
+- `DB_DATABASE`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+
+```env
+APP_NAME="PgPOS ERP"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://erpos.mitrasejaitberkah.com
+
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_LEVEL=error
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sql_erpos_mitrasejaitberkah_com
+DB_USERNAME=sql_erpos_mitrasejaitberkah_com
+DB_PASSWORD=password_dari_aapanel
+
+BROADCAST_CONNECTION=log
+CACHE_STORE=database
+FILESYSTEM_DISK=public
+QUEUE_CONNECTION=database
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+```
+
+Setelah selesai edit `.env`, jalankan:
+
+```bash
+php artisan optimize:clear
+php artisan config:cache
 ```
 
 ## 12A. Inisialisasi database untuk Opsi A
@@ -795,6 +913,11 @@ Di aaPanel `v8.0.1`:
 
 ## 11B. Siapkan `.env` untuk Opsi B
 
+Cara edit `.env` untuk Opsi B sama persis:
+- bisa lewat `Files`
+- atau lewat `Terminal`
+- tetap **tidak perlu** dipush ke Git
+
 ### Tes
 
 ```bash
@@ -812,6 +935,12 @@ php artisan key:generate
 ```
 
 Field minimal yang harus diisi sama seperti `11A`.
+
+Kalau mau langsung praktis, pakai contoh `.env` final di bagian `11A`, lalu sesuaikan:
+- `APP_URL`
+- `DB_DATABASE`
+- `DB_USERNAME`
+- `DB_PASSWORD`
 
 ## 12B. Inisialisasi database untuk Opsi B
 
