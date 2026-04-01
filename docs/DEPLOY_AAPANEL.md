@@ -347,6 +347,119 @@ Catatan autentikasi Git:
 - untuk deploy pertama yang sederhana:
   - repo `public` + `HTTPS` adalah jalur paling mudah
 
+### Contoh isi form `Create for Git` di aaPanel
+
+Untuk env `tes` dengan domain:
+- `teserpos.mitrasejatiberkah.com`
+
+isi form seperti ini:
+
+- `Domain name`
+  - `teserpos.mitrasejatiberkah.com`
+- `Description`
+  - biarkan auto dari aaPanel
+  - atau isi:
+    - `teserpos_mitrasejatiberkah_com`
+- `Website Path`
+  - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+- `FTP`
+  - `Not create`
+- `Database`
+  - `MySQL`
+- `Database settings`
+  - boleh pakai nama auto dari aaPanel
+  - atau nama yang mudah dikenali
+- `Password`
+  - pakai password auto-generate dari aaPanel atau isi manual yang kuat
+- `PHP version`
+  - `PHP-83`
+- `Site category`
+  - default saja
+- `Create html file`
+  - **OFF**
+
+Saran praktis:
+- `FTP`: pilih `Not create`
+  - karena deploy/update akan lewat `Git + Terminal`, bukan upload file manual
+- `Database`: pilih `MySQL`
+  - karena app ini memang kita siapkan untuk MySQL di server
+- `Create html file`: `OFF`
+  - karena ini aplikasi Laravel, bukan website HTML statis
+
+Setelah klik `Confirm`, catat data database yang dibuat aaPanel:
+- `DB name`
+- `DB username`
+- `DB password`
+
+Data itu nanti dipakai untuk isi `.env`.
+
+Contoh:
+- `DB name`
+  - `sql_teserpos_mitrasejatiberkah_com`
+- `DB username`
+  - `sql_teserpos_mitrasejatiberkah_com`
+- `DB password`
+  - `password_dari_aapanel`
+
+Lalu di `.env` nanti:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sql_teserpos_mitrasejatiberkah_com
+DB_USERNAME=sql_teserpos_mitrasejatiberkah_com
+DB_PASSWORD=password_dari_aapanel
+```
+
+Untuk env `prod` dengan domain:
+- `erpos.mitrasejaitberkah.com`
+
+isi form seperti ini:
+
+- `Domain name`
+  - `erpos.mitrasejaitberkah.com`
+- `Description`
+  - biarkan auto dari aaPanel
+  - atau isi:
+    - `erpos_mitrasejaitberkah_com`
+- `Website Path`
+  - `/www/wwwroot/erpos.mitrasejaitberkah.com`
+- `FTP`
+  - `Not create`
+- `Database`
+  - `MySQL`
+- `Database settings`
+  - boleh pakai nama auto dari aaPanel
+  - atau nama yang mudah dikenali
+- `Password`
+  - pakai password auto-generate dari aaPanel atau isi manual yang kuat
+- `PHP version`
+  - `PHP-83`
+- `Site category`
+  - default saja
+- `Create html file`
+  - **OFF**
+
+Contoh hasil database prod:
+- `DB name`
+  - `sql_erpos_mitrasejaitberkah_com`
+- `DB username`
+  - `sql_erpos_mitrasejaitberkah_com`
+- `DB password`
+  - `password_dari_aapanel`
+
+Lalu di `.env` prod nanti:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sql_erpos_mitrasejaitberkah_com
+DB_USERNAME=sql_erpos_mitrasejaitberkah_com
+DB_PASSWORD=password_dari_aapanel
+```
+
 Contoh isian:
 - `Domain`:
   - `teserpos.mitrasejatiberkah.com`
