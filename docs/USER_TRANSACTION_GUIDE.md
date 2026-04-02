@@ -240,6 +240,50 @@ Di aplikasi, surat pesanan dipakai untuk memantau:
 - total qty yang sudah diproses
 - sisa qty yang belum terpenuhi
 
+Di halaman detail `Surat Pesanan`, sekarang user juga bisa membaca dua area penting:
+
+1. tabel `Item`
+- menampilkan per barang:
+  - `Qty Pesanan`
+  - `Qty Terkirim`
+  - `Sisa Qty`
+  - `Status`
+
+Arti status:
+- `Belum Terkirim`
+  - barang itu belum pernah masuk ke faktur penjualan
+- `Terkirim Sebagian`
+  - barang itu sudah pernah dikirim, tetapi belum penuh
+- `Selesai`
+  - qty barang itu sudah terpenuhi semua
+
+2. card `Rincian Pengiriman per Item`
+- menampilkan:
+  - barang apa yang dikirim
+  - lewat `Faktur Penjualan` nomor berapa
+  - tanggal faktur
+  - qty yang terkirim di faktur itu
+- di bagian atas card juga ada ringkasan per invoice:
+  - nomor invoice
+  - tanggal
+  - jumlah item
+  - total qty terkirim
+
+Jadi user sekarang bisa menjawab dua pertanyaan ini dengan cepat:
+- barang mana yang sudah terkirim
+- barang mana yang belum terkirim
+- barang itu sempat terkirim lewat invoice mana
+
+### Di print / PDF surat pesanan
+
+Saat `Surat Pesanan` dicetak atau disimpan PDF:
+- tabel item juga menampilkan:
+  - `Qty Pesanan`
+  - `Qty Terkirim`
+  - `Sisa Qty`
+- ada bagian `Rincian Pengiriman per Item`
+- jadi hasil cetak bukan cuma menunjukkan pesanan awal, tetapi juga progress pemenuhannya
+
 Jadi kalau user bilang:
   `"barang baru terkirim setengah"`
 
@@ -247,6 +291,8 @@ Maka yang perlu dicek:
 - progress belum `100%`
 - sisa qty masih ada
 - surat pesanan belum selesai
+- lihat status item yang masih `Terkirim Sebagian` atau `Belum Terkirim`
+- lihat invoice pengiriman di card rincian agar tidak salah baca
 
 ### Catatan tipe transaksi surat pesanan
 - `Produk`

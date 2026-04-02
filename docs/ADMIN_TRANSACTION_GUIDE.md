@@ -208,6 +208,56 @@ Kalau user bilang `"barang baru terkirim setengah"`:
 - cek transaksi penjualan yang terhubung
 - pastikan status belum berubah menjadi selesai sebelum waktunya
 
+### Tampilan detail yang sekarang perlu dibaca admin
+
+Di halaman detail `Surat Pesanan`, admin sekarang punya dua lapisan bacaan:
+
+1. tabel `Item`
+- per barang tampil:
+  - `Qty Pesanan`
+  - `Qty Terkirim`
+  - `Sisa Qty`
+  - `Status`
+
+Arti status:
+- `Belum Terkirim`
+  - item belum pernah masuk faktur
+- `Terkirim Sebagian`
+  - item sudah pernah masuk faktur, tetapi masih ada sisa
+- `Selesai`
+  - item sudah terpenuhi semua
+
+2. card `Rincian Pengiriman per Item`
+- menampilkan pengiriman item per invoice
+- admin bisa lihat:
+  - invoice nomor berapa
+  - tanggal invoice
+  - qty item yang dikirim di invoice itu
+
+Di bagian atas card, admin juga melihat ringkasan per invoice:
+- nomor invoice
+- tanggal
+- jumlah item yang ikut terkirim
+- total qty terkirim per invoice
+
+Gunanya:
+- cepat membaca invoice mana yang paling banyak mengirim
+- mudah menjelaskan ke user kenapa status item masih `partial`
+- mudah cek apakah sisa item memang belum pernah difakturkan
+
+### Dampak ke print / PDF
+
+Print dan PDF `Surat Pesanan` sekarang juga ikut membawa:
+- `Qty Pesanan`
+- `Qty Terkirim`
+- `Sisa Qty`
+- `Rincian Pengiriman per Item`
+
+Jadi admin bisa pakai dokumen cetak untuk:
+- konfirmasi progress ke customer
+- cek internal gudang / sales
+- pembahasan jika ada item yang baru terkirim sebagian
+
 ## 7. Catatan Perjalanan
 
 ### Tugas admin
