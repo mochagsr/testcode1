@@ -897,6 +897,8 @@ cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan queue:work --stop-whe
 cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
@@ -906,6 +908,8 @@ php artisan app:smoke-test
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
@@ -915,15 +919,20 @@ Catatan:
 - langkah ini dijalankan **setelah**:
   - `13A` build frontend selesai
   - `14A` storage link dan cache selesai
+- jika `app:integrity-check` menampilkan `ANOMALI`, jalankan:
+  - `php artisan app:financial-rebuild`
+  - lalu ulangi `php artisan app:integrity-check`
+  - dan tutup dengan `php artisan app:smoke-test`
+- untuk mengisi `PERFORMANCE_PROBE`, pakai `app:load-test-light`, bukan `app:query-profile`
 
 ## 17A. Contoh alur lengkap Opsi A
 
 ### Env tes
 
 ```bash
-cd /www/wwwroot
-git clone https://github.com/mochagsr/testcode1.git teserpos.mitrasejatiberkah.com
 cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+git clone https://github.com/mochagsr/testcode1.git .
+git switch -c master --track origin/master
 composer install --no-dev --optimize-autoloader
 cp .env.aapanel.test.example .env
 php artisan key:generate
@@ -939,15 +948,17 @@ php artisan event:cache
 php artisan view:cache
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
 ### Env prod
 
 ```bash
-cd /www/wwwroot
-git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejaitberkah.com
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
+git clone https://github.com/mochagsr/testcode1.git .
+git switch -c master --track origin/master
 composer install --no-dev --optimize-autoloader
 cp .env.aapanel.prod.example .env
 php artisan key:generate
@@ -963,6 +974,8 @@ php artisan event:cache
 php artisan view:cache
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
@@ -1090,6 +1103,8 @@ cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan queue:work --stop-whe
 cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
@@ -1099,6 +1114,8 @@ php artisan app:smoke-test
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
@@ -1123,6 +1140,8 @@ php artisan event:cache
 php artisan view:cache
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
@@ -1145,6 +1164,8 @@ php artisan event:cache
 php artisan view:cache
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 

@@ -78,8 +78,9 @@ Catatan:
 - Backup DB: `php artisan app:db-backup --gzip`
 - Uji restore: `php artisan app:db-restore-test`
 - Integrity check: `php artisan app:integrity-check`
-- Profiling query list: `php artisan app:query-profile`
-- Load test ringan: `php artisan app:load-test-light --loops=50`
+- Profiling query plan manual: `php artisan app:query-profile`
+- Performance probe / load test ringan: `php artisan app:load-test-light --loops=50`
+- Sinkronisasi ulang saldo customer/supplier jika integrity check anomali: `php artisan app:financial-rebuild`
 
 ## SOP
 - `docs/ops-runbook.md`

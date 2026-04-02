@@ -1200,8 +1200,10 @@ Artisan::command('app:smoke-test', function () {
         File::exists($storageLinkPath) ? 'storage link tersedia.' : 'storage link belum dibuat / tidak terbaca.'
     );
 
-    $backupFiles = collect(Storage::disk('local')->files('backups'))
-        ->merge(Storage::disk('local')->files('backups/db'));
+    $backupFiles = collect(array_merge(
+        File::glob(storage_path('app/backups/*')) ?: [],
+        File::glob(storage_path('app/backups/db/*')) ?: []
+    ))->filter(static fn (string $path): bool => File::isFile($path));
     $pushRow(
         'BACKUP_FILES',
         $backupFiles->isNotEmpty() ? 'OK' : 'WARN',
