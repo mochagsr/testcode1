@@ -638,8 +638,8 @@ Ringkas:
 Di aaPanel `v8.0.1`:
 1. buka `Databases`
 2. klik `Add DB`
-3. buat database `tes`
-4. buat database `prod`
+3. buat database kosong untuk env `tes`
+4. buat database kosong untuk env `prod`
 5. simpan:
    - host
    - db name
@@ -649,6 +649,13 @@ Di aaPanel `v8.0.1`:
 Biasanya host:
 - `127.0.0.1`
 - atau `localhost`
+
+Catatan penting:
+- pada tahap ini kamu hanya membuat **database kosong**
+- **jangan** buat tabel manual di phpMyAdmin
+- tabel aplikasi nanti akan masuk lewat salah satu cara ini:
+  - import file snapshot / bootstrap SQL
+  - atau jalankan `php artisan migrate --force`
 
 ## 11A. Siapkan `.env` untuk Opsi A
 
