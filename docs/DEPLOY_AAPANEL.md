@@ -297,6 +297,10 @@ Catatan penting:
   - `storage:link`
   - cache
   - cron / queue
+- untuk repo ini, branch deploy yang benar adalah:
+  - `master`
+- jangan pilih `main`
+  - karena branch `main` bisa terbaca kosong di server dan membuat file Laravel tidak muncul
 
 ## 7A. Opsi A - Rekomendasi: `Terminal + git clone`
 
@@ -330,7 +334,7 @@ Langkah di aaPanel `v8.0.1`:
    - `Project path`
    - `PHP Version` = `PHP 8.3`
    - `Git Repository URL`
-   - branch, biasanya `master`
+   - branch = `master`
 5. simpan
 
 Catatan autentikasi Git:
@@ -470,6 +474,10 @@ Contoh isian:
 - `Branch`:
   - `master`
 
+Penting:
+- untuk repo ini jangan pilih `main`
+- kalau terlanjur ter-clone ke branch `main` dan isi folder hanya `.git` atau `.gitkeep`, pindahkan ke branch `master`
+
 Setelah site berhasil dibuat lewat `Create for Git`, lanjutkan:
 1. buka detail site
 2. cek dulu apakah source code Laravel sudah benar-benar masuk ke:
@@ -584,12 +592,14 @@ Contoh **BENAR / PAKAI YANG INI**:
 - masuk dulu ke folder website yang sudah dibuat
 - lalu clone ke folder saat ini dengan command lengkap berikut:
   - `git clone https://github.com/mochagsr/testcode1.git .`
+- setelah clone, pastikan branch aktif adalah `master`
 
 ### Env tes
 
 ```bash
 cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 git clone https://github.com/mochagsr/testcode1.git .
+git switch -c master --track origin/master
 composer install --no-dev --optimize-autoloader
 ```
 
@@ -598,6 +608,7 @@ composer install --no-dev --optimize-autoloader
 ```bash
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
 git clone https://github.com/mochagsr/testcode1.git .
+git switch -c master --track origin/master
 composer install --no-dev --optimize-autoloader
 ```
 
@@ -607,6 +618,7 @@ Kalau folder site masih berisi file default aaPanel seperti `index.html`, hapus 
 cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 rm -f index.html index.php
 git clone https://github.com/mochagsr/testcode1.git .
+git switch -c master --track origin/master
 ```
 
 Setelah clone selesai:
@@ -619,6 +631,7 @@ Setelah clone selesai:
 Ringkas:
 - `Website Path` = folder project Laravel
 - `Running directory` = folder `public` di dalam project Laravel
+- branch deploy yang dipakai = `master`
 
 ## 10A. Buat database untuk Opsi A
 

@@ -104,6 +104,9 @@ Catatan aaPanel:
   - `Terminal + git clone`
   - `Website -> Add site -> Create for Git`
   - dan section khusus `Update program / upgrade aplikasi`
+- untuk repo ini, branch deploy yang dipakai di server adalah:
+  - `master`
+  - bukan `main`
 - dokumentasi juga sudah mencakup setup subdomain untuk skenario:
   - domain di `DomaiNesia`
   - VPS `aaPanel` di `IDCloudHost`
