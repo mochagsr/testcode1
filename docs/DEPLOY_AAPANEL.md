@@ -1319,7 +1319,52 @@ Pola update yang benar:
 3. `git pull`
 4. jalankan command update sesuai jenis perubahan
 
-### Update kecil
+### 19C. Update aman untuk semua kondisi
+
+Pakai opsi ini kalau:
+- kamu ingin jalur paling aman
+- kamu belum yakin update ini termasuk kecil, migration, atau frontend
+- kamu ingin satu urutan yang hampir selalu aman dipakai di server
+
+Kelebihan:
+- tidak perlu menebak jenis update
+- cocok untuk operator yang ingin langkah stabil
+
+Konsekuensi:
+- lebih lama dari update kecil
+- `composer install`, `npm build`, dan `migrate` tetap dijalankan walaupun kadang tidak selalu perlu
+
+```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+git pull origin master
+composer install --no-dev --optimize-autoloader
+npm install
+npm run build
+php artisan migrate --force
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan event:cache
+php artisan view:cache
+php artisan app:smoke-test
+```
+
+Kalau update dilakukan di env `tes`, ganti folder:
+- `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+
+### 19D. Update kecil
+
+Pakai opsi ini kalau perubahan hanya:
+- view / Blade
+- teks
+- CSS kecil
+- controller ringan
+- logic kecil tanpa perubahan tabel database
+
+Jangan pakai opsi ini kalau ada:
+- migration baru
+- package baru
+- perubahan asset hasil build
 
 ```bash
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
@@ -1330,7 +1375,16 @@ php artisan route:cache
 php artisan view:cache
 ```
 
-### Update dengan migration
+### 19E. Update dengan migration
+
+Pakai opsi ini kalau ada:
+- tabel baru
+- kolom baru
+- index baru
+- perubahan struktur database
+
+Kenapa perlu:
+- tanpa `php artisan migrate --force`, aplikasi bisa error karena schema DB tertinggal
 
 ```bash
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
@@ -1344,7 +1398,16 @@ php artisan event:cache
 php artisan view:cache
 ```
 
-### Update dengan frontend build
+### 19F. Update dengan frontend build
+
+Pakai opsi ini kalau ada perubahan:
+- asset frontend
+- file Vite
+- CSS/JS hasil build
+- tampilan yang bergantung bundle baru
+
+Kenapa perlu:
+- kalau `npm run build` tidak dijalankan, browser bisa tetap memakai asset lama atau asset baru tidak ditemukan
 
 ```bash
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
@@ -1366,7 +1429,7 @@ php artisan view:cache
 2. uji login, transaksi, print, PDF, dan Excel
 3. kalau aman, baru update `prod`
 
-### 19C. Rollback singkat kalau update gagal
+### 19G. Rollback singkat kalau update gagal
 
 Kalau sesudah update muncul error dan kamu perlu rollback cepat:
 
