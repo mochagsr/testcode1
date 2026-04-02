@@ -419,6 +419,78 @@ DB_PASSWORD=password_user_database_mysql
 Untuk env `prod` dengan domain:
 - `erpos.mitrasejaitberkah.com`
 
+## 7C. Running Directory dan URL Rewrite Laravel
+
+Supaya route seperti:
+- `/login`
+- `/dashboard`
+- `/products`
+
+bisa dibuka normal, ada **2 hal yang wajib benar** di aaPanel:
+
+1. `Website Path` harus menunjuk ke root project Laravel
+2. `Running directory` / `Document Root` harus menunjuk ke folder `public`
+
+Contoh yang benar:
+
+- `tes`
+  - `Website Path`
+    - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+  - `Running directory`
+    - `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
+
+- `prod`
+  - `Website Path`
+    - `/www/wwwroot/erpos.mitrasejaitberkah.com`
+  - `Running directory`
+    - `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
+
+Kalau `Running directory` masih menunjuk ke root project dan belum ke `public`, URL seperti `/login` biasanya gagal.
+
+### Rewrite untuk Nginx
+
+Kalau website kamu memakai `Nginx`, isi rewrite Laravel seperti ini:
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.php?$query_string;
+}
+```
+
+Cara set di aaPanel:
+1. buka `Website`
+2. pilih domain
+3. buka tab `Rewrite`
+4. pilih template `Laravel` jika tersedia
+5. kalau tidak ada, tempel rule di atas secara manual
+6. simpan lalu reload web server jika diminta
+
+### Rewrite untuk Apache
+
+Kalau website kamu memakai `Apache`, pastikan:
+- `Running directory` tetap ke folder `public`
+- file `.htaccess` di folder `public` ikut terbaca
+
+### Cek cepat setelah set rewrite
+
+Setelah `Running directory` dan rewrite sudah benar, jalankan:
+
+```bash
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+Lalu uji:
+- `https://teserpos.mitrasejatiberkah.com/`
+- `https://teserpos.mitrasejatiberkah.com/login`
+
+Kalau `/login` masih gagal, cek lagi:
+- apakah `Running directory` sudah ke `public`
+- apakah rewrite Laravel sudah aktif
+
 isi form seperti ini:
 
 - `Domain name`
