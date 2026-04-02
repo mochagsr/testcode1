@@ -777,23 +777,25 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
     $password = (string) ($config['password'] ?? '');
     $tempDb = (string) ($this->option('temp-db') ?: ('restore_test_' . now()->format('YmdHis')));
 
-    $dropCreate = sprintf(
-        'mysql --host=%s --port=%s --user=%s --password=%s -e "DROP DATABASE IF EXISTS `%s`; CREATE DATABASE `%s`;"',
-        escapeshellarg($host),
-        escapeshellarg($port),
-        escapeshellarg($username),
-        escapeshellarg($password),
-        $tempDb,
-        $tempDb
-    );
-    exec($dropCreate, $o1, $e1);
-    if ($e1 !== 0) {
+    try {
+        $adminPdo = new PDO(
+            sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port),
+            $username,
+            $password,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]
+        );
+        $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
+        $adminPdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', str_replace('`', '``', $tempDb)));
+    } catch (Throwable $e) {
         $this->error('Failed preparing temporary database.');
         DB::table('restore_drill_logs')->insert([
             'backup_file' => $file,
             'status' => 'failed',
             'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
-            'message' => 'Failed preparing temporary database.',
+            'message' => 'Failed preparing temporary database: ' . $e->getMessage(),
             'tested_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
@@ -812,15 +814,20 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
     );
     exec($restoreCmd, $o2, $e2);
 
-    $cleanup = sprintf(
-        'mysql --host=%s --port=%s --user=%s --password=%s -e "DROP DATABASE IF EXISTS `%s`;"',
-        escapeshellarg($host),
-        escapeshellarg($port),
-        escapeshellarg($username),
-        escapeshellarg($password),
-        $tempDb
-    );
-    exec($cleanup);
+    try {
+        $adminPdo = new PDO(
+            sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port),
+            $username,
+            $password,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]
+        );
+        $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
+    } catch (Throwable) {
+        // Ignore cleanup failure and continue reporting restore result.
+    }
 
     if ($e2 !== 0) {
         $this->error('Restore test failed.');
