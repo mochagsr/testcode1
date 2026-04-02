@@ -28,6 +28,11 @@
         .qty-box table { margin-top: 0; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 68%; }
         .qty-box td:last-child { width: 32%; text-align: right; font-weight: 700; white-space: nowrap; }
+        .fulfillment-box { margin-top: 10px; }
+        .fulfillment-box .section-title { font-weight: 800; margin-bottom: 6px; }
+        .delivery-list { margin: 0; padding-left: 16px; }
+        .delivery-list li { margin-bottom: 4px; }
+        .delivery-empty { font-style: italic; color: #444; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
@@ -53,6 +58,8 @@
         $customerCity = trim((string) ($note->city ?: $note->customer?->city ?: ''));
         $customerDisplayName = trim((string) ($note->customer?->name ?: preg_replace('/\s*\([^)]+\)\s*$/', '', (string) $note->customer_name)));
         $totalQty = (int) round((float) $note->items->sum('quantity'), 0);
+        $fulfilledTotal = collect($fulfillmentDetails['items'] ?? [])->sum(fn (array $item): int => (int) ($item['fulfilled_qty'] ?? 0));
+        $remainingTotal = collect($fulfillmentDetails['items'] ?? [])->sum(fn (array $item): int => (int) ($item['remaining_qty'] ?? 0));
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
@@ -110,17 +117,21 @@
         <tr>
             <th style="width: 6%">{{ __('txn.no') }}</th>
             <th>{{ __('txn.name') }}</th>
-            <th class="num" style="width: 10%">{{ __('txn.qty') }}</th>
-            <th style="width: 35%">{{ __('txn.notes') }}</th>
+            <th class="num" style="width: 9%">{{ __('txn.order_note_qty_ordered') }}</th>
+            <th class="num" style="width: 9%">{{ __('txn.order_note_qty_fulfilled') }}</th>
+            <th class="num" style="width: 9%">{{ __('txn.order_note_qty_remaining') }}</th>
+            <th style="width: 31%">{{ __('txn.notes') }}</th>
         </tr>
         </thead>
         <tbody>
-        @foreach($note->items as $item)
+        @foreach(($fulfillmentDetails['items'] ?? []) as $item)
             <tr>
                 <td>{{ $loop->iteration }}</td>
-                <td>{{ $item->product_name }}</td>
-                <td class="num">{{ (int) round($item->quantity) }}</td>
-                <td>{{ $item->notes ?: '' }}</td>
+                <td>{{ $item['product_name'] }}</td>
+                <td class="num">{{ number_format((int) ($item['ordered_qty'] ?? 0), 0, ',', '.') }}</td>
+                <td class="num">{{ number_format((int) ($item['fulfilled_qty'] ?? 0), 0, ',', '.') }}</td>
+                <td class="num">{{ number_format((int) ($item['remaining_qty'] ?? 0), 0, ',', '.') }}</td>
+                <td>{{ $item['notes'] ?? '' }}</td>
             </tr>
         @endforeach
         </tbody>
@@ -136,8 +147,52 @@
                     <td style="width: 50%;">{{ __('txn.summary_total_qty') }}</td>
                     <td style="width: 40%;">{{ number_format($totalQty, 0, ',', '.') }}</td>
                 </tr>
+                <tr>
+                    <td>{{ __('txn.order_note_qty_fulfilled') }}</td>
+                    <td>{{ number_format($fulfilledTotal, 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td>{{ __('txn.order_note_qty_remaining') }}</td>
+                    <td>{{ number_format($remainingTotal, 0, ',', '.') }}</td>
+                </tr>
             </table>
         </div>
+    </div>
+
+    <div class="fulfillment-box">
+        <div class="section-title">{{ __('txn.order_note_delivery_history_title') }}</div>
+        <table class="line-items">
+            <thead>
+            <tr>
+                <th>{{ __('txn.name') }}</th>
+                <th class="num" style="width: 10%">{{ __('txn.order_note_qty_ordered') }}</th>
+                <th class="num" style="width: 10%">{{ __('txn.order_note_qty_fulfilled') }}</th>
+                <th class="num" style="width: 10%">{{ __('txn.order_note_qty_remaining') }}</th>
+                <th style="width: 40%">{{ __('txn.order_note_delivered_in_invoice') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach(($fulfillmentDetails['items'] ?? []) as $item)
+                <tr>
+                    <td>{{ $item['product_name'] }}</td>
+                    <td class="num">{{ number_format((int) ($item['ordered_qty'] ?? 0), 0, ',', '.') }}</td>
+                    <td class="num">{{ number_format((int) ($item['fulfilled_qty'] ?? 0), 0, ',', '.') }}</td>
+                    <td class="num">{{ number_format((int) ($item['remaining_qty'] ?? 0), 0, ',', '.') }}</td>
+                    <td>
+                        @if(!empty($item['deliveries']))
+                            <ul class="delivery-list">
+                                @foreach($item['deliveries'] as $delivery)
+                                    <li>{{ $delivery['invoice_number'] }} ({{ $delivery['invoice_date'] }}) - {{ __('txn.qty') }} {{ number_format((int) ($delivery['quantity'] ?? 0), 0, ',', '.') }}</li>
+                                @endforeach
+                            </ul>
+                        @else
+                            <span class="delivery-empty">{{ __('txn.order_note_no_delivery_history') }}</span>
+                        @endif
+                    </td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
     </div>
 
     <table class="signature-table">

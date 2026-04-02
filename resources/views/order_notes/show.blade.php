@@ -73,6 +73,46 @@
             min-width: 210px;
             max-width: none;
         }
+        .txn-status-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .txn-status-chip.open {
+            background: rgba(245, 158, 11, 0.18);
+            color: #fbbf24;
+        }
+        .txn-status-chip.partial {
+            background: rgba(59, 130, 246, 0.18);
+            color: #93c5fd;
+        }
+        .txn-status-chip.finished {
+            background: rgba(34, 197, 94, 0.18);
+            color: #86efac;
+        }
+        .delivery-history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .delivery-history-row {
+            padding: 8px 10px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.18);
+        }
+        .delivery-history-row strong {
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .delivery-history-empty {
+            color: #94a3b8;
+            font-style: italic;
+        }
     </style>
 
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -124,21 +164,78 @@
     <div class="card">
         <div class="form-section">
             <h3 class="form-section-title">{{ __('txn.items') }}</h3>
-            <p class="form-section-note">{{ __('txn.order_items_note') }}</p>
+            <p class="form-section-note">{{ __('txn.order_items_note') }} {{ __('txn.order_note_items_detail_hint') }}</p>
             <table>
                 <thead>
                 <tr>
                     <th>{{ __('txn.name') }}</th>
-                    <th>{{ __('txn.qty') }}</th>
+                    <th>{{ __('txn.order_note_qty_ordered') }}</th>
+                    <th>{{ __('txn.order_note_qty_fulfilled') }}</th>
+                    <th>{{ __('txn.order_note_qty_remaining') }}</th>
+                    <th>{{ __('txn.status') }}</th>
                     <th>{{ __('txn.notes') }}</th>
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($note->items as $item)
+                @foreach(($fulfillmentDetails['items'] ?? []) as $item)
+                    @php
+                        $itemStatus = (string) ($item['status'] ?? 'open');
+                        $itemStatusLabel = match ($itemStatus) {
+                            'finished' => __('txn.order_note_status_finished'),
+                            'partial' => __('txn.order_note_status_partial'),
+                            default => __('txn.order_note_status_not_delivered'),
+                        };
+                    @endphp
                     <tr>
-                        <td>{{ $item->product_name }}</td>
-                        <td>{{ (int) round($item->quantity) }}</td>
-                        <td>{{ $item->notes ?: '-' }}</td>
+                        <td>{{ $item['product_name'] }}</td>
+                        <td>{{ number_format((int) ($item['ordered_qty'] ?? 0), 0, ',', '.') }}</td>
+                        <td>{{ number_format((int) ($item['fulfilled_qty'] ?? 0), 0, ',', '.') }}</td>
+                        <td>{{ number_format((int) ($item['remaining_qty'] ?? 0), 0, ',', '.') }}</td>
+                        <td><span class="txn-status-chip {{ $itemStatus === 'finished' ? 'finished' : ($itemStatus === 'partial' ? 'partial' : 'open') }}">{{ $itemStatusLabel }}</span></td>
+                        <td>{{ ($item['notes'] ?? '') !== '' ? $item['notes'] : '-' }}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="form-section">
+            <h3 class="form-section-title">{{ __('txn.order_note_delivery_history_title') }}</h3>
+            <p class="form-section-note">{{ __('txn.order_note_delivery_history_note') }}</p>
+            <table>
+                <thead>
+                <tr>
+                    <th>{{ __('txn.name') }}</th>
+                    <th>{{ __('txn.order_note_qty_ordered') }}</th>
+                    <th>{{ __('txn.order_note_qty_fulfilled') }}</th>
+                    <th>{{ __('txn.order_note_qty_remaining') }}</th>
+                    <th>{{ __('txn.order_note_delivered_in_invoice') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach(($fulfillmentDetails['items'] ?? []) as $item)
+                    <tr>
+                        <td>{{ $item['product_name'] }}</td>
+                        <td>{{ number_format((int) ($item['ordered_qty'] ?? 0), 0, ',', '.') }}</td>
+                        <td>{{ number_format((int) ($item['fulfilled_qty'] ?? 0), 0, ',', '.') }}</td>
+                        <td>{{ number_format((int) ($item['remaining_qty'] ?? 0), 0, ',', '.') }}</td>
+                        <td>
+                            @if(!empty($item['deliveries']))
+                                <div class="delivery-history-list">
+                                    @foreach($item['deliveries'] as $delivery)
+                                        <div class="delivery-history-row">
+                                            <strong>{{ $delivery['invoice_number'] }}</strong>
+                                            <span>{{ $delivery['invoice_date'] }}</span>
+                                            <span style="margin-left: 8px;">{{ __('txn.qty') }} {{ number_format((int) ($delivery['quantity'] ?? 0), 0, ',', '.') }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <span class="delivery-history-empty">{{ __('txn.order_note_no_delivery_history') }}</span>
+                            @endif
+                        </td>
                     </tr>
                 @endforeach
                 </tbody>

@@ -492,6 +492,7 @@ class OrderNotePageController extends Controller
             'progress_percent' => 0.0,
             'status' => 'open',
         ];
+        $fulfillmentDetails = $this->buildOrderNoteFulfillmentDetails($orderNote);
         $itemProductIds = $orderNote->items
             ->pluck('product_id')
             ->map(fn($id): int => (int) $id)
@@ -519,6 +520,7 @@ class OrderNotePageController extends Controller
             'note' => $orderNote,
             'products' => $products,
             'noteProgress' => $noteProgress,
+            'fulfillmentDetails' => $fulfillmentDetails,
         ]);
     }
 
@@ -636,6 +638,7 @@ class OrderNotePageController extends Controller
 
         return view('order_notes.print', [
             'note' => $orderNote,
+            'fulfillmentDetails' => $this->buildOrderNoteFulfillmentDetails($orderNote),
         ]);
     }
 
@@ -646,6 +649,7 @@ class OrderNotePageController extends Controller
         $filename = $orderNote->note_number . '.pdf';
         $pdf = Pdf::loadView('order_notes.print', [
             'note' => $orderNote,
+            'fulfillmentDetails' => $this->buildOrderNoteFulfillmentDetails($orderNote),
             'isPdf' => true,
         ])->setPaper('a4', 'portrait');
 
@@ -748,6 +752,172 @@ class OrderNotePageController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * @return array{
+     *     items:list<array{
+     *         id:int,
+     *         product_id:int|null,
+     *         product_code:string,
+     *         product_name:string,
+     *         ordered_qty:int,
+     *         fulfilled_qty:int,
+     *         remaining_qty:int,
+     *         notes:string,
+     *         status:string,
+     *         deliveries:list<array{invoice_id:int,invoice_number:string,invoice_date:string,quantity:int}>
+     *     }>,
+     *     has_deliveries:bool
+     * }
+     */
+    private function buildOrderNoteFulfillmentDetails(OrderNote $orderNote): array
+    {
+        $items = [];
+        $itemIdsByProduct = [];
+
+        foreach ($orderNote->items as $item) {
+            $itemId = (int) $item->id;
+            $productId = (int) ($item->product_id ?? 0);
+            $items[$itemId] = [
+                'id' => $itemId,
+                'product_id' => $productId > 0 ? $productId : null,
+                'product_code' => (string) ($item->product_code ?? ''),
+                'product_name' => (string) ($item->product_name ?? ''),
+                'ordered_qty' => max(0, (int) ($item->quantity ?? 0)),
+                'fulfilled_qty' => 0,
+                'remaining_qty' => max(0, (int) ($item->quantity ?? 0)),
+                'notes' => (string) ($item->notes ?? ''),
+                'status' => 'open',
+                'deliveries' => [],
+            ];
+
+            if ($productId > 0) {
+                $itemIdsByProduct[$productId] = $itemIdsByProduct[$productId] ?? [];
+                $itemIdsByProduct[$productId][] = $itemId;
+            }
+        }
+
+        $invoiceRows = DB::table('sales_invoice_items as sii')
+            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+            ->where('si.order_note_id', (int) $orderNote->id)
+            ->whereNull('si.deleted_at')
+            ->where('si.is_canceled', false)
+            ->orderBy('si.invoice_date')
+            ->orderBy('si.id')
+            ->orderBy('sii.id')
+            ->get([
+                'sii.id',
+                'sii.order_note_item_id',
+                'sii.product_id',
+                'sii.quantity',
+                'si.id as invoice_id',
+                'si.invoice_number',
+                'si.invoice_date',
+            ]);
+
+        foreach ($invoiceRows as $row) {
+            $invoiceId = (int) ($row->invoice_id ?? 0);
+            $invoiceNumber = (string) ($row->invoice_number ?? '');
+            $invoiceDate = $row->invoice_date !== null
+                ? Carbon::parse((string) $row->invoice_date)->format('d-m-Y')
+                : '-';
+            $remainingAllocation = max(0, (int) round((float) ($row->quantity ?? 0)));
+
+            if ($remainingAllocation <= 0 || $invoiceId <= 0 || $invoiceNumber === '') {
+                continue;
+            }
+
+            $directItemId = (int) ($row->order_note_item_id ?? 0);
+            if ($directItemId > 0 && isset($items[$directItemId])) {
+                $allocated = min($remainingAllocation, max(0, (int) $items[$directItemId]['remaining_qty']));
+                if ($allocated > 0) {
+                    $this->applyOrderNoteDeliveryAllocation($items, $directItemId, $invoiceId, $invoiceNumber, $invoiceDate, $allocated);
+                    $remainingAllocation -= $allocated;
+                }
+            }
+
+            if ($remainingAllocation <= 0) {
+                continue;
+            }
+
+            $productId = (int) ($row->product_id ?? 0);
+            if ($productId <= 0 || ! isset($itemIdsByProduct[$productId])) {
+                continue;
+            }
+
+            foreach ($itemIdsByProduct[$productId] as $fallbackItemId) {
+                if ($remainingAllocation <= 0) {
+                    break;
+                }
+
+                $itemRemaining = max(0, (int) ($items[$fallbackItemId]['remaining_qty'] ?? 0));
+                if ($itemRemaining <= 0) {
+                    continue;
+                }
+
+                $allocated = min($remainingAllocation, $itemRemaining);
+                if ($allocated <= 0) {
+                    continue;
+                }
+
+                $this->applyOrderNoteDeliveryAllocation($items, $fallbackItemId, $invoiceId, $invoiceNumber, $invoiceDate, $allocated);
+                $remainingAllocation -= $allocated;
+            }
+        }
+
+        $hasDeliveries = false;
+        foreach ($items as &$item) {
+            $item['remaining_qty'] = max(0, (int) $item['ordered_qty'] - (int) $item['fulfilled_qty']);
+            $item['status'] = $item['fulfilled_qty'] <= 0
+                ? 'not_delivered'
+                : ($item['remaining_qty'] > 0 ? 'partial' : 'finished');
+            $item['deliveries'] = array_values($item['deliveries']);
+            if ($item['deliveries'] !== []) {
+                $hasDeliveries = true;
+            }
+        }
+        unset($item);
+
+        return [
+            'items' => array_values($items),
+            'has_deliveries' => $hasDeliveries,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $items
+     */
+    private function applyOrderNoteDeliveryAllocation(
+        array &$items,
+        int $itemId,
+        int $invoiceId,
+        string $invoiceNumber,
+        string $invoiceDate,
+        int $quantity
+    ): void {
+        if (! isset($items[$itemId]) || $quantity <= 0) {
+            return;
+        }
+
+        $items[$itemId]['fulfilled_qty'] = (int) $items[$itemId]['fulfilled_qty'] + $quantity;
+        $items[$itemId]['remaining_qty'] = max(
+            0,
+            (int) $items[$itemId]['ordered_qty'] - (int) $items[$itemId]['fulfilled_qty']
+        );
+
+        $deliveryKey = (string) $invoiceId;
+        if (! isset($items[$itemId]['deliveries'][$deliveryKey])) {
+            $items[$itemId]['deliveries'][$deliveryKey] = [
+                'invoice_id' => $invoiceId,
+                'invoice_number' => $invoiceNumber,
+                'invoice_date' => $invoiceDate,
+                'quantity' => 0,
+            ];
+        }
+
+        $items[$itemId]['deliveries'][$deliveryKey]['quantity'] =
+            (int) $items[$itemId]['deliveries'][$deliveryKey]['quantity'] + $quantity;
     }
 
     private function generateNoteNumber(string $date): string
