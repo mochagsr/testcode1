@@ -1354,6 +1354,52 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee(__('ui.semester_close_button'));
     }
 
+    public function test_user_with_receivable_lock_permission_can_access_customer_semester_book_controls(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => ['receivables.view', 'receivables.lock'],
+        ]);
+
+        $customer = Customer::query()->create([
+            'code' => 'CUST-LOCK-001',
+            'name' => 'Customer Lockable',
+            'city' => 'Surabaya',
+        ]);
+
+        SalesInvoice::query()->create([
+            'invoice_number' => 'INV-LOCK-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-03-15',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 90000,
+            'total' => 90000,
+            'total_paid' => 0,
+            'balance' => 90000,
+            'payment_status' => 'unpaid',
+            'is_canceled' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.customer_semester_book_title'));
+        $response->assertSee(__('receivable.customer_semester_close_button'));
+
+        $postResponse = $this->actingAs($user)->post(route('receivables.customer-semester.close', [
+            'customer' => $customer->id,
+        ]), [
+            'semester' => 'S2-2526',
+            'customer_id' => $customer->id,
+        ]);
+
+        $postResponse->assertRedirect();
+        $this->assertTrue(app(\App\Support\SemesterBookService::class)->isCustomerLocked((int) $customer->id, 'S2-2526'));
+    }
+
     public function test_receivable_semester_print_renders_totals(): void
     {
         $user = User::factory()->create();

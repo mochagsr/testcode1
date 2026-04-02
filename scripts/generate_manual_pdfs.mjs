@@ -428,6 +428,9 @@ async function main() {
   await user.goto(`${baseUrl}/supplier-payables`, { waitUntil: 'domcontentloaded' });
   await waitForUi(user);
   await shot(user, 'user-supplier-payables.png');
+  await user.goto(`${baseUrl}/settings`, { waitUntil: 'domcontentloaded' });
+  await waitForUi(user);
+  await shot(user, 'user-settings.png');
 
   await renderPdf(browser, 'USER_TRANSACTION_GUIDE.md', 'USER_TRANSACTION_GUIDE.pdf', 'Panduan User - Semua Jenis Transaksi');
   await renderPdf(browser, 'ADMIN_TRANSACTION_GUIDE.md', 'ADMIN_TRANSACTION_GUIDE.pdf', 'Panduan Admin - Semua Jenis Transaksi');

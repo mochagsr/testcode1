@@ -363,7 +363,7 @@ isi form seperti ini:
 - `Website Path`
   - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
 - `FTP`
-  - `Not create`
+  - `Not create` 
 - `Database`
   - `MySQL`
 - `Database settings`
@@ -472,10 +472,19 @@ Contoh isian:
 
 Setelah site berhasil dibuat lewat `Create for Git`, lanjutkan:
 1. buka detail site
-2. masuk `Site directory`
-3. set `Running directory = public`
+2. cek dulu apakah source code Laravel sudah benar-benar masuk ke:
+   - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+   - atau `/www/wwwroot/erpos.mitrasejaitberkah.com`
+3. kalau folder `public` Laravel sudah ada, baru set:
+   - `Running directory = public`
 4. masuk `Terminal`
 5. jalankan langkah Laravel seperti biasa
+
+Catatan:
+- `Website Path` tetap folder project utama
+- `Running directory` adalah subfolder `public` di dalam project Laravel
+- jadi kalau `public` belum ada saat pertama buka detail site, jangan panik
+- lanjutkan proses clone dulu, lalu kembali lagi untuk mengarahkan `Running directory`
 
 Contoh untuk env `tes` setelah `Create for Git`:
 
@@ -539,30 +548,72 @@ Langkah:
    - atau `/www/wwwroot/erpos.mitrasejaitberkah.com`
 6. simpan
 
-Setelah site dibuat:
-1. buka site tersebut
-2. masuk `Site directory`
-3. set `Running directory = public`
+Catatan penting:
+- saat site baru dibuat, aaPanel memang langsung membuat folder website
+- contoh:
+  - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+- folder itu adalah **Website Path / project root**
+- ini **belum** berarti subfolder Laravel `public` sudah ada
+
+Jadi pada tahap ini:
+- **Website Path** sudah benar
+- **Running directory** belum perlu dipaksa dulu kalau source code Laravel belum masuk
+
+Set `Running directory = public` dilakukan **setelah repo berhasil di-clone**, karena barulah folder berikut tersedia:
+- `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
+- atau `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
 
 ## 9A. Clone code dari GitHub untuk Opsi A
 
-### Env tes
+Karena folder website sudah dibuat dulu oleh aaPanel, clone repo harus masuk ke **folder yang sudah ada itu**.
+
+Jangan pakai pola ini:
 
 ```bash
 cd /www/wwwroot
 git clone https://github.com/mochagsr/testcode1.git teserpos.mitrasejatiberkah.com
+```
+
+karena folder `teserpos.mitrasejatiberkah.com` sudah dibuat aaPanel.
+
+Gunakan pola ini:
+- masuk dulu ke folder website yang sudah dibuat
+- lalu clone ke folder saat ini dengan `git clone ... .`
+
+### Env tes
+
+```bash
 cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+git clone https://github.com/mochagsr/testcode1.git .
 composer install --no-dev --optimize-autoloader
 ```
 
 ### Env prod
 
 ```bash
-cd /www/wwwroot
-git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejaitberkah.com
 cd /www/wwwroot/erpos.mitrasejaitberkah.com
+git clone https://github.com/mochagsr/testcode1.git .
 composer install --no-dev --optimize-autoloader
 ```
+
+Kalau folder site masih berisi file default aaPanel seperti `index.html`, hapus dulu sebelum clone:
+
+```bash
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+rm -f index.html index.php
+git clone https://github.com/mochagsr/testcode1.git .
+```
+
+Setelah clone selesai:
+1. buka kembali menu website di aaPanel
+2. masuk ke `Site directory`
+3. set `Running directory` ke:
+   - `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
+   - atau `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
+
+Ringkas:
+- `Website Path` = folder project Laravel
+- `Running directory` = folder `public` di dalam project Laravel
 
 ## 10A. Buat database untuk Opsi A
 

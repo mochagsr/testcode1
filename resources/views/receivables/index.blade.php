@@ -485,7 +485,7 @@
             </div>
         @endif
 
-        @if((auth()->user()?->role ?? '') === 'admin' && $selectedCustomerId > 0 && $selectedSemester)
+        @if((auth()->user()?->canAccess('receivables.lock') ?? false) && $selectedCustomerId > 0 && $selectedSemester)
             <div style="margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-color, #d0d7de); border-radius: 8px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
                 <div>
                     <strong>{{ __('receivable.customer_semester_book_title') }}</strong><br>

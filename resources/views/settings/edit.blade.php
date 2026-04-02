@@ -3,6 +3,39 @@
 @section('title', __('ui.settings_title').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $isEnglishSettings = app()->getLocale() === 'en';
+        $settingsHints = [
+            'profile_title' => $isEnglishSettings ? 'Manage the name shown on receipts and your account profile.' : 'Atur nama pengguna yang tampil di nota dan profil akun Anda.',
+            'profile_name' => $isEnglishSettings ? 'This name is shown on receipts and several account displays.' : 'Nama ini tampil di nota dan beberapa tampilan akun.',
+            'profile_email' => $isEnglishSettings ? 'This email is used for login and is managed from user data.' : 'Email ini dipakai untuk login dan diatur dari data pengguna.',
+            'preferences_title' => $isEnglishSettings ? 'Choose the interface language, theme, and password for this account.' : 'Pilih bahasa, tema, dan password untuk akun yang sedang dipakai.',
+            'preferences_language' => $isEnglishSettings ? 'Change the interface language for this account only.' : 'Ubah bahasa tampilan untuk akun yang sedang login saja.',
+            'preferences_theme' => $isEnglishSettings ? 'Choose light or dark appearance for this account.' : 'Pilih tampilan terang atau gelap untuk akun ini.',
+            'preferences_password' => $isEnglishSettings ? 'Leave blank if you do not want to change the current password.' : 'Kosongkan jika tidak ingin mengganti password saat ini.',
+            'company_profile_title' => $isEnglishSettings ? 'Company identity used on printed documents and reports.' : 'Identitas perusahaan yang dipakai di header cetak dokumen dan laporan.',
+            'company_name' => $isEnglishSettings ? 'Shown in document and report headers.' : 'Nama perusahaan yang tampil di header dokumen dan laporan.',
+            'company_address' => $isEnglishSettings ? 'Shown in printed headers and invoices.' : 'Alamat perusahaan yang tampil di header cetak dan invoice.',
+            'company_phone' => $isEnglishSettings ? 'Phone number shown on printed documents when needed.' : 'Nomor telepon perusahaan yang bisa tampil di dokumen cetak.',
+            'company_email' => $isEnglishSettings ? 'Email shown on printed documents when needed.' : 'Email perusahaan yang bisa tampil di dokumen cetak.',
+            'company_invoice_notes' => $isEnglishSettings ? 'Default notes printed on customer invoices.' : 'Catatan default yang tampil di invoice customer.',
+            'report_header_text' => $isEnglishSettings ? 'Optional custom header text for operational reports.' : 'Teks header tambahan untuk report operasional jika diperlukan.',
+            'company_logo_title' => $isEnglishSettings ? 'Upload the company logo used in supported documents and reports.' : 'Upload logo perusahaan yang dipakai di dokumen dan report yang mendukung logo.',
+            'company_logo_upload' => $isEnglishSettings ? 'Accepted image file for the active company logo.' : 'File gambar yang akan dipakai sebagai logo perusahaan aktif.',
+            'print_workflow_title' => $isEnglishSettings ? 'Configure the default printing behavior for the team.' : 'Atur perilaku cetak default yang dipakai tim saat print dokumen.',
+            'print_mode' => $isEnglishSettings ? 'Choose browser printing or QZ Tray integration.' : 'Pilih print lewat browser atau integrasi QZ Tray.',
+            'print_paper_preset' => $isEnglishSettings ? 'Default paper size preset used by print actions.' : 'Preset ukuran kertas default yang dipakai saat print.',
+            'print_small_rows_threshold' => $isEnglishSettings ? 'Used to decide when the compact print layout should be used.' : 'Dipakai untuk menentukan kapan layout print kecil digunakan.',
+            'semester_title' => $isEnglishSettings ? 'Manage semester options, active flags, and open/closed status.' : 'Kelola daftar semester, status aktif, dan status buka/tutup semester.',
+            'semester_list' => $isEnglishSettings ? 'Only open semesters can appear in transaction dropdowns.' : 'Hanya semester yang masih terbuka yang bisa tampil di dropdown transaksi.',
+            'semester_active' => $isEnglishSettings ? 'Use this flag to allow a semester in transaction dropdowns.' : 'Centang ini jika semester boleh muncul di dropdown transaksi.',
+            'semester_action' => $isEnglishSettings ? 'Close a semester to prevent new transactions from using it.' : 'Tutup semester jika ingin menghentikan transaksi baru pada periode itu.',
+            'units_title' => $isEnglishSettings ? 'Manage unit options shown in sales and supplier goods receipt forms.' : 'Kelola daftar satuan yang tampil di form penjualan dan tanda terima barang.',
+            'product_units' => $isEnglishSettings ? 'Units shown in Sales Invoice item rows.' : 'Satuan yang tampil di baris item Faktur Penjualan.',
+            'outgoing_units' => $isEnglishSettings ? 'Units shown in Supplier Goods Receipt item rows.' : 'Satuan yang tampil di baris item Tanda Terima Barang.',
+        ];
+        $settingsHintIcon = static fn (string $text): string => '<span class="settings-help" tabindex="0" title="'.e($text).'" aria-label="'.e($text).'">?</span>';
+    @endphp
     <style>
         .settings-top-inline {
             display: grid;
@@ -59,6 +92,27 @@
             min-height: 32px;
             padding: 7px 10px;
         }
+        .settings-help {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            margin-left: 6px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: help;
+            background: color-mix(in srgb, var(--card) 92%, var(--bg));
+            vertical-align: middle;
+        }
+        .settings-help:focus {
+            outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+            outline-offset: 2px;
+        }
     </style>
 
     <h1 class="page-title">{{ __('menu.settings') }}</h1>
@@ -71,15 +125,15 @@
             <div class="settings-top-inline">
                 <div class="col-6">
                     <div class="form-section" style="margin-bottom: 0;">
-                        <h3 class="form-section-title">{{ __('ui.profile') }}</h3>
+                        <h3 class="form-section-title">{{ __('ui.profile') }} {!! $settingsHintIcon($settingsHints['profile_title']) !!}</h3>
                         <p class="form-section-note">{{ __('ui.settings_profile_note') }}</p>
                         <div class="row">
                             <div class="col-12">
-                                <label>{{ __('ui.name') }} <span class="label-required">*</span></label>
+                                <label>{{ __('ui.name') }} {!! $settingsHintIcon($settingsHints['profile_name']) !!} <span class="label-required">*</span></label>
                                 <input type="text" name="name" value="{{ old('name', $user->name) }}" required>
                             </div>
                             <div class="col-12">
-                                <label>{{ __('ui.email') }}</label>
+                                <label>{{ __('ui.email') }} {!! $settingsHintIcon($settingsHints['profile_email']) !!}</label>
                                 <input type="email" value="{{ $user->email }}" disabled>
                             </div>
                         </div>
@@ -87,25 +141,25 @@
                 </div>
                 <div class="col-6">
                     <div class="form-section" style="margin-bottom: 0;">
-                        <h3 class="form-section-title">{{ __('ui.preferences') }}</h3>
+                        <h3 class="form-section-title">{{ __('ui.preferences') }} {!! $settingsHintIcon($settingsHints['preferences_title']) !!}</h3>
                         <p class="form-section-note">{{ __('ui.settings_preferences_note') }}</p>
                         <div class="row">
                             <div class="col-6">
-                                <label>{{ __('ui.language') }} <span class="label-required">*</span></label>
+                                <label>{{ __('ui.language') }} {!! $settingsHintIcon($settingsHints['preferences_language']) !!} <span class="label-required">*</span></label>
                                 <select name="locale" required>
                                     <option value="id" @selected(old('locale', $user->locale) === 'id')>Indonesia</option>
                                     <option value="en" @selected(old('locale', $user->locale) === 'en')>English</option>
                                 </select>
                             </div>
                             <div class="col-6">
-                                <label>{{ __('ui.theme') }} <span class="label-required">*</span></label>
+                                <label>{{ __('ui.theme') }} {!! $settingsHintIcon($settingsHints['preferences_theme']) !!} <span class="label-required">*</span></label>
                                 <select name="theme" required>
                                     <option value="light" @selected(old('theme', $user->theme) === 'light')>Light</option>
                                     <option value="dark" @selected(old('theme', $user->theme) === 'dark')>Dark</option>
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label>{{ __('ui.new_password_optional') }}</label>
+                                <label>{{ __('ui.new_password_optional') }} {!! $settingsHintIcon($settingsHints['preferences_password']) !!}</label>
                                 <input type="password" name="password">
                             </div>
                         </div>
@@ -115,26 +169,26 @@
 
             @if($user->role === 'admin')
                 <div class="form-section">
-                    <h3 class="form-section-title">{{ __('ui.settings_company_profile') }}</h3>
+                    <h3 class="form-section-title">{{ __('ui.settings_company_profile') }} {!! $settingsHintIcon($settingsHints['company_profile_title']) !!}</h3>
                     <p class="form-section-note">{{ __('ui.settings_company_profile_note') }}</p>
                     <div class="row inline">
                         <div class="col-6">
                             <div class="form-section" style="margin-bottom: 0;">
                                 <div class="row">
                                     <div class="col-12">
-                                        <label>{{ __('ui.settings_company_name') }}</label>
+                                        <label>{{ __('ui.settings_company_name') }} {!! $settingsHintIcon($settingsHints['company_name']) !!}</label>
                                         <input type="text" name="company_name" value="{{ old('company_name', $companyName) }}">
                                     </div>
                                     <div class="col-12">
-                                        <label>{{ __('ui.settings_company_address') }}</label>
+                                        <label>{{ __('ui.settings_company_address') }} {!! $settingsHintIcon($settingsHints['company_address']) !!}</label>
                                         <textarea name="company_address" rows="3" style="min-height: 86px;">{{ old('company_address', $companyAddress) }}</textarea>
                                     </div>
                                     <div class="col-12">
-                                        <label>{{ __('ui.settings_company_phone') }}</label>
+                                        <label>{{ __('ui.settings_company_phone') }} {!! $settingsHintIcon($settingsHints['company_phone']) !!}</label>
                                         <input type="text" name="company_phone" value="{{ old('company_phone', $companyPhone) }}">
                                     </div>
                                     <div class="col-12">
-                                        <label>{{ __('ui.settings_company_email') }}</label>
+                                        <label>{{ __('ui.settings_company_email') }} {!! $settingsHintIcon($settingsHints['company_email']) !!}</label>
                                         <input type="text" name="company_email" value="{{ old('company_email', $companyEmail) }}">
                                     </div>
                                 </div>
@@ -144,11 +198,11 @@
                             <div class="form-section" style="margin-bottom: 0;">
                                 <div class="row">
                                     <div class="col-12">
-                                        <label>{{ __('ui.settings_company_invoice_notes') }}</label>
+                                        <label>{{ __('ui.settings_company_invoice_notes') }} {!! $settingsHintIcon($settingsHints['company_invoice_notes']) !!}</label>
                                         <textarea name="company_invoice_notes" rows="12">{{ old('company_invoice_notes', $companyInvoiceNotes) }}</textarea>
                                     </div>
                                     <div class="col-12">
-                                        <label>Template Header Report</label>
+                                        <label>Template Header Report {!! $settingsHintIcon($settingsHints['report_header_text']) !!}</label>
                                         <textarea name="report_header_text" rows="3" placeholder="Contoh: FAKTUR RESMI - CV. PUSTAKA GRAFIKA">{{ old('report_header_text', $reportHeaderText ?? '') }}</textarea>
                                     </div>
                                 </div>
@@ -158,11 +212,11 @@
                 </div>
 
                 <div class="form-section">
-                    <h3 class="form-section-title">{{ __('ui.settings_company_logo') }}</h3>
+                    <h3 class="form-section-title">{{ __('ui.settings_company_logo') }} {!! $settingsHintIcon($settingsHints['company_logo_title']) !!}</h3>
                     <p class="form-section-note">{{ __('ui.settings_company_logo_note') }}</p>
                     <div class="row">
                         <div class="col-6">
-                            <label>{{ __('ui.settings_upload_logo') }}</label>
+                            <label>{{ __('ui.settings_upload_logo') }} {!! $settingsHintIcon($settingsHints['company_logo_upload']) !!}</label>
                             <input type="file" name="company_logo" accept="image/*">
                             @if($companyLogoPath)
                                 <p style="margin-top: 8px;">
@@ -179,18 +233,18 @@
                 </div>
 
                 <div class="form-section">
-                    <h3 class="form-section-title">{{ __('ui.settings_print_workflow_title') }}</h3>
+                    <h3 class="form-section-title">{{ __('ui.settings_print_workflow_title') }} {!! $settingsHintIcon($settingsHints['print_workflow_title']) !!}</h3>
                     <p class="form-section-note">{{ __('ui.settings_print_workflow_note') }}</p>
                     <div class="row inline">
                         <div class="col-4">
-                            <label>{{ __('ui.settings_print_mode') }}</label>
+                            <label>{{ __('ui.settings_print_mode') }} {!! $settingsHintIcon($settingsHints['print_mode']) !!}</label>
                             <select name="print_workflow_mode">
                                 <option value="browser" @selected(old('print_workflow_mode', $printWorkflowMode ?? 'browser') === 'browser')>Browser</option>
                                 <option value="qz" @selected(old('print_workflow_mode', $printWorkflowMode ?? 'browser') === 'qz')>QZ Tray</option>
                             </select>
                         </div>
                         <div class="col-4">
-                            <label>{{ __('ui.settings_print_paper_preset') }}</label>
+                            <label>{{ __('ui.settings_print_paper_preset') }} {!! $settingsHintIcon($settingsHints['print_paper_preset']) !!}</label>
                             <select name="print_paper_preset">
                                 <option value="auto" @selected(old('print_paper_preset', $printPaperPreset ?? 'auto') === 'auto')>{{ __('ui.settings_print_paper_auto') }}</option>
                                 <option value="9.5x5.5" @selected(old('print_paper_preset', $printPaperPreset ?? 'auto') === '9.5x5.5')>9.5x5.5</option>
@@ -198,14 +252,14 @@
                             </select>
                         </div>
                         <div class="col-4">
-                            <label>{{ __('ui.settings_print_small_rows_threshold') }}</label>
+                            <label>{{ __('ui.settings_print_small_rows_threshold') }} {!! $settingsHintIcon($settingsHints['print_small_rows_threshold']) !!}</label>
                             <input type="number" name="print_small_rows_threshold" min="5" max="200" step="1" value="{{ old('print_small_rows_threshold', (int) ($printSmallRowsThreshold ?? 35)) }}">
                         </div>
                     </div>
                 </div>
 
                 <div class="form-section">
-                    <h3 class="form-section-title">{{ __('ui.settings_semester_title') }}</h3>
+                    <h3 class="form-section-title">{{ __('ui.settings_semester_title') }} {!! $settingsHintIcon($settingsHints['semester_title']) !!}</h3>
                     <p class="form-section-note">{{ __('ui.settings_semester_note') }}</p>
                     @php
                         $semesterRows = collect(old('semester_period_codes', $semesterBookOptions ?? []))
@@ -233,7 +287,7 @@
                             ->values();
                         $semesterMetadataMap = $semesterMetadata ?? [];
                     @endphp
-                    <label>{{ __('ui.settings_semester_list') }} / {{ __('ui.active') }}</label>
+                    <label>{{ __('ui.settings_semester_list') }} / {{ __('ui.active') }} {!! $settingsHintIcon($settingsHints['semester_list']) !!}</label>
                     <p class="muted" style="margin: 0 0 8px 0;">{{ __('ui.settings_semester_active_note') }}</p>
                     <table id="semester-codes-table">
                         <thead>
@@ -270,16 +324,16 @@
                                             class="semester-active-checkbox"
                                             @checked($activeSemesters->contains((string) $semesterRow))
                                         >
-                                        {{ __('ui.active') }}
+                                        {{ __('ui.active') }} {!! $settingsHintIcon($settingsHints['semester_active']) !!}
                                     </label>
                                 </td>
                                 <td>{{ $isClosed ? __('ui.semester_closed') : __('ui.semester_open') }}</td>
                                 <td>
                                     <div class="flex" style="justify-content: center;">
                                         @if($isClosed)
-                                            <button type="submit" class="btn warning-btn" form="semester-open-{{ md5((string) $semesterRow) }}">{{ __('ui.semester_open_button') }}</button>
+                                            <button type="submit" class="btn warning-btn" form="semester-open-{{ md5((string) $semesterRow) }}" title="{{ $settingsHints['semester_action'] }}">{{ __('ui.semester_open_button') }}</button>
                                         @else
-                                            <button type="submit" class="btn edit-btn" form="semester-close-{{ md5((string) $semesterRow) }}">{{ __('ui.semester_close_button') }}</button>
+                                            <button type="submit" class="btn edit-btn" form="semester-close-{{ md5((string) $semesterRow) }}" title="{{ $settingsHints['semester_action'] }}">{{ __('ui.semester_close_button') }}</button>
                                         @endif
                                         <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
                                     </div>
@@ -301,7 +355,7 @@
                                             class="semester-active-checkbox"
                                             checked
                                         >
-                                        {{ __('ui.active') }}
+                                        {{ __('ui.active') }} {!! $settingsHintIcon($settingsHints['semester_active']) !!}
                                     </label>
                                 </td>
                                 <td>{{ __('ui.semester_open') }}</td>
@@ -314,11 +368,11 @@
                 </div>
 
                 <div class="form-section">
-                    <h3 class="form-section-title">{{ __('ui.settings_units_title') }}</h3>
+                    <h3 class="form-section-title">{{ __('ui.settings_units_title') }} {!! $settingsHintIcon($settingsHints['units_title']) !!}</h3>
                     <p class="form-section-note">{{ __('ui.settings_units_note') }}</p>
                     <div class="row inline">
                         <div class="col-6">
-                            <label>{{ __('ui.settings_units_list') }} ({{ __('txn.sales_invoice') }})</label>
+                            <label>{{ __('ui.settings_units_list') }} ({{ __('txn.sales_invoice') }}) {!! $settingsHintIcon($settingsHints['product_units']) !!}</label>
                             @php
                                 $productCodes = collect(old('product_unit_codes', $unitOptionRows->pluck('code')->all()))->values();
                                 $productLabels = collect(old('product_unit_labels', $unitOptionRows->pluck('label')->all()))->values();
@@ -350,7 +404,7 @@
                             <button type="button" id="add-product-unit-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                         </div>
                         <div class="col-6">
-                            <label>{{ __('ui.settings_units_list') }} ({{ __('txn.outgoing_transactions_title') }})</label>
+                            <label>{{ __('ui.settings_units_list') }} ({{ __('txn.outgoing_transactions_title') }}) {!! $settingsHintIcon($settingsHints['outgoing_units']) !!}</label>
                             @php
                                 $outgoingCodes = collect(old('outgoing_unit_codes', $outgoingUnitOptionRows->pluck('code')->all()))->values();
                                 $outgoingLabels = collect(old('outgoing_unit_labels', $outgoingUnitOptionRows->pluck('label')->all()))->values();

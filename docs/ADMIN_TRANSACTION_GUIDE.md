@@ -649,8 +649,123 @@ Sebelum import besar:
 
 ### Tugas admin di pengaturan
 - atur profil perusahaan
+- atur preferensi akun admin
+- atur bahasa dan tema akun
+- atur workflow print
 - kelola periode semester
 - cek status aktif / tutup semester
+- atur daftar satuan transaksi
+
+### Yang bisa diatur admin
+- `Nama`
+- `Email`
+- `Bahasa`
+- `Tema`
+- `Profil Perusahaan`
+- `Logo Perusahaan`
+- `Print Workflow`
+- `Periode Semester`
+- `Satuan Penjualan`
+- `Satuan Tanda Terima Barang`
+
+### Pengaturan akun admin
+Admin bisa mengubah preferensi akun sendiri:
+- nama pengguna yang tampil di nota
+- email
+- bahasa aplikasi
+- tema tampilan
+
+Contoh:
+- nama user admin sebelumnya `Admin PgPOS`
+- lalu diubah menjadi `Supervisor Cetak`
+- sesudah disimpan, nama yang tampil di nota akan ikut berubah
+- admin operasional A memakai bahasa `Indonesia`
+- admin owner memakai bahasa `English`
+- masing-masing akun tetap bisa berbeda
+
+### Bahasa dan tema
+Opsi bahasa:
+- `Indonesia`
+- `English`
+
+Opsi tema:
+- `Light`
+- `Dark`
+
+Gunanya:
+- bahasa membantu tim yang butuh tampilan bilingual
+- tema membantu kenyamanan kerja di monitor yang berbeda
+
+### Profil perusahaan
+Bagian ini dipakai untuk:
+- nama perusahaan
+- alamat perusahaan
+- telepon perusahaan
+- email perusahaan
+- catatan invoice default
+
+Dampaknya:
+- dipakai di header print dokumen dan laporan
+- dipakai di invoice customer
+- dipakai di beberapa report operasional
+
+Kalau data ini salah:
+- hasil print akan ikut salah
+- jadi perubahan di bagian ini harus dicek hati-hati
+
+### Logo perusahaan
+Admin bisa:
+- upload logo
+- lihat logo aktif
+- hapus logo lama
+
+Dampaknya:
+- logo muncul di dokumen/report yang memang mendukung logo perusahaan
+
+### Print workflow
+Admin bisa mengatur:
+- mode print
+- preset kertas
+- ambang batas baris untuk print kecil
+
+Gunanya:
+- menyesuaikan hasil cetak dengan printer yang dipakai tim
+- mengurangi layout report yang terpotong
+
+### Periode semester
+Di bagian ini admin mengelola:
+- daftar semester
+- status aktif semester
+- status buka/tutup semester
+- tanggal dibuat
+- tanggal tutup
+
+Aturan yang perlu diingat:
+- semester tertutup tidak boleh dipakai transaksi baru
+- semester tertutup tidak muncul di dropdown transaksi terkait
+- admin masih perlu cek apakah semester benar-benar siap ditutup
+
+### Satuan transaksi
+Admin juga bisa mengatur daftar satuan yang muncul di:
+- `Faktur Penjualan`
+- `Tanda Terima Barang`
+
+Contoh:
+- `pcs`
+- `pack`
+- `dus`
+- `rim`
+
+Kalau satuan belum ada:
+- tambahkan di `Pengaturan`
+- lalu user baru bisa memakainya di transaksi
+
+### Checklist admin saat mengubah pengaturan
+1. cek akun yang sedang dipakai memang akun admin
+2. simpan perubahan
+3. refresh halaman kalau perlu
+4. cek hasil pada transaksi / print / report terkait
+5. kalau mengubah semester atau profil perusahaan, lakukan pengecekan ulang lebih teliti
 
 ## 22. Checklist admin harian
 
@@ -668,6 +783,81 @@ Sebelum import besar:
 3. cek integrity check
 4. cek performa list/export
 5. cek periode yang siap ditutup
+
+## 24. Master data dan referensi
+
+Menu yang termasuk di sini:
+- `Kategori Barang`
+- `Barang`
+- `Level Customer`
+- `Customer`
+- `Supplier`
+- `Lokasi Kirim Sekolah`
+
+Tugas admin:
+- memastikan data referensi rapi sebelum dipakai transaksi
+- mencegah duplikasi kode / nama yang membingungkan
+- memastikan data customer, supplier, dan lokasi kirim tetap akurat
+
+Contoh:
+- ada customer baru dengan alamat kirim berbeda
+- admin cek apakah cukup tambah `Lokasi Kirim Sekolah`
+- atau memang perlu buat customer baru
+
+## 25. Laporan
+
+Menu `Laporan` dipakai admin untuk:
+- melihat data historis lintas periode
+- print report operasional
+- export PDF / Excel
+- membandingkan hasil transaksi dengan piutang / hutang / stok
+
+Yang perlu dicek admin:
+- filter semester
+- filter customer / supplier bila ada
+- tipe transaksi kalau analisa perlu dipisah `Produk` dan `Cetak`
+
+Contoh:
+- owner minta rekap piutang semester `S2-2526`
+- admin buka `Laporan`
+- pilih filter yang sesuai
+- lalu print / export
+
+## 26. Pengguna dan hak akses
+
+Menu `Pengguna` dipakai untuk:
+- membuat user baru
+- mengubah password awal user
+- mengatur bahasa dan tema default user
+- memberi hak akses detail
+
+Hak akses yang perlu diperhatikan:
+- `Edit transaksi`
+- `Input pembayaran piutang`
+- `Lock semester piutang per customer`
+- `Input pembayaran hutang supplier`
+- `Kelola user`
+
+Contoh:
+- user A boleh input faktur, tapi tidak boleh edit
+- user B boleh lock piutang per customer
+- admin atur itu dari `Sistem > Pengguna`
+
+## 27. Approval dan semester transaksi
+
+Menu yang termasuk:
+- `Approval`
+- `Semester Transaksi`
+
+Fungsi admin:
+- review permintaan koreksi transaksi
+- setujui / tolak koreksi
+- jalankan aksi buka / tutup semester massal jika diperlukan
+
+Contoh:
+- banyak customer di satu semester sudah final
+- admin buka `Semester Transaksi`
+- lakukan aksi massal hanya setelah memastikan datanya benar
 
 
 

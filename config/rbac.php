@@ -41,6 +41,7 @@ return [
         'receivables.view',
         'receivables.pay',
         'receivables.adjust',
+        'receivables.lock',
         'supplier_payables.view',
         'supplier_payables.pay',
         'supplier_payables.adjust',

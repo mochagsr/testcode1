@@ -650,14 +650,98 @@ Kalau ada selisih:
 
 Biasanya keduanya saling terkait lewat transaksi `Tanda Terima Barang`.
 
-## 15. Kalau ada salah input
+## 15. Pengaturan
+
+![Pengaturan User](assets/manuals/user-settings.png)
+
+### Kapan dipakai
+- saat user ingin mengganti bahasa aplikasi
+- saat user ingin mengganti tema tampilan
+- saat user ingin mengubah nama pengguna yang tampil di nota
+
+### Yang bisa diatur user
+- `Nama`
+- `Email`
+- `Bahasa`
+- `Tema`
+
+### Ganti nama pengguna yang tampil di nota
+Di menu `Pengaturan`, user bisa mengubah field:
+- `Nama`
+
+Gunanya:
+- nama ini dipakai sebagai nama pengguna yang tampil di nota
+- nama ini juga bisa muncul di beberapa tampilan akun di aplikasi
+
+Contoh:
+- sebelumnya nama user tercatat `User PgPOS`
+- lalu diganti menjadi `Kasir Toko Depan`
+- sesudah disimpan, nama yang tampil di nota akan mengikuti perubahan itu
+
+### Ganti bahasa
+Di menu `Pengaturan`, user bisa memilih:
+- `Indonesia`
+- `English`
+
+Sesudah disimpan:
+- label menu
+- tombol
+- teks bantuan
+akan mengikuti bahasa yang dipilih
+
+### Ganti tema
+Di menu `Pengaturan`, user bisa memilih:
+- `Light`
+- `Dark`
+
+Contoh penggunaan:
+- pilih `Dark` kalau bekerja lama di layar dan ingin tampilan lebih gelap
+- pilih `Light` kalau ingin tampilan standar terang
+
+Sesudah disimpan:
+- sidebar
+- card
+- tabel
+- input
+akan mengikuti tema yang dipilih
+
+### Catatan untuk user
+- perubahan ini hanya mengubah preferensi akun yang sedang login
+- kalau user lain login, tema dan bahasa mereka bisa berbeda
+- kalau ada bagian tampilan yang terasa aneh setelah ganti tema, lakukan refresh halaman
+
+## 16. Menu tambahan yang perlu dikenal user
+
+Beberapa menu ini mungkin tidak selalu dipakai semua user, tetapi tetap perlu dipahami saat admin memberi hak akses lihat.
+
+### Dashboard
+- dipakai untuk melihat ringkasan kerja harian
+- biasanya berisi total transaksi, piutang, hutang, dan shortcut cepat
+
+### Laporan
+- dipakai untuk print atau export laporan operasional
+- biasanya admin yang paling sering memakai menu ini
+- user hanya memakai menu ini kalau memang diberi hak akses lihat / export laporan
+
+### Barang, Customer, dan Supplier
+- menu ini dipakai untuk melihat data referensi
+- biasanya user operasional hanya melihat, bukan mengubah
+- kalau ada data yang salah:
+  - jangan ubah sembarangan
+  - laporkan ke admin
+
+### Kategori Barang dan Level Customer
+- menu ini biasanya dikelola admin
+- user cukup tahu bahwa data ini memengaruhi pilihan di form transaksi
+
+## 17. Kalau ada salah input
 
 Lakukan ini:
 1. jangan hapus data sembarangan
 2. cek apakah transaksi sudah memengaruhi stok / piutang / hutang
 3. gunakan jalur koreksi atau hubungi admin
 
-## 16. Kalau menu terkunci
+## 18. Kalau menu terkunci
 
 ### Semester customer terkunci
 - berarti periode customer itu ditutup
@@ -667,7 +751,7 @@ Lakukan ini:
 - berarti hutang supplier untuk tahun itu ditutup
 - hubungi admin
 
-## 17. Checklist user harian
+## 19. Checklist user harian
 
 Setiap hari user biasanya:
 1. login
@@ -676,7 +760,7 @@ Setiap hari user biasanya:
 4. cek piutang / hutang bila ada pembayaran
 5. laporkan ke admin kalau ada koreksi
 
-## 18. Hubungan antar menu
+## 20. Hubungan antar menu
 
 Supaya tidak bingung, ini hubungan sederhananya:
 

@@ -172,10 +172,10 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['finance.unlocked', 'admin', 'semester.open'])
         ->name('receivables.customer-discount');
     Route::post('/receivables/customer/{customer}/semester-close', [ReceivablePageController::class, 'closeCustomerSemester'])
-        ->middleware('admin')
+        ->middleware('perm:receivables.lock')
         ->name('receivables.customer-semester.close');
     Route::post('/receivables/customer/{customer}/semester-open', [ReceivablePageController::class, 'openCustomerSemester'])
-        ->middleware('admin')
+        ->middleware('perm:receivables.lock')
         ->name('receivables.customer-semester.open');
     Route::get('/receivable-payments', [ReceivablePaymentPageController::class, 'index'])->middleware('perm:receivables.view')->name('receivable-payments.index');
     Route::get('/receivable-payments/create', [ReceivablePaymentPageController::class, 'create'])->middleware('perm:receivables.pay')->name('receivable-payments.create');

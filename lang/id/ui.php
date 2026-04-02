@@ -356,7 +356,7 @@ return [
     'contact_admin_for_locked_customer_semester' => 'Semester customer sudah dikunci/tutup buku. Hubungi admin untuk perubahan data.',
     'semester_inactive_error' => 'Semester :semester sedang nonaktif. Pilih semester aktif.',
     'invalid_semester_format' => 'Format semester tidak valid. Gunakan S1-2526 atau S2-2526 (2 digit awal dan akhir harus berurutan).',
-    'settings_profile_note' => 'Ubah nama tampilan akun.',
+    'settings_profile_note' => 'Ubah nama pengguna yang tampil di nota.',
     'settings_preferences_note' => 'Bahasa dan tema tampilan aplikasi.',
     'product_info' => 'Informasi Barang',
     'product_info_note' => 'Lengkapi identitas utama barang.',

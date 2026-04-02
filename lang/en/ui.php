@@ -356,7 +356,7 @@ return [
     'contact_admin_for_locked_customer_semester' => 'This customer semester is locked/closed. Please contact admin for changes.',
     'semester_inactive_error' => 'Semester :semester is inactive. Please select an active semester.',
     'invalid_semester_format' => 'Invalid semester format. Use S1-2526 or S2-2526 (the last 2 digits must be next year).',
-    'settings_profile_note' => 'Update the display name of your account.',
+    'settings_profile_note' => 'Update the name shown on receipts.',
     'settings_preferences_note' => 'Language and theme preferences.',
     'product_info' => 'Product Information',
     'product_info_note' => 'Complete the main product details.',

@@ -29,6 +29,7 @@
         'receivables.view' => 'Lihat piutang customer',
         'receivables.pay' => 'Input pembayaran piutang',
         'receivables.adjust' => 'Write-off / diskon piutang',
+        'receivables.lock' => 'Lock semester piutang per customer',
         'supplier_payables.view' => 'Lihat hutang supplier',
         'supplier_payables.pay' => 'Input pembayaran hutang supplier',
         'supplier_payables.adjust' => 'Penyesuaian hutang supplier',
