@@ -1194,12 +1194,12 @@ Artisan::command('app:smoke-test', function () {
     );
 
     if (Schema::hasTable('restore_drill_logs')) {
-        $latestRestoreDrill = DB::table('restore_drill_logs')->latest('checked_at')->latest('id')->first();
+        $latestRestoreDrill = DB::table('restore_drill_logs')->latest('tested_at')->latest('id')->first();
         $pushRow(
             'RESTORE_DRILL',
             $latestRestoreDrill !== null ? 'OK' : 'WARN',
             $latestRestoreDrill !== null
-                ? 'Terakhir: '.Carbon::parse((string) $latestRestoreDrill->checked_at, 'Asia/Jakarta')->format('d-m-Y H:i:s').' / '.strtoupper((string) $latestRestoreDrill->status)
+                ? 'Terakhir: '.Carbon::parse((string) $latestRestoreDrill->tested_at, 'Asia/Jakarta')->format('d-m-Y H:i:s').' / '.strtoupper((string) $latestRestoreDrill->status)
                 : 'Belum ada restore drill log.'
         );
     }

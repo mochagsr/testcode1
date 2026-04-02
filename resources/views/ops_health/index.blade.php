@@ -65,7 +65,7 @@
                         </span>
                     </td>
                 </tr>
-                <tr><th>Checked At</th><td>{{ \Illuminate\Support\Carbon::parse((string) $latestRestoreDrill->checked_at)->format('d-m-Y H:i:s') }}</td></tr>
+                <tr><th>Tested At</th><td>{{ \Illuminate\Support\Carbon::parse((string) $latestRestoreDrill->tested_at)->format('d-m-Y H:i:s') }}</td></tr>
                 <tr><th>Backup File</th><td>{{ $latestRestoreDrill->backup_file ?: '-' }}</td></tr>
                 <tr><th>Message</th><td>{{ $latestRestoreDrill->message ?: '-' }}</td></tr>
                 </tbody>
