@@ -147,6 +147,12 @@ Backup created: /www/wwwroot/pgpos-prod/storage/app/backups/db/backup-20260329-1
 Restore test passed for backup: /www/wwwroot/pgpos-prod/storage/app/backups/db/backup-20260329-101500.sql
 ```
 
+Kalau di server seperti aaPanel user database tidak punya hak `CREATE DATABASE` / `DROP DATABASE`, hasil yang masih normal adalah:
+
+```text
+Restore test skipped: database user cannot create/drop temporary databases on this server.
+```
+
 ### Hasil smoke test yang sehat
 
 Contoh ringkas:
@@ -173,6 +179,7 @@ Yang seharusnya berubah:
 - status terakhir:
   - `PASSED`
   - atau `SKIPPED` kalau environment masih non-MySQL
+  - atau `SKIPPED` kalau user database server tidak punya hak membuat database sementara
 
 ## 9. Lokasi file backup
 

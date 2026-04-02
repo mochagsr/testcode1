@@ -790,17 +790,25 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
         $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
         $adminPdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', str_replace('`', '``', $tempDb)));
     } catch (Throwable $e) {
-        $this->error('Failed preparing temporary database.');
+        $message = 'Failed preparing temporary database: ' . $e->getMessage();
+        $privilegeHint = str_contains(strtolower($e->getMessage()), 'denied')
+            || str_contains(strtolower($e->getMessage()), 'access')
+            || str_contains(strtolower($e->getMessage()), 'permission');
+        if ($privilegeHint) {
+            $this->warn('Restore test skipped: database user cannot create/drop temporary databases on this server.');
+        } else {
+            $this->error('Failed preparing temporary database.');
+        }
         DB::table('restore_drill_logs')->insert([
             'backup_file' => $file,
-            'status' => 'failed',
+            'status' => $privilegeHint ? 'skipped' : 'failed',
             'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
-            'message' => 'Failed preparing temporary database: ' . $e->getMessage(),
+            'message' => $message,
             'tested_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        return 1;
+        return $privilegeHint ? 0 : 1;
     }
 
     $restoreCmd = sprintf(
@@ -1202,11 +1210,14 @@ Artisan::command('app:smoke-test', function () {
 
     if (Schema::hasTable('restore_drill_logs')) {
         $latestRestoreDrill = DB::table('restore_drill_logs')->latest('tested_at')->latest('id')->first();
+        $restoreStatus = strtoupper((string) ($latestRestoreDrill->status ?? ''));
         $pushRow(
             'RESTORE_DRILL',
-            $latestRestoreDrill !== null ? 'OK' : 'WARN',
+            $latestRestoreDrill === null
+                ? 'WARN'
+                : ($restoreStatus === 'PASSED' ? 'OK' : ($restoreStatus === 'SKIPPED' ? 'WARN' : 'FAIL')),
             $latestRestoreDrill !== null
-                ? 'Terakhir: '.Carbon::parse((string) $latestRestoreDrill->tested_at, 'Asia/Jakarta')->format('d-m-Y H:i:s').' / '.strtoupper((string) $latestRestoreDrill->status)
+                ? 'Terakhir: '.Carbon::parse((string) $latestRestoreDrill->tested_at, 'Asia/Jakarta')->format('d-m-Y H:i:s').' / '.$restoreStatus
                 : 'Belum ada restore drill log.'
         );
     }
