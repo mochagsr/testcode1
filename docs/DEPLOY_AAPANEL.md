@@ -851,6 +851,14 @@ npm install
 npm run build
 ```
 
+Catatan urutan:
+- langkah ini tetap dikerjakan **lebih dulu**
+- sesudah itu baru lanjut ke:
+  - `14A` untuk `storage:link` dan cache
+  - `16A` untuk backup awal dan smoke test
+- jadi urutan normalnya:
+  - `13A -> 14A -> 16A`
+
 ## 14A. Link storage dan cache production untuk Opsi A
 
 ```bash
@@ -904,6 +912,9 @@ php artisan app:smoke-test
 Catatan:
 - backup awal lebih aman **tanpa `--gzip`**
 - restore drill otomatis mencari file `.sql`
+- langkah ini dijalankan **setelah**:
+  - `13A` build frontend selesai
+  - `14A` storage link dan cache selesai
 
 ## 17A. Contoh alur lengkap Opsi A
 
