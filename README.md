@@ -36,6 +36,24 @@ ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
   - field ini dipakai untuk memisahkan analisa transaksi customer antara penjualan produk dan pekerjaan cetak
   - di menu `Piutang`, `Subjenis Cetak` ikut tampil di mutasi, tagihan, print, PDF, dan Excel
 
+## Detail surat pesanan
+- Detail `Surat Pesanan` sekarang menampilkan progress per item, bukan hanya total progress
+- Di tabel item user/admin bisa melihat:
+  - `Qty Pesanan`
+  - `Qty Terkirim`
+  - `Sisa Qty`
+  - `Status`
+- Ada card `Rincian Pengiriman per Item`
+  - menampilkan barang sudah terkirim lewat invoice nomor berapa
+  - tanggal invoice
+  - qty yang terkirim di invoice itu
+- Ada ringkasan per invoice di bagian atas card pengiriman
+  - nomor invoice
+  - tanggal
+  - jumlah item
+  - total qty terkirim
+- Informasi yang sama juga ikut ke print/PDF `Surat Pesanan`
+
 ## Quick start
 1. `composer install`
 2. `cp .env.example .env`
