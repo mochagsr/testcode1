@@ -705,6 +705,41 @@ Sesudah disimpan:
 - input
 akan mengikuti tema yang dipilih
 
+### Tips setting printer untuk kertas `9.5" x 11"`
+
+Kalau user print ke printer continuous form seperti `Epson LQ-300`, pakai panduan ini:
+
+1. minta admin memastikan `Pengaturan > Print Workflow > Preset Kertas = 9.5x11`
+2. di Windows printer properties / driver:
+   - pilih ukuran kertas `9.5 x 11 inch`
+   - atau buat custom form dengan ukuran yang sama
+3. saat print dari browser:
+   - `Scale = 100%`
+   - jangan pilih `Fit to page`
+   - jangan pilih `Shrink to fit`
+4. matikan header/footer browser kalau muncul
+5. gunakan:
+   - `Portrait` untuk invoice, nota, dan kwitansi
+   - `Landscape` untuk report lebar bila diminta admin
+
+![Contoh setting print browser 9.5 x 11](assets/manuals/print-browser-settings.png)
+
+Gambar di atas adalah contoh acuan sederhana. Tampilan browser bisa sedikit berbeda, tetapi inti setting yang perlu dijaga tetap sama:
+- ukuran kertas `9.5 x 11`
+- `Scale = 100%`
+- `Fit to page` / `Shrink to fit` = mati
+- `Headers and footers` = mati
+
+Kalau hasil print terpotong:
+- cek ukuran kertas di driver printer
+- cek apakah browser mengubah skala otomatis
+- minta admin cek preset kertas di aplikasi
+
+Kalau tulisan terlihat terlalu tipis:
+- pilih kualitas print yang lebih tegas di driver printer
+- cek ribbon printer
+- hindari mode hemat yang terlalu tipis untuk dokumen penting
+
 ### Catatan untuk user
 - perubahan ini hanya mengubah preferensi akun yang sedang login
 - kalau user lain login, tema dan bahasa mereka bisa berbeda

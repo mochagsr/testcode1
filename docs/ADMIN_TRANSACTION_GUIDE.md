@@ -732,6 +732,81 @@ Gunanya:
 - menyesuaikan hasil cetak dengan printer yang dipakai tim
 - mengurangi layout report yang terpotong
 
+### Tips setting printer untuk kertas `9.5" x 11"`
+
+Untuk printer continuous form seperti `Epson LQ-300`, admin sebaiknya set begini:
+
+#### Di aplikasi
+Di `Pengaturan > Print Workflow`:
+- pilih preset kertas:
+  - `9.5x11`
+- simpan perubahan
+
+Kalau tim memakai printer yang sama untuk banyak user:
+- jadikan preset ini sebagai standar dulu
+- baru ubah per kebutuhan jika ada printer berbeda
+
+#### Di driver printer Windows
+Pastikan:
+- paper size = `9.5 x 11 inch`
+- continuous / tractor form sesuai printer
+- margin tidak dipaksa terlalu besar
+- kualitas print cukup tebal untuk dokumen operasional
+
+Kalau ukuran `9.5 x 11` belum ada:
+- buat custom paper form di Windows
+- lalu pilih form itu di driver printer
+
+#### Saat print dari browser
+Pakai:
+- `Scale = 100%`
+- `Margins = Default` atau serendah mungkin sesuai kebutuhan
+- matikan `Headers and footers`
+- jangan pilih `Fit to page`
+- jangan pilih `Shrink to fit`
+
+Orientasi umum:
+- `Portrait`:
+  - faktur
+  - retur
+  - surat jalan
+  - surat pesanan
+  - kwitansi
+- `Landscape`:
+  - report lebar tertentu jika template memang lebih pas lebar
+
+![Contoh setting print browser 9.5 x 11](assets/manuals/print-browser-settings.png)
+
+Gunakan gambar di atas sebagai acuan minimum saat briefing tim. Tampilan browser tidak selalu persis sama, tetapi admin perlu memastikan poin berikut tetap konsisten:
+- paper size `9.5 x 11`
+- scale `100%`
+- `Fit to page` / `Shrink to fit` tidak aktif
+- `Headers and footers` browser tidak aktif
+
+#### Jika hasil print masih bermasalah
+
+Kalau nama perusahaan terpotong:
+- cek skala browser masih `100%`
+- cek driver printer benar-benar memakai `9.5 x 11`
+- cek printer tidak mengganti ukuran kertas otomatis
+
+Kalau tulisan terlalu tipis:
+- naikkan kualitas print di driver
+- gunakan ribbon yang masih bagus
+- hindari mode draft yang terlalu pucat untuk dokumen resmi
+
+Kalau tabel terlalu kecil:
+- cek apakah browser mengecilkan halaman
+- pastikan user tidak memilih `Fit to page`
+- gunakan preset kertas yang benar di aplikasi
+
+Checklist admin setelah setting:
+1. print 1 faktur
+2. print 1 kwitansi
+3. print 1 report lebar
+4. cek header perusahaan
+5. cek tanggal, jatuh tempo, dan isi tabel tetap terbaca
+
 ### Periode semester
 Di bagian ini admin mengelola:
 - daftar semester
