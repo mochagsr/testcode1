@@ -32,9 +32,20 @@ async function login(page, loginIdentifier, password) {
 }
 
 async function ensureLoggedIn(page, loginIdentifier, password, targetPath) {
-  await login(page, loginIdentifier, password);
   await page.goto(`${baseUrl}${targetPath}`, { waitUntil: 'domcontentloaded' });
   await waitForUi(page);
+  const needsLogin = await page.locator('input[name="login"]').count().catch(() => 0);
+  if (needsLogin > 0) {
+    await page.fill('input[name="login"]', loginIdentifier);
+    await page.fill('input[name="password"]', password);
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {}),
+      page.click('button[type="submit"]'),
+    ]);
+    await waitForUi(page);
+    await page.goto(`${baseUrl}${targetPath}`, { waitUntil: 'domcontentloaded' });
+    await waitForUi(page);
+  }
 }
 
 async function shot(page, fileName) {
@@ -385,28 +396,21 @@ async function main() {
   const admin = await adminContext.newPage();
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/dashboard');
   await shot(admin, 'admin-dashboard.png');
-  await admin.goto(`${baseUrl}/sales-invoices`, { waitUntil: 'domcontentloaded' });
-  await waitForUi(admin);
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/sales-invoices');
   await shot(admin, 'admin-sales-invoices.png');
-  await admin.goto(`${baseUrl}/receivables`, { waitUntil: 'domcontentloaded' });
-  await waitForUi(admin);
-  await selectIfExists(admin, '#receivable-semester', 'S2-2526');
-  await selectIfExists(admin, '#receivable-customer-id', '1');
-  await admin.click('button[type="submit"]').catch(() => {});
-  await waitForUi(admin);
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/receivables?customer_id=1&semester=S2-2526');
   await shot(admin, 'admin-receivables.png');
-  await admin.goto(`${baseUrl}/supplier-payables`, { waitUntil: 'domcontentloaded' });
-  await waitForUi(admin);
-  await selectIfExists(admin, '#supplier-payable-supplier', '1');
-  await selectIfExists(admin, '#supplier-payable-year', '2026');
-  await admin.click('button[type="submit"]').catch(() => {});
-  await waitForUi(admin);
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/supplier-payables?supplier_id=1&year=2026');
   await shot(admin, 'admin-supplier-payables.png');
-  await admin.goto(`${baseUrl}/ops-health`, { waitUntil: 'domcontentloaded' });
-  await waitForUi(admin);
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/reports');
+  await shot(admin, 'admin-reports.png');
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/users');
+  await shot(admin, 'admin-users.png');
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/audit-logs');
+  await shot(admin, 'admin-audit-logs.png');
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/ops-health');
   await shot(admin, 'admin-ops-health.png');
-  await admin.goto(`${baseUrl}/settings`, { waitUntil: 'domcontentloaded' });
-  await waitForUi(admin);
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/settings');
   await shot(admin, 'admin-settings.png');
 
   const userContext = await browser.newContext({ viewport: { width: 1600, height: 980 } });
@@ -428,6 +432,12 @@ async function main() {
   await user.goto(`${baseUrl}/supplier-payables`, { waitUntil: 'domcontentloaded' });
   await waitForUi(user);
   await shot(user, 'user-supplier-payables.png');
+  await user.goto(`${baseUrl}/receivable-payments`, { waitUntil: 'domcontentloaded' });
+  await waitForUi(user);
+  await shot(user, 'user-receivable-payments.png');
+  await user.goto(`${baseUrl}/outgoing-transactions`, { waitUntil: 'domcontentloaded' });
+  await waitForUi(user);
+  await shot(user, 'user-outgoing-transactions.png');
   await user.goto(`${baseUrl}/settings`, { waitUntil: 'domcontentloaded' });
   await waitForUi(user);
   await shot(user, 'user-settings.png');

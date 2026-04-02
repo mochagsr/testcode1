@@ -585,6 +585,8 @@ Mutasi hutang supplier 1 tahun diperiksa
 
 ## 18. Audit log
 
+![Audit Log Admin](assets/manuals/admin-audit-logs.png)
+
 ### Tugas admin
 - telusuri siapa membuat / mengubah transaksi
 - filter per modul
@@ -881,6 +883,8 @@ Contoh:
 
 ## 25. Laporan
 
+![Laporan Admin](assets/manuals/admin-reports.png)
+
 Menu `Laporan` dipakai admin untuk:
 - melihat data historis lintas periode
 - print report operasional
@@ -899,6 +903,8 @@ Contoh:
 - lalu print / export
 
 ## 26. Pengguna dan hak akses
+
+![Pengguna Admin](assets/manuals/admin-users.png)
 
 Menu `Pengguna` dipakai untuk:
 - membuat user baru

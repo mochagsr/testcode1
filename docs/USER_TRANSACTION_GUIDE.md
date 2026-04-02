@@ -284,6 +284,8 @@ Maka yang perlu dicek:
 
 ## 7. Tanda Terima Barang
 
+![Tanda Terima Barang User](assets/manuals/user-outgoing-transactions.png)
+
 ### Kapan dipakai
 - saat menerima barang dari supplier
 - ini memengaruhi stok dan hutang supplier
@@ -509,6 +511,8 @@ Jadi kolom `Piutang` selalu dibaca sebagai:
 - **Penjualan - Pembayaran - Retur**
 
 ## 12. Bayar Piutang
+
+![Bayar Piutang User](assets/manuals/user-receivable-payments.png)
 
 ### Kapan dipakai
 - saat customer membayar sebagian atau seluruh tagihan
