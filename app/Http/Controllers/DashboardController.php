@@ -216,7 +216,7 @@ class DashboardController extends Controller
         $latestBackup = $backupFiles->last();
 
         $latestRestoreDrill = Schema::hasTable('restore_drill_logs')
-            ? DB::table('restore_drill_logs')->latest('checked_at')->latest('id')->first()
+            ? DB::table('restore_drill_logs')->latest('tested_at')->latest('id')->first()
             : null;
         $latestIntegrityLog = Schema::hasTable('integrity_check_logs')
             ? IntegrityCheckLog::query()->latest('checked_at')->latest('id')->first()
@@ -228,8 +228,8 @@ class DashboardController extends Controller
         return [
             'latestBackup' => $latestBackup ?: '-',
             'latestRestoreStatus' => strtoupper((string) ($latestRestoreDrill->status ?? '-')),
-            'latestRestoreAt' => $latestRestoreDrill?->checked_at
-                ? (string) \Carbon\Carbon::parse((string) $latestRestoreDrill->checked_at, 'Asia/Jakarta')->format('d-m-Y H:i')
+            'latestRestoreAt' => $latestRestoreDrill?->tested_at
+                ? (string) \Carbon\Carbon::parse((string) $latestRestoreDrill->tested_at, 'Asia/Jakarta')->format('d-m-Y H:i')
                 : '-',
             'latestIntegrityStatus' => $latestIntegrityLog === null
                 ? '-'

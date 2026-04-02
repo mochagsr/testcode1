@@ -28,7 +28,7 @@ class OpsHealthController extends Controller
             ->values();
         $latestBackup = $backupFiles->last();
         $latestRestoreDrill = Schema::hasTable('restore_drill_logs')
-            ? DB::table('restore_drill_logs')->latest('checked_at')->latest('id')->first()
+            ? DB::table('restore_drill_logs')->latest('tested_at')->latest('id')->first()
             : null;
         $latestIntegrityLog = null;
         $integrityIssueRuns7d = 0;
