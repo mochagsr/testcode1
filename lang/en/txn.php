@@ -182,6 +182,8 @@ return [
     'order_note_delivery_history_note' => 'See which items have been delivered, through which invoice, and which ones are still pending.',
     'order_note_delivered_in_invoice' => 'Delivered in Invoice',
     'order_note_no_delivery_history' => 'No related sales invoice yet.',
+    'order_note_invoice_summary_qty' => 'Delivered Qty Total',
+    'order_note_invoice_summary_items' => 'Item Count',
     'new_category_option' => 'New Category',
     'create_category_title' => 'Add New Category',
     'category_name' => 'Category Name',

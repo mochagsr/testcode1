@@ -768,6 +768,7 @@ class OrderNotePageController extends Controller
      *         status:string,
      *         deliveries:list<array{invoice_id:int,invoice_number:string,invoice_date:string,quantity:int}>
      *     }>,
+     *     invoice_summaries:list<array{invoice_id:int,invoice_number:string,invoice_date:string,total_quantity:int,item_count:int}>,
      *     has_deliveries:bool
      * }
      */
@@ -775,6 +776,8 @@ class OrderNotePageController extends Controller
     {
         $items = [];
         $itemIdsByProduct = [];
+        $invoiceSummaries = [];
+        $invoiceSummaryItemKeys = [];
 
         foreach ($orderNote->items as $item) {
             $itemId = (int) $item->id;
@@ -828,11 +831,24 @@ class OrderNotePageController extends Controller
                 continue;
             }
 
+            if (! isset($invoiceSummaries[$invoiceId])) {
+                $invoiceSummaries[$invoiceId] = [
+                    'invoice_id' => $invoiceId,
+                    'invoice_number' => $invoiceNumber,
+                    'invoice_date' => $invoiceDate,
+                    'total_quantity' => 0,
+                    'item_count' => 0,
+                ];
+                $invoiceSummaryItemKeys[$invoiceId] = [];
+            }
+
             $directItemId = (int) ($row->order_note_item_id ?? 0);
             if ($directItemId > 0 && isset($items[$directItemId])) {
                 $allocated = min($remainingAllocation, max(0, (int) $items[$directItemId]['remaining_qty']));
                 if ($allocated > 0) {
                     $this->applyOrderNoteDeliveryAllocation($items, $directItemId, $invoiceId, $invoiceNumber, $invoiceDate, $allocated);
+                    $invoiceSummaries[$invoiceId]['total_quantity'] += $allocated;
+                    $invoiceSummaryItemKeys[$invoiceId][$directItemId] = true;
                     $remainingAllocation -= $allocated;
                 }
             }
@@ -862,6 +878,8 @@ class OrderNotePageController extends Controller
                 }
 
                 $this->applyOrderNoteDeliveryAllocation($items, $fallbackItemId, $invoiceId, $invoiceNumber, $invoiceDate, $allocated);
+                $invoiceSummaries[$invoiceId]['total_quantity'] += $allocated;
+                $invoiceSummaryItemKeys[$invoiceId][$fallbackItemId] = true;
                 $remainingAllocation -= $allocated;
             }
         }
@@ -879,8 +897,14 @@ class OrderNotePageController extends Controller
         }
         unset($item);
 
+        foreach ($invoiceSummaries as $invoiceId => &$invoiceSummary) {
+            $invoiceSummary['item_count'] = count($invoiceSummaryItemKeys[$invoiceId] ?? []);
+        }
+        unset($invoiceSummary);
+
         return [
             'items' => array_values($items),
+            'invoice_summaries' => array_values($invoiceSummaries),
             'has_deliveries' => $hasDeliveries,
         ];
     }

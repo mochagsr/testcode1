@@ -182,6 +182,8 @@ return [
     'order_note_delivery_history_note' => 'Lihat barang mana yang sudah dikirim, lewat faktur mana, dan mana yang masih belum terkirim.',
     'order_note_delivered_in_invoice' => 'Terkirim di Faktur',
     'order_note_no_delivery_history' => 'Belum ada faktur penjualan terkait.',
+    'order_note_invoice_summary_qty' => 'Total Qty Terkirim',
+    'order_note_invoice_summary_items' => 'Jumlah Item',
     'new_category_option' => 'Kategori Baru',
     'create_category_title' => 'Tambah Kategori Baru',
     'category_name' => 'Nama Kategori',
