@@ -413,7 +413,7 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=sql_teserpos_mitrasejatiberkah_com
 DB_USERNAME=sql_teserpos_mitrasejatiberkah_com
-DB_PASSWORD=password_dari_aapanel
+DB_PASSWORD=password_user_database_mysql
 ```
 
 Untuk env `prod` dengan domain:
@@ -461,7 +461,7 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=sql_erpos_mitrasejaitberkah_com
 DB_USERNAME=sql_erpos_mitrasejaitberkah_com
-DB_PASSWORD=password_dari_aapanel
+DB_PASSWORD=password_user_database_mysql
 ```
 
 Contoh isian:
@@ -813,6 +813,11 @@ Setelah selesai edit `.env`, jalankan:
 php artisan optimize:clear
 php artisan config:cache
 ```
+
+Catatan untuk `DB_PASSWORD`:
+- isi dengan **password user database MySQL** yang dibuat saat `Add DB`
+- **bukan** password login aaPanel
+- kalau phpMyAdmin meminta login manual, biasanya password ini juga yang dipakai bersama `DB_USERNAME`
 
 ## 12A. Inisialisasi database untuk Opsi A
 
