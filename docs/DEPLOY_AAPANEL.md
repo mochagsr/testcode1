@@ -582,7 +582,8 @@ Kenapa salah:
 
 Contoh **BENAR / PAKAI YANG INI**:
 - masuk dulu ke folder website yang sudah dibuat
-- lalu clone ke folder saat ini dengan `git clone ... .`
+- lalu clone ke folder saat ini dengan command lengkap berikut:
+  - `git clone https://github.com/mochagsr/testcode1.git .`
 
 ### Env tes
 
