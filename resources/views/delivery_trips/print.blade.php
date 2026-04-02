@@ -6,16 +6,16 @@
     <title>{{ $trip->trip_number }}</title>
     <style>
         @page { margin: 8mm 8mm 10mm 8mm; }
-        body { font-family: 'Courier New', monospace; color: #111; font-size: 11px; line-height: 1.2; }
+        body { font-family: 'Courier New', monospace; color: #111; font-size: 12px; line-height: 1.28; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
-        .company-head { display: grid; grid-template-columns: minmax(0, 42%) minmax(220px, 26%) minmax(0, 32%); align-items: start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 18px; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
         .company-left { display: flex; gap: 8px; }
         .company-logo { width: 40px; height: 60px; border: none; overflow: hidden; flex-shrink: 0; display: grid; place-items: center; }
         .company-logo img { width: 100%; height: 100%; object-fit: contain; }
-        .company-name { font-size: 16px; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
-        .company-detail { white-space: pre-line; font-size: 11px; line-height: 1.3; }
+        .company-name { font-size: 15px; font-weight: 800; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
+        .company-detail { white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
         .doc-title-wrap { text-align: center; min-width: 210px; align-self: center; }
-        .doc-title { font-size: 18px; font-weight: 700; text-transform: uppercase; }
+        .doc-title { font-size: 20px; font-weight: 800; text-transform: uppercase; }
         .doc-number { margin-top: 4px; font-size: 12px; }
         .doc-right { justify-self: end; width: 260px; }
         .doc-meta-table { width: 100%; border-collapse: collapse; margin-top: 0; }
@@ -26,13 +26,14 @@
             vertical-align: top;
             line-height: 1.25;
             background: transparent;
-            font-size: 11px;
+            font-size: 12px;
         }
         .doc-meta-table th { width: 112px; text-align: left; font-weight: 700; }
         .doc-meta-table td { text-align: left; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { border: 1px solid #111; padding: 5px; vertical-align: top; }
-        th { background: #efefef; font-weight: 700; }
+        th { background: #efefef; font-weight: 800; font-size: 12px; }
+        td { font-size: 12px; font-weight: 600; }
         .meta { margin-top: 8px; }
         .meta-layout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
         .cost-box { grid-column: span 2; }
@@ -64,8 +65,8 @@
         }
         @media print {
             .no-print { display: none; }
-            body { margin: 4mm; font-size: 10px; }
-            th, td { padding: 3px; }
+            body { margin: 4mm; font-size: 12px; line-height: 1.28; font-weight: 600; }
+            th, td { padding: 4px; }
         }
     </style>
 </head>

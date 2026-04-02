@@ -6,29 +6,29 @@
     <title>{{ $printTitle ?? $title }}</title>
     <style>
         @page { margin: 8mm 8mm 10mm 8mm; }
-        body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
+        body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 1180px; margin: 0 auto; }
         .no-print { margin-bottom: 10px; }
         .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .report-table th, .report-table td { border: 1px solid #111; padding: 4px 5px; vertical-align: top; }
-        .report-table thead th { background: #fff54f; font-weight: 700; text-align: center; }
+        .report-table th, .report-table td { border: 1px solid #111; padding: 5px 6px; vertical-align: top; font-size: 12px; font-weight: 600; }
+        .report-table thead th { background: #fff54f; font-weight: 800; text-align: center; }
         .num { text-align: right; white-space: nowrap; }
         .total-row td { font-weight: 700; background: #2f74c8; color: #fff; }
         .head { margin-bottom: 8px; position: relative; min-height: 34px; }
-        .head-title { text-align: center; font-size: 18px; font-weight: 700; text-transform: uppercase; }
-        .head-update { position: absolute; right: 0; bottom: 0; font-size: 12px; font-style: italic; font-weight: 700; }
+        .head-title { text-align: center; font-size: 20px; font-weight: 800; text-transform: uppercase; }
+        .head-update { position: absolute; right: 0; bottom: 0; font-size: 13px; font-style: italic; font-weight: 800; }
         .invoice-wrap { width: 100%; }
         .invoice-grid {
             display: grid;
-            grid-template-columns: minmax(0, 44%) minmax(0, 24%) minmax(0, 32%);
+            grid-template-columns: minmax(0, 48%) minmax(0, 22%) minmax(0, 30%);
             align-items: flex-start;
             gap: 16px;
             margin-bottom: 10px;
         }
         .company-left { display: flex; gap: 10px; min-width: 0; }
         .logo { width: 52px; height: 72px; object-fit: contain; border: none; background: transparent; }
-        .company-name { font-size: 18px; font-weight: 700; text-transform: uppercase; line-height: 1.05; }
-        .company-meta { white-space: pre-line; margin-top: 3px; }
+        .company-name { font-size: 15px; font-weight: 800; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
+        .company-meta { white-space: pre-line; margin-top: 3px; font-size: 12px; line-height: 1.35; font-weight: 600; }
         .invoice-title { font-size: 24px; font-weight: 700; text-align: center; margin-top: 36px; }
         .customer-meta { margin-top: 10px; width: 62%; }
         .customer-meta table { width: 100%; border-collapse: collapse; }
@@ -49,7 +49,7 @@
         .notes-line, .transfer-line { white-space: pre-line; margin-bottom: 2px; }
         @media print {
             .no-print { display: none; }
-            body { margin: 4mm; font-size: 10px; }
+            body { margin: 4mm; font-size: 12px; line-height: 1.28; font-weight: 600; }
         }
     </style>
 </head>

@@ -4,13 +4,13 @@
     <meta charset="utf-8">
     <title>{{ $payment->payment_number }}</title>
     <style>
-        body { font-family: "Courier New", monospace; font-size: 12px; color: #000; }
+        body { font-family: "Courier New", monospace; font-size: 12px; color: #000; font-weight: 600; line-height: 1.28; }
         .wrap { max-width: 760px; margin: 0 auto; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #000; padding: 6px; vertical-align: top; }
-        th { text-align: center; width: 30%; font-weight: 700; }
-        td { text-align: left; }
-        .title { text-align: center; font-weight: 700; margin-bottom: 10px; font-size: 14px; }
+        th, td { border: 1px solid #000; padding: 6px; vertical-align: top; font-size: 12px; }
+        th { text-align: center; width: 30%; font-weight: 800; }
+        td { text-align: left; font-weight: 600; }
+        .title { text-align: center; font-weight: 800; margin-bottom: 10px; font-size: 16px; }
         .sign { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
         .sign-box { text-align: center; }
         .line { margin-top: 48px; border-top: 1px solid #000; }

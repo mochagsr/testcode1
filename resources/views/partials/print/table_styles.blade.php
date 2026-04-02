@@ -1,6 +1,6 @@
 table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-th, td { border: 1px solid #111; padding: 4px; vertical-align: top; }
-th { font-size: 10px; text-align: center; font-weight: 700; }
+th, td { border: 1px solid #111; padding: 5px; vertical-align: top; font-size: 12px; font-weight: 600; }
+th { font-size: 12px; text-align: center; font-weight: 800; }
 td { text-align: left; }
 .line-items th:first-child,
 .line-items td:first-child { text-align: center; }
@@ -11,5 +11,5 @@ td.num,
 .qty-box td:last-child,
 .total-box td:last-child { text-align: right !important; white-space: nowrap; }
 @media print {
-    th, td { padding: 3px; }
+    th, td { padding: 4px; font-size: 12px; font-weight: 600; }
 }

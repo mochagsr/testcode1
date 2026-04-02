@@ -6,20 +6,20 @@
     <title>{{ __('supplier_stock.report_title') }}</title>
     <style>
         @page { margin: 8mm 8mm 10mm 8mm; }
-        body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
+        body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
-        .company-head { display: grid; grid-template-columns: minmax(0, 42%) minmax(220px, 26%) minmax(0, 32%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 18px; }
-        .company-name { font-size: 16px; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 1px; line-height: 1.2; text-transform: uppercase; }
-        .company-detail { font-size: 11px; line-height: 1.3; white-space: pre-line; }
-        .doc-title-center { font-size: 11px; line-height: 1.25; text-align: center; align-self: center; }
-        .doc-meta-right { font-size: 11px; line-height: 1.25; max-width: 250px; justify-self: end; width: 100%; margin-left: auto; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .company-name { font-size: 15px; font-weight: 800; letter-spacing: 0; margin-bottom: 2px; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
+        .company-detail { font-size: 12px; line-height: 1.35; white-space: pre-line; font-weight: 600; }
+        .doc-title-center { font-size: 12px; line-height: 1.3; text-align: center; align-self: center; font-weight: 700; }
+        .doc-meta-right { font-size: 12px; line-height: 1.3; max-width: 270px; justify-self: end; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-label { font-weight: 700; }
         .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .section-title { font-weight: 700; margin: 12px 0 6px; }
         .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .report-table th, .report-table td { border: 1px solid #111; padding: 4px 6px; vertical-align: top; }
-        .report-table thead th { text-align: center; font-weight: 700; }
+        .report-table th, .report-table td { border: 1px solid #111; padding: 5px 6px; vertical-align: top; font-size: 12px; font-weight: 600; }
+        .report-table thead th { text-align: center; font-weight: 800; }
         .report-table td.num, .report-table th.num { text-align: right !important; white-space: nowrap; }
         .print-actions { margin-bottom: 8px; }
         @media print { .print-actions { display: none; } }

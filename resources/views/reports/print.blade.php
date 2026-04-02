@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title }}</title>
     <style>
-        body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.2; color: #111; }
+        body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 1180px; margin: 0 auto; }
         .head { display: flex; justify-content: space-between; align-items: end; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 12px; gap: 10px; }
-        .title { font-size: 18px; font-weight: 700; text-transform: uppercase; }
+        .title { font-size: 20px; font-weight: 800; text-transform: uppercase; }
         .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .meta-box table { width: 100%; border-collapse: collapse; }
-        .meta-box th, .meta-box td { border: 1px solid #111; padding: 3px 4px; text-align: left; vertical-align: top; }
+        .meta-box th, .meta-box td { border: 1px solid #111; padding: 4px 5px; text-align: left; vertical-align: top; font-size: 12px; font-weight: 600; }
         .meta-box th { width: 42%; background: #f3f3f3; }
         table.report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .report-table th, .report-table td { border: 1px solid #111; padding: 4px; vertical-align: top; word-break: break-word; white-space: normal; }
-        .report-table th { background: #efefef; font-size: 10px; text-align: center; font-weight: 700; }
+        .report-table th, .report-table td { border: 1px solid #111; padding: 5px; vertical-align: top; word-break: break-word; white-space: normal; font-size: 12px; font-weight: 600; }
+        .report-table th { background: #efefef; font-size: 12px; text-align: center; font-weight: 800; }
         .report-table td { text-align: left; }
         .report-table th:first-child, .report-table td:first-child { text-align: center; }
         .report-table .grand-total td { font-weight: 700; background: #f8f8f8; }
@@ -26,8 +26,8 @@
         .no-print { margin-bottom: 10px; }
         @media print {
             .no-print { display: none; }
-            body { margin: 4mm; font-size: 10px; }
-            .report-table th, .report-table td { padding: 3px; }
+            body { margin: 4mm; font-size: 12px; line-height: 1.28; font-weight: 600; }
+            .report-table th, .report-table td { padding: 4px; }
         }
     </style>
 </head>

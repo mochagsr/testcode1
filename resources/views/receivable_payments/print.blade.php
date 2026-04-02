@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -9,14 +9,14 @@
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.25; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
         .receipt { border: 1px solid #111; padding: 12px; }
-        .company-head { display: grid; grid-template-columns: minmax(0, 42%) minmax(220px, 26%) minmax(0, 32%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 18px; }
-        .company-left { display: flex; gap: 8px; min-width: 0; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .company-left { display: flex; gap: 6px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
-        .company-name { font-size: 16px; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
-        .company-detail { white-space: pre-line; }
-        .doc-title-center { font-size: 11px; line-height: 1.25; min-width: 210px; text-align: center; align-self: center; min-width: 0; }
-        .doc-meta-right { font-size: 11px; line-height: 1.25; min-width: 210px; max-width: 250px; justify-self: end; text-align: left; width: 100%; margin-left: auto; }
+        .company-name { font-size: 15px; font-weight: 800; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
+        .company-detail { white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
+        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: center; align-self: center; min-width: 0; font-weight: 700; }
+        .doc-meta-right { font-size: 12px; line-height: 1.3; min-width: 180px; max-width: 270px; justify-self: end; text-align: left; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .kwitansi-title { font-size: 18px; font-weight: 700; letter-spacing: 0.6px; text-align: center; }
@@ -38,7 +38,7 @@
         .muted { color: #333; }
         @media print {
             .no-print { display: none; }
-            body { margin: 4mm; font-size: 10px; }
+            body { margin: 4mm; font-size: 12px; line-height: 1.28; font-weight: 600; }
             .receipt { border: 1px solid #111; }
         }
     </style>
@@ -167,5 +167,6 @@
 </div>
 </body>
 </html>
+
 
 
