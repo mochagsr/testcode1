@@ -567,16 +567,20 @@ Set `Running directory = public` dilakukan **setelah repo berhasil di-clone**, k
 
 Karena folder website sudah dibuat dulu oleh aaPanel, clone repo harus masuk ke **folder yang sudah ada itu**.
 
-Jangan pakai pola ini:
+Contoh **SALAH / JANGAN PAKAI**:
 
 ```bash
 cd /www/wwwroot
 git clone https://github.com/mochagsr/testcode1.git teserpos.mitrasejatiberkah.com
 ```
 
-karena folder `teserpos.mitrasejatiberkah.com` sudah dibuat aaPanel.
+Kenapa salah:
+- folder `teserpos.mitrasejatiberkah.com` sudah dibuat aaPanel
+- command itu mencoba membuat folder repo baru dengan nama yang sama
+- hasilnya akan error:
+  - `destination path ... already exists and is not an empty directory`
 
-Gunakan pola ini:
+Contoh **BENAR / PAKAI YANG INI**:
 - masuk dulu ke folder website yang sudah dibuat
 - lalu clone ke folder saat ini dengan `git clone ... .`
 
