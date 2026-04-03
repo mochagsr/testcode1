@@ -283,7 +283,8 @@
         }
         .form-section-note {
             margin: 0 0 8px;
-            font-size: 12px;
+            font-size: 13px;
+            line-height: 1.45;
             color: var(--muted);
         }
         .label-required {
