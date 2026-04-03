@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -59,21 +59,13 @@
         $transferText = trim((string) ($companyTransferAccounts ?? ''));
         $maxBlankRows = 3;
         $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($customer->address ?? ''), 4);
-        $companyLogoSrc = null;
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
         $companyMetaLines = collect([
             $companyAddress,
             $companyPhone !== '' ? 'Telp: '.$companyPhone : '',
             $companyEmail !== '' ? 'Email: '.$companyEmail : '',
             $companyNotes,
         ])->filter(fn (string $line): bool => trim($line) !== '');
-
-        if ($companyLogoPath !== '') {
-            $absoluteLogoPath = public_path('storage/'.$companyLogoPath);
-            if (is_file($absoluteLogoPath)) {
-                $mimeType = mime_content_type($absoluteLogoPath) ?: 'image/png';
-                $companyLogoSrc = 'data:'.$mimeType.';base64,'.base64_encode(file_get_contents($absoluteLogoPath));
-            }
-        }
     @endphp
 
     @if(empty($isPdf))
@@ -253,3 +245,4 @@
 </div>
 </body>
 </html>
+

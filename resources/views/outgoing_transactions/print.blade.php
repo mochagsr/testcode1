@@ -60,17 +60,8 @@
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
-        $companyLogoSrc = null;
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
         $supplierInvoicePhotoSrc = null;
-
-        if ($companyLogoPath) {
-            $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
-
-            if (is_file($absoluteLogoPath)) {
-                $mimeType = mime_content_type($absoluteLogoPath) ?: 'image/png';
-                $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
-            }
-        }
 
         if (!empty($transaction->supplier_invoice_photo_path)) {
             $absoluteInvoicePhotoPath = public_path('storage/' . $transaction->supplier_invoice_photo_path);
@@ -193,4 +184,5 @@
 </div>
 </body>
 </html>
+
 

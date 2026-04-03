@@ -57,16 +57,7 @@
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
-        $companyLogoSrc = null;
-
-        if ($companyLogoPath) {
-            $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
-
-            if (is_file($absoluteLogoPath)) {
-                $mimeType = mime_content_type($absoluteLogoPath) ?: 'image/png';
-                $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
-            }
-        }
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
     @endphp
 
     @if(empty($isPdf))
@@ -224,5 +215,8 @@
 </div>
 </body>
 </html>
+
+
+
 
 

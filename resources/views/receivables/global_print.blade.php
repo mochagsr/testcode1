@@ -68,14 +68,7 @@
             $customerAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($selectedCustomer->address ?? '')), 4);
             $notesText = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($companyInvoiceNotes ?? '')), 4);
             $transferText = trim((string) ($companyTransferAccounts ?? ''));
-            $companyLogoSrc = null;
-            if ((string) ($companyLogoPath ?? '') !== '') {
-                $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
-                if (is_file($absoluteLogoPath)) {
-                    $mimeType = mime_content_type($absoluteLogoPath) ?: 'image/png';
-                    $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
-                }
-            }
+            $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) ($companyLogoPath ?? ''));
             $blankRows = max(0, 7 - $customerInvoiceRows->count());
         @endphp
 
@@ -238,3 +231,4 @@
 </div>
 </body>
 </html>
+

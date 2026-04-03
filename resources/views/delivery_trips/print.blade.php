@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="id">
 <head>
     <meta charset="utf-8">
@@ -83,14 +83,7 @@
     $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
         ->filter(fn ($line) => trim((string) $line) !== '');
 
-    $companyLogoSrc = null;
-    if ($companyLogoPath) {
-        $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
-        if (is_file($absoluteLogoPath)) {
-            $mimeType = mime_content_type($absoluteLogoPath) ?: 'image/png';
-            $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
-        }
-    }
+    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
 @endphp
 
 <div class="no-print" style="margin-bottom:10px;">
@@ -173,4 +166,7 @@
 </div>
 </body>
 </html>
+
+
+
 

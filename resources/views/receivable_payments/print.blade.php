@@ -58,28 +58,7 @@
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
-        $companyLogoSrc = null;
-
-        if ($companyLogoPath) {
-            $normalized = ltrim((string) $companyLogoPath, '/\\');
-            $storageRelative = str_starts_with($normalized, 'storage/')
-                ? substr($normalized, strlen('storage/'))
-                : $normalized;
-            $candidatePaths = array_values(array_unique([
-                public_path('storage/' . $storageRelative),
-                public_path($normalized),
-                storage_path('app/public/' . $storageRelative),
-            ]));
-
-            foreach ($candidatePaths as $candidatePath) {
-                if (is_file($candidatePath)) {
-                    $mimeType = function_exists('mime_content_type')
-                        ? (mime_content_type($candidatePath) ?: 'image/png')
-                        : 'image/png';
-                    $companyLogoSrc = 'data:' . $mimeType . ';base64,' . base64_encode((string) file_get_contents($candidatePath));
-                    break;
-                }
-            }
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
         }
     @endphp
     @if(empty($isPdf))
@@ -167,6 +146,9 @@
 </div>
 </body>
 </html>
+
+
+
 
 
 
