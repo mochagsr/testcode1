@@ -131,13 +131,19 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            align-items: flex-start;
         }
         .delivery-history-row {
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: wrap;
             padding: 4px 8px;
             border: 1px solid rgba(148, 163, 184, 0.2);
             border-radius: 6px;
             background: rgba(15, 23, 42, 0.18);
             font-size: 13px;
+            width: fit-content;
+            max-width: 100%;
         }
         .delivery-history-row strong {
             display: inline-block;
