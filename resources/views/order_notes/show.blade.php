@@ -115,7 +115,7 @@
             text-align: center;
         }
         .order-note-items-table .col-status {
-            width: 112px;
+            width: 148px;
         }
         .order-note-items-table .col-notes {
             width: 380px;
@@ -140,8 +140,8 @@
         }
         .order-note-items-table td:nth-child(5) {
             text-align: center;
-            padding-top: 14px;
-            padding-bottom: 14px;
+            padding-left: 14px;
+            padding-right: 14px;
         }
         .delivery-history-list {
             display: flex;
