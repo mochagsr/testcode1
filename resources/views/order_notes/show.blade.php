@@ -113,10 +113,10 @@
             width: 110px;
         }
         .order-note-items-table .col-status {
-            width: 158px;
+            width: 136px;
         }
         .order-note-items-table .col-notes {
-            width: 240px;
+            width: 300px;
         }
         .order-note-delivery-table .col-name {
             width: auto;
