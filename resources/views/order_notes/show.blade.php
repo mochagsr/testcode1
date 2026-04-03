@@ -140,8 +140,8 @@
         }
         .order-note-items-table td:nth-child(5) {
             text-align: center;
-            padding-top: 10px;
-            padding-bottom: 10px;
+            padding-top: 14px;
+            padding-bottom: 14px;
         }
         .delivery-history-list {
             display: flex;
