@@ -130,17 +130,18 @@
         .delivery-history-list {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 4px;
         }
         .delivery-history-row {
-            padding: 8px 10px;
+            padding: 4px 8px;
             border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 8px;
+            border-radius: 6px;
             background: rgba(15, 23, 42, 0.18);
+            font-size: 13px;
         }
         .delivery-history-row strong {
             display: inline-block;
-            margin-right: 8px;
+            margin-right: 6px;
         }
         .delivery-history-link {
             color: #e2e8f0;
