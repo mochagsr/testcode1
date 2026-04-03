@@ -125,7 +125,7 @@
             width: 96px;
         }
         .order-note-delivery-table .col-history {
-            width: 56%;
+            width: 25%;
         }
         .delivery-history-list {
             display: flex;
