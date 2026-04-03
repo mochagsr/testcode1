@@ -77,10 +77,10 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 132px;
-            padding: 6px 12px;
+            min-width: 104px;
+            padding: 4px 10px;
             border-radius: 999px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 800;
             line-height: 1.15;
             border: 1px solid transparent;
@@ -100,6 +100,32 @@
             background: rgba(34, 197, 94, 0.20);
             color: #bbf7d0;
             border-color: rgba(74, 222, 128, 0.55);
+        }
+        .order-note-items-table,
+        .order-note-delivery-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .order-note-items-table .col-name {
+            width: auto;
+        }
+        .order-note-items-table .col-qty {
+            width: 110px;
+        }
+        .order-note-items-table .col-status {
+            width: 158px;
+        }
+        .order-note-items-table .col-notes {
+            width: 240px;
+        }
+        .order-note-delivery-table .col-name {
+            width: auto;
+        }
+        .order-note-delivery-table .col-qty {
+            width: 96px;
+        }
+        .order-note-delivery-table .col-history {
+            width: 56%;
         }
         .delivery-history-list {
             display: flex;
@@ -181,15 +207,15 @@
         <div class="form-section">
             <h3 class="form-section-title">{{ __('txn.items') }}</h3>
             <p class="form-section-note">{{ __('txn.order_items_note') }} {{ __('txn.order_note_items_detail_hint') }}</p>
-            <table>
+            <table class="order-note-items-table">
                 <thead>
                 <tr>
-                    <th>{{ __('txn.name') }}</th>
-                    <th>{{ __('txn.order_note_qty_ordered') }}</th>
-                    <th>{{ __('txn.order_note_qty_fulfilled') }}</th>
-                    <th>{{ __('txn.order_note_qty_remaining') }}</th>
-                    <th>{{ __('txn.status') }}</th>
-                    <th>{{ __('txn.notes') }}</th>
+                    <th class="col-name">{{ __('txn.name') }}</th>
+                    <th class="col-qty">{{ __('txn.order_note_qty_ordered') }}</th>
+                    <th class="col-qty">{{ __('txn.order_note_qty_fulfilled') }}</th>
+                    <th class="col-qty">{{ __('txn.order_note_qty_remaining') }}</th>
+                    <th class="col-status">{{ __('txn.status') }}</th>
+                    <th class="col-notes">{{ __('txn.notes') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -220,14 +246,14 @@
         <div class="form-section">
             <h3 class="form-section-title">{{ __('txn.order_note_delivery_history_title') }}</h3>
             <p class="form-section-note">{{ __('txn.order_note_delivery_history_note') }}</p>
-            <table>
+            <table class="order-note-delivery-table">
                 <thead>
                 <tr>
-                    <th>{{ __('txn.name') }}</th>
-                    <th>{{ __('txn.order_note_qty_ordered') }}</th>
-                    <th>{{ __('txn.order_note_qty_fulfilled') }}</th>
-                    <th>{{ __('txn.order_note_qty_remaining') }}</th>
-                    <th>{{ __('txn.order_note_delivered_in_invoice') }}</th>
+                    <th class="col-name">{{ __('txn.name') }}</th>
+                    <th class="col-qty">{{ __('txn.order_note_qty_ordered') }}</th>
+                    <th class="col-qty">{{ __('txn.order_note_qty_fulfilled') }}</th>
+                    <th class="col-qty">{{ __('txn.order_note_qty_remaining') }}</th>
+                    <th class="col-history">{{ __('txn.order_note_delivered_in_invoice') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -643,3 +669,4 @@
     </script>
     @include('partials.printing_subtype_script')
 @endsection
+
