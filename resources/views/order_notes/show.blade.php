@@ -79,6 +79,7 @@
             justify-content: center;
             min-width: 104px;
             padding: 4px 10px;
+            margin: 2px 0;
             border-radius: 999px;
             font-size: 11px;
             font-weight: 800;
@@ -111,6 +112,7 @@
         }
         .order-note-items-table .col-qty {
             width: 92px;
+            text-align: center;
         }
         .order-note-items-table .col-status {
             width: 112px;
@@ -123,9 +125,23 @@
         }
         .order-note-delivery-table .col-qty {
             width: 96px;
+            text-align: center;
         }
         .order-note-delivery-table .col-history {
             width: 25%;
+        }
+        .order-note-items-table td:nth-child(2),
+        .order-note-items-table td:nth-child(3),
+        .order-note-items-table td:nth-child(4),
+        .order-note-delivery-table td:nth-child(2),
+        .order-note-delivery-table td:nth-child(3),
+        .order-note-delivery-table td:nth-child(4) {
+            text-align: center;
+        }
+        .order-note-items-table td:nth-child(5) {
+            text-align: center;
+            padding-top: 10px;
+            padding-bottom: 10px;
         }
         .delivery-history-list {
             display: flex;
