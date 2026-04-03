@@ -1,12 +1,12 @@
-# Backup DB dan Ops Health (aaPanel v8.0.1 / cPanel / VPS)
+# Backup DB dan Ops Health di aaPanel v8.0.1
 
-Dokumen ini menjelaskan cara membuat backup database pertama, cara supaya backup tersebut tercatat di menu `Ops Health`, dan cara memvalidasi restore drill.
+Dokumen ini menjelaskan cara membuat backup database pertama di server `aaPanel`, cara supaya backup tersebut tercatat di menu `Ops Health`, dan cara membaca hasil restore drill.
 
 Dokumen ini dipakai untuk:
-- lokal / development
-- server `tes`
-- server `prod`
-- aaPanel / cPanel / VPS biasa
+- env `tes`
+  - path project: `/www/wwwroot/teserpos.mitrasejatiberkah.com`
+- env `prod`
+  - path project: `/www/wwwroot/erpos.mitrasejaitberkah.com`
 
 ## 1. Yang dibaca Ops Health
 
@@ -35,13 +35,6 @@ Artinya:
 php artisan app:db-backup
 ```
 
-Opsi tambahan:
-
-```bash
-php artisan app:db-backup --gzip
-php artisan app:db-backup --path="D:\backup-db"
-```
-
 ### Restore drill
 
 ```bash
@@ -52,6 +45,18 @@ php artisan app:db-restore-test
 
 ```bash
 php artisan app:smoke-test
+```
+
+### Integrity check
+
+```bash
+php artisan app:integrity-check
+```
+
+### Performance probe ringan
+
+```bash
+php artisan app:load-test-light --loops=80 --search=ang
 ```
 
 ## 3. Cara paling aman untuk backup awal
@@ -71,21 +76,12 @@ Kenapa urutannya begitu:
 
 ## 4. Penting: jangan pakai `--gzip` dulu untuk backup pertama
 
-Backup pertama **lebih aman tanpa `--gzip`**.
+Backup pertama lebih aman tanpa `--gzip`.
 
 Kenapa:
 - command `app:db-restore-test` saat ini otomatis mencari file:
   - `*.sql`
-- kalau kamu backup pakai:
-
-```bash
-php artisan app:db-backup --gzip
-```
-
-hasilnya menjadi:
-- `*.sql.gz`
-
-dan restore drill otomatis tidak akan menemukannya.
+- kalau backup pertama langsung digzip, restore drill otomatis bisa melewati file itu
 
 Jadi untuk backup pertama:
 
@@ -93,24 +89,9 @@ Jadi untuk backup pertama:
 php artisan app:db-backup
 ```
 
-Setelah backup dan restore drill pertama berhasil, backup otomatis harian boleh tetap memakai `--gzip`.
+Setelah backup dan restore drill pertama tercatat, backup otomatis harian boleh tetap memakai `--gzip` lewat scheduler aplikasi.
 
-## 5. Contoh di lokal
-
-Contoh path project lokal:
-
-```bash
-cd g:\laragon\www\tespgpos
-php artisan app:db-backup
-php artisan app:db-restore-test
-php artisan app:smoke-test
-```
-
-Kalau database lokal masih `sqlite`, backup tetap tercatat di `Ops Health`, tetapi:
-- restore drill bisa `skipped`
-- karena restore drill penuh dipakai untuk driver `mysql`
-
-## 6. Contoh di aaPanel
+## 5. Contoh di aaPanel
 
 Di aaPanel `v8.0.1`, command ini biasanya dijalankan dari menu:
 - `Terminal`
@@ -118,7 +99,7 @@ Di aaPanel `v8.0.1`, command ini biasanya dijalankan dari menu:
 ### Env tes
 
 ```bash
-cd /www/wwwroot/pgpos-tes
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:smoke-test
@@ -127,27 +108,29 @@ php artisan app:smoke-test
 ### Env prod
 
 ```bash
-cd /www/wwwroot/pgpos-prod
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:smoke-test
 ```
 
-## 7. Contoh output yang normal
+## 6. Contoh output yang normal
 
 ### Hasil backup
 
 ```text
-Backup created: /www/wwwroot/pgpos-prod/storage/app/backups/db/backup-20260329-101500.sql
+Backup created: /www/wwwroot/teserpos.mitrasejatiberkah.com/storage/app/backups/db/backup-20260403-094100.sql
 ```
 
-### Hasil restore drill
+### Hasil restore drill berhasil
 
 ```text
-Restore test passed for backup: /www/wwwroot/pgpos-prod/storage/app/backups/db/backup-20260329-101500.sql
+Restore test passed for backup: /www/wwwroot/teserpos.mitrasejatiberkah.com/storage/app/backups/db/backup-20260403-094100.sql
 ```
 
-Kalau di server seperti aaPanel user database tidak punya hak `CREATE DATABASE` / `DROP DATABASE`, hasil yang masih normal adalah:
+### Hasil restore drill yang masih normal di aaPanel
+
+Kalau user database server tidak punya hak `CREATE DATABASE` / `DROP DATABASE`, hasil berikut masih normal:
 
 ```text
 Restore test skipped: database user cannot create/drop temporary databases on this server.
@@ -155,14 +138,18 @@ Restore test skipped: database user cannot create/drop temporary databases on th
 
 ### Hasil smoke test yang sehat
 
-Contoh ringkas:
-
 ```text
-BACKUP_FILES     OK    Backup ditemukan: backups/db/backup-20260329-101500.sql
-RESTORE_DRILL    OK    Terakhir: 29-03-2026 10:17:40 / PASSED
+BACKUP_FILES      OK     Backup ditemukan: backups/db/backup-20260403-094100.sql
+RESTORE_DRILL     WARN   Terakhir: 03-04-2026 09:41:02 / SKIPPED
+INTEGRITY_CHECK   OK     Terakhir: 03-04-2026 09:45:32 / OK
+PERFORMANCE_PROBE OK     Terakhir: 03-04-2026 09:45:33 / avg 2 ms
 ```
 
-## 8. Cara cek di Ops Health
+Catatan:
+- di aaPanel, `RESTORE_DRILL = SKIPPED` masih aman kalau user DB tidak boleh membuat database sementara
+- itu bukan blocker untuk env `tes`
+
+## 7. Cara cek di Ops Health
 
 Setelah command di atas selesai, buka:
 - menu `Ops Health`
@@ -178,23 +165,24 @@ Yang seharusnya berubah:
 3. `Restore Drill`
 - status terakhir:
   - `PASSED`
-  - atau `SKIPPED` kalau environment masih non-MySQL
   - atau `SKIPPED` kalau user database server tidak punya hak membuat database sementara
 
-## 9. Lokasi file backup
+4. `Integrity Check`
+- sebaiknya `OK`
+
+5. `Performance Probe`
+- sebaiknya sudah ada timestamp dan angka rata-rata query ringan
+
+## 8. Lokasi file backup
 
 Default folder backup:
-
 - `storage/app/backups/db`
 
 Contoh file:
+- `backup-20260403-094100.sql`
+- `backup-20260403-094100.sql.gz`
 
-- `backup-20260329-101500.sql`
-- `backup-20260329-101500.sql.gz`
-- untuk SQLite:
-  - `backup-20260329-101500.sql.sqlite`
-
-## 10. Kapan pakai `app:db-backup` dan kapan pakai snapshot SQL
+## 9. Kapan pakai `app:db-backup` dan kapan pakai snapshot SQL
 
 ### `app:db-backup`
 Dipakai untuk:
@@ -217,7 +205,7 @@ Jadi:
 - **backup operasional** = `app:db-backup`
 - **snapshot deploy / clone data** = file SQL di `database/sql`
 
-## 11. Kapan wajib backup manual
+## 10. Kapan wajib backup manual
 
 Sebelum melakukan:
 - `git pull`
@@ -233,11 +221,12 @@ Command:
 php artisan app:db-backup
 ```
 
-## 12. Contoh alur aman sebelum update
+## 11. Contoh alur aman sebelum update
 
 ### Update kecil
 
 ```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 php artisan app:db-backup
 git pull origin master
 composer install --no-dev --optimize-autoloader
@@ -252,6 +241,7 @@ php artisan app:smoke-test
 ### Update dengan migration
 
 ```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
 php artisan app:db-backup
 git pull origin master
 composer install --no-dev --optimize-autoloader
@@ -264,7 +254,7 @@ php artisan view:cache
 php artisan app:smoke-test
 ```
 
-## 13. Kalau backup tidak muncul di Ops Health
+## 12. Kalau backup tidak muncul di Ops Health
 
 Cek ini satu per satu:
 
@@ -276,20 +266,11 @@ php artisan app:db-backup
 
 2. file backup benar-benar ada?
 
-Linux:
-
 ```bash
 ls -lah storage/app/backups/db
 ```
 
-Windows:
-
-```powershell
-Get-ChildItem storage\app\backups\db
-```
-
 3. app membaca disk local normal?
-- jalankan:
 
 ```bash
 php artisan app:smoke-test
@@ -304,7 +285,7 @@ php artisan optimize:clear
 5. `Ops Health` dibuka di environment yang benar?
 - jangan salah cek antara `tes` dan `prod`
 
-## 14. Kalau restore drill gagal
+## 13. Kalau restore drill gagal atau skipped
 
 Penyebab paling umum:
 - belum ada file backup `.sql`
@@ -318,15 +299,17 @@ Yang perlu dicek:
 php artisan app:db-restore-test
 ```
 
-Kalau gagal, biasanya pesan yang muncul:
-- `No SQL backup file found.`
+Kemungkinan hasil:
+- `Restore test passed ...`
+  - aman
+- `Restore test skipped ...`
+  - masih normal untuk aaPanel jika user DB dibatasi
 - `Failed preparing temporary database.`
-- `Restore command failed.`
+  - cek hak akses DB dan konfigurasi MySQL
 
-## 15. Jadwal otomatis yang sudah ada
+## 14. Jadwal otomatis yang sudah ada
 
 Di scheduler app:
-
 - backup:
   - `php artisan app:db-backup --gzip`
   - setiap hari `01:00`
@@ -340,10 +323,10 @@ Di scheduler app:
 Supaya scheduler berjalan, cron server harus aktif:
 
 ```bash
-* * * * * cd /path/app && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-## 16. Rekomendasi operasional nyata
+## 15. Rekomendasi operasional nyata
 
 Untuk environment `tes`:
 - backup manual pertama setelah deploy
@@ -355,13 +338,29 @@ Untuk environment `prod`:
 - restore drill di jam sepi
 - backup lagi sebelum update besar
 
-## 17. Checklist singkat
+## 16. Checklist singkat
 
 Kalau kamu cuma butuh versi singkat:
 
+### Env tes
+
 ```bash
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
+php artisan app:smoke-test
+```
+
+### Env prod
+
+```bash
+cd /www/wwwroot/erpos.mitrasejaitberkah.com
+php artisan app:db-backup
+php artisan app:db-restore-test
+php artisan app:integrity-check
+php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 ```
 
@@ -372,11 +371,11 @@ Pastikan:
 - `Latest Backup File` terisi
 - `Total Backup Files >= 1`
 - `Restore Drill` sudah ada status
+- `Integrity Check` tidak fail
+- `Performance Probe` sudah tercatat
 
-## 18. Dokumen terkait
+## 17. Dokumen terkait
 
-- `docs/ops-runbook.md`
-- `docs/RECOVERY_SOP.md`
 - `docs/DEPLOY_AAPANEL.md`
 - `docs/GO_LIVE_RUNBOOK.md`
 - `docs/UAT_AAPANEL_POST_DEPLOY.md`
