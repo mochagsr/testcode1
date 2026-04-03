@@ -101,36 +101,6 @@
             color: #bbf7d0;
             border-color: rgba(74, 222, 128, 0.55);
         }
-        .delivery-summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 10px;
-            margin: 0 0 14px;
-        }
-        .delivery-summary-card {
-            border: 1px solid rgba(59, 130, 246, 0.22);
-            border-radius: 10px;
-            padding: 10px 12px;
-            background: rgba(30, 41, 59, 0.45);
-        }
-        .delivery-summary-title {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 6px;
-            font-weight: 800;
-        }
-        .delivery-summary-meta {
-            font-size: 12px;
-            color: #94a3b8;
-            margin-bottom: 2px;
-        }
-        .delivery-summary-total {
-            font-size: 14px;
-            font-weight: 800;
-            color: #e2e8f0;
-        }
         .delivery-history-list {
             display: flex;
             flex-direction: column;
@@ -241,20 +211,6 @@
         <div class="form-section">
             <h3 class="form-section-title">{{ __('txn.order_note_delivery_history_title') }}</h3>
             <p class="form-section-note">{{ __('txn.order_note_delivery_history_note') }}</p>
-            @if(!empty($fulfillmentDetails['invoice_summaries']))
-                <div class="delivery-summary-grid">
-                    @foreach(($fulfillmentDetails['invoice_summaries'] ?? []) as $invoiceSummary)
-                        <div class="delivery-summary-card">
-                            <div class="delivery-summary-title">
-                                <span>{{ $invoiceSummary['invoice_number'] }}</span>
-                                <span>{{ $invoiceSummary['invoice_date'] }}</span>
-                            </div>
-                            <div class="delivery-summary-meta">{{ __('txn.order_note_invoice_summary_items') }}: {{ number_format((int) ($invoiceSummary['item_count'] ?? 0), 0, ',', '.') }}</div>
-                            <div class="delivery-summary-total">{{ __('txn.order_note_invoice_summary_qty') }}: {{ number_format((int) ($invoiceSummary['total_quantity'] ?? 0), 0, ',', '.') }}</div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
             <table>
                 <thead>
                 <tr>

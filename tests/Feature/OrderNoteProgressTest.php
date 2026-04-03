@@ -251,8 +251,6 @@ class OrderNoteProgressTest extends TestCase
         $response->assertSee('INV-ON-004');
         $response->assertSee('Produk E');
         $response->assertSee('Produk F');
-        $response->assertSee(__('txn.order_note_invoice_summary_qty'));
-        $response->assertSee(__('txn.order_note_invoice_summary_items'));
         $response->assertSee(__('txn.order_note_status_partial'));
         $response->assertSee(__('txn.order_note_status_not_delivered'));
         $response->assertSee(__('txn.order_note_no_delivery_history'));
