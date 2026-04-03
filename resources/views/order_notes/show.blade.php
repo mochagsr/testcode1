@@ -116,6 +116,15 @@
             display: inline-block;
             margin-right: 8px;
         }
+        .delivery-history-link {
+            color: #e2e8f0;
+            font-weight: 800;
+            text-decoration: none;
+        }
+        .delivery-history-link:hover {
+            color: #93c5fd;
+            text-decoration: underline;
+        }
         .delivery-history-empty {
             color: #94a3b8;
             font-style: italic;
@@ -233,7 +242,11 @@
                                 <div class="delivery-history-list">
                                     @foreach($item['deliveries'] as $delivery)
                                         <div class="delivery-history-row">
-                                            <strong>{{ $delivery['invoice_number'] }}</strong>
+                                            <strong>
+                                                <a href="{{ route('sales-invoices.show', $delivery['invoice_id']) }}" class="delivery-history-link">
+                                                    {{ $delivery['invoice_number'] }}
+                                                </a>
+                                            </strong>
                                             <span>{{ $delivery['invoice_date'] }}</span>
                                             <span style="margin-left: 8px;">{{ __('txn.qty') }} {{ number_format((int) ($delivery['quantity'] ?? 0), 0, ',', '.') }}</span>
                                         </div>
