@@ -155,6 +155,8 @@ Ini penting agar piutang tidak langsung nol kalau ternyata yang dikembalikan han
 
 ## 6. Surat Pesanan
 
+![Surat Pesanan Admin](assets/manuals/admin-order-notes.png)
+
 ### Flow kontrol surat pesanan
 
 ```text
@@ -234,14 +236,7 @@ Arti status:
   - tanggal invoice
   - qty item yang dikirim di invoice itu
 
-Di bagian atas card, admin juga melihat ringkasan per invoice:
-- nomor invoice
-- tanggal
-- jumlah item yang ikut terkirim
-- total qty terkirim per invoice
-
 Gunanya:
-- cepat membaca invoice mana yang paling banyak mengirim
 - mudah menjelaskan ke user kenapa status item masih `partial`
 - mudah cek apakah sisa item memang belum pernah difakturkan
 

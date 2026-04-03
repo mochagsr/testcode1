@@ -263,11 +263,6 @@ Arti status:
   - lewat `Faktur Penjualan` nomor berapa
   - tanggal faktur
   - qty yang terkirim di faktur itu
-- di bagian atas card juga ada ringkasan per invoice:
-  - nomor invoice
-  - tanggal
-  - jumlah item
-  - total qty terkirim
 
 Jadi user sekarang bisa menjawab dua pertanyaan ini dengan cepat:
 - barang mana yang sudah terkirim

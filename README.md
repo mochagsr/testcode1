@@ -47,11 +47,6 @@ ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
   - menampilkan barang sudah terkirim lewat invoice nomor berapa
   - tanggal invoice
   - qty yang terkirim di invoice itu
-- Ada ringkasan per invoice di bagian atas card pengiriman
-  - nomor invoice
-  - tanggal
-  - jumlah item
-  - total qty terkirim
 - Informasi yang sama juga ikut ke print/PDF `Surat Pesanan`
 
 ## Quick start

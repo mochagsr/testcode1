@@ -69,6 +69,22 @@ async function selectIfExists(page, selector, value) {
   return false;
 }
 
+async function captureFirstOrderNoteDetail(page, fileName, loginIdentifier, password) {
+  await ensureLoggedIn(page, loginIdentifier, password, '/order-notes');
+  const firstLink = page.locator('.list-doc-link').first();
+  const hasLink = await firstLink.count().catch(() => 0);
+
+  if (hasLink > 0) {
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {}),
+      firstLink.click(),
+    ]);
+    await waitForUi(page);
+  }
+
+  await shot(page, fileName);
+}
+
 function wrapHtml(title, bodyHtml) {
   return `<!doctype html>
 <html lang="id">
@@ -398,6 +414,7 @@ async function main() {
   await shot(admin, 'admin-dashboard.png');
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/sales-invoices');
   await shot(admin, 'admin-sales-invoices.png');
+  await captureFirstOrderNoteDetail(admin, 'admin-order-notes.png', adminLogin || adminEmail, adminPassword);
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/receivables?customer_id=1&semester=S2-2526');
   await shot(admin, 'admin-receivables.png');
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/supplier-payables?supplier_id=1&year=2026');
@@ -420,9 +437,7 @@ async function main() {
   await user.goto(`${baseUrl}/sales-invoices`, { waitUntil: 'domcontentloaded' });
   await waitForUi(user);
   await shot(user, 'user-sales-invoices.png');
-  await user.goto(`${baseUrl}/order-notes`, { waitUntil: 'domcontentloaded' });
-  await waitForUi(user);
-  await shot(user, 'user-order-notes.png');
+  await captureFirstOrderNoteDetail(user, 'user-order-notes.png', userLogin || userEmail, userPassword);
   await user.goto(`${baseUrl}/receivables/global`, { waitUntil: 'domcontentloaded' });
   await waitForUi(user);
   await shot(user, 'user-receivables-global.png');
