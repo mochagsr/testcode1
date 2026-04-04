@@ -35,6 +35,7 @@ class CustomerController extends Controller
                 'customer_level_id',
                 'name',
                 'phone',
+                'phone_secondary',
                 'city',
                 'address',
                 'outstanding_receivable',
@@ -60,11 +61,12 @@ class CustomerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'customer_level_id' => ['nullable', 'integer', 'exists:customer_levels,id'],
+            'customer_level_id' => ['required', 'integer', 'exists:customer_levels,id'],
             'name' => ['required', 'string', 'max:150'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
+            'phone' => ['required', 'string', 'max:30'],
+            'phone_secondary' => ['nullable', 'string', 'max:30'],
+            'city' => ['required', 'string', 'max:100'],
+            'address' => ['required', 'string'],
             'id_card_photo' => ['nullable', 'image', 'max:3072'],
             'outstanding_receivable' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
@@ -90,11 +92,12 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer): JsonResponse
     {
         $data = $request->validate([
-            'customer_level_id' => ['nullable', 'integer', 'exists:customer_levels,id'],
+            'customer_level_id' => ['required', 'integer', 'exists:customer_levels,id'],
             'name' => ['required', 'string', 'max:150'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
+            'phone' => ['required', 'string', 'max:30'],
+            'phone_secondary' => ['nullable', 'string', 'max:30'],
+            'city' => ['required', 'string', 'max:100'],
+            'address' => ['required', 'string'],
             'id_card_photo' => ['nullable', 'image', 'max:3072'],
             'outstanding_receivable' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],

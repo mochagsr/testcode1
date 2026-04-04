@@ -32,6 +32,7 @@ class CustomerPageController extends Controller
                 'customer_level_id',
                 'name',
                 'phone',
+                'phone_secondary',
                 'city',
                 'address',
                 'outstanding_receivable',
@@ -41,11 +42,7 @@ class CustomerPageController extends Controller
             ->when($selectedLevelId > 0, fn ($query) => $query->where('customer_level_id', $selectedLevelId))
             ->searchKeyword($search);
 
-        if ($search === '' && $selectedLevelId === 0) {
-            $customerQuery->latest('id');
-        } else {
-            $customerQuery->orderBy('name')->orderBy('id');
-        }
+        $customerQuery->orderBy('name')->orderBy('id');
 
         $customers = $customerQuery
             ->paginate((int) config('pagination.master_per_page', 20))
@@ -54,7 +51,7 @@ class CustomerPageController extends Controller
         return view('customers.index', [
             'customers' => $customers,
             'search' => $search,
-            'levels' => CustomerLevel::query()->orderBy('code')->orderBy('name')->get(['id', 'code', 'name']),
+            'levels' => CustomerLevel::query()->orderBy('name')->orderBy('code')->get(['id', 'code', 'name']),
             'selectedLevelId' => $selectedLevelId,
         ]);
     }
@@ -67,9 +64,10 @@ class CustomerPageController extends Controller
         $filename = 'customers-' . $printedAt->format('Ymd-His') . '.xlsx';
 
         $customerQuery = Customer::query()
-            ->select(['id', 'name', 'phone', 'city', 'address', 'outstanding_receivable'])
+            ->select(['id', 'name', 'phone', 'phone_secondary', 'city', 'address', 'outstanding_receivable'])
             ->when($selectedLevelId > 0, fn ($query) => $query->where('customer_level_id', $selectedLevelId))
             ->searchKeyword($search)
+            ->orderBy('name')
             ->orderBy('id');
 
         $customerCount = (clone $customerQuery)->count();
@@ -92,8 +90,16 @@ class CustomerPageController extends Controller
             $number = 1;
             $customerQuery->chunkById(500, function ($customers) use ($sheet, &$row, &$number): void {
                 foreach ($customers as $customer) {
-                    $phoneRaw = (string) ($customer->phone ?? '');
-                    $phoneNumber = preg_replace('/[^0-9]/', '', $phoneRaw);
+                    $phoneParts = collect([
+                        (string) ($customer->phone ?? ''),
+                        (string) ($customer->phone_secondary ?? ''),
+                    ])->map(static fn (string $value): string => trim($value))
+                        ->filter()
+                        ->values();
+                    $phoneNumber = $phoneParts
+                        ->map(static fn (string $value): string => preg_replace('/[^0-9]/', '', $value) ?? '')
+                        ->filter()
+                        ->implode(' / ');
 
                     $sheet->setCellValue('A' . $row, $number++);
                     $sheet->setCellValue('B' . $row, (string) $customer->name);
@@ -133,7 +139,7 @@ class CustomerPageController extends Controller
     public function levelCustomers(CustomerLevel $customerLevel): JsonResponse
     {
         $customers = Customer::query()
-            ->select(['id', 'name', 'phone', 'city', 'address'])
+            ->select(['id', 'name', 'phone', 'phone_secondary', 'city', 'address'])
             ->where('customer_level_id', $customerLevel->id)
             ->orderBy('name')
             ->limit(500)
@@ -149,6 +155,7 @@ class CustomerPageController extends Controller
                 'id' => (int) $customer->id,
                 'name' => (string) $customer->name,
                 'phone' => (string) ($customer->phone ?? ''),
+                'phone_secondary' => (string) ($customer->phone_secondary ?? ''),
                 'city' => (string) ($customer->city ?? ''),
                 'address' => (string) ($customer->address ?? ''),
             ])->values(),
@@ -230,11 +237,12 @@ class CustomerPageController extends Controller
     private function validatePayload(Request $request): array
     {
         return $request->validate([
-            'customer_level_id' => ['nullable', 'integer', 'exists:customer_levels,id'],
+            'customer_level_id' => ['required', 'integer', 'exists:customer_levels,id'],
             'name' => ['required', 'string', 'max:150'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
+            'phone' => ['required', 'string', 'max:30'],
+            'phone_secondary' => ['nullable', 'string', 'max:30'],
+            'city' => ['required', 'string', 'max:100'],
+            'address' => ['required', 'string'],
             'id_card_photo' => ['nullable', 'image', 'max:3072'],
             'outstanding_receivable' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],

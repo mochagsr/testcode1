@@ -22,6 +22,7 @@ class Customer extends Model
         'code',
         'name',
         'phone',
+        'phone_secondary',
         'city',
         'address',
         'id_card_photo_path',
@@ -124,6 +125,7 @@ class Customer extends Model
             'code',
             'name',
             'phone',
+            'phone_secondary',
             'city',
             'outstanding_receivable',
             'credit_balance',
@@ -149,7 +151,7 @@ class Customer extends Model
      */
     public function scopeOnlyReceivableFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'name', 'city', 'address', 'outstanding_receivable', 'credit_balance']);
+        return $query->select(['id', 'name', 'city', 'address', 'phone', 'phone_secondary', 'outstanding_receivable', 'credit_balance']);
     }
 
     /**
@@ -160,7 +162,7 @@ class Customer extends Model
      */
     public function scopeOnlyDeliveryFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'customer_level_id', 'name', 'city', 'phone', 'address']);
+        return $query->select(['id', 'customer_level_id', 'name', 'city', 'phone', 'phone_secondary', 'address']);
     }
 
     /**
@@ -171,7 +173,7 @@ class Customer extends Model
      */
     public function scopeOnlyOrderFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'name', 'city', 'phone', 'address']);
+        return $query->select(['id', 'name', 'city', 'phone', 'phone_secondary', 'address']);
     }
 
     /**
@@ -241,6 +243,7 @@ class Customer extends Model
                 $fullQuery->where('name', 'like', "%{$search}%")
                     ->orWhere('city', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('phone_secondary', 'like', "%{$search}%")
                     ->orWhereHas('level', function (Builder $levelQuery) use ($search): void {
                         $levelQuery->where('code', 'like', "%{$search}%")
                             ->orWhere('name', 'like', "%{$search}%");
@@ -254,6 +257,7 @@ class Customer extends Model
                             $perTokenQuery->where('name', 'like', "%{$token}%")
                                 ->orWhere('city', 'like', "%{$token}%")
                                 ->orWhere('phone', 'like', "%{$token}%")
+                                ->orWhere('phone_secondary', 'like', "%{$token}%")
                                 ->orWhereHas('level', function (Builder $levelQuery) use ($token): void {
                                     $levelQuery->where('code', 'like', "%{$token}%")
                                         ->orWhere('name', 'like', "%{$token}%");

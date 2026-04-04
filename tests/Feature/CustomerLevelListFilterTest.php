@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\CustomerLevel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CustomerLevelListFilterTest extends TestCase
@@ -94,7 +95,7 @@ class CustomerLevelListFilterTest extends TestCase
         $response->assertJsonPath('customers.0.id', $customerA->id);
     }
 
-    public function test_customer_list_defaults_to_latest_customer_first_without_filters(): void
+    public function test_customer_list_defaults_to_alphabetical_order_without_filters(): void
     {
         $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
 
@@ -112,8 +113,35 @@ class CustomerLevelListFilterTest extends TestCase
 
         $response->assertOk();
         $response->assertSeeInOrder([
-            'Zulu Customer',
             'Alpha Customer',
+            'Zulu Customer',
+        ]);
+    }
+
+    public function test_customer_store_redirects_to_filtered_list_for_created_customer(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $level = CustomerLevel::query()->create(['code' => 'AGN', 'name' => 'Agen', 'description' => null]);
+
+        $response = $this->actingAs($admin)->post(route('customers-web.store'), [
+            'customer_level_id' => $level->id,
+            'name' => 'Customer Baru',
+            'phone' => '08123456789',
+            'phone_secondary' => '08999999999',
+            'city' => 'Sidoarjo',
+            'address' => 'Jl. Mawar No. 1',
+            'outstanding_receivable' => 0,
+        ]);
+
+        $response->assertRedirect(route('customers-web.index', ['search' => 'Customer Baru']));
+        $this->assertDatabaseHas('customers', [
+            'name' => 'Customer Baru',
+            'customer_level_id' => $level->id,
+            'phone' => '08123456789',
+            'phone_secondary' => '08999999999',
+            'city' => 'Sidoarjo',
         ]);
     }
 }

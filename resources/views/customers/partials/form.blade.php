@@ -6,31 +6,35 @@
                 <p class="form-section-note">{{ __('ui.customer_profile_note') }}</p>
                 <div class="row">
                     <div class="col-4">
-                        <label>{{ __('ui.customer_level') }}</label>
-                        <select name="customer_level_id">
-                            <option value="">{{ __('ui.no_level') }}</option>
+                        <label>{{ __('ui.customer_level') }} <span class="label-required">*</span></label>
+                        <select name="customer_level_id" required>
+                            <option value="">{{ __('ui.select_customer_level') }}</option>
                             @foreach($levels as $level)
                                 <option value="{{ $level->id }}" @selected(old('customer_level_id', $customer?->customer_level_id) == $level->id)>
-                                    {{ $level->code }}
+                                    {{ $level->name }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
                     <div class="col-4">
-                        <label>{{ __('ui.phone') }}</label>
-                        <input type="text" name="phone" value="{{ old('phone', $customer?->phone) }}">
-                    </div>
-                    <div class="col-6">
-                        <label>{{ __('ui.customer') }} <span class="label-required">*</span></label>
+                        <label>{{ __('ui.customer_name') }} <span class="label-required">*</span></label>
                         <input type="text" name="name" value="{{ old('name', $customer?->name) }}" required>
                     </div>
                     <div class="col-6">
-                        <label>{{ __('ui.city') }}</label>
-                        <input type="text" name="city" value="{{ old('city', $customer?->city) }}">
+                        <label>{{ __('ui.phone_1') }} <span class="label-required">*</span></label>
+                        <input type="text" name="phone" value="{{ old('phone', $customer?->phone) }}" required>
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('ui.phone_2') }}</label>
+                        <input type="text" name="phone_secondary" value="{{ old('phone_secondary', $customer?->phone_secondary) }}">
+                    </div>
+                    <div class="col-4">
+                        <label>{{ __('ui.city') }} <span class="label-required">*</span></label>
+                        <input type="text" name="city" value="{{ old('city', $customer?->city) }}" required>
                     </div>
                     <div class="col-12">
-                        <label>{{ __('ui.address') }}</label>
-                        <textarea name="address" rows="2">{{ old('address', $customer?->address) }}</textarea>
+                        <label>{{ __('ui.address') }} <span class="label-required">*</span></label>
+                        <textarea name="address" rows="2" required>{{ old('address', $customer?->address) }}</textarea>
                     </div>
                 </div>
             </div>

@@ -126,7 +126,7 @@
                     <select name="level_id" id="customers-level-filter">
                         <option value="">{{ __('ui.all_levels') }}</option>
                         @foreach($levels as $level)
-                            <option value="{{ $level->id }}" @selected((int) $selectedLevelId === (int) $level->id)>{{ $level->code }} - {{ $level->name }}</option>
+                            <option value="{{ $level->id }}" @selected((int) $selectedLevelId === (int) $level->id)>{{ $level->name }}</option>
                         @endforeach
                     </select>
                     <button type="submit">{{ __('ui.search') }}</button>
@@ -182,14 +182,22 @@
                             <a href="#"
                                class="customer-level-link"
                                data-level-id="{{ (int) $customer->level->id }}"
-                               data-level-label="{{ $customer->level->code }}{{ $customer->level->name ? ' - '.$customer->level->name : '' }}">
-                                {{ $customer->level->code }}
+                               data-level-label="{{ $customer->level->name }}">
+                                {{ $customer->level->name }}
                             </a>
                         @else
                             -
                         @endif
                     </td>
-                    <td>{{ $customer->phone ?: '-' }}</td>
+                    <td>
+                        @php
+                            $phoneDisplay = collect([
+                                (string) ($customer->phone ?? ''),
+                                (string) ($customer->phone_secondary ?? ''),
+                            ])->map(fn (string $value) => trim($value))->filter()->values();
+                        @endphp
+                        {{ $phoneDisplay->isNotEmpty() ? $phoneDisplay->implode(' / ') : '-' }}
+                    </td>
                     <td>{{ $customer->city ?: '-' }}</td>
                     <td>{{ $customer->address ?: '-' }}</td>
                     <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
@@ -333,7 +341,7 @@
                         <td>${escapeHtml(row.name || '-')}</td>
                         <td>${escapeHtml(row.city || '-')}</td>
                         <td>${escapeHtml(row.address || '-')}</td>
-                        <td>${escapeHtml(row.phone || '-')}</td>
+                        <td>${escapeHtml([row.phone || '', row.phone_secondary || ''].filter((value) => String(value).trim() !== '').join(' / ') || '-')}</td>
                     </tr>
                 `).join('');
             };
