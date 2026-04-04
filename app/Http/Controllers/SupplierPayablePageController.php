@@ -59,16 +59,23 @@ class SupplierPayablePageController extends Controller
             'totalCredit' => $pageData['totalCredit'],
             'mutationBalance' => $pageData['mutationBalance'],
             'finalOutstanding' => $pageData['finalOutstanding'],
-            'selectedSupplierYearClosed' => $pageData['selectedSupplierYearClosed'],
+            'selectedSupplierMonthClosed' => $pageData['selectedSupplierMonthClosed'],
         ]);
     }
 
     public function create(Request $request): View
     {
         $supplierId = $request->integer('supplier_id');
+        $suppliers = Supplier::query()->onlyLookupColumns()->orderBy('name')->limit(50)->get();
+        if ($supplierId > 0 && ! $suppliers->contains('id', $supplierId)) {
+            $prefillSupplier = Supplier::query()->onlyLookupColumns()->whereKey($supplierId)->first();
+            if ($prefillSupplier !== null) {
+                $suppliers->prepend($prefillSupplier);
+            }
+        }
 
         return view('supplier_payables.create', [
-            'suppliers' => Supplier::query()->onlyLookupColumns()->orderBy('name')->limit(50)->get(),
+            'suppliers' => $suppliers->unique('id')->values(),
             'prefillSupplierId' => $supplierId > 0 ? $supplierId : null,
             'prefillDate' => now()->format('Y-m-d'),
         ]);
@@ -88,10 +95,11 @@ class SupplierPayablePageController extends Controller
         ]);
 
         $supplierYear = $this->semesterBookService->yearFromDate((string) $data['payment_date']);
+        $supplierMonth = (int) Carbon::parse((string) $data['payment_date'])->format('n');
         $isAdmin = ((string) ($request->user()?->role ?? '') === 'admin');
-        if (! $isAdmin && $this->semesterBookService->isSupplierYearClosed((int) $data['supplier_id'], $supplierYear)) {
+        if (! $isAdmin && $this->semesterBookService->isSupplierMonthClosed((int) $data['supplier_id'], $supplierYear, $supplierMonth)) {
             return back()
-                ->withErrors(['payment_date' => __('txn.supplier_semester_closed_error', ['semester' => $supplierYear ?? '-'])])
+                ->withErrors(['payment_date' => __('txn.supplier_semester_closed_error', ['semester' => sprintf('%s-%02d', $supplierYear ?? '-', $supplierMonth)])])
                 ->withInput()
                 ->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
@@ -164,7 +172,7 @@ class SupplierPayablePageController extends Controller
         $data = $request->validate([
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'year' => ['required', 'digits:4'],
-            'month' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
             'search' => ['nullable', 'string'],
         ]);
 
@@ -173,16 +181,20 @@ class SupplierPayablePageController extends Controller
             return back()->with('error', __('supplier_payable.invalid_year'));
         }
 
-        $this->semesterBookService->closeSupplierYear((int) $data['supplier_id'], $normalizedYear);
+        $month = (int) $data['month'];
+        $this->semesterBookService->closeSupplierMonth((int) $data['supplier_id'], $normalizedYear, $month);
 
         return redirect()
             ->route('supplier-payables.index', [
                 'supplier_id' => (int) $data['supplier_id'],
                 'year' => $normalizedYear,
-                'month' => isset($data['month']) ? (int) $data['month'] : null,
+                'month' => $month,
                 'search' => trim((string) ($data['search'] ?? '')),
             ])
-            ->with('success', __('supplier_payable.year_closed_success', ['year' => $normalizedYear]));
+            ->with('success', __('supplier_payable.month_closed_success', [
+                'year' => $normalizedYear,
+                'month' => $this->monthOptions()[$month] ?? sprintf('%02d', $month),
+            ]));
     }
 
     public function openYear(Request $request): RedirectResponse
@@ -190,7 +202,7 @@ class SupplierPayablePageController extends Controller
         $data = $request->validate([
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'year' => ['required', 'digits:4'],
-            'month' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
             'search' => ['nullable', 'string'],
         ]);
 
@@ -199,16 +211,20 @@ class SupplierPayablePageController extends Controller
             return back()->with('error', __('supplier_payable.invalid_year'));
         }
 
-        $this->semesterBookService->openSupplierYear((int) $data['supplier_id'], $normalizedYear);
+        $month = (int) $data['month'];
+        $this->semesterBookService->openSupplierMonth((int) $data['supplier_id'], $normalizedYear, $month);
 
         return redirect()
             ->route('supplier-payables.index', [
                 'supplier_id' => (int) $data['supplier_id'],
                 'year' => $normalizedYear,
-                'month' => isset($data['month']) ? (int) $data['month'] : null,
+                'month' => $month,
                 'search' => trim((string) ($data['search'] ?? '')),
             ])
-            ->with('success', __('supplier_payable.year_opened_success', ['year' => $normalizedYear]));
+            ->with('success', __('supplier_payable.month_opened_success', [
+                'year' => $normalizedYear,
+                'month' => $this->monthOptions()[$month] ?? sprintf('%02d', $month),
+            ]));
     }
 
     public function printReport(Request $request): View
@@ -618,7 +634,7 @@ class SupplierPayablePageController extends Controller
      *   totalCredit:int,
      *   mutationBalance:int,
      *   finalOutstanding:int,
-     *   selectedSupplierYearClosed:bool
+     *   selectedSupplierMonthClosed:bool
      * }
      */
     private function buildIndexData(Request $request): array
@@ -647,7 +663,7 @@ class SupplierPayablePageController extends Controller
         $totalCredit = 0;
         $mutationBalance = 0;
         $finalOutstanding = 0;
-        $selectedSupplierYearClosed = false;
+        $selectedSupplierMonthClosed = false;
         if ($selectedSupplier !== null) {
             $ledgerRows = SupplierLedger::query()
                 ->forSupplier((int) $selectedSupplier->id)
@@ -662,8 +678,9 @@ class SupplierPayablePageController extends Controller
             $totalCredit = (int) round((float) $ledgerRows->sum('credit'));
             $mutationBalance = $totalDebit - $totalCredit;
             $finalOutstanding = $selectedYear !== null ? $mutationBalance : (int) ($selectedSupplier->outstanding_payable ?? 0);
-            $selectedSupplierYearClosed = $selectedYear !== null
-                && $this->semesterBookService->isSupplierYearClosed((int) $selectedSupplier->id, $selectedYear);
+            $selectedSupplierMonthClosed = $selectedYear !== null
+                && $selectedMonth !== null
+                && $this->semesterBookService->isSupplierMonthClosed((int) $selectedSupplier->id, $selectedYear, $selectedMonth);
 
             $supplierPaymentIds = $ledgerRows
                 ->pluck('supplier_payment_id')
@@ -726,7 +743,7 @@ class SupplierPayablePageController extends Controller
             'totalCredit',
             'mutationBalance',
             'finalOutstanding',
-            'selectedSupplierYearClosed',
+            'selectedSupplierMonthClosed',
         );
     }
 

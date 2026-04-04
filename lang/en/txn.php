@@ -266,15 +266,15 @@ return [
     'outgoing_transaction_count' => 'Document Count',
     'admin_edit_outgoing_title' => 'Admin Edit Goods Receipt',
     'no_outgoing_supplier_recap' => 'No supplier recap data yet.',
-    'supplier_semester_book_title' => 'Supplier Year Closing',
-    'supplier_semester_status' => 'Supplier Year Status',
+    'supplier_semester_book_title' => 'Supplier Monthly Closing',
+    'supplier_semester_status' => 'Supplier Month Status',
     'supplier_semester_open' => 'Open',
     'supplier_semester_closed' => 'Closed',
-    'supplier_semester_open_button' => 'Open Supplier Year',
-    'supplier_semester_close_button' => 'Close Supplier Year',
-    'supplier_semester_closed_success' => 'Year :semester for supplier :supplier has been closed.',
-    'supplier_semester_opened_success' => 'Year :semester for supplier :supplier has been reopened.',
-    'supplier_semester_closed_error' => 'Year :semester for this supplier is closed. New goods receipts are not allowed.',
+    'supplier_semester_open_button' => 'Open Supplier Month',
+    'supplier_semester_close_button' => 'Close Supplier Month',
+    'supplier_semester_closed_success' => 'Period :semester for supplier :supplier has been closed.',
+    'supplier_semester_opened_success' => 'Period :semester for supplier :supplier has been reopened.',
+    'supplier_semester_closed_error' => 'Period :semester for this supplier is closed. New goods receipts are not allowed.',
 ];
 
 

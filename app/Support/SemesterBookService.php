@@ -31,6 +31,11 @@ class SemesterBookService
     /**
      * @var array<int, string>|null
      */
+    private ?array $closedSupplierMonthsCache = null;
+
+    /**
+     * @var array<int, string>|null
+     */
     private ?array $closedCustomerSemestersCache = null;
 
     /**
@@ -173,6 +178,26 @@ class SemesterBookService
         return $this->closedSupplierYears();
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public function closedSupplierMonths(): array
+    {
+        if (is_array($this->closedSupplierMonthsCache)) {
+            return $this->closedSupplierMonthsCache;
+        }
+
+        $this->closedSupplierMonthsCache = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_supplier_month_periods', '')) ?: [])
+            ->map(fn (string $item): string => trim($item))
+            ->map(fn (string $item): ?string => $this->normalizeSupplierMonthKey($item))
+            ->filter(fn (?string $item): bool => $item !== null)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $this->closedSupplierMonthsCache;
+    }
+
     public function isSupplierYearClosed(?int $supplierId, ?string $year): bool
     {
         $normalizedYear = $this->normalizeYear((string) $year);
@@ -184,6 +209,23 @@ class SemesterBookService
         $key = $this->supplierYearKey($normalizedSupplierId, $normalizedYear);
 
         return in_array($key, $this->closedSupplierYears(), true);
+    }
+
+    public function isSupplierMonthClosed(?int $supplierId, ?string $year, ?int $month): bool
+    {
+        $normalizedYear = $this->normalizeYear((string) $year);
+        $normalizedMonth = (int) ($month ?? 0);
+        $normalizedSupplierId = (int) ($supplierId ?? 0);
+        if ($normalizedYear === null || $normalizedMonth < 1 || $normalizedMonth > 12 || $normalizedSupplierId <= 0) {
+            return false;
+        }
+
+        $monthKey = $this->supplierMonthKey($normalizedSupplierId, $normalizedYear, $normalizedMonth);
+        if (in_array($monthKey, $this->closedSupplierMonths(), true)) {
+            return true;
+        }
+
+        return $this->isSupplierYearClosed($normalizedSupplierId, $normalizedYear);
     }
 
     /**
@@ -227,6 +269,50 @@ class SemesterBookService
         return $this->supplierYearClosedStates($supplierIds, $year);
     }
 
+    /**
+     * @param  iterable<int, int|string>  $supplierIds
+     * @return array<int, bool>
+     */
+    public function supplierMonthClosedStates(iterable $supplierIds, string $year, int $month): array
+    {
+        $normalizedYear = $this->normalizeYear($year);
+        if ($normalizedYear === null || $month < 1 || $month > 12) {
+            return [];
+        }
+
+        $ids = collect($supplierIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $closedMonthMap = collect($this->closedSupplierMonths())
+            ->filter(fn (string $key): bool => str_ends_with($key, ':'.$normalizedYear.'-'.sprintf('%02d', $month)))
+            ->mapWithKeys(function (string $key): array {
+                [$supplierId] = explode(':', $key, 2);
+
+                return [(int) $supplierId => true];
+            });
+
+        $closedYearMap = collect($this->closedSupplierYears())
+            ->filter(fn (string $key): bool => str_ends_with($key, ':'.$normalizedYear))
+            ->mapWithKeys(function (string $key): array {
+                [$supplierId] = explode(':', $key, 2);
+
+                return [(int) $supplierId => true];
+            });
+
+        $states = [];
+        foreach ($ids as $supplierId) {
+            $states[$supplierId] = (bool) $closedMonthMap->get($supplierId, false) || (bool) $closedYearMap->get($supplierId, false);
+        }
+
+        return $states;
+    }
+
     public function closeSupplierYear(int $supplierId, string $year): void
     {
         $normalizedYear = $this->normalizeYear($year);
@@ -250,6 +336,24 @@ class SemesterBookService
         $this->closeSupplierYear($supplierId, $year);
     }
 
+    public function closeSupplierMonth(int $supplierId, string $year, int $month): void
+    {
+        $normalizedYear = $this->normalizeYear($year);
+        $normalizedSupplierId = (int) $supplierId;
+        if ($normalizedYear === null || $month < 1 || $month > 12 || $normalizedSupplierId <= 0) {
+            return;
+        }
+
+        $items = collect($this->closedSupplierMonths())
+            ->push($this->supplierMonthKey($normalizedSupplierId, $normalizedYear, $month))
+            ->unique()
+            ->values()
+            ->implode(',');
+
+        AppSetting::setValue('closed_supplier_month_periods', $items);
+        $this->invalidateSemesterCaches();
+    }
+
     public function openSupplierYear(int $supplierId, string $year): void
     {
         $normalizedYear = $this->normalizeYear($year);
@@ -271,6 +375,24 @@ class SemesterBookService
     public function openSupplierSemester(int $supplierId, string $year): void
     {
         $this->openSupplierYear($supplierId, $year);
+    }
+
+    public function openSupplierMonth(int $supplierId, string $year, int $month): void
+    {
+        $normalizedYear = $this->normalizeYear($year);
+        $normalizedSupplierId = (int) $supplierId;
+        if ($normalizedYear === null || $month < 1 || $month > 12 || $normalizedSupplierId <= 0) {
+            return;
+        }
+
+        $target = $this->supplierMonthKey($normalizedSupplierId, $normalizedYear, $month);
+        $items = collect($this->closedSupplierMonths())
+            ->reject(fn (string $item): bool => $item === $target)
+            ->values()
+            ->implode(',');
+
+        AppSetting::setValue('closed_supplier_month_periods', $items);
+        $this->invalidateSemesterCaches();
     }
 
     public function isSupplierClosed(?int $supplierId, ?string $year): bool
@@ -968,9 +1090,31 @@ class SemesterBookService
         return $this->supplierYearKey($supplierId, $year);
     }
 
+    private function normalizeSupplierMonthKey(string $value): ?string
+    {
+        $trimmed = trim($value);
+        if (preg_match('/^(\d+)\s*[:|]\s*(\d{4})-(\d{2})$/', $trimmed, $matches) !== 1) {
+            return null;
+        }
+
+        $supplierId = (int) $matches[1];
+        $year = $this->normalizeYear((string) $matches[2]);
+        $month = (int) $matches[3];
+        if ($supplierId <= 0 || $year === null || $month < 1 || $month > 12) {
+            return null;
+        }
+
+        return $this->supplierMonthKey($supplierId, $year, $month);
+    }
+
     private function supplierYearKey(int $supplierId, string $year): string
     {
         return $supplierId.':'.$year;
+    }
+
+    private function supplierMonthKey(int $supplierId, string $year, int $month): string
+    {
+        return $supplierId.':'.$year.'-'.sprintf('%02d', $month);
     }
 
     private function yearFromSemester(string $semester): ?string
@@ -997,6 +1141,7 @@ class SemesterBookService
     {
         $this->configuredSemesterOptionsCache = null;
         $this->closedSupplierSemestersCache = null;
+        $this->closedSupplierMonthsCache = null;
         $this->closedCustomerSemestersCache = null;
         $this->activeSemestersCache = null;
         $this->closedSemestersCache = null;

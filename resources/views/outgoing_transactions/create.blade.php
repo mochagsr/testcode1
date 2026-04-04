@@ -390,6 +390,21 @@
                     || null;
             }
 
+            async function resolveSupplierFromInput(rawValue) {
+                const trimmed = String(rawValue || '').trim();
+                if (trimmed === '') {
+                    return null;
+                }
+
+                let supplier = findSupplierByLabel(trimmed) || findSupplierLoose(trimmed);
+                if (supplier) {
+                    return supplier;
+                }
+
+                await fetchSupplierSuggestions(trimmed);
+                return findSupplierByLabel(trimmed) || findSupplierLoose(trimmed);
+            }
+
             function updateSupplierPreview(supplier) {
                 document.getElementById('supplier-preview-name').textContent = supplier?.name || '-';
                 document.getElementById('supplier-preview-company').textContent = supplier?.company_name || '-';
@@ -792,8 +807,26 @@
                 }
             });
 
-            form.addEventListener('submit', (event) => {
-                const hasSupplier = supplierIdField.value !== '';
+            let isSubmitting = false;
+
+            form.addEventListener('submit', async (event) => {
+                if (isSubmitting) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                let hasSupplier = supplierIdField.value !== '';
+                if (!hasSupplier) {
+                    const supplier = await resolveSupplierFromInput(supplierSearch.value);
+                    if (supplier) {
+                        supplierIdField.value = supplier.id;
+                        supplierSearch.value = supplierLabel(supplier);
+                        updateSupplierPreview(supplier);
+                        hasSupplier = true;
+                    }
+                }
+
                 const rows = Array.from(tableBody.querySelectorAll('tr'));
                 const hasRows = rows.length > 0;
                 const invalidRows = rows.some((row) => {
@@ -809,9 +842,15 @@
                         || cost < 0;
                 });
                 if (!hasSupplier || !hasRows || invalidRows) {
-                    event.preventDefault();
                     alert('{{ __('txn.select_supplier') }} / {{ __('txn.outgoing_items_required') }}');
+                    if (!hasSupplier) {
+                        supplierSearch.focus();
+                    }
+                    return;
                 }
+
+                isSubmitting = true;
+                form.submit();
             });
 
             const initialSupplier = supplierIdField.value

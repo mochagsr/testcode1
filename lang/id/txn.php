@@ -266,15 +266,15 @@ return [
     'outgoing_transaction_count' => 'Jumlah Dokumen',
     'admin_edit_outgoing_title' => 'Admin Edit Tanda Terima Barang',
     'no_outgoing_supplier_recap' => 'Belum ada data rekap supplier.',
-    'supplier_semester_book_title' => 'Tutup Buku Tahunan Supplier',
-    'supplier_semester_status' => 'Status Tahun Supplier',
+    'supplier_semester_book_title' => 'Tutup Buku Bulanan Supplier',
+    'supplier_semester_status' => 'Status Bulan Supplier',
     'supplier_semester_open' => 'Terbuka',
     'supplier_semester_closed' => 'Tertutup',
-    'supplier_semester_open_button' => 'Buka Tahun Supplier',
-    'supplier_semester_close_button' => 'Tutup Tahun Supplier',
-    'supplier_semester_closed_success' => 'Tahun :semester untuk supplier :supplier berhasil ditutup.',
-    'supplier_semester_opened_success' => 'Tahun :semester untuk supplier :supplier berhasil dibuka.',
-    'supplier_semester_closed_error' => 'Tahun :semester untuk supplier ini sedang ditutup. Transaksi keluar baru tidak diizinkan.',
+    'supplier_semester_open_button' => 'Buka Bulan Supplier',
+    'supplier_semester_close_button' => 'Tutup Bulan Supplier',
+    'supplier_semester_closed_success' => 'Periode :semester untuk supplier :supplier berhasil ditutup.',
+    'supplier_semester_opened_success' => 'Periode :semester untuk supplier :supplier berhasil dibuka.',
+    'supplier_semester_closed_error' => 'Periode :semester untuk supplier ini sedang ditutup. Transaksi keluar baru tidak diizinkan.',
 ];
 
 

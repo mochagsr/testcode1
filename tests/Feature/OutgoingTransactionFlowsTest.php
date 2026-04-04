@@ -252,7 +252,7 @@ class OutgoingTransactionFlowsTest extends TestCase
             'is_active' => true,
         ]);
 
-        AppSetting::setValue('closed_supplier_semester_periods', $supplier->id.':S2-2526');
+        AppSetting::setValue('closed_supplier_month_periods', $supplier->id.':2026-02');
 
         $response = $this->actingAs($user)->from(route('outgoing-transactions.create'))->post(route('outgoing-transactions.store'), [
             'supplier_id' => $supplier->id,
@@ -275,6 +275,33 @@ class OutgoingTransactionFlowsTest extends TestCase
         $this->assertDatabaseMissing('outgoing_transactions', [
             'note_number' => 'NOTA-002',
         ]);
+    }
+
+    public function test_supplier_payment_store_fails_if_supplier_month_closed(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'finance_locked' => false,
+        ]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Lock Bayar',
+            'company_name' => 'PT Lock Bayar',
+            'outstanding_payable' => 50000,
+        ]);
+
+        AppSetting::setValue('closed_supplier_month_periods', $supplier->id.':2026-02');
+
+        $response = $this->actingAs($user)
+            ->from(route('supplier-payables.create', ['supplier_id' => $supplier->id]))
+            ->post(route('supplier-payables.store'), [
+                'supplier_id' => $supplier->id,
+                'payment_date' => '2026-02-15',
+                'amount' => 10000,
+            ]);
+
+        $response->assertRedirect(route('supplier-payables.create', ['supplier_id' => $supplier->id]));
+        $response->assertSessionHasErrors('payment_date');
+        $this->assertDatabaseCount('supplier_payments', 0);
     }
 
     public function test_admin_can_update_outgoing_transaction_and_rebalance_stock(): void

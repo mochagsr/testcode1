@@ -12,6 +12,7 @@ use App\Models\OutgoingTransaction;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
 use App\Support\SemesterBookService;
+use Carbon\Carbon;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,6 +29,7 @@ class EnsureSemesterOpen
      */
     public function handle(Request $request, Closure $next): Response
     {
+        $routeName = (string) optional($request->route())->getName();
         $semester = $this->resolveSemester($request);
         if ($semester !== null && $this->semesterBookService->isClosed($semester)) {
             return back()->withErrors([
@@ -37,15 +39,16 @@ class EnsureSemesterOpen
         $customerId = $this->resolveCustomerId($request);
         $supplierId = $this->resolveSupplierId($request);
         $supplierYear = $this->resolveSupplierYear($request);
+        $supplierMonth = $this->resolveSupplierMonth($request);
         $isAdmin = (($request->user()?->role ?? '') === 'admin');
         if (! $isAdmin && $semester !== null && $this->semesterBookService->isCustomerLocked($customerId, $semester)) {
             return back()->withErrors([
                 'semester' => __('ui.customer_semester_closed_error', ['semester' => $semester]),
             ])->withInput()->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
-        if (! $isAdmin && $supplierYear !== null && $this->semesterBookService->isSupplierYearClosed($supplierId, $supplierYear)) {
+        if (! $isAdmin && $supplierYear !== null && $supplierMonth !== null && $this->semesterBookService->isSupplierMonthClosed($supplierId, $supplierYear, $supplierMonth)) {
             return back()->withErrors([
-                'semester_period' => __('txn.supplier_semester_closed_error', ['semester' => $supplierYear]),
+                $this->supplierLockErrorField($routeName) => __('txn.supplier_semester_closed_error', ['semester' => sprintf('%s-%02d', $supplierYear, $supplierMonth)]),
             ])->withInput()->with('error_popup', __('ui.contact_admin_for_locked_customer_semester'));
         }
         if ($semester !== null && ! $this->semesterBookService->isActive($semester)) {
@@ -153,6 +156,47 @@ class EnsureSemesterOpen
             default => $this->semesterBookService->normalizeYear((string) $request->input('year'))
                 ?? $this->semesterBookService->yearFromDate((string) $request->input('transaction_date'))
                 ?? $this->semesterBookService->yearFromDate((string) $request->input('payment_date')),
+        };
+    }
+
+    private function resolveSupplierMonth(Request $request): ?int
+    {
+        $routeName = (string) optional($request->route())->getName();
+
+        $rawValue = match ($routeName) {
+            'outgoing-transactions.store' => $this->monthFromDate((string) $request->input('transaction_date')),
+            'supplier-payables.store' => $this->monthFromDate((string) $request->input('payment_date')),
+            'outgoing-transactions.show', 'outgoing-transactions.print', 'outgoing-transactions.export.pdf', 'outgoing-transactions.export.excel' => $this->monthFromDate((string) optional($request->route('outgoingTransaction'))->transaction_date),
+            'supplier-payables.show-payment', 'supplier-payables.print-payment', 'supplier-payables.export-payment-pdf' => $this->monthFromDate((string) optional($request->route('supplierPayment'))->payment_date),
+            default => (int) $request->input('month') ?: $this->monthFromDate((string) $request->input('transaction_date')) ?: $this->monthFromDate((string) $request->input('payment_date')),
+        };
+
+        $month = (int) $rawValue;
+
+        return $month >= 1 && $month <= 12 ? $month : null;
+    }
+
+    private function monthFromDate(?string $value): ?int
+    {
+        $date = trim((string) $value);
+        if ($date === '') {
+            return null;
+        }
+
+        try {
+            $month = (int) Carbon::parse($date)->format('n');
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $month >= 1 && $month <= 12 ? $month : null;
+    }
+
+    private function supplierLockErrorField(string $routeName): string
+    {
+        return match ($routeName) {
+            'supplier-payables.store' => 'payment_date',
+            default => 'semester_period',
         };
     }
 

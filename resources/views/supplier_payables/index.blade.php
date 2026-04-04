@@ -147,41 +147,42 @@
     @if(auth()->user()->role === 'admin')
         <div class="card">
             <div class="form-section">
-                <h3 class="form-section-title">{{ __('supplier_payable.year_book_title') }}</h3>
-                <p class="form-section-note">{{ __('supplier_payable.year_book_note') }}</p>
-                @if($selectedSupplier && $selectedYear)
+                <h3 class="form-section-title">{{ __('supplier_payable.month_book_title') }}</h3>
+                <p class="form-section-note">{{ __('supplier_payable.month_book_note') }}</p>
+                @if($selectedSupplier && $selectedYear && $selectedMonth)
                     <div class="flex" style="align-items:center; justify-content:space-between;">
                         <div>
                             <strong>{{ $selectedSupplier->name }}</strong>
                             <div class="muted">{{ __('supplier_payable.year_label') }}: {{ $selectedYear }}</div>
-                            <div class="muted" style="margin-top: 4px;">{{ __('supplier_payable.year_book_note') }}</div>
+                            <div class="muted">{{ __('supplier_payable.month_label') }}: {{ $monthOptions[$selectedMonth] ?? sprintf('%02d', $selectedMonth) }}</div>
+                            <div class="muted" style="margin-top: 4px;">{{ __('supplier_payable.month_book_note') }}</div>
                         </div>
                         <div class="flex" style="align-items:center; gap:8px;">
-                            @if($selectedSupplierYearClosed)
-                                <span class="badge warning">{{ __('supplier_payable.year_closed_badge') }}</span>
+                            @if($selectedSupplierMonthClosed)
+                                <span class="badge warning">{{ __('supplier_payable.month_closed_badge') }}</span>
                                 <form method="post" action="{{ route('supplier-payables.year-open') }}">
                                     @csrf
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplier->id }}">
                                     <input type="hidden" name="year" value="{{ $selectedYear }}">
                                     <input type="hidden" name="month" value="{{ $selectedMonth }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
-                                    <button type="submit" class="btn payment-btn">{{ __('supplier_payable.open_year_action') }}</button>
+                                    <button type="submit" class="btn payment-btn">{{ __('supplier_payable.open_month_action') }}</button>
                                 </form>
                             @else
-                                <span class="badge success">{{ __('supplier_payable.year_open_badge') }}</span>
+                                <span class="badge success">{{ __('supplier_payable.month_open_badge') }}</span>
                                 <form method="post" action="{{ route('supplier-payables.year-close') }}">
                                     @csrf
                                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplier->id }}">
                                     <input type="hidden" name="year" value="{{ $selectedYear }}">
                                     <input type="hidden" name="month" value="{{ $selectedMonth }}">
                                     <input type="hidden" name="search" value="{{ $search }}">
-                                    <button type="submit" class="btn warning-btn">{{ __('supplier_payable.close_year_action') }}</button>
+                                    <button type="submit" class="btn warning-btn">{{ __('supplier_payable.close_month_action') }}</button>
                                 </form>
                             @endif
                         </div>
                     </div>
                 @else
-                    <div class="muted">{{ __('supplier_payable.select_supplier_year_hint') }}</div>
+                    <div class="muted">{{ __('supplier_payable.select_supplier_month_hint') }}</div>
                 @endif
             </div>
         </div>
