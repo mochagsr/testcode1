@@ -16,6 +16,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -167,21 +168,24 @@ class AuditLogPageController extends Controller
         $dateTo = $filters['dateTo'];
         $dateFromStart = $dateFrom !== '' ? Carbon::parse($dateFrom)->startOfDay()->toDateTimeString() : null;
         $dateToEnd = $dateTo !== '' ? Carbon::parse($dateTo)->endOfDay()->toDateTimeString() : null;
+        $availableColumns = $this->availableAuditLogColumns();
+        $selectColumns = array_values(array_filter([
+            'id',
+            'user_id',
+            'action',
+            'subject_type',
+            'subject_id',
+            'description',
+            in_array('before_data', $availableColumns, true) ? 'before_data' : null,
+            in_array('after_data', $availableColumns, true) ? 'after_data' : null,
+            in_array('request_id', $availableColumns, true) ? 'request_id' : null,
+            'ip_address',
+            'created_at',
+        ]));
+        $hasRequestId = in_array('request_id', $availableColumns, true);
 
         return AuditLog::query()
-            ->select([
-                'id',
-                'user_id',
-                'action',
-                'subject_type',
-                'subject_id',
-                'description',
-                'before_data',
-                'after_data',
-                'request_id',
-                'ip_address',
-                'created_at',
-            ])
+            ->select($selectColumns)
             ->with('user:id,name,email')
             ->when($selectedModule !== '', function ($query) use ($selectedModule): void {
                 $query->where(function ($moduleQuery) use ($selectedModule): void {
@@ -218,7 +222,9 @@ class AuditLogPageController extends Controller
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery->where('action', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhere('request_id', 'like', "%{$search}%")
+                        ->when($hasRequestId, function ($requestIdQuery) use ($search): void {
+                            $requestIdQuery->orWhere('request_id', 'like', "%{$search}%");
+                        })
                         ->orWhereHas('user', function ($userQuery) use ($search): void {
                             $userQuery->where('name', 'like', "%{$search}%")
                                 ->orWhere('email', 'like', "%{$search}%");
@@ -273,6 +279,21 @@ class AuditLogPageController extends Controller
                         });
                 });
             });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function availableAuditLogColumns(): array
+    {
+        if (! Schema::hasTable('audit_logs')) {
+            return [];
+        }
+
+        return array_map(
+            static fn (string $column): string => strtolower(trim($column)),
+            Schema::getColumnListing('audit_logs')
+        );
     }
 
     /**
