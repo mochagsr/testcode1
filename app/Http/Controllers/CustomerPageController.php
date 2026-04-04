@@ -26,7 +26,7 @@ class CustomerPageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $selectedLevelId = max(0, (int) $request->integer('level_id', 0));
 
-        $customers = Customer::query()
+        $customerQuery = Customer::query()
             ->select([
                 'id',
                 'customer_level_id',
@@ -39,8 +39,15 @@ class CustomerPageController extends Controller
             ])
             ->withLevel()
             ->when($selectedLevelId > 0, fn ($query) => $query->where('customer_level_id', $selectedLevelId))
-            ->searchKeyword($search)
-            ->orderBy('name')
+            ->searchKeyword($search);
+
+        if ($search === '' && $selectedLevelId === 0) {
+            $customerQuery->latest('id');
+        } else {
+            $customerQuery->orderBy('name')->orderBy('id');
+        }
+
+        $customers = $customerQuery
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
@@ -165,10 +172,12 @@ class CustomerPageController extends Controller
         }
 
         unset($data['id_card_photo']);
-        Customer::create($data);
+        $customer = Customer::create($data);
         AppCache::forgetAfterFinancialMutation();
 
-        return redirect()->route('customers-web.index')->with('success', 'Customer created successfully.');
+        return redirect()
+            ->route('customers-web.index', ['search' => $customer->name])
+            ->with('success', 'Customer created successfully.');
     }
 
     public function edit(Customer $customer): View
@@ -199,7 +208,9 @@ class CustomerPageController extends Controller
         $customer->update($data);
         AppCache::forgetAfterFinancialMutation();
 
-        return redirect()->route('customers-web.index')->with('success', 'Customer updated successfully.');
+        return redirect()
+            ->route('customers-web.index', ['search' => $customer->name])
+            ->with('success', 'Customer updated successfully.');
     }
 
     public function destroy(Customer $customer): RedirectResponse

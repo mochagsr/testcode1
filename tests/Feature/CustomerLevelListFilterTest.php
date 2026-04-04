@@ -93,5 +93,27 @@ class CustomerLevelListFilterTest extends TestCase
         $response->assertJsonCount(1, 'customers');
         $response->assertJsonPath('customers.0.id', $customerA->id);
     }
-}
 
+    public function test_customer_list_defaults_to_latest_customer_first_without_filters(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+
+        Customer::query()->create([
+            'name' => 'Alpha Customer',
+            'code' => 'CUS-1001',
+        ]);
+
+        Customer::query()->create([
+            'name' => 'Zulu Customer',
+            'code' => 'CUS-1002',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('customers-web.index'));
+
+        $response->assertOk();
+        $response->assertSeeInOrder([
+            'Zulu Customer',
+            'Alpha Customer',
+        ]);
+    }
+}
