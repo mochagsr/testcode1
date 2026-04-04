@@ -43,7 +43,7 @@
                                name="customer_name"
                                list="customers-list"
                                value="{{ $oldCustomerLabel }}"
-                               placeholder="{{ __('txn.manual_customer') }}"
+                               placeholder="Pilih customer terdaftar"
                                required>
                         <input type="hidden" id="customer_id" name="customer_id" value="{{ $oldCustomerId }}">
                         <datalist id="customers-list">
@@ -367,7 +367,7 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="{{ __('txn.manual_item') }}" required>
+                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                 </td>
                 <td><input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required style="max-width: 88px;"></td>

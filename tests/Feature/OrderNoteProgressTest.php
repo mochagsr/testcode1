@@ -11,6 +11,7 @@ use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class OrderNoteProgressTest extends TestCase
@@ -430,5 +431,85 @@ class OrderNoteProgressTest extends TestCase
         $response->assertJsonPath('data.0.remaining_total', 10);
         $response->assertJsonPath('data.0.fulfilled_total', 15);
         $response->assertJsonPath('data.0.ordered_total', 25);
+    }
+
+    public function test_order_note_store_requires_registered_customer_and_products(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-ON-REQ',
+            'name' => 'Kategori ON Req',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-ON-REQ',
+            'name' => 'Produk Req',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 10000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('order-notes.store'), [
+            'note_date' => '2026-04-05',
+            'customer_id' => '',
+            'customer_name' => 'Customer Manual',
+            'items' => [
+                [
+                    'product_id' => '',
+                    'product_name' => 'Barang Manual',
+                    'quantity' => 3,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors(['customer_id', 'items.0.product_id']);
+        $this->assertSame(0, OrderNote::query()->count());
+        $this->assertSame(0, OrderNoteItem::query()->count());
+
+        $customer = Customer::query()->create([
+            'customer_level_id' => DB::table('customer_levels')->insertGetId([
+                'code' => 'LVL-ON-REQ',
+                'name' => 'Level ON Req',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]),
+            'code' => 'CUST-ON-REQ',
+            'name' => 'Customer Terdaftar',
+            'phone' => '08123',
+            'city' => 'Malang',
+            'address' => 'Alamat',
+        ]);
+
+        $ok = $this->actingAs($user)->post(route('order-notes.store'), [
+            'note_date' => '2026-04-05',
+            'customer_id' => $customer->id,
+            'customer_name' => 'Label yang diketik user',
+            'customer_phone' => '',
+            'city' => '',
+            'address' => '',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => 'Label produk bebas',
+                    'quantity' => 3,
+                ],
+            ],
+        ]);
+
+        $ok->assertRedirect();
+        $note = OrderNote::query()->latest('id')->first();
+        $this->assertNotNull($note);
+        $this->assertSame($customer->id, (int) $note->customer_id);
+        $this->assertSame($customer->name, (string) $note->customer_name);
+        $this->assertSame($customer->city, (string) $note->city);
+        $this->assertSame($customer->address, (string) $note->address);
+        $this->assertSame($customer->phone, (string) $note->customer_phone);
+
+        $item = $note->items()->first();
+        $this->assertNotNull($item);
+        $this->assertSame($product->id, (int) $item->product_id);
+        $this->assertSame($product->name, (string) $item->product_name);
+        $this->assertSame($product->code, (string) $item->product_code);
     }
 }

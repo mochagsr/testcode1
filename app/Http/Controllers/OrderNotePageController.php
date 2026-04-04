@@ -399,7 +399,7 @@ class OrderNotePageController extends Controller
     {
         $data = $request->validate([
             'note_date' => ['required', 'date'],
-            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:30'],
             'transaction_type' => ['nullable', 'in:product,printing'],
@@ -408,50 +408,52 @@ class OrderNotePageController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.product_code' => ['nullable', 'string', 'max:60'],
             'items.*.product_name' => ['required', 'string', 'max:200'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
+        $customer = Customer::query()
+            ->onlyOrderFormColumns()
+            ->findOrFail((int) $data['customer_id']);
+
         $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
         $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
-            customerId: isset($data['customer_id']) ? (int) $data['customer_id'] : null,
+            customerId: (int) $data['customer_id'],
             transactionType: $selectedTransactionType,
             subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
         );
 
-        $note = DB::transaction(function () use ($data, $selectedTransactionType, $printingSubtype): OrderNote {
+        $note = DB::transaction(function () use ($data, $customer, $selectedTransactionType, $printingSubtype): OrderNote {
             $noteDate = $data['note_date'];
             $noteNumber = $this->generateNoteNumber($noteDate);
 
             $note = OrderNote::create([
                 'note_number' => $noteNumber,
                 'note_date' => $noteDate,
-                'customer_id' => $data['customer_id'] ?? null,
+                'customer_id' => (int) $data['customer_id'],
                 'transaction_type' => $selectedTransactionType,
                 'customer_printing_subtype_id' => $printingSubtype['id'],
                 'printing_subtype_name' => $printingSubtype['name'],
-                'customer_name' => $data['customer_name'],
-                'customer_phone' => $data['customer_phone'] ?? null,
-                'address' => $data['address'] ?? null,
-                'city' => $data['city'] ?? null,
+                'customer_name' => (string) $customer->name,
+                'customer_phone' => $data['customer_phone'] ?? (string) ($customer->phone ?? ''),
+                'address' => $data['address'] ?? (string) ($customer->address ?? ''),
+                'city' => $data['city'] ?? (string) ($customer->city ?? ''),
                 'created_by_name' => auth()->user()?->name ?? __('txn.system_user'),
                 'notes' => $data['notes'] ?? null,
             ]);
 
             foreach ($data['items'] as $row) {
-                $productId = $row['product_id'] ?? null;
+                $productId = (int) $row['product_id'];
                 $productCode = $row['product_code'] ?? null;
                 $productName = $row['product_name'];
 
-                if ($productId) {
-                    $product = Product::query()->find($productId);
-                    if ($product) {
-                        $productCode = $productCode ?: $product->code;
-                        $productName = $productName ?: $product->name;
-                    }
+                $product = Product::query()->find($productId);
+                if ($product) {
+                    $productCode = $product->code;
+                    $productName = $product->name;
                 }
 
                 OrderNoteItem::create([
@@ -536,7 +538,7 @@ class OrderNotePageController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.product_name' => ['required', 'string', 'max:200'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.notes' => ['nullable', 'string'],
@@ -570,15 +572,13 @@ class OrderNotePageController extends Controller
             $note->items()->delete();
 
             foreach ($data['items'] as $row) {
-                $productId = $row['product_id'] ?? null;
+                $productId = (int) $row['product_id'];
                 $productCode = null;
                 $productName = $row['product_name'];
-                if ($productId) {
-                    $product = Product::query()->find($productId);
-                    if ($product) {
-                        $productCode = $product->code;
-                        $productName = $product->name;
-                    }
+                $product = Product::query()->find($productId);
+                if ($product) {
+                    $productCode = $product->code;
+                    $productName = $product->name;
                 }
 
                 OrderNoteItem::create([
