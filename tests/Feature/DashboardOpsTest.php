@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -36,5 +37,31 @@ class DashboardOpsTest extends TestCase
         $response->assertSee(__('ui.audit_module_delivery_trip'));
         $response->assertSee(__('ui.audit_module_school_bulk'));
         $response->assertSee(__('ui.audit_module_master'));
+    }
+
+    public function test_audit_log_page_stays_accessible_with_malformed_payload_values(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => 'master.customer.updated',
+            'subject_type' => \App\Models\Customer::class,
+            'subject_id' => 9999,
+            'description' => 'Customer malformed payload',
+            'before_data' => [
+                'updated_at' => '2026-99-99 99:99:99',
+                'meta' => ['broken' => ['nested' => ['date' => '2026-13-40']]],
+            ],
+            'after_data' => [
+                'updated_at' => '2026-13-40',
+                'notes' => 'Tetap tampil',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('audit-logs.index'));
+
+        $response->assertOk();
+        $response->assertSee('Customer malformed payload');
     }
 }

@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -30,7 +31,22 @@ class AuditLogPageController extends Controller
             ->latest('id')
             ->paginate((int) config('pagination.audit_per_page', 50))
             ->withQueryString();
-        $viewMaps = $this->buildAuditViewMaps($logs->getCollection());
+        try {
+            $viewMaps = $this->buildAuditViewMaps($logs->getCollection());
+        } catch (\Throwable $exception) {
+            Log::error('audit_logs.index_view_maps_failed', [
+                'message' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
+
+            $viewMaps = [
+                'subjectMap' => [],
+                'subjectCodeMap' => [],
+                'descriptionMap' => [],
+                'beforeAfterMap' => [],
+                'codeLinkMap' => [],
+            ];
+        }
 
         return view('audit_logs.index', [
             'logs' => $logs,
@@ -296,7 +312,7 @@ class AuditLogPageController extends Controller
                 ->keyBy('id');
             foreach ($invoiceMap as $invoice) {
                 if ($invoice->invoice_number) {
-                    $codeLinkMap[strtoupper((string) $invoice->invoice_number)] = route('sales-invoices.show', $invoice);
+                    $this->putCodeLink($codeLinkMap, (string) $invoice->invoice_number, 'sales-invoices.show', $invoice);
                 }
             }
         }
@@ -309,7 +325,7 @@ class AuditLogPageController extends Controller
                 ->keyBy('id');
             foreach ($salesReturnMap as $salesReturn) {
                 if ($salesReturn->return_number) {
-                    $codeLinkMap[strtoupper((string) $salesReturn->return_number)] = route('sales-returns.show', $salesReturn);
+                    $this->putCodeLink($codeLinkMap, (string) $salesReturn->return_number, 'sales-returns.show', $salesReturn);
                 }
             }
         }
@@ -322,7 +338,7 @@ class AuditLogPageController extends Controller
                 ->keyBy('id');
             foreach ($deliveryMap as $deliveryNote) {
                 if ($deliveryNote->note_number) {
-                    $codeLinkMap[strtoupper((string) $deliveryNote->note_number)] = route('delivery-notes.show', $deliveryNote);
+                    $this->putCodeLink($codeLinkMap, (string) $deliveryNote->note_number, 'delivery-notes.show', $deliveryNote);
                 }
             }
         }
@@ -335,7 +351,7 @@ class AuditLogPageController extends Controller
                 ->keyBy('id');
             foreach ($orderMap as $orderNote) {
                 if ($orderNote->note_number) {
-                    $codeLinkMap[strtoupper((string) $orderNote->note_number)] = route('order-notes.show', $orderNote);
+                    $this->putCodeLink($codeLinkMap, (string) $orderNote->note_number, 'order-notes.show', $orderNote);
                 }
             }
         }
@@ -348,7 +364,7 @@ class AuditLogPageController extends Controller
                 ->keyBy('id');
             foreach ($receivablePaymentMap as $payment) {
                 if ($payment->payment_number) {
-                    $codeLinkMap[strtoupper((string) $payment->payment_number)] = route('receivable-payments.show', $payment);
+                    $this->putCodeLink($codeLinkMap, (string) $payment->payment_number, 'receivable-payments.show', $payment);
                 }
             }
         }
@@ -361,7 +377,7 @@ class AuditLogPageController extends Controller
                 ->keyBy('id');
             foreach ($supplierPaymentMap as $payment) {
                 if ($payment->payment_number) {
-                    $codeLinkMap[strtoupper((string) $payment->payment_number)] = route('supplier-payables.show-payment', $payment);
+                    $this->putCodeLink($codeLinkMap, (string) $payment->payment_number, 'supplier-payables.show-payment', $payment);
                 }
             }
         }
@@ -475,7 +491,7 @@ class AuditLogPageController extends Controller
         if ($invoiceCodes->isNotEmpty()) {
             $invoices = SalesInvoice::query()->whereIn('invoice_number', $invoiceCodes->all())->get(['id', 'invoice_number']);
             foreach ($invoices as $invoice) {
-                $map[strtoupper((string) $invoice->invoice_number)] = route('sales-invoices.show', $invoice);
+                $this->putCodeLink($map, (string) $invoice->invoice_number, 'sales-invoices.show', $invoice);
             }
         }
 
@@ -483,7 +499,7 @@ class AuditLogPageController extends Controller
         if ($returnCodes->isNotEmpty()) {
             $returns = SalesReturn::query()->whereIn('return_number', $returnCodes->all())->get(['id', 'return_number']);
             foreach ($returns as $salesReturn) {
-                $map[strtoupper((string) $salesReturn->return_number)] = route('sales-returns.show', $salesReturn);
+                $this->putCodeLink($map, (string) $salesReturn->return_number, 'sales-returns.show', $salesReturn);
             }
         }
 
@@ -491,7 +507,7 @@ class AuditLogPageController extends Controller
         if ($deliveryCodes->isNotEmpty()) {
             $deliveryNotes = DeliveryNote::query()->whereIn('note_number', $deliveryCodes->all())->get(['id', 'note_number']);
             foreach ($deliveryNotes as $deliveryNote) {
-                $map[strtoupper((string) $deliveryNote->note_number)] = route('delivery-notes.show', $deliveryNote);
+                $this->putCodeLink($map, (string) $deliveryNote->note_number, 'delivery-notes.show', $deliveryNote);
             }
         }
 
@@ -499,7 +515,7 @@ class AuditLogPageController extends Controller
         if ($orderCodes->isNotEmpty()) {
             $orderNotes = OrderNote::query()->whereIn('note_number', $orderCodes->all())->get(['id', 'note_number']);
             foreach ($orderNotes as $orderNote) {
-                $map[strtoupper((string) $orderNote->note_number)] = route('order-notes.show', $orderNote);
+                $this->putCodeLink($map, (string) $orderNote->note_number, 'order-notes.show', $orderNote);
             }
         }
 
@@ -507,7 +523,7 @@ class AuditLogPageController extends Controller
         if ($paymentCodes->isNotEmpty()) {
             $payments = ReceivablePayment::query()->whereIn('payment_number', $paymentCodes->all())->get(['id', 'payment_number']);
             foreach ($payments as $payment) {
-                $map[strtoupper((string) $payment->payment_number)] = route('receivable-payments.show', $payment);
+                $this->putCodeLink($map, (string) $payment->payment_number, 'receivable-payments.show', $payment);
             }
         }
 
@@ -646,10 +662,10 @@ class AuditLogPageController extends Controller
             }
 
             if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimmed) === 1) {
-                return Carbon::parse($trimmed)->format('d-m-Y');
+                return $this->safeAuditDateFormat($trimmed, 'd-m-Y');
             }
             if (preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/', $trimmed) === 1) {
-                return Carbon::parse($trimmed)->format('d-m-Y H:i:s');
+                return $this->safeAuditDateFormat($trimmed, 'd-m-Y H:i:s');
             }
 
             return $trimmed;
@@ -754,5 +770,35 @@ class AuditLogPageController extends Controller
     private function nowWib(): Carbon
     {
         return now('Asia/Jakarta');
+    }
+
+    /**
+     * @param  array<string, string>  $map
+     */
+    private function putCodeLink(array &$map, string $code, string $routeName, mixed $parameter): void
+    {
+        $normalizedCode = strtoupper(trim($code));
+        if ($normalizedCode === '') {
+            return;
+        }
+
+        try {
+            $map[$normalizedCode] = route($routeName, $parameter);
+        } catch (\Throwable $exception) {
+            Log::warning('audit_logs.route_link_failed', [
+                'route' => $routeName,
+                'code' => $normalizedCode,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function safeAuditDateFormat(string $value, string $format): string
+    {
+        try {
+            return Carbon::parse($value)->format($format);
+        } catch (\Throwable) {
+            return trim($value) !== '' ? $value : '-';
+        }
     }
 }
