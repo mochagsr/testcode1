@@ -7,14 +7,11 @@
 
     <style>
         #items-table input[type=number].qty-input::-webkit-outer-spin-button,
-        #items-table input[type=number].qty-input::-webkit-inner-spin-button,
-        #items-table input[type=number].price-input::-webkit-outer-spin-button,
-        #items-table input[type=number].price-input::-webkit-inner-spin-button {
+        #items-table input[type=number].qty-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
-        #items-table input[type=number].qty-input,
-        #items-table input[type=number].price-input {
+        #items-table input[type=number].qty-input {
             -moz-appearance: textfield;
             appearance: textfield;
         }
@@ -33,7 +30,7 @@
                         <input type="date" name="note_date" value="{{ old('note_date', now()->format('Y-m-d')) }}" required>
                     </div>
                     <div class="col-4">
-                        <label>{{ __('txn.customer') }} {{ __('txn.name') }} <span class="label-required">*</span></label>
+                        <label>{{ __('txn.customer') }} <span class="label-required">*</span></label>
                         @php
                             $customerMap = $customers->keyBy('id');
                             $oldCustomerId = old('customer_id');
@@ -45,7 +42,7 @@
                                id="customer-search"
                                list="customers-list"
                                value="{{ $oldCustomerLabel }}"
-                               placeholder="{{ __('txn.no_linked_customer') }}"
+                               placeholder="Pilih customer terdaftar"
                                required>
                         <input type="hidden" id="recipient_name" name="recipient_name" value="{{ old('recipient_name') }}">
                         <input type="hidden" id="customer_id" name="customer_id" value="{{ $oldCustomerId }}">
@@ -112,10 +109,9 @@
             <table id="items-table" style="margin-top: 12px;">
                 <thead>
                 <tr>
-                    <th style="width: 36%">{{ __('txn.product') }} *</th>
-                    <th style="width: 10%">{{ __('txn.qty') }} *</th>
-                    <th style="width: 7%">{{ __('txn.unit') }}</th>
-                    <th style="width: 14%">{{ __('txn.price') }} ({{ __('txn.optional') }})</th>
+                    <th style="width: 48%">{{ __('txn.product') }} *</th>
+                    <th style="width: 12%">{{ __('txn.qty') }} *</th>
+                    <th style="width: 10%">{{ __('txn.unit') }}</th>
                     <th>{{ __('txn.notes') }}</th>
                     <th></th>
                 </tr>
@@ -157,6 +153,8 @@
         const recipientPhoneField = document.getElementById('recipient_phone');
         const cityField = document.getElementById('city');
         const addressField = document.getElementById('address');
+        const form = document.querySelector('form');
+        let isSubmitting = false;
         const SEARCH_DEBOUNCE_MS = 100;
         let currentCustomer = null;
         let customerLookupAbort = null;
@@ -552,22 +550,78 @@
                 || null;
         }
 
-        function syncItemPricesForCurrentCustomer() {
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            rows.forEach((row) => {
-                const productId = row.querySelector('.product-id')?.value || '';
-                if (productId === '') {
-                    return;
+        async function resolveCustomerFromInput(rawValue) {
+            const input = String(rawValue || '').trim();
+            if (input === '') {
+                return null;
+            }
+
+            const variants = [input];
+            const match = input.match(/^(.+?)\s*\((.+)\)\s*$/);
+            if (match) {
+                const namePart = String(match[1] || '').trim();
+                const cityPart = String(match[2] || '').trim();
+                if (namePart !== '') {
+                    variants.push(namePart);
                 }
-                const product = products.find((entry) => String(entry.id) === String(productId));
-                if (!product) {
-                    return;
+                if (cityPart !== '') {
+                    variants.push(cityPart);
                 }
-                const priceField = row.querySelector('.price-input');
-                if (priceField) {
-                    priceField.value = Math.round(getProductPriceByCustomerLevel(product));
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                if (customer) {
+                    return customer;
                 }
-            });
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                await fetchCustomerSuggestions(variant);
+                const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                if (customer) {
+                    return customer;
+                }
+            }
+
+            return null;
+        }
+
+        async function resolveProductFromInput(rawValue) {
+            const input = String(rawValue || '').trim();
+            if (input === '') {
+                return null;
+            }
+
+            const variants = [input];
+            const match = input.match(/^(.+?)\s*-\s*(.+)\s*$/);
+            if (match) {
+                const codePart = String(match[1] || '').trim();
+                const namePart = String(match[2] || '').trim();
+                if (codePart !== '') {
+                    variants.push(codePart);
+                }
+                if (namePart !== '') {
+                    variants.push(namePart);
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                const product = findProductByLabel(variant) || findProductLoose(variant);
+                if (product) {
+                    return product;
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                await fetchProductSuggestions(variant);
+                const product = findProductByLabel(variant) || findProductLoose(variant);
+                if (product) {
+                    return product;
+                }
+            }
+
+            return null;
         }
 
         function addRow() {
@@ -575,12 +629,11 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="{{ __('txn.manual_item') }}" required>
+                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                 </td>
                 <td><input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required style="max-width: 104px;"></td>
                 <td><input name="items[${index}][unit]" class="unit" style="max-width: 72px;"></td>
-                <td><input name="items[${index}][unit_price]" type="number" min="0" step="1" class="price-input" style="max-width: 104px;"></td>
                 <td><input name="items[${index}][notes]"></td>
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
@@ -592,7 +645,6 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.unit').value = product.unit || '';
-                    tr.querySelector('[name="items[' + index + '][unit_price]"]').value = Math.round(getProductPriceByCustomerLevel(product));
                 }
             });
             tr.querySelector('.product-search').addEventListener('input', onProductInput);
@@ -607,7 +659,6 @@
                 }
                 tr.querySelector('.product-search').value = productLabel(product);
                 tr.querySelector('.unit').value = product.unit || '';
-                tr.querySelector('[name="items[' + index + '][unit_price]"]').value = Math.round(getProductPriceByCustomerLevel(product));
             });
             tr.querySelector('.remove').addEventListener('click', () => tr.remove());
         }
@@ -671,6 +722,50 @@
                 if (location) {
                     shipLocationSearch.value = shipLocationLabel(location);
                 }
+            });
+        }
+        if (form) {
+            form.addEventListener('submit', async (event) => {
+                if (isSubmitting) {
+                    return;
+                }
+                event.preventDefault();
+                const customer = customerIdField.value
+                    ? getCustomerById(customerIdField.value)
+                    : await resolveCustomerFromInput(customerSearch?.value || '');
+                if (customer) {
+                    applyCustomerFields(customer);
+                    customerSearch.value = customerLabel(customer);
+                }
+
+                for (const row of Array.from(tbody.querySelectorAll('tr'))) {
+                    const productIdField = row.querySelector('.product-id');
+                    const productSearchField = row.querySelector('.product-search');
+                    if (!productIdField || !productSearchField) {
+                        continue;
+                    }
+                    if (String(productIdField.value || '').trim() !== '') {
+                        continue;
+                    }
+                    const product = await resolveProductFromInput(productSearchField.value || '');
+                    if (product) {
+                        productIdField.value = product.id;
+                        productSearchField.value = productLabel(product);
+                        const unitField = row.querySelector('.unit');
+                        if (unitField && String(unitField.value || '').trim() === '') {
+                            unitField.value = product.unit || '';
+                        }
+                    }
+                }
+
+                const missingProduct = Array.from(document.querySelectorAll('.product-id'))
+                    .some((input) => !String(input.value || '').trim());
+                if (!customerIdField.value || missingProduct) {
+                    alert('{{ __('txn.select_customer') }} / {{ __('txn.select_product') }}');
+                    return;
+                }
+                isSubmitting = true;
+                form.submit();
             });
         }
         addRow();

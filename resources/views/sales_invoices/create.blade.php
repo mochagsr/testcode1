@@ -182,6 +182,7 @@
         const invoiceDateInput = document.getElementById('invoice-date');
         const semesterPeriodSelect = document.getElementById('semester-period');
         const form = document.querySelector('form');
+        let isSubmitting = false;
         const SEARCH_DEBOUNCE_MS = 100;
         let currentCustomer = null;
         let orderNoteLookupAbort = null;
@@ -654,6 +655,43 @@
                 || null;
         }
 
+        async function resolveProductFromInput(rawValue) {
+            const input = String(rawValue || '').trim();
+            if (input === '') {
+                return null;
+            }
+
+            const variants = [input];
+            const match = input.match(/^(.+?)\s*-\s*(.+)\s*$/);
+            if (match) {
+                const codePart = String(match[1] || '').trim();
+                const namePart = String(match[2] || '').trim();
+                if (codePart !== '') {
+                    variants.push(codePart);
+                }
+                if (namePart !== '') {
+                    variants.push(namePart);
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                const product = findProductByLabel(variant) || findProductLoose(variant);
+                if (product) {
+                    return product;
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                await fetchProductSuggestions(variant);
+                const product = findProductByLabel(variant) || findProductLoose(variant);
+                if (product) {
+                    return product;
+                }
+            }
+
+            return null;
+        }
+
         function resolveProductPrice(product) {
             if (!product) {
                 return 0;
@@ -941,13 +979,43 @@
             });
         }
         if (form) {
-            form.addEventListener('submit', (event) => {
+            form.addEventListener('submit', async (event) => {
+                if (isSubmitting) {
+                    return;
+                }
+                event.preventDefault();
+                if (!customerIdField.value && customerSearch?.value) {
+                    const customer = await resolveCustomerFromInput(customerSearch.value);
+                    await handleResolvedCustomer(customer, false);
+                    if (customer) {
+                        customerSearch.value = customerLabel(customer);
+                    }
+                }
+
+                const rows = Array.from(document.querySelectorAll('#items-table tbody tr'));
+                for (const row of rows) {
+                    const productIdField = row.querySelector('.product-id');
+                    const productSearchField = row.querySelector('.product-search');
+                    if (!productIdField || !productSearchField || String(productIdField.value || '').trim() !== '') {
+                        continue;
+                    }
+                    const product = await resolveProductFromInput(productSearchField.value || '');
+                    if (!product) {
+                        continue;
+                    }
+                    productIdField.value = product.id;
+                    productSearchField.value = productLabel(product);
+                    updateRowMeta(row, product);
+                }
+
                 const missing = Array.from(document.querySelectorAll('.product-id'))
                     .some(input => !input.value);
                 if (missing || !customerIdField.value) {
-                    event.preventDefault();
                     alert('{{ __('txn.select_customer') }} / {{ __('txn.select_product') }}');
+                    return;
                 }
+                isSubmitting = true;
+                form.submit();
             });
         }
         initializeInvoiceForm();

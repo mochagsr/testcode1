@@ -34,14 +34,11 @@
             margin-bottom: 8px;
         }
         #admin-delivery-items-table input[type=number].qty-input::-webkit-outer-spin-button,
-        #admin-delivery-items-table input[type=number].qty-input::-webkit-inner-spin-button,
-        #admin-delivery-items-table input[type=number].price-input::-webkit-outer-spin-button,
-        #admin-delivery-items-table input[type=number].price-input::-webkit-inner-spin-button {
+        #admin-delivery-items-table input[type=number].qty-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
-        #admin-delivery-items-table input[type=number].qty-input,
-        #admin-delivery-items-table input[type=number].price-input {
+        #admin-delivery-items-table input[type=number].qty-input {
             -moz-appearance: textfield;
             appearance: textfield;
         }
@@ -95,7 +92,6 @@
                     <th>{{ __('txn.name') }}</th>
                     <th>{{ __('txn.unit') }}</th>
                     <th>{{ __('txn.qty') }}</th>
-                    <th>{{ __('txn.price') }}</th>
                     <th>{{ __('txn.notes') }}</th>
                 </tr>
                 </thead>
@@ -105,7 +101,6 @@
                         <td>{{ $item->product_name }}</td>
                         <td>{{ $item->unit ?: '-' }}</td>
                         <td>{{ (int) round($item->quantity) }}</td>
-                        <td>{{ $item->unit_price !== null ? 'Rp '.number_format((int) round($item->unit_price), 0, ',', '.') : '-' }}</td>
                         <td>{{ $item->notes ?: '-' }}</td>
                     </tr>
                 @endforeach
@@ -166,12 +161,11 @@
                         <table id="admin-delivery-items-table">
                             <thead>
                             <tr>
-                                <th style="width: 34%;">{{ __('txn.product') }}</th>
-                                <th style="width: 10%;">{{ __('txn.qty') }}</th>
-                                <th style="width: 9%;">{{ __('txn.unit') }}</th>
-                                <th style="width: 12%;">{{ __('txn.price') }}</th>
-                                <th style="width: 20%;">{{ __('txn.notes') }}</th>
-                                <th style="width: 15%;">{{ __('txn.action') }}</th>
+                                <th style="width: 42%;">{{ __('txn.product') }}</th>
+                                <th style="width: 12%;">{{ __('txn.qty') }}</th>
+                                <th style="width: 10%;">{{ __('txn.unit') }}</th>
+                                <th style="width: 24%;">{{ __('txn.notes') }}</th>
+                                <th style="width: 12%;">{{ __('txn.action') }}</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -183,7 +177,6 @@
                                     </td>
                                     <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-delivery-item-qty qty-input" value="{{ (int) round($item->quantity) }}" style="max-width: 104px;" required></td>
                                     <td><input type="text" name="items[{{ $index }}][unit]" class="admin-delivery-item-unit" value="{{ $item->unit }}" style="max-width: 72px;"></td>
-                                    <td><input type="number" min="0" step="1" name="items[{{ $index }}][unit_price]" class="admin-delivery-item-price price-input" value="{{ $item->unit_price !== null ? (int) round((float) $item->unit_price) : '' }}" style="max-width: 104px;"></td>
                                     <td><input type="text" name="items[{{ $index }}][notes]" class="admin-delivery-item-notes" value="{{ $item->notes }}" style="max-width: 130px;"></td>
                                     <td><button type="button" class="btn danger-btn admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
                                 </tr>
@@ -440,7 +433,6 @@
                         row.querySelector('.admin-delivery-item-product-id').name = `items[${index}][product_id]`;
                         row.querySelector('.admin-delivery-item-unit').name = `items[${index}][unit]`;
                         row.querySelector('.admin-delivery-item-qty').name = `items[${index}][quantity]`;
-                        row.querySelector('.admin-delivery-item-price').name = `items[${index}][unit_price]`;
                         row.querySelector('.admin-delivery-item-notes').name = `items[${index}][notes]`;
                     });
                 }
@@ -459,9 +451,6 @@
                         if (!row.querySelector('.admin-delivery-item-unit').value) {
                             row.querySelector('.admin-delivery-item-unit').value = selected.unit || '';
                         }
-                        if (!row.querySelector('.admin-delivery-item-price').value) {
-                            row.querySelector('.admin-delivery-item-price').value = Math.round(getProductPriceByCustomerLevel(selected));
-                        }
                     });
                     searchInput?.addEventListener('input', onSearchInput);
                     searchInput?.addEventListener('focus', (event) => {
@@ -477,9 +466,6 @@
                         searchInput.value = productLabel(selected);
                         if (!row.querySelector('.admin-delivery-item-unit').value) {
                             row.querySelector('.admin-delivery-item-unit').value = selected.unit || '';
-                        }
-                        if (!row.querySelector('.admin-delivery-item-price').value) {
-                            row.querySelector('.admin-delivery-item-price').value = Math.round(getProductPriceByCustomerLevel(selected));
                         }
                     });
                     row.querySelector('.admin-remove-delivery-item')?.addEventListener('click', () => {
@@ -501,7 +487,6 @@
                         </td>
                         <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-delivery-item-qty qty-input" value="1" style="max-width: 104px;" required></td>
                         <td><input type="text" name="items[${index}][unit]" class="admin-delivery-item-unit" value="" style="max-width: 72px;"></td>
-                        <td><input type="number" min="0" step="1" name="items[${index}][unit_price]" class="admin-delivery-item-price price-input" value="" style="max-width: 104px;"></td>
                         <td><input type="text" name="items[${index}][notes]" class="admin-delivery-item-notes" value="" style="max-width: 130px;"></td>
                         <td><button type="button" class="btn danger-btn admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
                     `;

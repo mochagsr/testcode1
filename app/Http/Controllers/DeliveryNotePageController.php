@@ -195,28 +195,27 @@ class DeliveryNotePageController extends Controller
     {
         $data = $request->validate([
             'note_date' => ['required', 'date'],
-            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
             'transaction_type' => ['nullable', 'in:product,printing'],
             'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'recipient_name' => ['required', 'string', 'max:150'],
+            'recipient_name' => ['nullable', 'string', 'max:150'],
             'recipient_phone' => ['nullable', 'string', 'max:30'],
             'city' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.product_code' => ['nullable', 'string', 'max:60'],
             'items.*.product_name' => ['required', 'string', 'max:200'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
         $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
         $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
-            customerId: isset($data['customer_id']) ? (int) $data['customer_id'] : null,
+            customerId: (int) $data['customer_id'],
             transactionType: $selectedTransactionType,
             subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
         );
@@ -224,14 +223,12 @@ class DeliveryNotePageController extends Controller
         $note = DB::transaction(function () use ($data, $selectedTransactionType, $printingSubtype): DeliveryNote {
             $noteDate = $data['note_date'];
             $noteNumber = $this->generateNoteNumber($noteDate);
-            $customerId = isset($data['customer_id']) ? (int) $data['customer_id'] : null;
+            $customerId = (int) $data['customer_id'];
             $shipLocationId = (int) ($data['customer_ship_location_id'] ?? 0);
             $shipLocation = null;
             if ($shipLocationId > 0) {
                 $shipLocationQuery = CustomerShipLocation::query()->where('is_active', true);
-                if ($customerId !== null) {
-                    $shipLocationQuery->where('customer_id', $customerId);
-                }
+                $shipLocationQuery->where('customer_id', $customerId);
                 $shipLocation = $shipLocationQuery->find($shipLocationId);
                 if ($shipLocation === null) {
                     throw ValidationException::withMessages([
@@ -240,14 +237,27 @@ class DeliveryNotePageController extends Controller
                 }
             }
 
-            $customer = $customerId !== null
-                ? Customer::query()->with('level:id,code,name')->find($customerId)
-                : null;
+            $customer = Customer::query()
+                ->onlyOrderFormColumns()
+                ->with('level:id,code,name')
+                ->findOrFail($customerId);
 
             $recipientName = trim((string) ($data['recipient_name'] ?? ''));
             $recipientPhone = trim((string) ($data['recipient_phone'] ?? ''));
             $city = trim((string) ($data['city'] ?? ''));
             $address = trim((string) ($data['address'] ?? ''));
+            if ($recipientName === '') {
+                $recipientName = (string) $customer->name;
+            }
+            if ($recipientPhone === '') {
+                $recipientPhone = (string) ($customer->phone ?? '');
+            }
+            if ($city === '') {
+                $city = (string) ($customer->city ?? '');
+            }
+            if ($address === '') {
+                $address = (string) ($customer->address ?? '');
+            }
             if ($recipientName === '' && $shipLocation !== null) {
                 $recipientName = (string) ($shipLocation->school_name ?: $shipLocation->recipient_name);
             }
@@ -279,11 +289,10 @@ class DeliveryNotePageController extends Controller
 
             $stockUsageByProduct = [];
             foreach ($data['items'] as $row) {
-                $productId = isset($row['product_id']) ? (int) $row['product_id'] : 0;
+                $productId = (int) $row['product_id'];
                 $productCode = $row['product_code'] ?? null;
                 $productName = $row['product_name'];
                 $unit = $row['unit'] ?? null;
-                $unitPrice = $row['unit_price'] ?? null;
                 $quantity = (int) ($row['quantity'] ?? 0);
 
                 $product = $this->resolveProductFromInput($productId, $productName);
@@ -302,9 +311,6 @@ class DeliveryNotePageController extends Controller
                         $productCode = $productCode ?: $product->code;
                         $productName = trim((string) ($product->name ?: $productName));
                         $unit = $unit ?: $product->unit;
-                        $unitPrice = $unitPrice !== null && $unitPrice !== ''
-                            ? $unitPrice
-                            : $this->resolvePriceByCustomerLevel($product, $customer);
                         $stockUsageByProduct[$product->id] = ($stockUsageByProduct[$product->id] ?? 0) + $quantity;
                     }
                 }
@@ -316,7 +322,7 @@ class DeliveryNotePageController extends Controller
                     'product_name' => $productName,
                     'unit' => $unit,
                     'quantity' => $quantity,
-                    'unit_price' => $unitPrice !== null && $unitPrice !== '' ? $unitPrice : null,
+                    'unit_price' => null,
                     'notes' => $row['notes'] ?? null,
                 ]);
             }
@@ -413,11 +419,10 @@ class DeliveryNotePageController extends Controller
             'address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.product_name' => ['required', 'string', 'max:200'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -561,8 +566,6 @@ class DeliveryNotePageController extends Controller
                 $productCode = null;
                 $productName = $row['product_name'];
                 $unit = $row['unit'] ?? null;
-                $unitPrice = $row['unit_price'] ?? null;
-
                 $product = $productId > 0
                     ? $products->get($productId)
                     : $this->resolveProductFromInput(0, $productName);
@@ -572,9 +575,6 @@ class DeliveryNotePageController extends Controller
                     $productCode = $product->code;
                     $productName = $product->name;
                     $unit = $unit ?: $product->unit;
-                    $unitPrice = $unitPrice !== null && $unitPrice !== ''
-                        ? $unitPrice
-                        : $this->resolvePriceByCustomerLevel($product, $customer);
                 }
 
                 DeliveryNoteItem::create([
@@ -584,7 +584,7 @@ class DeliveryNotePageController extends Controller
                     'product_name' => $productName,
                     'unit' => $unit,
                     'quantity' => $row['quantity'],
-                    'unit_price' => $unitPrice !== null && $unitPrice !== '' ? (float) round((float) $unitPrice) : null,
+                    'unit_price' => null,
                     'notes' => $row['notes'] ?? null,
                 ]);
             }
@@ -720,14 +720,13 @@ class DeliveryNotePageController extends Controller
             $rows[] = [__('txn.address'), $address !== '' ? $address : '-'];
             $rows[] = [];
             $rows[] = [__('txn.items')];
-            $rows[] = [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.notes')];
+            $rows[] = [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.notes')];
 
             foreach ($deliveryNote->items as $item) {
                 $rows[] = [
                     $item->product_name,
                     $item->unit,
                     $item->quantity,
-                    $item->unit_price !== null ? number_format((int) round((float) $item->unit_price), 0, ',', '.') : null,
                     $item->notes,
                 ];
             }
@@ -739,8 +738,8 @@ class DeliveryNotePageController extends Controller
             $sheet->fromArray($rows, null, 'A1');
             $itemsCount = $deliveryNote->items->count();
             $itemsHeaderRow = (($deliveryNote->shipLocation?->school_name ?? '') !== '') ? 9 : 8;
-            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 5, $itemsCount, true);
-            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [3, 4], '#,##0');
+            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 4, $itemsCount, true);
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [3], '#,##0');
             $sheet->getStyle('B1:B'.(14 + $itemsCount))->getAlignment()->setWrapText(true);
 
             $writer = new Xlsx($spreadsheet);

@@ -184,7 +184,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }} {{ $note->note_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.back') }}</a>
-            @if($canEditTransactions)
+            @if($canEditTransactions || ($isAdminUser && !$note->is_canceled))
                 <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
@@ -312,7 +312,7 @@
         </div>
     </div>
 
-    @if($canEditTransactions)
+    @if($canEditTransactions || ($isAdminUser && !$note->is_canceled))
     <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
         <div id="admin-edit-transaction" class="card txn-modal-card">
             <div class="form-section">
@@ -320,88 +320,90 @@
                     <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
                     <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
                 </div>
-                <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
-                <form id="admin-order-edit-form" method="post" action="{{ route('order-notes.admin-update', $note) }}" class="row" style="margin-bottom: 12px;">
-                    @csrf
-                    @method('PUT')
-                    <div class="col-4">
-                        <label>{{ __('txn.date') }}</label>
-                        <input type="date" name="note_date" value="{{ old('note_date', optional($note->note_date)->format('Y-m-d')) }}" required>
-                    </div>
-                    <div class="col-4">
-                        <label>{{ __('txn.customer') }}</label>
-                        <input type="text" name="customer_name" value="{{ old('customer_name', $note->customer_name) }}" required>
-                    </div>
-                    <div class="col-4">
-                        <label>{{ __('txn.phone') }}</label>
-                        <input type="text" name="customer_phone" value="{{ old('customer_phone', $note->customer_phone) }}">
-                    </div>
-                    <div class="col-4">
-                        <label>{{ __('txn.city') }}</label>
-                        <input type="text" name="city" value="{{ old('city', $note->city) }}">
-                    </div>
-                    <div class="col-4">
-                        <label>{{ __('txn.transaction_type') }}</label>
-                        <select id="admin-order-note-transaction-type" name="transaction_type">
-                            <option value="product" @selected(old('transaction_type', $note->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
-                            <option value="printing" @selected(old('transaction_type', $note->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
-                        </select>
-                    </div>
-                    <input type="hidden" id="admin-order-note-customer-id" value="{{ (int) $note->customer_id }}">
-                    @include('partials.printing_subtype_fields', [
-                        'customerFieldId' => 'admin-order-note-customer-id',
-                        'transactionTypeFieldId' => 'admin-order-note-transaction-type',
-                        'subtypeFieldId' => 'admin-order-note-printing-subtype-id',
-                        'selectedSubtypeId' => old('customer_printing_subtype_id', $note->customer_printing_subtype_id),
-                        'selectedSubtypeName' => old('printing_subtype_name', $note->printing_subtype_name),
-                        'colClass' => 'col-4',
-                    ])
-                    <div class="col-12">
-                        <label>{{ __('txn.address') }}</label>
-                        <textarea name="address" rows="2">{{ old('address', $note->address ?: $note->customer?->address) }}</textarea>
-                    </div>
-                    <div class="col-12">
-                        <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
-                            <strong>{{ __('txn.items') }}</strong>
-                            <button type="button" id="admin-add-order-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
+                @if($canEditTransactions)
+                    <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
+                    <form id="admin-order-edit-form" method="post" action="{{ route('order-notes.admin-update', $note) }}" class="row" style="margin-bottom: 12px;">
+                        @csrf
+                        @method('PUT')
+                        <div class="col-4">
+                            <label>{{ __('txn.date') }}</label>
+                            <input type="date" name="note_date" value="{{ old('note_date', optional($note->note_date)->format('Y-m-d')) }}" required>
                         </div>
-                        <table id="admin-order-items-table">
-                            <thead>
-                            <tr>
-                                <th class="product-col">{{ __('txn.product') }}</th>
-                                <th class="qty-col">{{ __('txn.qty') }}</th>
-                                <th class="notes-col">{{ __('txn.notes') }}</th>
-                                <th class="action-col">{{ __('txn.action') }}</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($note->items as $index => $item)
+                        <div class="col-4">
+                            <label>{{ __('txn.customer') }}</label>
+                            <input type="text" name="customer_name" value="{{ old('customer_name', $note->customer_name) }}" required>
+                        </div>
+                        <div class="col-4">
+                            <label>{{ __('txn.phone') }}</label>
+                            <input type="text" name="customer_phone" value="{{ old('customer_phone', $note->customer_phone) }}">
+                        </div>
+                        <div class="col-4">
+                            <label>{{ __('txn.city') }}</label>
+                            <input type="text" name="city" value="{{ old('city', $note->city) }}">
+                        </div>
+                        <div class="col-4">
+                            <label>{{ __('txn.transaction_type') }}</label>
+                            <select id="admin-order-note-transaction-type" name="transaction_type">
+                                <option value="product" @selected(old('transaction_type', $note->transaction_type ?? 'product') === 'product')>{{ __('txn.transaction_type_product') }}</option>
+                                <option value="printing" @selected(old('transaction_type', $note->transaction_type) === 'printing')>{{ __('txn.transaction_type_printing') }}</option>
+                            </select>
+                        </div>
+                        <input type="hidden" id="admin-order-note-customer-id" value="{{ (int) $note->customer_id }}">
+                        @include('partials.printing_subtype_fields', [
+                            'customerFieldId' => 'admin-order-note-customer-id',
+                            'transactionTypeFieldId' => 'admin-order-note-transaction-type',
+                            'subtypeFieldId' => 'admin-order-note-printing-subtype-id',
+                            'selectedSubtypeId' => old('customer_printing_subtype_id', $note->customer_printing_subtype_id),
+                            'selectedSubtypeName' => old('printing_subtype_name', $note->printing_subtype_name),
+                            'colClass' => 'col-4',
+                        ])
+                        <div class="col-12">
+                            <label>{{ __('txn.address') }}</label>
+                            <textarea name="address" rows="2">{{ old('address', $note->address ?: $note->customer?->address) }}</textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="flex" style="justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
+                                <strong>{{ __('txn.items') }}</strong>
+                                <button type="button" id="admin-add-order-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
+                            </div>
+                            <table id="admin-order-items-table">
+                                <thead>
                                 <tr>
-                                    <td>
-                                        <input type="text" name="items[{{ $index }}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="{{ $item->product_name }}" required>
-                                        <input type="hidden" class="admin-order-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
-                                    </td>
-                                    <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" required></td>
-                                    <td><input type="text" name="items[{{ $index }}][notes]" class="admin-order-item-notes" value="{{ $item->notes }}"></td>
-                                    <td><button type="button" class="btn danger-btn admin-remove-order-item">{{ __('txn.remove') }}</button></td>
+                                    <th class="product-col">{{ __('txn.product') }}</th>
+                                    <th class="qty-col">{{ __('txn.qty') }}</th>
+                                    <th class="notes-col">{{ __('txn.notes') }}</th>
+                                    <th class="action-col">{{ __('txn.action') }}</th>
                                 </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                        <datalist id="admin-order-products-list">
-                            @foreach($products as $productOption)
-                                <option value="{{ $productOption->code ? $productOption->code.' - '.$productOption->name : $productOption->name }}"></option>
-                            @endforeach
-                        </datalist>
-                    </div>
-                    <div class="col-12">
-                        <label>{{ __('txn.notes') }}</label>
-                        <textarea name="notes" rows="2">{{ old('notes', $note->notes) }}</textarea>
-                    </div>
-                    <div class="col-12">
-                        <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
-                    </div>
-                </form>
+                                </thead>
+                                <tbody>
+                                @foreach($note->items as $index => $item)
+                                    <tr>
+                                        <td>
+                                            <input type="text" name="items[{{ $index }}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="{{ $item->product_name }}" required>
+                                            <input type="hidden" class="admin-order-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
+                                        </td>
+                                        <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" required></td>
+                                        <td><input type="text" name="items[{{ $index }}][notes]" class="admin-order-item-notes" value="{{ $item->notes }}"></td>
+                                        <td><button type="button" class="btn danger-btn admin-remove-order-item">{{ __('txn.remove') }}</button></td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                            <datalist id="admin-order-products-list">
+                                @foreach($products as $productOption)
+                                    <option value="{{ $productOption->code ? $productOption->code.' - '.$productOption->name : $productOption->name }}"></option>
+                                @endforeach
+                            </datalist>
+                        </div>
+                        <div class="col-12">
+                            <label>{{ __('txn.notes') }}</label>
+                            <textarea name="notes" rows="2">{{ old('notes', $note->notes) }}</textarea>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
+                        </div>
+                    </form>
+                @endif
                 @if($isAdminUser && !$note->is_canceled)
                     <form method="post" action="{{ route('order-notes.cancel', $note) }}" class="row">
                         @csrf

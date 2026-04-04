@@ -105,7 +105,6 @@
             <th>{{ __('txn.name') }}</th>
             <th style="width: 7%">{{ __('txn.unit') }}</th>
             <th class="num" style="width: 7%">{{ __('txn.qty') }}</th>
-            <th class="num" style="width: 10%">{{ __('txn.price') }}</th>
             <th style="width: 20%">{{ __('txn.notes') }}</th>
         </tr>
         </thead>
@@ -116,7 +115,6 @@
                 <td>{{ $item->product_name }}</td>
                 <td>{{ $item->unit ?: '' }}</td>
                 <td class="num">{{ (int) round($item->quantity) }}</td>
-                <td class="num">{{ $item->unit_price !== null ? 'Rp '.number_format((int) round($item->unit_price), 0, ',', '.') : '' }}</td>
                 <td>{{ $item->notes ?: '' }}</td>
             </tr>
         @endforeach

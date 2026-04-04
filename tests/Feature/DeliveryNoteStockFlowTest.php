@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\ItemCategory;
 use App\Models\Product;
@@ -20,6 +21,11 @@ class DeliveryNoteStockFlowTest extends TestCase
             'code' => 'CAT-DN-STK',
             'name' => 'Kategori DN Stock',
         ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-DN-01',
+            'name' => 'Customer DN 01',
+            'city' => 'Malang',
+        ]);
         $product = Product::query()->create([
             'item_category_id' => $category->id,
             'code' => 'PRD-DN-01',
@@ -32,6 +38,7 @@ class DeliveryNoteStockFlowTest extends TestCase
 
         $response = $this->actingAs($admin)->post(route('delivery-notes.store'), [
             'note_date' => '2026-03-01',
+            'customer_id' => $customer->id,
             'recipient_name' => 'Penerima Test',
             'recipient_phone' => '08123',
             'city' => 'Malang',
@@ -43,7 +50,6 @@ class DeliveryNoteStockFlowTest extends TestCase
                     'product_name' => $product->name,
                     'unit' => 'exp',
                     'quantity' => 3,
-                    'unit_price' => 5000,
                 ],
             ],
         ]);
@@ -69,6 +75,11 @@ class DeliveryNoteStockFlowTest extends TestCase
             'code' => 'CAT-DN-MAN',
             'name' => 'Kategori DN Manual',
         ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-DN-02',
+            'name' => 'Customer DN 02',
+            'city' => 'Sidoarjo',
+        ]);
         $product = Product::query()->create([
             'item_category_id' => $category->id,
             'code' => 'PRD-DN-MAN',
@@ -81,15 +92,15 @@ class DeliveryNoteStockFlowTest extends TestCase
 
         $response = $this->actingAs($admin)->post(route('delivery-notes.store'), [
             'note_date' => '2026-03-01',
+            'customer_id' => $customer->id,
             'recipient_name' => 'Penerima Manual',
             'city' => 'Sidoarjo',
             'items' => [
                 [
-                    // sengaja tanpa product_id, hanya label manual:
                     'product_name' => $product->code . ' - ' . $product->name,
+                    'product_id' => $product->id,
                     'quantity' => 2,
                     'unit' => 'pcs',
-                    'unit_price' => 12000,
                 ],
             ],
         ]);
@@ -114,6 +125,11 @@ class DeliveryNoteStockFlowTest extends TestCase
             'code' => 'CAT-DN-CAN',
             'name' => 'Kategori DN Cancel',
         ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-DN-03',
+            'name' => 'Customer DN 03',
+            'city' => 'Malang',
+        ]);
         $product = Product::query()->create([
             'item_category_id' => $category->id,
             'code' => 'PRD-DN-CAN',
@@ -126,6 +142,7 @@ class DeliveryNoteStockFlowTest extends TestCase
 
         $storeResponse = $this->actingAs($admin)->post(route('delivery-notes.store'), [
             'note_date' => '2026-03-01',
+            'customer_id' => $customer->id,
             'recipient_name' => 'Penerima Cancel',
             'city' => 'Malang',
             'items' => [
@@ -134,7 +151,6 @@ class DeliveryNoteStockFlowTest extends TestCase
                     'product_name' => $product->name,
                     'unit' => 'exp',
                     'quantity' => 4,
-                    'unit_price' => 7000,
                 ],
             ],
         ]);
@@ -160,5 +176,27 @@ class DeliveryNoteStockFlowTest extends TestCase
             'quantity' => 4,
         ]);
     }
-}
 
+    public function test_store_delivery_note_requires_registered_customer_and_products(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $response = $this->actingAs($admin)
+            ->from(route('delivery-notes.create'))
+            ->post(route('delivery-notes.store'), [
+                'note_date' => '2026-03-01',
+                'customer_id' => '',
+                'items' => [
+                    [
+                        'product_id' => '',
+                        'product_name' => 'Produk Manual',
+                        'quantity' => 1,
+                    ],
+                ],
+            ]);
+
+        $response->assertRedirect(route('delivery-notes.create'));
+        $response->assertSessionHasErrors(['customer_id', 'items.0.product_id']);
+        $this->assertSame(0, DeliveryNote::query()->count());
+    }
+}
