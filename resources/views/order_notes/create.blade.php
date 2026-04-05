@@ -259,8 +259,8 @@
                 return null;
             }
             const normalized = label.trim().toLowerCase();
-            return customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
-                || customers.find((customer) => customer.name.toLowerCase().includes(normalized))
+            return customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
+                || customers.find((customer) => customer.name.toLowerCase() === normalized)
                 || null;
         }
 

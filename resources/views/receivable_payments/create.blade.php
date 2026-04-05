@@ -206,8 +206,8 @@
             const normalized = normalizeLookup(label);
             return customerByLabel.get(normalized)
                 || customerByName.get(normalized)
-                || customers.find((customer) => customerLabel(customer).toLowerCase().includes(normalized))
-                || customers.find((customer) => customer.name.toLowerCase().includes(normalized))
+                || customers.find((customer) => customerLabel(customer).toLowerCase() === normalized)
+                || customers.find((customer) => customer.name.toLowerCase() === normalized)
                 || null;
         }
 
