@@ -11,7 +11,10 @@
         <div class="card">
             <div class="row">
                 <div class="col-6">
-                    <label>{{ __('txn.customer') }} <span class="label-required">*</span></label>
+                    <label class="label-with-feedback">
+                        <span>{{ __('txn.customer') }} <span class="label-required">*</span></span>
+                        <span id="customer-search-error" class="field-inline-error" aria-live="polite"></span>
+                    </label>
                     @php
                         $customerMap = $customers->keyBy('id');
                         $oldCustomerId = (int) old('customer_id', 0);
@@ -114,6 +117,7 @@
             const addLocationBtn = document.getElementById('add-location');
             const customerSearch = document.getElementById('customer-search');
             const customerIdField = document.getElementById('customer-id');
+            const customerSearchError = document.getElementById('customer-search-error');
             const customersList = document.getElementById('customers-list');
             const schoolLocationsList = document.getElementById('school-locations-list');
             const locationsTbody = document.querySelector('#locations-table tbody');
@@ -247,8 +251,53 @@
                     || null;
             }
 
+            async function resolveCustomerFromInput(rawValue) {
+                const input = String(rawValue || '').trim();
+                if (input === '') {
+                    return null;
+                }
+
+                const variants = [input];
+                const match = input.match(/^(.+?)\s*\((.+)\)\s*$/);
+                if (match) {
+                    const namePart = String(match[1] || '').trim();
+                    const cityPart = String(match[2] || '').trim();
+                    if (namePart !== '') {
+                        variants.push(namePart);
+                    }
+                    if (cityPart !== '') {
+                        variants.push(cityPart);
+                    }
+                }
+
+                for (const variant of Array.from(new Set(variants))) {
+                    const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                    if (customer) {
+                        return customer;
+                    }
+                }
+
+                for (const variant of Array.from(new Set(variants))) {
+                    await fetchCustomerSuggestions(variant);
+                    const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                    if (customer) {
+                        return customer;
+                    }
+                }
+
+                return null;
+            }
+
             function getCustomerById(id) {
                 return customerById.get(String(id)) || null;
+            }
+
+            function setCustomerFieldError(message = '') {
+                const hasMessage = String(message || '').trim() !== '';
+                if (customerSearchError) {
+                    customerSearchError.textContent = hasMessage ? message : '';
+                }
+                customerSearch?.classList.toggle('input-inline-error', hasMessage);
             }
 
             function applyCustomerSelection(customer) {
@@ -258,6 +307,7 @@
                 customerIdField.value = customer ? customer.id : '';
                 if (customer && customerSearch) {
                     customerSearch.value = customerLabel(customer);
+                    setCustomerFieldError('');
                 }
             }
 
@@ -789,6 +839,7 @@
                 applyCustomerSelection(bootCustomer);
                 const onCustomerInput = debounce(async (event) => {
                     const previousCustomerId = String(customerIdField.value || '');
+                    setCustomerFieldError('');
                     await fetchCustomerSuggestions(event.currentTarget.value);
                     const customer = findCustomerByLabel(event.currentTarget.value);
                     applyCustomerSelection(customer);
@@ -796,14 +847,34 @@
                         resetMasterShipLocations();
                     }
                 });
-                customerSearch.addEventListener('input', onCustomerInput);
-                customerSearch.addEventListener('change', (event) => {
+                const syncCustomerSelection = async (rawValue) => {
                     const previousCustomerId = String(customerIdField.value || '');
-                    const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
+                    const value = String(rawValue || '').trim();
+                    if (value === '') {
+                        applyCustomerSelection(null);
+                        setCustomerFieldError('');
+                        if (String(customerIdField.value || '') !== previousCustomerId) {
+                            resetMasterShipLocations();
+                        }
+                        return;
+                    }
+                    const customer = await resolveCustomerFromInput(value);
                     applyCustomerSelection(customer);
+                    if (!customer) {
+                        setCustomerFieldError(@json(__('txn.customer_not_registered')));
+                    } else {
+                        setCustomerFieldError('');
+                    }
                     if (String(customerIdField.value || '') !== previousCustomerId) {
                         resetMasterShipLocations();
                     }
+                };
+                customerSearch.addEventListener('input', onCustomerInput);
+                customerSearch.addEventListener('change', async (event) => {
+                    await syncCustomerSelection(event.currentTarget.value);
+                });
+                customerSearch.addEventListener('blur', async (event) => {
+                    await syncCustomerSelection(event.currentTarget.value);
                 });
             }
             fillFromMasterBtn?.addEventListener('click', async () => {
@@ -839,6 +910,20 @@
             });
 
             form?.addEventListener('submit', (event) => {
+                if (!customerIdField.value && customerSearch?.value) {
+                    event.preventDefault();
+                    resolveCustomerFromInput(customerSearch.value).then((customer) => {
+                        applyCustomerSelection(customer);
+                        if (!customer) {
+                            setCustomerFieldError(@json(__('txn.customer_not_registered')));
+                            customerSearch.focus();
+                            return;
+                        }
+                        setCustomerFieldError('');
+                        form.requestSubmit();
+                    });
+                    return;
+                }
                 const locationRows = Array.from(locationsTbody.querySelectorAll('tr'));
                 if (locationRows.length === 0 || locationRows.some((row) => !(row.querySelector('.school-name')?.value || '').trim())) {
                     event.preventDefault();

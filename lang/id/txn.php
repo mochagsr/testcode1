@@ -159,6 +159,7 @@ return [
     'created_by' => 'Dibuat Oleh',
     'linked_customer' => 'Customer Terkait',
     'select_customer' => 'Pilih customer',
+    'customer_not_registered' => 'Customer tidak terdaftar.',
     'select_supplier' => 'Pilih supplier',
     'select_product' => 'Pilih barang',
     'select_order_note' => 'Pilih surat pesanan',

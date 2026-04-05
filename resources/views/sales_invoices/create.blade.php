@@ -16,7 +16,10 @@
                         <p class="form-section-note">{{ __('txn.invoice_header_note') }}</p>
                         <div class="row">
                             <div class="col-12">
-                                <label>{{ __('txn.customer') }} <span class="label-required">*</span></label>
+                                <label class="label-with-feedback">
+                                    <span>{{ __('txn.customer') }} <span class="label-required">*</span></span>
+                                    <span id="customer-search-error" class="field-inline-error" aria-live="polite"></span>
+                                </label>
                                 @php
                                     $customerMap = $customers->keyBy('id');
                                     $oldCustomerId = old('customer_id');
@@ -175,6 +178,7 @@
         const customersList = document.getElementById('customers-list');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer-id');
+        const customerSearchError = document.getElementById('customer-search-error');
         const orderNoteField = document.getElementById('order-note-id');
         const orderNoteInfo = document.getElementById('order-note-info');
         const grandTotal = document.getElementById('grand-total');
@@ -377,6 +381,14 @@
             return Array.from(new Set(variants));
         }
 
+        function setCustomerFieldError(message = '') {
+            const hasMessage = String(message || '').trim() !== '';
+            if (customerSearchError) {
+                customerSearchError.textContent = hasMessage ? message : '';
+            }
+            customerSearch?.classList.toggle('input-inline-error', hasMessage);
+        }
+
         async function resolveCustomerFromInput(rawValue) {
             const variants = customerSearchVariants(rawValue);
             if (variants.length === 0) {
@@ -405,6 +417,7 @@
             currentCustomer = customer;
             if (customer) {
                 customerIdField.value = customer.id;
+                setCustomerFieldError('');
             } else {
                 customerIdField.value = '';
             }
@@ -906,6 +919,7 @@
                 : findCustomerByLabel(customerSearch?.value || '');
 
             setCurrentCustomer(bootCustomer, false);
+            setCustomerFieldError('');
 
             if (bootCustomer) {
                 await fetchOrderNotesForCustomer(String(bootCustomer.id), bootOrderNoteId || '');
@@ -937,17 +951,33 @@
         addBtn.addEventListener('click', addRow);
         if (customerSearch) {
             const onCustomerInput = debounce(async (event) => {
+                setCustomerFieldError('');
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 await handleResolvedCustomer(customer, true);
             });
-            customerSearch.addEventListener('input', onCustomerInput);
-            customerSearch.addEventListener('change', async (event) => {
-                const customer = await resolveCustomerFromInput(event.currentTarget.value);
+            const syncCustomerSelection = async (rawValue) => {
+                const value = String(rawValue || '').trim();
+                if (value === '') {
+                    setCustomerFieldError('');
+                    await handleResolvedCustomer(null, true);
+                    return;
+                }
+                const customer = await resolveCustomerFromInput(value);
                 await handleResolvedCustomer(customer, true);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
+                    setCustomerFieldError('');
+                    return;
                 }
+                setCustomerFieldError(@json(__('txn.customer_not_registered')));
+            };
+            customerSearch.addEventListener('input', onCustomerInput);
+            customerSearch.addEventListener('change', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
+            });
+            customerSearch.addEventListener('blur', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
             });
         }
         if (orderNoteField) {
@@ -989,6 +1019,9 @@
                     await handleResolvedCustomer(customer, false);
                     if (customer) {
                         customerSearch.value = customerLabel(customer);
+                        setCustomerFieldError('');
+                    } else {
+                        setCustomerFieldError(@json(__('txn.customer_not_registered')));
                     }
                 }
 
@@ -1011,6 +1044,9 @@
                 const missing = Array.from(document.querySelectorAll('.product-id'))
                     .some(input => !input.value);
                 if (missing || !customerIdField.value) {
+                    if (!customerIdField.value && customerSearch?.value) {
+                        setCustomerFieldError(@json(__('txn.customer_not_registered')));
+                    }
                     alert('{{ __('txn.select_customer') }} / {{ __('txn.select_product') }}');
                     return;
                 }

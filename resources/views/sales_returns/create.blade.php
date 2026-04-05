@@ -14,7 +14,10 @@
                 <p class="form-section-note">{{ __('txn.return_summary_note') }}</p>
                 <div class="row">
                     <div class="col-4">
-                        <label>{{ __('txn.customer') }} <span class="label-required">*</span></label>
+                        <label class="label-with-feedback">
+                            <span>{{ __('txn.customer') }} <span class="label-required">*</span></span>
+                            <span id="customer-search-error" class="field-inline-error" aria-live="polite"></span>
+                        </label>
                         @php
                             $customerMap = $customers->keyBy('id');
                             $oldCustomerId = old('customer_id');
@@ -118,6 +121,7 @@
         const form = document.querySelector('form');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer-id');
+        const customerSearchError = document.getElementById('customer-search-error');
         const returnDateInput = document.getElementById('return-date');
         const semesterPeriodSelect = document.getElementById('semester-period');
         const SEARCH_DEBOUNCE_MS = 100;
@@ -285,9 +289,57 @@
                 || null;
         }
 
+        async function resolveCustomerFromInput(rawValue) {
+            const input = String(rawValue || '').trim();
+            if (input === '') {
+                return null;
+            }
+
+            const variants = [input];
+            const match = input.match(/^(.+?)\s*\((.+)\)\s*$/);
+            if (match) {
+                const namePart = String(match[1] || '').trim();
+                const cityPart = String(match[2] || '').trim();
+                if (namePart !== '') {
+                    variants.push(namePart);
+                }
+                if (cityPart !== '') {
+                    variants.push(cityPart);
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                if (customer) {
+                    return customer;
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                await fetchCustomerSuggestions(variant);
+                const customer = findCustomerByLabel(variant) || findCustomerLoose(variant);
+                if (customer) {
+                    return customer;
+                }
+            }
+
+            return null;
+        }
+
+        function setCustomerFieldError(message = '') {
+            const hasMessage = String(message || '').trim() !== '';
+            if (customerSearchError) {
+                customerSearchError.textContent = hasMessage ? message : '';
+            }
+            customerSearch?.classList.toggle('input-inline-error', hasMessage);
+        }
+
         function setCurrentCustomer(customer) {
             currentCustomer = customer;
             customerIdField.value = customer ? customer.id : '';
+            if (customer) {
+                setCustomerFieldError('');
+            }
         }
 
         function productLabel(product) {
@@ -472,23 +524,50 @@
                 : findCustomerByLabel(customerSearch.value);
             setCurrentCustomer(bootCustomer);
             const onCustomerInput = debounce(async (event) => {
+                setCustomerFieldError('');
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 setCurrentCustomer(customer);
                 recalc();
             });
-            customerSearch.addEventListener('input', onCustomerInput);
-            customerSearch.addEventListener('change', (event) => {
-                const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
+            const syncCustomerSelection = async (rawValue) => {
+                const value = String(rawValue || '').trim();
+                if (value === '') {
+                    setCurrentCustomer(null);
+                    setCustomerFieldError('');
+                    recalc();
+                    return;
+                }
+                const customer = await resolveCustomerFromInput(value);
                 setCurrentCustomer(customer);
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
+                    setCustomerFieldError('');
+                } else {
+                    setCustomerFieldError(@json(__('txn.customer_not_registered')));
                 }
                 recalc();
+            };
+            customerSearch.addEventListener('input', onCustomerInput);
+            customerSearch.addEventListener('change', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
+            });
+            customerSearch.addEventListener('blur', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
             });
         }
         if (form) {
-            form.addEventListener('submit', (event) => {
+            form.addEventListener('submit', async (event) => {
+                if (!customerIdField.value && customerSearch?.value) {
+                    const customer = await resolveCustomerFromInput(customerSearch.value);
+                    setCurrentCustomer(customer);
+                    if (customer) {
+                        customerSearch.value = customerLabel(customer);
+                        setCustomerFieldError('');
+                    } else {
+                        setCustomerFieldError(@json(__('txn.customer_not_registered')));
+                    }
+                }
                 const missing = Array.from(document.querySelectorAll('.product-id'))
                     .some(input => !input.value);
                 if (missing || !customerIdField.value) {

@@ -330,7 +330,7 @@
                             <input type="date" name="note_date" value="{{ old('note_date', optional($note->note_date)->format('Y-m-d')) }}" required>
                         </div>
                         <div class="col-4">
-                            <label>{{ __('txn.customer') }}</label>
+                            <label>{{ __('ui.customer_name') }}</label>
                             <input type="text" name="customer_name" value="{{ old('customer_name', $note->customer_name) }}" required>
                         </div>
                         <div class="col-4">

@@ -159,6 +159,7 @@ return [
     'created_by' => 'Created By',
     'linked_customer' => 'Linked Customer',
     'select_customer' => 'Select customer',
+    'customer_not_registered' => 'Customer is not registered.',
     'select_supplier' => 'Select supplier',
     'select_product' => 'Select product',
     'select_order_note' => 'Select order note',

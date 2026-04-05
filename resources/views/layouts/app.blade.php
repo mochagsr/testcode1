@@ -292,6 +292,26 @@
             margin-left: 2px;
             font-weight: 700;
         }
+        .label-with-feedback {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+        }
+        .field-inline-error {
+            font-size: 12px;
+            font-weight: 600;
+            color: #dc2626;
+            min-height: 16px;
+            white-space: nowrap;
+            padding-left: 10px;
+            line-height: 1.35;
+            text-align: right;
+        }
+        .input-inline-error {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.18);
+        }
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

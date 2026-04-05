@@ -30,7 +30,10 @@
                         <input type="date" name="note_date" value="{{ old('note_date', now()->format('Y-m-d')) }}" required>
                     </div>
                     <div class="col-4">
-                        <label>{{ __('txn.customer') }} <span class="label-required">*</span></label>
+                        <label class="label-with-feedback">
+                            <span>{{ __('txn.customer') }} <span class="label-required">*</span></span>
+                            <span id="customer-search-error" class="field-inline-error" aria-live="polite"></span>
+                        </label>
                         @php
                             $customerMap = $customers->keyBy('id');
                             $oldCustomerId = old('customer_id');
@@ -147,6 +150,7 @@
         const addBtn = document.getElementById('add-item');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
+        const customerSearchError = document.getElementById('customer-search-error');
         const recipientNameField = document.getElementById('recipient_name');
         const shipLocationSearch = document.getElementById('ship-location-search');
         const shipLocationIdField = document.getElementById('customer_ship_location_id');
@@ -419,6 +423,14 @@
             return customerById.get(String(id)) || null;
         }
 
+        function setCustomerFieldError(message = '') {
+            const hasMessage = String(message || '').trim() !== '';
+            if (customerSearchError) {
+                customerSearchError.textContent = hasMessage ? message : '';
+            }
+            customerSearch?.classList.toggle('input-inline-error', hasMessage);
+        }
+
         function applyCustomerFields(customer) {
             currentCustomer = customer || null;
             customerIdField.value = customer ? customer.id : '';
@@ -428,6 +440,7 @@
             if (!customer) {
                 return;
             }
+            setCustomerFieldError('');
             if (recipientPhoneField) recipientPhoneField.value = customer.phone || '';
             if (cityField) cityField.value = customer.city || '';
             if (addressField) addressField.value = customer.address || '';
@@ -670,6 +683,7 @@
             applyCustomerFields(bootCustomer);
             const onCustomerInput = debounce(async (event) => {
                 const previousCustomerId = String(customerIdField.value || '');
+                setCustomerFieldError('');
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 const customer = findCustomerByLabel(event.currentTarget.value);
                 applyCustomerFields(customer);
@@ -681,14 +695,29 @@
                     renderShipLocationSuggestions('');
                 }
             });
-            customerSearch.addEventListener('input', onCustomerInput);
-            customerSearch.addEventListener('change', (event) => {
+            const syncCustomerSelection = async (rawValue) => {
                 const previousCustomerId = String(customerIdField.value || '');
-                const customer = findCustomerByLabel(event.currentTarget.value) || findCustomerLoose(event.currentTarget.value);
+                const value = String(rawValue || '').trim();
+                if (value === '') {
+                    applyCustomerFields(null);
+                    setCustomerFieldError('');
+                    syncItemPricesForCurrentCustomer();
+                    if (String(customerIdField.value || '') !== previousCustomerId) {
+                        shipLocations = [];
+                        rebuildShipIndexes();
+                        resetShipLocationSelection();
+                        renderShipLocationSuggestions('');
+                    }
+                    return;
+                }
+                const customer = await resolveCustomerFromInput(value);
                 applyCustomerFields(customer);
                 syncItemPricesForCurrentCustomer();
                 if (customer) {
                     customerSearch.value = customerLabel(customer);
+                    setCustomerFieldError('');
+                } else {
+                    setCustomerFieldError(@json(__('txn.customer_not_registered')));
                 }
                 if (String(customerIdField.value || '') !== previousCustomerId) {
                     shipLocations = [];
@@ -696,6 +725,13 @@
                     resetShipLocationSelection();
                     renderShipLocationSuggestions('');
                 }
+            };
+            customerSearch.addEventListener('input', onCustomerInput);
+            customerSearch.addEventListener('change', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
+            });
+            customerSearch.addEventListener('blur', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
             });
         }
 
@@ -736,6 +772,9 @@
                 if (customer) {
                     applyCustomerFields(customer);
                     customerSearch.value = customerLabel(customer);
+                    setCustomerFieldError('');
+                } else if (customerSearch?.value) {
+                    setCustomerFieldError(@json(__('txn.customer_not_registered')));
                 }
 
                 for (const row of Array.from(tbody.querySelectorAll('tr'))) {
@@ -761,6 +800,9 @@
                 const missingProduct = Array.from(document.querySelectorAll('.product-id'))
                     .some((input) => !String(input.value || '').trim());
                 if (!customerIdField.value || missingProduct) {
+                    if (!customerIdField.value && customerSearch?.value) {
+                        setCustomerFieldError(@json(__('txn.customer_not_registered')));
+                    }
                     alert('{{ __('txn.select_customer') }} / {{ __('txn.select_product') }}');
                     return;
                 }

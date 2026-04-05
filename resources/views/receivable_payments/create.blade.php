@@ -27,7 +27,10 @@
                 @endif
                 <div class="row">
                     <div class="col-6">
-                        <label>{{ __('receivable.customer') }} <span class="label-required">*</span></label>
+                        <label class="label-with-feedback">
+                            <span>{{ __('receivable.customer') }} <span class="label-required">*</span></span>
+                            <span id="customer-search-error" class="field-inline-error" aria-live="polite"></span>
+                        </label>
                         <input type="text" id="customer-search" list="customers-list" value="{{ $oldCustomerLabel }}" placeholder="{{ __('txn.select_customer') }}" required>
                         <input type="hidden" id="customer-id" name="customer_id" value="{{ old('customer_id', $prefillCustomerId ?? null) }}" required>
                         <datalist id="customers-list">
@@ -90,6 +93,7 @@
         const customerSearch = document.getElementById('customer-search');
         const customersList = document.getElementById('customers-list');
         const customerIdField = document.getElementById('customer-id');
+        const customerSearchError = document.getElementById('customer-search-error');
         const customerAddressField = document.getElementById('customer-address');
         const customerOutstandingField = document.getElementById('customer-outstanding');
         const paymentAmountDisplayField = document.getElementById('payment-amount-display');
@@ -207,6 +211,51 @@
                 || null;
         }
 
+        async function resolveCustomerFromInput(rawValue) {
+            const input = String(rawValue || '').trim();
+            if (input === '') {
+                return null;
+            }
+
+            const variants = [input];
+            const match = input.match(/^(.+?)\s*\((.+)\)\s*$/);
+            if (match) {
+                const namePart = String(match[1] || '').trim();
+                const cityPart = String(match[2] || '').trim();
+                if (namePart !== '') {
+                    variants.push(namePart);
+                }
+                if (cityPart !== '') {
+                    variants.push(cityPart);
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                const customer = findCustomerByLabel(variant);
+                if (customer) {
+                    return customer;
+                }
+            }
+
+            for (const variant of Array.from(new Set(variants))) {
+                await fetchCustomerSuggestions(variant);
+                const customer = findCustomerByLabel(variant);
+                if (customer) {
+                    return customer;
+                }
+            }
+
+            return null;
+        }
+
+        function setCustomerFieldError(message = '') {
+            const hasMessage = String(message || '').trim() !== '';
+            if (customerSearchError) {
+                customerSearchError.textContent = hasMessage ? message : '';
+            }
+            customerSearch?.classList.toggle('input-inline-error', hasMessage);
+        }
+
         function money(value) {
             const amount = Number(value || 0);
             return `Rp ${idNumberFormatter.format(Math.round(amount))}`;
@@ -308,6 +357,7 @@
                 updateAmountWords();
                 return;
             }
+            setCustomerFieldError('');
             customerIdField.value = customer.id;
             customerAddressField.value = customer.address || '';
             const outstanding = Number(customer.outstanding_receivable || 0);
@@ -328,12 +378,32 @@
             renderCustomerSuggestions('');
             bindCustomer(bootCustomer, hasPresetAmount);
             const onCustomerInput = debounce(async (event) => {
+                setCustomerFieldError('');
                 await fetchCustomerSuggestions(event.currentTarget.value);
                 bindCustomer(findCustomerByLabel(event.currentTarget.value));
             });
+            const syncCustomerSelection = async (rawValue) => {
+                const value = String(rawValue || '').trim();
+                if (value === '') {
+                    bindCustomer(null);
+                    setCustomerFieldError('');
+                    return;
+                }
+                const customer = await resolveCustomerFromInput(value);
+                bindCustomer(customer);
+                if (customer) {
+                    customerSearch.value = customerLabel(customer);
+                    setCustomerFieldError('');
+                } else {
+                    setCustomerFieldError(@json(__('txn.customer_not_registered')));
+                }
+            };
             customerSearch.addEventListener('input', onCustomerInput);
-            customerSearch.addEventListener('change', (event) => {
-                bindCustomer(findCustomerByLabel(event.currentTarget.value));
+            customerSearch.addEventListener('change', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
+            });
+            customerSearch.addEventListener('blur', async (event) => {
+                await syncCustomerSelection(event.currentTarget.value);
             });
         }
 
@@ -363,10 +433,24 @@
             validatePaymentAmount();
         });
         paymentAmountField.addEventListener('change', validatePaymentAmount);
-        document.querySelector('form')?.addEventListener('submit', (event) => {
+        document.querySelector('form')?.addEventListener('submit', async (event) => {
+            if (!customerIdField.value && customerSearch?.value) {
+                const customer = await resolveCustomerFromInput(customerSearch.value);
+                bindCustomer(customer);
+                if (customer) {
+                    customerSearch.value = customerLabel(customer);
+                    setCustomerFieldError('');
+                } else {
+                    setCustomerFieldError(@json(__('txn.customer_not_registered')));
+                }
+            }
             validatePaymentAmount();
-            if (!paymentAmountField.checkValidity()) {
+            if (!customerIdField.value || !paymentAmountField.checkValidity()) {
                 event.preventDefault();
+                if (!customerIdField.value && customerSearch?.value) {
+                    customerSearch.focus();
+                    return;
+                }
                 if (paymentAmountDisplayField) {
                     paymentAmountDisplayField.setCustomValidity(paymentAmountField.validationMessage || '');
                     paymentAmountDisplayField.reportValidity();
