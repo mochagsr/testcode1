@@ -102,6 +102,8 @@ return [
     'role' => 'Role',
     'finance_lock' => 'Finance Lock',
     'login' => 'Login',
+    'mobile_menu' => 'Menu',
+    'close_menu' => 'Tutup menu',
     'login_title' => 'Login',
     'remember_me' => 'Ingat saya',
     'sign_in' => 'Masuk',

@@ -102,6 +102,8 @@ return [
     'role' => 'Role',
     'finance_lock' => 'Finance Lock',
     'login' => 'Login',
+    'mobile_menu' => 'Menu',
+    'close_menu' => 'Close menu',
     'login_title' => 'Login',
     'remember_me' => 'Remember me',
     'sign_in' => 'Sign In',

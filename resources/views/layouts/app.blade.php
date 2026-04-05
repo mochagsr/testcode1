@@ -99,6 +99,12 @@
             grid-template-columns: 220px 1fr;
             min-height: 100vh;
         }
+        .mobile-topbar,
+        .mobile-nav-toggle,
+        .sidebar-backdrop,
+        .sidebar-close {
+            display: none;
+        }
         .sidebar {
             background: var(--sidebar-bg);
             color: var(--sidebar-text);
@@ -713,8 +719,90 @@
             pointer-events: none;
         }
         @media (max-width: 900px) {
-            .wrap { grid-template-columns: 1fr; }
-            .sidebar { position: sticky; top: 0; z-index: 10; }
+            body {
+                overflow-x: hidden;
+            }
+            .wrap {
+                grid-template-columns: 1fr;
+            }
+            .mobile-topbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                position: sticky;
+                top: 0;
+                z-index: 32;
+                padding: 12px 16px;
+                background: var(--card);
+                border-bottom: 1px solid var(--border);
+                box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            }
+            .mobile-topbar-title {
+                font-size: 16px;
+                font-weight: 700;
+                color: var(--text);
+            }
+            .mobile-nav-toggle,
+            .sidebar-close {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 42px;
+                min-height: 42px;
+                padding: 0 12px;
+                border-radius: 10px;
+                border: 1px solid var(--border);
+                background: var(--card);
+                color: var(--text);
+                font: inherit;
+                font-weight: 700;
+                cursor: pointer;
+                box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+            }
+            .sidebar-backdrop {
+                display: block;
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.48);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.2s ease;
+                z-index: 34;
+            }
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: min(84vw, 320px);
+                max-width: 320px;
+                z-index: 35;
+                overflow-y: auto;
+                box-shadow: 18px 0 36px rgba(15, 23, 42, 0.28);
+                transform: translateX(-100%);
+                transition: transform 0.22s ease;
+            }
+            body.mobile-sidebar-open .sidebar {
+                transform: translateX(0);
+            }
+            body.mobile-sidebar-open .sidebar-backdrop {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .sidebar-header-mobile {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 18px;
+            }
+            .sidebar-header-mobile .brand {
+                margin-bottom: 0;
+            }
+            .main {
+                padding: 16px;
+            }
             .col-3, .col-4, .col-6, .col-8, .col-12 { grid-column: span 12; }
             form .row > [class^="col-"] > input,
             form .row > [class^="col-"] > select,
@@ -724,6 +812,9 @@
             .form-section {
                 padding: 10px;
             }
+            .page-title {
+                font-size: 22px;
+            }
         }
     </style>
 </head>
@@ -731,9 +822,17 @@
     $isDark = auth()->check() && auth()->user()->theme === 'dark';
 @endphp
 <body @if($isDark) style="--bg:#111827;--surface:#111827;--card:#1F2937;--text:#F9FAFB;--muted:#9CA3AF;--border:#374151;--accent:#F9FAFB;--sidebar-bg:#1F2937;--sidebar-text:#D1D5DB;--sidebar-muted:#9CA3AF;--sidebar-hover:#2563EB;--sidebar-group-hover:rgba(37,99,235,0.12);--sidebar-group-active:rgba(37,99,235,0.18);--sidebar-group-border:rgba(37,99,235,0.35);--sidebar-group-title-active-bg:rgba(37,99,235,0.20);--sidebar-sub-text:#D1D5DB;--sidebar-sub-active:#2563EB;--sidebar-sub-active-border:#2563EB;--sidebar-active-text:#FFFFFF;--table-bg:#1F2937;--table-header-bg:#111827;--table-border:#374151;--table-border-soft:#374151;--input-bg:#111827;--link:#93c5fd;--link-hover:#bfdbfe;--btn-secondary-bg:#374151;--btn-secondary-text:#F9FAFB;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-increase-bg:#11301f;--alert-increase-border:#4fb06e;--alert-increase-text:#d9ffe7;--alert-decrease-bg:#3a1717;--alert-decrease-border:#d86868;--alert-decrease-text:#ffd9d9;--alert-edit-bg:#3f3415;--alert-edit-border:#d3b25a;--alert-edit-text:#ffedb8;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>
+<div class="mobile-topbar">
+    <button type="button" class="mobile-nav-toggle" data-mobile-nav-toggle aria-expanded="false" aria-controls="app-sidebar">{{ __('ui.mobile_menu') }}</button>
+    <div class="mobile-topbar-title">PgPOS ERP</div>
+</div>
+<div class="sidebar-backdrop" data-sidebar-backdrop></div>
 <div class="wrap">
-    <aside class="sidebar">
-        <div class="brand">PgPOS ERP</div>
+    <aside class="sidebar" id="app-sidebar">
+        <div class="sidebar-header-mobile">
+            <div class="brand">PgPOS ERP</div>
+            <button type="button" class="sidebar-close" data-mobile-nav-close aria-label="{{ __('ui.close_menu') }}">×</button>
+        </div>
         @php
             $authUser = auth()->user();
             $canDashboard = $authUser?->canAccess('dashboard.view') ?? false;
@@ -1043,6 +1142,44 @@
             escapeAttribute,
             canSearchInput,
             deriveSemesterFromDate,
+        });
+
+        const mobileBreakpoint = window.matchMedia('(max-width: 900px)');
+        const mobileToggle = document.querySelector('[data-mobile-nav-toggle]');
+        const mobileClose = document.querySelector('[data-mobile-nav-close]');
+        const sidebarBackdrop = document.querySelector('[data-sidebar-backdrop]');
+        const sidebarLinks = Array.from(document.querySelectorAll('.sidebar a'));
+
+        function setMobileSidebarState(isOpen) {
+            document.body.classList.toggle('mobile-sidebar-open', Boolean(isOpen) && mobileBreakpoint.matches);
+            if (mobileToggle) {
+                mobileToggle.setAttribute('aria-expanded', document.body.classList.contains('mobile-sidebar-open') ? 'true' : 'false');
+            }
+        }
+
+        function closeMobileSidebar() {
+            setMobileSidebarState(false);
+        }
+
+        mobileToggle?.addEventListener('click', () => {
+            setMobileSidebarState(!document.body.classList.contains('mobile-sidebar-open'));
+        });
+
+        mobileClose?.addEventListener('click', closeMobileSidebar);
+        sidebarBackdrop?.addEventListener('click', closeMobileSidebar);
+
+        sidebarLinks.forEach((link) => {
+            link.addEventListener('click', () => {
+                if (mobileBreakpoint.matches) {
+                    closeMobileSidebar();
+                }
+            });
+        });
+
+        mobileBreakpoint.addEventListener('change', (event) => {
+            if (!event.matches) {
+                closeMobileSidebar();
+            }
         });
     })();
 </script>
