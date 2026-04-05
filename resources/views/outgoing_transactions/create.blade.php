@@ -890,6 +890,8 @@
                 }
             });
 
+            const selectSupplierAndProductMessage = @json(__('txn.select_supplier_and_product'));
+            const fixInvalidProductsMessage = @json(__('txn.fix_invalid_products'));
             let isSubmitting = false;
 
             form.addEventListener('submit', async (event) => {
@@ -952,7 +954,7 @@
                         || cost < 0;
                 });
                 if (!hasSupplier || !hasRows || invalidRows || hasInvalidProduct) {
-                    alert(@json(hasInvalidProduct ? __('txn.fix_invalid_products') : __('txn.select_supplier_and_product')));
+                    alert(hasInvalidProduct ? fixInvalidProductsMessage : selectSupplierAndProductMessage);
                     if (!hasSupplier) {
                         setSupplierFieldError(@json(__('txn.supplier_not_registered')));
                         supplierSearch.focus();

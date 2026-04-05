@@ -910,6 +910,9 @@
                     await syncCustomerSelection(event.currentTarget.value);
                 });
             }
+            const fillItemsMessage = @json(__('school_bulk.fill_items'));
+            const fixInvalidProductsMessage = @json(__('txn.fix_invalid_products'));
+
             fillFromMasterBtn?.addEventListener('click', async () => {
                 const customerId = Number(customerIdField?.value || 0);
                 if (customerId <= 0) {
@@ -1006,7 +1009,7 @@
                 });
                 if (hasInvalidItemRows || hasInvalidProductLookup) {
                     event.preventDefault();
-                    alert(@json(hasInvalidProductLookup ? __('txn.fix_invalid_products') : __('school_bulk.fill_items')));
+                    alert(hasInvalidProductLookup ? fixInvalidProductsMessage : fillItemsMessage);
                 }
             });
 
