@@ -973,6 +973,7 @@ php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
+php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure
 php artisan app:deploy-check --skip-ops
 ```
 
@@ -986,6 +987,7 @@ php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
+php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure
 php artisan app:deploy-check --skip-ops
 ```
 
@@ -1002,7 +1004,9 @@ Catatan:
 - untuk mengisi `PERFORMANCE_PROBE`, pakai `app:load-test-light`, bukan `app:query-profile`
 - untuk cek cepat semua menu dan sub-menu utama dari sisi halaman, jalankan:
   - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
+  - `php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure`
   - test ini aman dijalankan di server karena memakai environment `testing` dan SQLite in-memory, bukan database operasional
+  - `ActionSmokeTest` menambah cek untuk lookup API, preview POST, queue export, cancel/retry queue, dan generate invoice bulk di database test
 - untuk cek sekali jalan setelah deploy, jalankan:
   - `php artisan app:deploy-check`
   - command ini menjalankan:
@@ -1010,10 +1014,19 @@ Catatan:
     - smoke test menu dan sub-menu
     - smoke test halaman detail dokumen + print/PDF/Excel
     - smoke test report print/PDF/Excel
+    - smoke test lookup API dan preview POST aman
 - jika server sedang ada masalah permission log/cache dan kamu hanya ingin cek halaman HTTP:
   - `php artisan app:deploy-check --skip-ops`
 - jika ingin memaksa full suite:
   - `php artisan app:deploy-check --full-suite`
+- jika server install `composer --no-dev` sehingga `artisan test` tidak tersedia:
+  - `app:deploy-check` otomatis fallback ke `app:http-smoke-test`
+  - fallback ini fokus ke route HTTP aman:
+    - menu utama
+    - detail dokumen
+    - report utama
+    - lookup API
+    - preview POST non-destruktif
 
 ## 17A. Contoh alur lengkap Opsi A
 

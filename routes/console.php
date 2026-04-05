@@ -19,12 +19,15 @@ use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Models\IntegrityCheckLog;
 use App\Models\PerformanceProbeLog;
+use App\Models\User;
 use App\Support\AppCache;
 use App\Support\SemesterBookService;
 use App\Services\AccountingService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schedule;
@@ -1256,6 +1259,264 @@ Artisan::command('app:smoke-test', function () {
     return $failures === 0 ? 0 : 1;
 })->purpose('Run lightweight smoke test for deploy readiness and key operational checks');
 
+Artisan::command('app:http-smoke-test', function () {
+    $admin = User::query()->where('role', 'admin')->orderBy('id')->first();
+    if ($admin === null) {
+        $this->error('Tidak ada user admin untuk menjalankan HTTP smoke test.');
+        return 1;
+    }
+
+    $user = User::query()->where('role', 'user')->orderBy('id')->first();
+
+    $kernel = app(\Illuminate\Contracts\Http\Kernel::class);
+    $rows = [];
+    $failures = 0;
+    $warnings = 0;
+
+    $pushRow = function (string $group, string $label, string $status, string $detail) use (&$rows, &$failures, &$warnings): void {
+        $rows[] = [$group, $label, $status, $detail];
+        if ($status === 'FAIL') {
+            $failures++;
+        } elseif ($status === 'WARN') {
+            $warnings++;
+        }
+    };
+
+    $dispatch = function (string $method, string $url, User $actingUser, array $payload = []) use ($kernel): array {
+        $session = app('session')->driver();
+        $session->start();
+        Auth::guard()->setUser($actingUser);
+
+        if (in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            $payload['_token'] = $session->token();
+        }
+
+        $request = Request::create($url, strtoupper($method), $payload);
+        $request->setLaravelSession($session);
+        $request->headers->set('Accept', 'text/html,application/xhtml+xml');
+        $request->headers->set('X-CSRF-TOKEN', $session->token());
+        $request->setUserResolver(static fn () => $actingUser);
+
+        try {
+            $response = $kernel->handle($request);
+            $status = (int) $response->getStatusCode();
+            $kernel->terminate($request, $response);
+            return [
+                'ok' => $status >= 200 && $status < 300,
+                'detail' => 'HTTP '.$status,
+            ];
+        } catch (\Throwable $throwable) {
+            return [
+                'ok' => false,
+                'detail' => $throwable->getMessage(),
+            ];
+        } finally {
+            Auth::guard()->logout();
+        }
+    };
+
+    $runRouteSet = function (string $group, array $routes, User $actingUser) use ($dispatch, $pushRow): void {
+        foreach ($routes as $label => $definition) {
+            $method = 'GET';
+            $url = null;
+            $payload = [];
+
+            if (is_array($definition)) {
+                $method = strtoupper((string) ($definition['method'] ?? 'GET'));
+                $url = (string) ($definition['url'] ?? '');
+                $payload = (array) ($definition['payload'] ?? []);
+            } else {
+                $url = (string) $definition;
+            }
+
+            if ($url === '') {
+                $pushRow($group, $label, 'WARN', 'Route dilewati karena URL kosong.');
+                continue;
+            }
+
+            $result = $dispatch($method, $url, $actingUser, $payload);
+            $pushRow($group, $label, $result['ok'] ? 'OK' : 'FAIL', $result['detail']);
+        }
+    };
+
+    $adminRoutes = [
+        'Dashboard' => route('dashboard'),
+        'Kategori Barang' => route('item-categories.index'),
+        'Barang' => route('products.index'),
+        'Level Customer' => route('customer-levels-web.index'),
+        'Customer' => route('customers-web.index'),
+        'Supplier' => route('suppliers.index'),
+        'Transaksi Keluar' => route('outgoing-transactions.index'),
+        'Hutang Supplier' => route('supplier-payables.index'),
+        'Kartu Stok Supplier' => route('supplier-stock-cards.index'),
+        'Lokasi Kirim' => route('customer-ship-locations.index'),
+        'Sebar Sekolah' => route('school-bulk-transactions.index'),
+        'Faktur Penjualan' => route('sales-invoices.index'),
+        'Retur Penjualan' => route('sales-returns.index'),
+        'Surat Jalan' => route('delivery-notes.index'),
+        'Catatan Perjalanan' => route('delivery-trips.index'),
+        'Surat Pesanan' => route('order-notes.index'),
+        'Piutang' => route('receivables.index'),
+        'Piutang Global' => route('receivables.global.index'),
+        'Piutang Semester' => route('receivables.semester.index'),
+        'Bayar Piutang' => route('receivable-payments.index'),
+        'Laporan' => route('reports.index'),
+        'Users' => route('users.index'),
+        'Audit Log' => route('audit-logs.index'),
+        'Approval' => route('approvals.index'),
+        'Semester Transaksi' => route('semester-transactions.index'),
+        'Ops Health' => route('ops-health.index'),
+        'Pengaturan' => route('settings.edit'),
+    ];
+
+    $runRouteSet('Admin Menu', $adminRoutes, $admin);
+
+    if ($user !== null) {
+        $userRoutes = [
+            'Dashboard' => route('dashboard'),
+            'Supplier' => route('suppliers.index'),
+            'Transaksi Keluar' => route('outgoing-transactions.index'),
+            'Hutang Supplier' => route('supplier-payables.index'),
+            'Kartu Stok Supplier' => route('supplier-stock-cards.index'),
+            'Lokasi Kirim' => route('customer-ship-locations.index'),
+            'Sebar Sekolah' => route('school-bulk-transactions.index'),
+            'Faktur Penjualan' => route('sales-invoices.index'),
+            'Retur Penjualan' => route('sales-returns.index'),
+            'Surat Jalan' => route('delivery-notes.index'),
+            'Catatan Perjalanan' => route('delivery-trips.index'),
+            'Surat Pesanan' => route('order-notes.index'),
+            'Piutang' => route('receivables.index'),
+            'Piutang Global' => route('receivables.global.index'),
+            'Piutang Semester' => route('receivables.semester.index'),
+            'Bayar Piutang' => route('receivable-payments.index'),
+            'Laporan' => route('reports.index'),
+            'Pengaturan' => route('settings.edit'),
+        ];
+
+        $runRouteSet('User Menu', $userRoutes, $user);
+    } else {
+        $pushRow('User Menu', 'Role user', 'WARN', 'Tidak ada user role=user, route user dilewati.');
+    }
+
+    $documentRoutes = [];
+    if ($invoice = SalesInvoice::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Faktur'] = route('sales-invoices.show', $invoice);
+        $documentRoutes['Print Faktur'] = route('sales-invoices.print', $invoice);
+    }
+    if ($salesReturn = SalesReturn::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Retur'] = route('sales-returns.show', $salesReturn);
+        $documentRoutes['Print Retur'] = route('sales-returns.print', $salesReturn);
+    }
+    if ($deliveryNote = DeliveryNote::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Surat Jalan'] = route('delivery-notes.show', $deliveryNote);
+        $documentRoutes['Print Surat Jalan'] = route('delivery-notes.print', $deliveryNote);
+    }
+    if ($orderNote = OrderNote::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Surat Pesanan'] = route('order-notes.show', $orderNote);
+        $documentRoutes['Print Surat Pesanan'] = route('order-notes.print', $orderNote);
+    }
+    if ($deliveryTrip = DeliveryTrip::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Catatan Perjalanan'] = route('delivery-trips.show', $deliveryTrip);
+        $documentRoutes['Print Catatan Perjalanan'] = route('delivery-trips.print', $deliveryTrip);
+    }
+    if ($outgoing = OutgoingTransaction::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Transaksi Keluar'] = route('outgoing-transactions.show', $outgoing);
+        $documentRoutes['Print Transaksi Keluar'] = route('outgoing-transactions.print', $outgoing);
+    }
+    if ($receivablePayment = ReceivablePayment::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Bayar Piutang'] = route('receivable-payments.show', $receivablePayment);
+        $documentRoutes['Print Bayar Piutang'] = route('receivable-payments.print', $receivablePayment);
+    }
+    if ($supplierPayment = SupplierPayment::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Bayar Supplier'] = route('supplier-payables.show-payment', $supplierPayment);
+        $documentRoutes['Print Bayar Supplier'] = route('supplier-payables.print-payment', $supplierPayment);
+    }
+    if ($bulk = SchoolBulkTransaction::query()->orderBy('id')->first()) {
+        $documentRoutes['Detail Sebar Sekolah'] = route('school-bulk-transactions.show', $bulk);
+        $documentRoutes['Print Sebar Sekolah'] = route('school-bulk-transactions.print', $bulk);
+    }
+    if ($customer = Customer::query()->orderBy('id')->first()) {
+        $documentRoutes['Print Tagihan Customer'] = route('receivables.print-customer-bill', $customer);
+    }
+
+    if ($documentRoutes !== []) {
+        $runRouteSet('Document Routes', $documentRoutes, $admin);
+    } else {
+        $pushRow('Document Routes', 'Dokumen', 'WARN', 'Belum ada data dokumen untuk diuji.');
+    }
+
+    $reportRoutes = [
+        'Print Report Barang' => route('reports.print', ['dataset' => 'products']),
+        'Print Report Customer' => route('reports.print', ['dataset' => 'customers']),
+        'Print Report Faktur' => route('reports.print', ['dataset' => 'sales_invoices', 'semester' => 'S2-2526']),
+        'Print Report Piutang' => route('reports.print', ['dataset' => 'receivables', 'semester' => 'S2-2526']),
+        'Print Report Surat Jalan' => route('reports.print', ['dataset' => 'delivery_notes', 'semester' => 'S2-2526']),
+        'Print Report Surat Pesanan' => route('reports.print', ['dataset' => 'order_notes', 'semester' => 'S2-2526']),
+        'Print Report Transaksi Keluar' => route('reports.print', ['dataset' => 'outgoing_transactions', 'semester' => 'S2-2526']),
+    ];
+    $runRouteSet('Report Routes', $reportRoutes, $admin);
+
+    $lookupRoutes = [
+        'Lookup Supplier' => route('suppliers.lookup', ['search' => 'a']),
+        'Status Export Queue' => route('reports.queue.status'),
+    ];
+    if ($customer !== null) {
+        $lookupRoutes['Lookup Lokasi Kirim Customer'] = route('customer-ship-locations.lookup', [
+            'customer_id' => $customer->id,
+            'search' => 'a',
+        ]);
+        $lookupRoutes['Lookup Subjenis Cetak Customer'] = route('api.customers.printing-subtypes.index', $customer);
+    }
+    if ($orderNote !== null && $customer !== null) {
+        $lookupRoutes['Lookup Surat Pesanan Customer'] = route('api.order-notes.lookup', [
+            'customer_id' => $customer->id,
+            'search' => (string) $orderNote->note_number,
+        ]);
+    }
+    $runRouteSet('Lookup Routes', $lookupRoutes, $admin);
+
+    $actionRoutes = [];
+    if ($invoice !== null) {
+        $previewItems = SalesInvoice::query()
+            ->with('items:id,sales_invoice_id,product_id,quantity,unit_price,discount')
+            ->whereKey($invoice->id)
+            ->first()
+            ?->items
+            ->map(fn ($item): array => [
+                'product_id' => (int) ($item->product_id ?? 0),
+                'quantity' => (int) ($item->quantity ?? 0),
+                'unit_price' => (int) round((float) ($item->unit_price ?? 0)),
+                'discount' => (int) round((float) ($item->discount ?? 0)),
+            ])
+            ->values()
+            ->all() ?? [];
+
+        if ($previewItems !== []) {
+            $actionRoutes['Preview Koreksi Stok Faktur'] = [
+                'method' => 'POST',
+                'url' => route('transaction-corrections.preview-stock'),
+                'payload' => [
+                    'type' => 'sales_invoice',
+                    'subject_id' => (int) $invoice->id,
+                    'requested_patch_json' => json_encode(['items' => $previewItems], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ],
+            ];
+        }
+    }
+    if ($actionRoutes !== []) {
+        $runRouteSet('Action Routes', $actionRoutes, $admin);
+    } else {
+        $pushRow('Action Routes', 'Preview koreksi', 'WARN', 'Belum ada data invoice untuk preview POST aman.');
+    }
+
+    $this->table(['Group', 'Route', 'Status', 'Detail'], $rows);
+    $this->newLine();
+    $this->line('Warnings: '.$warnings);
+    $this->line('Failures: '.$failures);
+
+    return $failures === 0 ? 0 : 1;
+})->purpose('Run HTTP smoke checks for menu, document, and report routes without requiring PHPUnit on the server');
+
 Artisan::command('app:deploy-check {--skip-ops} {--full-suite}', function () {
     $failed = false;
 
@@ -1269,29 +1530,42 @@ Artisan::command('app:deploy-check {--skip-ops} {--full-suite}', function () {
         }
     }
 
-    $files = [
-        'tests/Feature/PageLoadSmokeTest.php',
-        'tests/Feature/DocumentOutputSmokeTest.php',
-        'tests/Feature/ReportOutputSmokeTest.php',
-    ];
+    $hasArtisanTest = array_key_exists('test', Artisan::all());
 
-    $args = [PHP_BINARY, base_path('artisan'), 'test', ...$files, '--stop-on-failure'];
-    if ((bool) $this->option('full-suite')) {
-        $args = [PHP_BINARY, base_path('artisan'), 'test', '--stop-on-failure'];
-    }
+    if ($hasArtisanTest) {
+        $files = [
+            'tests/Feature/PageLoadSmokeTest.php',
+            'tests/Feature/DocumentOutputSmokeTest.php',
+            'tests/Feature/ReportOutputSmokeTest.php',
+            'tests/Feature/ActionSmokeTest.php',
+        ];
 
-    $this->info('== artisan test ==');
-    $process = new Process($args, base_path(), [
-        'APP_ENV' => 'testing',
-    ]);
-    $process->setTimeout(null);
-    $process->run(function (string $type, string $buffer): void {
-        $this->output->write($buffer);
-    });
+        $args = [PHP_BINARY, base_path('artisan'), 'test', ...$files, '--stop-on-failure'];
+        if ((bool) $this->option('full-suite')) {
+            $args = [PHP_BINARY, base_path('artisan'), 'test', '--stop-on-failure'];
+        }
 
-    if (! $process->isSuccessful()) {
-        $failed = true;
-        $this->error('Smoke test halaman/dokumen gagal.');
+        $this->info('== artisan test ==');
+        $process = new Process($args, base_path(), [
+            'APP_ENV' => 'testing',
+        ]);
+        $process->setTimeout(null);
+        $process->run(function (string $type, string $buffer): void {
+            $this->output->write($buffer);
+        });
+
+        if (! $process->isSuccessful()) {
+            $failed = true;
+            $this->error('Smoke test halaman/dokumen gagal.');
+        }
+    } else {
+        $this->warn('Command "artisan test" tidak tersedia di server ini. Fallback ke app:http-smoke-test.');
+        $httpSmokeExitCode = Artisan::call('app:http-smoke-test');
+        $this->output->write(Artisan::output());
+        if ($httpSmokeExitCode !== 0) {
+            $failed = true;
+            $this->error('HTTP smoke test gagal.');
+        }
     }
 
     if ($failed) {

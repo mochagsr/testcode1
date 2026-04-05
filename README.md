@@ -118,10 +118,11 @@ Catatan:
 - Sinkronisasi ulang saldo customer/supplier jika integrity check anomali: `php artisan app:financial-rebuild`
 - Smoke test menu/sub-menu untuk cek `500 error` sebelum deploy:
   - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
+  - `php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure`
   - aman dijalankan di server karena memakai environment `testing` + SQLite in-memory
 - Deploy check sekali jalan:
   - `php artisan app:deploy-check`
-  - menjalankan `app:smoke-test` + smoke test halaman menu/sub-menu + dokumen detail/print/PDF/Excel + report print/PDF/Excel
+  - menjalankan `app:smoke-test` + smoke test halaman menu/sub-menu + dokumen detail/print/PDF/Excel + report print/PDF/Excel + lookup/preview action penting
   - untuk server yang sedang bermasalah di permission log/cache dan ingin cek halaman saja:
     - `php artisan app:deploy-check --skip-ops`
   - untuk menjalankan full test suite dari command yang sama:
