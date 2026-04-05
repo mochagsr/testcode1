@@ -31,7 +31,7 @@ Admin bertanggung jawab untuk:
 - melakukan koreksi bila perlu
 - mengelola hak akses user
 - menutup periode customer
-- menutup tahun supplier
+- menutup bulan supplier
 - memantau audit log
 - memantau backup dan `Ops Health`
 
@@ -283,6 +283,11 @@ Barang diterima dari supplier
 - cek dampak ke hutang supplier
 - gunakan koreksi jika ada selisih
 
+### Aturan supplier
+- `Tanda Terima Barang` sekarang harus memilih supplier dari master supplier
+- user tidak boleh menyimpan transaksi dengan nama supplier ketik bebas
+- kalau supplier belum ada, admin harus membuat data supplier dulu
+
 ### Contoh
 - supplier kirim `100`, user input `1000`
 - admin koreksi transaksi
@@ -518,19 +523,24 @@ Tanda Terima Barang dibuat
 -> Ledger hutang supplier bertambah
 -> Pembayaran supplier mengurangi hutang
 -> Admin cek mutasi + report
--> Jika final, tahun supplier bisa ditutup
+-> Jika final, bulan supplier bisa ditutup
 ```
 
 ### Tugas admin
 - cek mutasi hutang supplier
 - print report per supplier / tahun / bulan
 - bayar hutang supplier
-- tutup / buka tahun supplier
+- tutup / buka bulan supplier
+
+### Aturan supplier
+- pembayaran hutang supplier sekarang harus memilih supplier dari master supplier
+- supplier tidak boleh diketik bebas saat simpan pembayaran
+- kalau supplier belum ada, buat supplier dulu sebelum transaksi atau pembayaran
 
 ### Contoh
 - tahun `2026` sudah final
-- admin tutup tahun supplier
-- user tidak bisa tambah transaksi hutang baru di tahun itu
+- admin tutup bulan supplier
+- user tidak bisa tambah transaksi hutang baru di bulan itu
 
 ### Contoh hitungan hutang supplier
 
@@ -564,7 +574,7 @@ Kalau sesudah pembayaran saldo tidak cocok:
 1. cek transaksi `Tanda Terima Barang`
 2. cek semua pembayaran supplier terkait
 3. cek audit log
-4. cek apakah tahun supplier sedang terkunci atau sudah pernah dikoreksi
+4. cek apakah bulan supplier sedang terkunci atau sudah pernah dikoreksi
 
 ## 15. Kartu Stok Supplier
 
@@ -606,27 +616,27 @@ Mutasi piutang semester diperiksa
 - semester `S1 2526` customer `Angga` sudah final
 - admin tutup semester customer tersebut
 
-## 17. Lock tahun supplier
+## 17. Lock bulan supplier
 
-### Flow kontrol lock tahun supplier
+### Flow kontrol lock bulan supplier
 
 ```text
-Mutasi hutang supplier 1 tahun diperiksa
+Mutasi hutang supplier 1 bulan diperiksa
 -> Semua pembelian dan pembayaran dipastikan final
--> Admin tutup tahun supplier
--> User biasa tidak bisa input transaksi di tahun itu
--> Jika perlu revisi, admin buka tahun kembali
+-> Admin tutup bulan supplier
+-> User biasa tidak bisa input transaksi di bulan itu
+-> Jika perlu revisi, admin buka bulan kembali
 ```
 
 ### Kapan dilakukan
-- setelah pembelian dan pembayaran hutang supplier 1 tahun dianggap final
+- setelah pembelian dan pembayaran hutang supplier 1 bulan dianggap final
 
 ### Dampaknya
-- user biasa tidak bisa input transaksi hutang supplier untuk tahun itu
+- user biasa tidak bisa input transaksi hutang supplier untuk bulan itu
 
 ### Contoh
-- tahun `2026` supplier `CV Sinar` sudah final
-- admin tutup tahun supplier
+- bulan `Maret 2026` supplier `CV Sinar` sudah final
+- admin tutup bulan supplier
 
 ## 18. Audit log
 

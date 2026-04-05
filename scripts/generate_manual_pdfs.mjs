@@ -417,7 +417,7 @@ async function main() {
   await captureFirstOrderNoteDetail(admin, 'admin-order-notes.png', adminLogin || adminEmail, adminPassword);
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/receivables?customer_id=1&semester=S2-2526');
   await shot(admin, 'admin-receivables.png');
-  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/supplier-payables?supplier_id=1&year=2026');
+  await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/supplier-payables?supplier_id=1&year=2026&month=3');
   await shot(admin, 'admin-supplier-payables.png');
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/reports');
   await shot(admin, 'admin-reports.png');

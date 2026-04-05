@@ -45,7 +45,7 @@ Login bisa memakai username atau email.
 - Kelola hak akses user di menu `Pengguna`.
 - Koreksi transaksi sensitif lewat jalur resmi.
 - Tutup semester customer hanya setelah data diverifikasi.
-- Tutup tahun supplier dari menu `Hutang Supplier`.
+- Tutup bulan supplier dari menu `Hutang Supplier`.
 - Pantau `Ops Health`, `Audit Log`, dan backup secara rutin.
 
 ## Ringkasan cepat peran
@@ -59,5 +59,5 @@ Login bisa memakai username atau email.
 - review data
 - koreksi / cancel transaksi
 - lock semester customer
-- lock tahun supplier
+- lock bulan supplier
 - pantau audit, backup, dan kesehatan sistem

@@ -333,11 +333,17 @@ Maka yang perlu dicek:
 
 ### Yang diisi
 - tanggal transaksi
-- supplier
+- supplier terdaftar
 - barang
 - qty
 - harga
 - catatan
+
+### Aturan supplier
+- supplier harus dipilih dari data supplier yang sudah ada di master
+- user tidak boleh mengetik supplier bebas lalu langsung simpan transaksi
+- kalau supplier belum ada, buat data supplier dulu
+- setelah supplier terdaftar, baru buat `Tanda Terima Barang`
 
 ### Hasil transaksi
 - stok bertambah
@@ -643,6 +649,11 @@ Maka report fokus pada transaksi hutang supplier bulan itu saja.
 
 Di aplikasi ini, pembayaran hutang supplier dilakukan dari menu `Hutang Supplier`, lalu buat pembayaran supplier.
 
+Aturannya:
+- supplier harus dipilih dari supplier master yang sudah terdaftar
+- kalau supplier belum ada, buat data supplier dulu
+- pembayaran supplier tidak boleh disimpan dengan nama supplier ketik bebas
+
 Contoh:
 - hutang supplier saat ini = `Rp 300.000`
 - dibayar sekarang = `Rp 125.000`
@@ -828,7 +839,8 @@ Lakukan ini:
 - hubungi admin
 
 ### Tahun supplier terkunci
-- berarti hutang supplier untuk tahun itu ditutup
+- berarti hutang supplier untuk bulan tertentu ditutup oleh admin
+- user biasa tidak bisa input `Tanda Terima Barang` atau `Bayar Hutang Supplier` pada bulan itu
 - hubungi admin
 
 ## 19. Checklist user harian

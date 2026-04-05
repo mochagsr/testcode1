@@ -49,6 +49,19 @@ ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
   - qty yang terkirim di invoice itu
 - Informasi yang sama juga ikut ke print/PDF `Surat Pesanan`
 
+## Aturan supplier
+- `Tanda Terima Barang` harus memilih supplier dari master supplier
+- `Bayar Hutang Supplier` juga harus memilih supplier dari master supplier
+- supplier tidak boleh diketik bebas lalu langsung disimpan
+- kalau supplier belum ada:
+  - buat data supplier dulu
+  - baru input transaksi keluar atau pembayaran supplier
+- lock supplier sekarang per bulan
+  - admin bisa menutup atau membuka periode supplier per bulan
+  - saat bulan supplier ditutup, user biasa tidak bisa input:
+    - `Tanda Terima Barang`
+    - `Bayar Hutang Supplier`
+
 ## Quick start
 1. `composer install`
 2. `cp .env.example .env`
