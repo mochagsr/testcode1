@@ -1286,6 +1286,8 @@ Artisan::command('app:http-smoke-test', function () {
         $session = app('session')->driver();
         $session->start();
         Auth::guard()->setUser($actingUser);
+        $originalDebug = (bool) config('app.debug');
+        config(['app.debug' => true]);
 
         if (in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             $payload['_token'] = $session->token();
@@ -1301,9 +1303,14 @@ Artisan::command('app:http-smoke-test', function () {
             $response = $kernel->handle($request);
             $status = (int) $response->getStatusCode();
             $kernel->terminate($request, $response);
+            $responsePreview = trim(preg_replace('/\s+/', ' ', strip_tags((string) $response->getContent())) ?? '');
+            $detail = 'HTTP '.$status;
+            if ($status >= 500 && $responsePreview !== '') {
+                $detail .= ' - ' . mb_substr($responsePreview, 0, 180);
+            }
             return [
                 'ok' => $status >= 200 && $status < 300,
-                'detail' => 'HTTP '.$status,
+                'detail' => $detail,
             ];
         } catch (\Throwable $throwable) {
             return [
@@ -1311,6 +1318,7 @@ Artisan::command('app:http-smoke-test', function () {
                 'detail' => $throwable->getMessage(),
             ];
         } finally {
+            config(['app.debug' => $originalDebug]);
             Auth::guard()->logout();
         }
     };
