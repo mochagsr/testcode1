@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\Process\Process;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -1254,6 +1255,53 @@ Artisan::command('app:smoke-test', function () {
 
     return $failures === 0 ? 0 : 1;
 })->purpose('Run lightweight smoke test for deploy readiness and key operational checks');
+
+Artisan::command('app:deploy-check {--skip-ops} {--full-suite}', function () {
+    $failed = false;
+
+    if (! (bool) $this->option('skip-ops')) {
+        $this->info('== app:smoke-test ==');
+        $opsExitCode = Artisan::call('app:smoke-test');
+        $this->output->write(Artisan::output());
+        if ($opsExitCode !== 0) {
+            $failed = true;
+            $this->error('app:smoke-test mendeteksi FAIL.');
+        }
+    }
+
+    $files = [
+        'tests/Feature/PageLoadSmokeTest.php',
+        'tests/Feature/DocumentOutputSmokeTest.php',
+        'tests/Feature/ReportOutputSmokeTest.php',
+    ];
+
+    $args = [PHP_BINARY, base_path('artisan'), 'test', ...$files, '--stop-on-failure'];
+    if ((bool) $this->option('full-suite')) {
+        $args = [PHP_BINARY, base_path('artisan'), 'test', '--stop-on-failure'];
+    }
+
+    $this->info('== artisan test ==');
+    $process = new Process($args, base_path(), [
+        'APP_ENV' => 'testing',
+    ]);
+    $process->setTimeout(null);
+    $process->run(function (string $type, string $buffer): void {
+        $this->output->write($buffer);
+    });
+
+    if (! $process->isSuccessful()) {
+        $failed = true;
+        $this->error('Smoke test halaman/dokumen gagal.');
+    }
+
+    if ($failed) {
+        $this->error('Deploy check selesai dengan masalah. Periksa output di atas.');
+        return 1;
+    }
+
+    $this->info('Deploy check selesai tanpa FAIL.');
+    return 0;
+})->purpose('Run operational smoke test plus HTTP page/document/report smoke tests before or after deploy');
 
 Artisan::command('app:restore-document {type} {id}', function () {
     $type = strtolower(trim((string) $this->argument('type')));

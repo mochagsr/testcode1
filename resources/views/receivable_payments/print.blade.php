@@ -59,7 +59,6 @@
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
         $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
-        }
     @endphp
     @if(empty($isPdf))
         <div class="no-print" style="margin-bottom: 10px;">

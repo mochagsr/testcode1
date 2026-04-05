@@ -119,6 +119,13 @@ Catatan:
 - Smoke test menu/sub-menu untuk cek `500 error` sebelum deploy:
   - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
   - aman dijalankan di server karena memakai environment `testing` + SQLite in-memory
+- Deploy check sekali jalan:
+  - `php artisan app:deploy-check`
+  - menjalankan `app:smoke-test` + smoke test halaman menu/sub-menu + dokumen detail/print/PDF/Excel + report print/PDF/Excel
+  - untuk server yang sedang bermasalah di permission log/cache dan ingin cek halaman saja:
+    - `php artisan app:deploy-check --skip-ops`
+  - untuk menjalankan full test suite dari command yang sama:
+    - `php artisan app:deploy-check --full-suite`
 
 ## SOP
 - `docs/ops-runbook.md`

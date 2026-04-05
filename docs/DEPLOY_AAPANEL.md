@@ -973,6 +973,7 @@ php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
+php artisan app:deploy-check --skip-ops
 ```
 
 ### Env prod
@@ -985,6 +986,7 @@ php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
 php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
+php artisan app:deploy-check --skip-ops
 ```
 
 Catatan:
@@ -1001,6 +1003,17 @@ Catatan:
 - untuk cek cepat semua menu dan sub-menu utama dari sisi halaman, jalankan:
   - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
   - test ini aman dijalankan di server karena memakai environment `testing` dan SQLite in-memory, bukan database operasional
+- untuk cek sekali jalan setelah deploy, jalankan:
+  - `php artisan app:deploy-check`
+  - command ini menjalankan:
+    - `app:smoke-test`
+    - smoke test menu dan sub-menu
+    - smoke test halaman detail dokumen + print/PDF/Excel
+    - smoke test report print/PDF/Excel
+- jika server sedang ada masalah permission log/cache dan kamu hanya ingin cek halaman HTTP:
+  - `php artisan app:deploy-check --skip-ops`
+- jika ingin memaksa full suite:
+  - `php artisan app:deploy-check --full-suite`
 
 ## 17A. Contoh alur lengkap Opsi A
 
