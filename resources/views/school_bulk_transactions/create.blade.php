@@ -1006,7 +1006,7 @@
                 });
                 if (hasInvalidItemRows || hasInvalidProductLookup) {
                     event.preventDefault();
-                    alert(@json(__('school_bulk.fill_items')));
+                    alert(@json(hasInvalidProductLookup ? __('txn.fix_invalid_products') : __('school_bulk.fill_items')));
                 }
             });
 

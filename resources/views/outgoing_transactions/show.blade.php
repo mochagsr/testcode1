@@ -266,6 +266,23 @@
                     });
                 };
 
+                const setProductFieldError = (row, message = '') => {
+                    const hasMessage = String(message || '').trim() !== '';
+                    const input = row.querySelector('.admin-product-name');
+                    let error = row.querySelector('.admin-product-error');
+                    if (!error && input) {
+                        error = document.createElement('div');
+                        error.className = 'field-inline-error admin-product-error';
+                        error.style.display = 'block';
+                        error.style.marginTop = '4px';
+                        input.insertAdjacentElement('afterend', error);
+                    }
+                    if (error) {
+                        error.textContent = hasMessage ? message : '';
+                    }
+                    input?.classList.toggle('input-inline-error', hasMessage);
+                };
+
                 const bindRow = (row) => {
                     const idField = row.querySelector('.admin-product-id');
                     const nameField = row.querySelector('.admin-product-name');
@@ -276,10 +293,14 @@
                         const p = findProduct(nameField.value);
                         if (!p) {
                             idField.value = '';
+                            if (String(nameField.value || '').trim() !== '') {
+                                setProductFieldError(row, @js(__('txn.product_not_registered')));
+                            }
                             return;
                         }
                         idField.value = p.id;
                         nameField.value = p.name || '';
+                        setProductFieldError(row, '');
                         unitField.value = p.unit || '';
                         if (Number(costField.value || 0) <= 0) {
                             costField.value = Math.round(Number(p.price_general || 0));
@@ -297,7 +318,7 @@
                 const addRow = () => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"></td>
+                        <td><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"><div class="field-inline-error admin-product-error" style="display:block; margin-top:4px;"></div></td>
                         <td><input type="text" class="admin-unit"></td>
                         <td><input type="number" min="1" class="admin-qty w-xs" value="1" required></td>
                         <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" value=""></td>
@@ -313,6 +334,29 @@
                 [...body.querySelectorAll('tr')].forEach(bindRow);
                 reindex();
                 addBtn.addEventListener('click', addRow);
+                const form = document.getElementById('admin-outgoing-edit-form');
+                form?.addEventListener('submit', (event) => {
+                    const rows = [...body.querySelectorAll('tr')];
+                    if (rows.length === 0) {
+                        event.preventDefault();
+                        alert(@js(__('txn.add_item_first')));
+                        return;
+                    }
+                    const invalid = rows.some((row) => {
+                        const productId = row.querySelector('.admin-product-id')?.value;
+                        const qty = Number(row.querySelector('.admin-qty')?.value || 0);
+                        if (!productId) {
+                            setProductFieldError(row, @js(__('txn.product_not_registered')));
+                        } else {
+                            setProductFieldError(row, '');
+                        }
+                        return !productId || qty < 1;
+                    });
+                    if (invalid) {
+                        event.preventDefault();
+                        alert(@js(__('txn.fix_invalid_products')));
+                    }
+                });
             })();
         </script>
     @endif

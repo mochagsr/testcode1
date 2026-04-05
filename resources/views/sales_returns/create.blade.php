@@ -627,7 +627,7 @@
                     .some(input => !input.value);
                 if (missing || hasMissingProduct || !customerIdField.value) {
                     event.preventDefault();
-                    alert('{{ __('txn.select_customer') }} / {{ __('txn.select_product') }}');
+                    alert(@json(__('txn.select_customer_and_product')));
                 }
             });
         }

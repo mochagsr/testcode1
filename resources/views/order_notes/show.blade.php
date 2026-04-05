@@ -616,10 +616,28 @@
                     });
                 }
 
+                function setProductFieldError(row, message = '') {
+                    const hasMessage = String(message || '').trim() !== '';
+                    const input = row.querySelector('.admin-order-item-search');
+                    let error = row.querySelector('.admin-order-item-error');
+                    if (!error && input) {
+                        error = document.createElement('div');
+                        error.className = 'field-inline-error admin-order-item-error';
+                        error.style.display = 'block';
+                        error.style.marginTop = '4px';
+                        input.insertAdjacentElement('afterend', error);
+                    }
+                    if (error) {
+                        error.textContent = hasMessage ? message : '';
+                    }
+                    input?.classList.toggle('input-inline-error', hasMessage);
+                }
+
                 function bindRow(row) {
                     const searchInput = row.querySelector('.admin-order-item-search');
                     const productIdInput = row.querySelector('.admin-order-item-product-id');
                     const onSearchInput = debounce(async (event) => {
+                        setProductFieldError(row, '');
                         await fetchProductSuggestions(event.currentTarget);
                         const selected = findProductByLabel(event.currentTarget.value);
                         if (selected) {
@@ -636,10 +654,14 @@
                         const selected = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
                         if (!selected) {
                             productIdInput.value = '';
+                            if (String(event.currentTarget.value || '').trim() !== '') {
+                                setProductFieldError(row, @js(__('txn.product_not_registered')));
+                            }
                             return;
                         }
                         productIdInput.value = selected.id;
                         searchInput.value = productLabel(selected);
+                        setProductFieldError(row, '');
                     });
                     row.querySelector('.admin-remove-order-item')?.addEventListener('click', () => {
                         row.remove();
@@ -677,17 +699,22 @@
                     const rows = Array.from(tbody.querySelectorAll('tr'));
                     if (rows.length === 0) {
                         event.preventDefault();
-                        alert(@js(__('txn.no_data_found')));
+                        alert(@js(__('txn.add_item_first')));
                         return;
                     }
                     const invalid = rows.some((row) => {
-                        const productName = (row.querySelector('.admin-order-item-search')?.value || '').trim();
+                        const productId = row.querySelector('.admin-order-item-product-id')?.value;
                         const qty = Number(row.querySelector('.admin-order-item-qty')?.value || 0);
-                        return productName === '' || qty < 1;
+                        if (!productId) {
+                            setProductFieldError(row, @js(__('txn.product_not_registered')));
+                        } else {
+                            setProductFieldError(row, '');
+                        }
+                        return !productId || qty < 1;
                     });
                     if (invalid) {
                         event.preventDefault();
-                        alert(@js(__('txn.select_product')));
+                        alert(@js(__('txn.fix_invalid_products')));
                     }
                 });
         })();

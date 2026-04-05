@@ -845,7 +845,7 @@
                     if (!customerIdField.value && customerSearch?.value) {
                         setCustomerFieldError(@json(__('txn.customer_not_registered')));
                     }
-                    alert('{{ __('txn.select_customer') }} / {{ __('txn.select_product') }}');
+                    alert(@json(__('txn.select_customer_and_product')));
                     return;
                 }
                 isSubmitting = true;

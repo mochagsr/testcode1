@@ -437,6 +437,23 @@
                     }
                 }
 
+                function setProductFieldError(row, message = '') {
+                    const hasMessage = String(message || '').trim() !== '';
+                    const input = row.querySelector('.admin-return-item-product-search');
+                    let error = row.querySelector('.admin-return-item-product-error');
+                    if (!error && input) {
+                        error = document.createElement('div');
+                        error.className = 'field-inline-error admin-return-item-product-error';
+                        error.style.display = 'block';
+                        error.style.marginTop = '4px';
+                        input.insertAdjacentElement('afterend', error);
+                    }
+                    if (error) {
+                        error.textContent = hasMessage ? message : '';
+                    }
+                    input?.classList.toggle('input-inline-error', hasMessage);
+                }
+
                 function bindRow(row) {
                     row.querySelectorAll('.admin-return-item-qty, .admin-return-item-price').forEach((input) => {
                         input.addEventListener('input', () => recalcRow(row));
@@ -444,6 +461,7 @@
                     const searchInput = row.querySelector('.admin-return-item-product-search');
                     const productIdInput = row.querySelector('.admin-return-item-product');
                     const onSearchInput = debounce(async (event) => {
+                        setProductFieldError(row, '');
                         await fetchProductSuggestions(event.currentTarget);
                         const selected = findProductByLabel(event.currentTarget.value);
                         if (!selected) {
@@ -460,10 +478,14 @@
                         const selected = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
                         if (!selected) {
                             productIdInput.value = '';
+                            if (String(event.currentTarget.value || '').trim() !== '') {
+                                setProductFieldError(row, @js(__('txn.product_not_registered')));
+                            }
                             return;
                         }
                         productIdInput.value = selected.id;
                         searchInput.value = productLabel(selected);
+                        setProductFieldError(row, '');
                         const priceInput = row.querySelector('.admin-return-item-price');
                         if (selected && priceInput && Number(priceInput.value || 0) <= 0) {
                             priceInput.value = selected.price_general || 0;
@@ -510,18 +532,23 @@
                     const rows = Array.from(tbody.querySelectorAll('tr'));
                     if (rows.length === 0) {
                         event.preventDefault();
-                        alert(@js(__('txn.no_data_found')));
+                        alert(@js(__('txn.add_item_first')));
                         return;
                     }
                     const invalid = rows.some((row) => {
                         const productId = row.querySelector('.admin-return-item-product')?.value;
                         const qty = Number(row.querySelector('.admin-return-item-qty')?.value || 0);
                         const price = Number(row.querySelector('.admin-return-item-price')?.value || 0);
+                        if (!productId) {
+                            setProductFieldError(row, @js(__('txn.product_not_registered')));
+                        } else {
+                            setProductFieldError(row, '');
+                        }
                         return !productId || qty < 1 || price < 0;
                     });
                     if (invalid) {
                         event.preventDefault();
-                        alert(@js(__('txn.select_product')));
+                        alert(@js(__('txn.fix_invalid_products')));
                     }
                 });
         })();

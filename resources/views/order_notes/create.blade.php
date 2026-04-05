@@ -516,6 +516,7 @@
         }
 
         form?.addEventListener('submit', async (event) => {
+            let shouldAlert = false;
             if (!customerIdField.value && customerSearch?.value) {
                 const customer = await resolveCustomerFromInput(customerSearch.value);
                 applyCustomerFields(customer);
@@ -543,6 +544,7 @@
                         setProductFieldError(row, @json(__('txn.product_not_registered')));
                     }
                     hasMissingProduct = true;
+                    shouldAlert = true;
                     continue;
                 }
                 productIdField.value = product.id;
@@ -552,6 +554,9 @@
 
             if (hasMissingProduct) {
                 event.preventDefault();
+                if (shouldAlert) {
+                    alert(@json(__('txn.fix_invalid_products')));
+                }
             }
         });
 

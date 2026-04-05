@@ -952,7 +952,7 @@
                         || cost < 0;
                 });
                 if (!hasSupplier || !hasRows || invalidRows || hasInvalidProduct) {
-                    alert('{{ __('txn.select_supplier') }} / {{ __('txn.outgoing_items_required') }}');
+                    alert(@json(hasInvalidProduct ? __('txn.fix_invalid_products') : __('txn.select_supplier_and_product')));
                     if (!hasSupplier) {
                         setSupplierFieldError(@json(__('txn.supplier_not_registered')));
                         supplierSearch.focus();
