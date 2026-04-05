@@ -49,6 +49,15 @@ ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
   - qty yang terkirim di invoice itu
 - Informasi yang sama juga ikut ke print/PDF `Surat Pesanan`
 
+## Contoh pesan error yang ramah user
+- kalau nama customer diketik tetapi tidak dipilih dari daftar:
+  - `Customer tidak terdaftar.`
+- kalau nama barang diketik tetapi tidak dipilih dari daftar:
+  - `Barang tidak terdaftar.`
+- contoh screenshot dan penjelasan lengkapnya sudah dimasukkan ke:
+  - `docs/USER_TRANSACTION_GUIDE.md`
+  - `docs/ADMIN_TRANSACTION_GUIDE.md`
+
 ## Aturan supplier
 - `Tanda Terima Barang` harus memilih supplier dari master supplier
 - `Bayar Hutang Supplier` juga harus memilih supplier dari master supplier

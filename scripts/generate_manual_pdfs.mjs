@@ -85,6 +85,56 @@ async function captureFirstOrderNoteDetail(page, fileName, loginIdentifier, pass
   await shot(page, fileName);
 }
 
+async function captureInvoiceValidationExamples(page, prefix, loginIdentifier, password) {
+  await ensureLoggedIn(page, loginIdentifier, password, '/sales-invoices/create');
+
+  const customerInput = page.locator('#customer-search');
+  const invoiceDateInput = page.locator('#invoice-date');
+
+  await customerInput.fill('Anto Tidak Ada');
+  await invoiceDateInput.click();
+  await waitForUi(page);
+  await shot(page, `${prefix}-customer-error.png`);
+
+  await ensureLoggedIn(page, loginIdentifier, password, '/sales-invoices/create');
+  await page.evaluate(() => {
+    if (typeof customers === 'undefined' || !Array.isArray(customers) || customers.length === 0) {
+      return;
+    }
+    const selected = customers[0];
+    const customerSearch = document.getElementById('customer-search');
+    const customerId = document.getElementById('customer-id');
+    const customerError = document.getElementById('customer-search-error');
+    if (customerSearch) {
+      customerSearch.value = `${selected.name} (${selected.city || '-'})`;
+    }
+    if (customerId) {
+      customerId.value = String(selected.id);
+    }
+    if (customerError) {
+      customerError.textContent = '';
+      customerError.style.display = '';
+    }
+  });
+  await waitForUi(page);
+
+  let itemRows = await page.locator('#items-table tbody tr').count().catch(() => 0);
+  if (itemRows === 0) {
+    await page.click('#add-item');
+    await waitForUi(page);
+    itemRows = await page.locator('#items-table tbody tr').count().catch(() => 0);
+  }
+
+  if (itemRows > 0) {
+    const firstProductInput = page.locator('#items-table tbody tr').first().locator('.product-search');
+    const firstQtyInput = page.locator('#items-table tbody tr').first().locator('.qty');
+    await firstProductInput.fill('Barang Tidak Ada');
+    await firstQtyInput.click();
+    await waitForUi(page);
+    await shot(page, `${prefix}-product-error.png`);
+  }
+}
+
 function wrapHtml(title, bodyHtml) {
   return `<!doctype html>
 <html lang="id">
@@ -429,6 +479,7 @@ async function main() {
   await shot(admin, 'admin-ops-health.png');
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/settings');
   await shot(admin, 'admin-settings.png');
+  await captureInvoiceValidationExamples(admin, 'admin-validation', adminLogin || adminEmail, adminPassword);
 
   const userContext = await browser.newContext({ viewport: { width: 1600, height: 980 } });
   const user = await userContext.newPage();
@@ -456,6 +507,7 @@ async function main() {
   await user.goto(`${baseUrl}/settings`, { waitUntil: 'domcontentloaded' });
   await waitForUi(user);
   await shot(user, 'user-settings.png');
+  await captureInvoiceValidationExamples(user, 'user-validation', userLogin || userEmail, userPassword);
 
   await renderPdf(browser, 'USER_TRANSACTION_GUIDE.md', 'USER_TRANSACTION_GUIDE.pdf', 'Panduan User - Semua Jenis Transaksi');
   await renderPdf(browser, 'ADMIN_TRANSACTION_GUIDE.md', 'ADMIN_TRANSACTION_GUIDE.pdf', 'Panduan Admin - Semua Jenis Transaksi');

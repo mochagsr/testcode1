@@ -28,6 +28,25 @@ Login bisa memakai:
 - Jika muncul status semester / tahun terkunci, jangan dipaksa. Itu berarti periode tersebut memang sedang dikunci.
 - Untuk print dan export, gunakan tombol yang sudah tersedia di halaman masing-masing.
 
+### Contoh error yang perlu dipahami user
+
+Kalau user mengetik nama sendiri tanpa memilih dari daftar master, sistem sekarang akan memberi peringatan langsung di form.
+
+Contoh:
+- jika nama customer tidak ada di daftar:
+  - muncul pesan `Customer tidak terdaftar.`
+- jika nama barang tidak ada di daftar:
+  - muncul pesan `Barang tidak terdaftar.`
+
+Arti pesan ini:
+- data belum dipilih dari daftar master
+- user perlu memilih customer atau barang yang memang sudah terdaftar
+- kalau datanya memang belum ada, minta admin atau user yang berwenang untuk membuat data master dulu
+
+![Contoh Error Customer Tidak Terdaftar](assets/manuals/user-validation-customer-error.png)
+
+![Contoh Error Barang Tidak Terdaftar](assets/manuals/user-validation-product-error.png)
+
 ## 2. Faktur Penjualan
 
 ![Faktur Penjualan User](assets/manuals/user-sales-invoices.png)

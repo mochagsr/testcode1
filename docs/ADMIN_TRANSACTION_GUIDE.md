@@ -50,6 +50,27 @@ Admin bertanggung jawab untuk:
 - approve / review koreksi
 - pantau kesehatan aplikasi
 
+## 2A. Contoh error input yang perlu dikenali admin
+
+Di form transaksi, sistem sekarang menampilkan error langsung yang lebih ramah untuk user awam. Admin perlu mengenali pesan ini supaya bisa cepat menjelaskan penyebabnya.
+
+Contoh pesan:
+- `Customer tidak terdaftar.`
+  - artinya user mengetik nama customer, tetapi tidak memilih customer yang benar dari daftar master
+- `Barang tidak terdaftar.`
+  - artinya user mengetik nama barang, tetapi tidak memilih barang yang benar dari daftar master
+
+Tindakan admin:
+- minta user memilih data dari daftar, bukan mengetik bebas lalu langsung pindah
+- kalau data memang belum ada:
+  - buat master customer dulu
+  - atau buat master barang dulu
+- setelah data master tersedia, user bisa ulangi input transaksi
+
+![Contoh Error Customer Tidak Terdaftar - Admin](assets/manuals/admin-validation-customer-error.png)
+
+![Contoh Error Barang Tidak Terdaftar - Admin](assets/manuals/admin-validation-product-error.png)
+
 ## 3. Faktur Penjualan
 
 ![Faktur Penjualan Admin](assets/manuals/admin-sales-invoices.png)
