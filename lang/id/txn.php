@@ -161,6 +161,7 @@ return [
     'select_customer' => 'Pilih customer',
     'customer_not_registered' => 'Customer tidak terdaftar.',
     'select_supplier' => 'Pilih supplier',
+    'supplier_not_registered' => 'Supplier tidak terdaftar.',
     'select_product' => 'Pilih barang',
     'select_order_note' => 'Pilih surat pesanan',
     'order_note_pick_customer_first' => 'Pilih customer terlebih dulu untuk melihat surat pesanan.',

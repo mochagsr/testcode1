@@ -16,7 +16,10 @@
                         <p class="form-section-note">{{ __('txn.outgoing_header_note') }}</p>
                         <div class="row">
                             <div class="col-12">
-                                <label>{{ __('txn.supplier') }} <span class="label-required">*</span></label>
+                                <label class="label-with-feedback">
+                                    <span>{{ __('txn.supplier') }} <span class="label-required">*</span></span>
+                                    <span class="field-inline-error" id="supplier-search-error"></span>
+                                </label>
                                 @php
                                     $suppliersById = $suppliers->keyBy('id');
                                     $oldSupplierId = old('supplier_id');
@@ -161,6 +164,7 @@
             const supplierSearch = document.getElementById('supplier-search');
             const suppliersList = document.getElementById('suppliers-list');
             const supplierIdField = document.getElementById('supplier-id');
+            const supplierSearchError = document.getElementById('supplier-search-error');
             const transactionDateInput = document.getElementById('transaction-date');
             const semesterPeriodSelect = document.getElementById('semester-period');
             const form = document.querySelector('form');
@@ -609,6 +613,14 @@
                 });
             }
 
+            function setSupplierFieldError(message = '') {
+                const hasMessage = String(message || '').trim() !== '';
+                if (supplierSearchError) {
+                    supplierSearchError.textContent = hasMessage ? message : '';
+                }
+                supplierSearch?.classList.toggle('input-inline-error', hasMessage);
+            }
+
             function setProductFieldError(row, message = '') {
                 const hasMessage = String(message || '').trim() !== '';
                 const input = row?.querySelector('.product-search');
@@ -822,6 +834,7 @@
             }
 
             const onSupplierInput = debounce(async () => {
+                setSupplierFieldError('');
                 await fetchSupplierSuggestions(supplierSearch.value);
                 const supplier = findSupplierByLabel(supplierSearch.value);
                 supplierIdField.value = supplier ? supplier.id : '';
@@ -837,8 +850,32 @@
                 supplierIdField.value = supplier ? supplier.id : '';
                 if (supplier) {
                     supplierSearch.value = supplierLabel(supplier);
+                    setSupplierFieldError('');
+                } else if (String(supplierSearch.value || '').trim() !== '') {
+                    setSupplierFieldError(@json(__('txn.supplier_not_registered')));
+                } else {
+                    setSupplierFieldError('');
                 }
                 updateSupplierPreview(supplier);
+            });
+            supplierSearch.addEventListener('blur', async () => {
+                const value = String(supplierSearch.value || '').trim();
+                if (value === '') {
+                    supplierIdField.value = '';
+                    updateSupplierPreview(null);
+                    setSupplierFieldError('');
+                    return;
+                }
+                const supplier = await resolveSupplierFromInput(value);
+                supplierIdField.value = supplier ? supplier.id : '';
+                if (supplier) {
+                    supplierSearch.value = supplierLabel(supplier);
+                    updateSupplierPreview(supplier);
+                    setSupplierFieldError('');
+                } else {
+                    updateSupplierPreview(null);
+                    setSupplierFieldError(@json(__('txn.supplier_not_registered')));
+                }
             });
 
             categoryModalClose?.addEventListener('click', () => {
@@ -869,7 +906,10 @@
                         supplierIdField.value = supplier.id;
                         supplierSearch.value = supplierLabel(supplier);
                         updateSupplierPreview(supplier);
+                        setSupplierFieldError('');
                         hasSupplier = true;
+                    } else if (String(supplierSearch.value || '').trim() !== '') {
+                        setSupplierFieldError(@json(__('txn.supplier_not_registered')));
                     }
                 }
 
@@ -914,6 +954,7 @@
                 if (!hasSupplier || !hasRows || invalidRows || hasInvalidProduct) {
                     alert('{{ __('txn.select_supplier') }} / {{ __('txn.outgoing_items_required') }}');
                     if (!hasSupplier) {
+                        setSupplierFieldError(@json(__('txn.supplier_not_registered')));
                         supplierSearch.focus();
                     }
                     return;
@@ -931,6 +972,7 @@
             renderSupplierSuggestions('');
             renderProductSuggestions('');
             updateSupplierPreview(initialSupplier);
+            setSupplierFieldError('');
             addButton.addEventListener('click', () => addRow());
             if (Array.isArray(oldItems) && oldItems.length > 0) {
                 oldItems.forEach((item) => {

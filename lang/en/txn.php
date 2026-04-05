@@ -161,6 +161,7 @@ return [
     'select_customer' => 'Select customer',
     'customer_not_registered' => 'Customer is not registered.',
     'select_supplier' => 'Select supplier',
+    'supplier_not_registered' => 'Supplier is not registered.',
     'select_product' => 'Select product',
     'select_order_note' => 'Select order note',
     'order_note_pick_customer_first' => 'Select a customer first to view available order notes.',

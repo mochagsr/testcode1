@@ -16,7 +16,10 @@
             @endphp
             <div class="row inline">
                 <div class="col-4">
-                    <label>{{ __('txn.supplier') }}</label>
+                    <label class="label-with-feedback">
+                        <span>{{ __('txn.supplier') }}</span>
+                        <span class="field-inline-error" id="supplier-search-error"></span>
+                    </label>
                     <input type="text" id="supplier-search" list="suppliers-list" value="{{ $oldSupplierLabel }}" placeholder="{{ __('txn.select_supplier') }}" required>
                     <input type="hidden" id="supplier-id" name="supplier_id" value="{{ $oldSupplierId > 0 ? $oldSupplierId : '' }}" required>
                     <datalist id="suppliers-list">
@@ -64,6 +67,7 @@
             const supplierSearch = document.getElementById('supplier-search');
             const supplierIdField = document.getElementById('supplier-id');
             const suppliersList = document.getElementById('suppliers-list');
+            const supplierSearchError = document.getElementById('supplier-search-error');
             const SUPPLIER_LOOKUP_URL = @json(route('suppliers.lookup'));
             const LOOKUP_LIMIT = 20;
             let suppliers = @json($suppliers);
@@ -190,7 +194,16 @@
                 return findSupplierByLabel(trimmed) || findSupplierLoose(trimmed);
             }
 
+            function setSupplierFieldError(message = '') {
+                const hasMessage = String(message || '').trim() !== '';
+                if (supplierSearchError) {
+                    supplierSearchError.textContent = hasMessage ? message : '';
+                }
+                supplierSearch?.classList.toggle('input-inline-error', hasMessage);
+            }
+
             const onSupplierInput = debounce(async () => {
+                setSupplierFieldError('');
                 await fetchSupplierSuggestions(supplierSearch.value);
                 const supplier = findSupplierByLabel(supplierSearch.value);
                 supplierIdField.value = supplier ? supplier.id : '';
@@ -206,6 +219,27 @@
                 supplierIdField.value = supplier ? supplier.id : '';
                 if (supplier) {
                     supplierSearch.value = supplierLabel(supplier);
+                    setSupplierFieldError('');
+                } else if (String(supplierSearch.value || '').trim() !== '') {
+                    setSupplierFieldError(@json(__('txn.supplier_not_registered')));
+                } else {
+                    setSupplierFieldError('');
+                }
+            });
+            supplierSearch.addEventListener('blur', async () => {
+                const value = String(supplierSearch.value || '').trim();
+                if (value === '') {
+                    supplierIdField.value = '';
+                    setSupplierFieldError('');
+                    return;
+                }
+                const supplier = await resolveSupplierFromInput(value);
+                supplierIdField.value = supplier ? supplier.id : '';
+                if (supplier) {
+                    supplierSearch.value = supplierLabel(supplier);
+                    setSupplierFieldError('');
+                } else {
+                    setSupplierFieldError(@json(__('txn.supplier_not_registered')));
                 }
             });
 
@@ -219,13 +253,14 @@
                 if (supplierId === '') {
                     const supplier = await resolveSupplierFromInput(supplierSearch.value);
                     if (!supplier) {
-                        alert(@json(__('txn.select_supplier')));
+                        setSupplierFieldError(@json(__('txn.supplier_not_registered')));
                         supplierSearch.focus();
                         return;
                     }
                     supplierId = String(supplier.id);
                     supplierIdField.value = supplierId;
                     supplierSearch.value = supplierLabel(supplier);
+                    setSupplierFieldError('');
                 }
 
                 isSubmitting = true;
