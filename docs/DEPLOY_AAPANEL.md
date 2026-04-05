@@ -972,6 +972,7 @@ php artisan app:db-restore-test
 php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
+php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
 ```
 
 ### Env prod
@@ -983,6 +984,7 @@ php artisan app:db-restore-test
 php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
+php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
 ```
 
 Catatan:
@@ -996,6 +998,9 @@ Catatan:
   - lalu ulangi `php artisan app:integrity-check`
   - dan tutup dengan `php artisan app:smoke-test`
 - untuk mengisi `PERFORMANCE_PROBE`, pakai `app:load-test-light`, bukan `app:query-profile`
+- untuk cek cepat semua menu dan sub-menu utama dari sisi halaman, jalankan:
+  - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
+  - test ini aman dijalankan di server karena memakai environment `testing` dan SQLite in-memory, bukan database operasional
 
 ## 17A. Contoh alur lengkap Opsi A
 

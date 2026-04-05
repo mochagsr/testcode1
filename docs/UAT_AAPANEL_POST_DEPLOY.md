@@ -35,6 +35,7 @@ Gunakan salah satu:
 - `Ops Health` menampilkan environment dan DB yang benar.
 - `Debug Mode` harus `OFF`.
 - Jalankan `php artisan app:smoke-test` dan pastikan tidak ada status `FAIL`.
+- Jalankan `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure` untuk memastikan menu dan sub-menu utama tidak mengembalikan `500 error`.
 - Di aaPanel, cek juga:
   - site aktif di `Website`
   - `PHP 8.3` aktif
@@ -70,7 +71,7 @@ Gunakan salah satu:
 - Print/PDF/Excel report.
 - Buka `Kartu Stok Supplier`.
 - Print/PDF/Excel report.
-- Uji `Tutup Tahun` supplier.
+- Uji `Tutup Bulan` supplier.
 
 ## 7. Locking
 - Coba `Tutup Semester` global di `Pengaturan`.
@@ -106,6 +107,7 @@ Gunakan salah satu:
 ```bash
 cd /www/wwwroot/pgpos-tes
 php artisan app:smoke-test
+php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:integrity-check

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerLevel;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\ReceivableLedger;
@@ -15,21 +16,142 @@ class PageLoadSmokeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_main_pages_load_without_server_error_for_admin(): void
+    public function test_admin_menu_and_create_pages_load_without_server_error(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',
             'permissions' => ['*'],
         ]);
 
+        $this->seedSmokeData();
+
+        foreach ($this->adminRoutes() as $url) {
+            $response = $this->actingAs($admin)->get($url);
+            $response->assertOk("Failed asserting GET {$url} returns 200 for admin.");
+        }
+    }
+
+    public function test_user_menu_and_create_pages_load_without_server_error(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => config('rbac.roles.user', []),
+        ]);
+
+        $this->seedSmokeData();
+
+        foreach ($this->userRoutes() as $url) {
+            $response = $this->actingAs($user)->get($url);
+            $response->assertOk("Failed asserting GET {$url} returns 200 for user.");
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function adminRoutes(): array
+    {
+        return [
+            route('dashboard'),
+            route('item-categories.index'),
+            route('item-categories.create'),
+            route('products.index'),
+            route('products.create'),
+            route('customer-levels-web.index'),
+            route('customer-levels-web.create'),
+            route('customers-web.index'),
+            route('customers-web.create'),
+            route('suppliers.index'),
+            route('suppliers.create'),
+            route('outgoing-transactions.index'),
+            route('outgoing-transactions.create'),
+            route('supplier-payables.index'),
+            route('supplier-payables.create'),
+            route('supplier-stock-cards.index'),
+            route('customer-ship-locations.index'),
+            route('customer-ship-locations.create'),
+            route('school-bulk-transactions.index'),
+            route('school-bulk-transactions.create'),
+            route('sales-invoices.index'),
+            route('sales-invoices.create'),
+            route('sales-returns.index'),
+            route('sales-returns.create'),
+            route('delivery-notes.index'),
+            route('delivery-notes.create'),
+            route('delivery-trips.index'),
+            route('delivery-trips.create'),
+            route('order-notes.index'),
+            route('order-notes.create'),
+            route('receivables.index'),
+            route('receivables.global.index'),
+            route('receivables.semester.index'),
+            route('receivable-payments.index'),
+            route('receivable-payments.create'),
+            route('reports.index'),
+            route('users.index'),
+            route('users.create'),
+            route('audit-logs.index'),
+            route('approvals.index'),
+            route('semester-transactions.index'),
+            route('ops-health.index'),
+            route('settings.edit'),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function userRoutes(): array
+    {
+        return [
+            route('dashboard'),
+            route('suppliers.index'),
+            route('outgoing-transactions.index'),
+            route('outgoing-transactions.create'),
+            route('supplier-payables.index'),
+            route('supplier-payables.create'),
+            route('supplier-stock-cards.index'),
+            route('customer-ship-locations.index'),
+            route('customer-ship-locations.create'),
+            route('school-bulk-transactions.index'),
+            route('school-bulk-transactions.create'),
+            route('sales-invoices.index'),
+            route('sales-invoices.create'),
+            route('sales-returns.index'),
+            route('sales-returns.create'),
+            route('delivery-notes.index'),
+            route('delivery-notes.create'),
+            route('delivery-trips.index'),
+            route('delivery-trips.create'),
+            route('order-notes.index'),
+            route('order-notes.create'),
+            route('receivables.index'),
+            route('receivables.global.index'),
+            route('receivables.semester.index'),
+            route('receivable-payments.index'),
+            route('receivable-payments.create'),
+            route('reports.index'),
+            route('settings.edit'),
+        ];
+    }
+
+    private function seedSmokeData(): void
+    {
+        $level = CustomerLevel::query()->create([
+            'code' => 'LV-SMOKE',
+            'name' => 'Level Smoke',
+        ]);
+
         $customer = Customer::query()->create([
             'code' => 'CUST-SMOKE-001',
+            'customer_level_id' => $level->id,
             'name' => 'Customer Smoke',
+            'phone' => '081234567890',
             'city' => 'Malang',
             'address' => 'Jl. Smoke Test',
         ]);
 
-        $supplier = Supplier::query()->create([
+        Supplier::query()->create([
             'name' => 'Supplier Smoke',
             'company_name' => 'PT Smoke',
             'phone' => '081234567890',
@@ -60,41 +182,5 @@ class PageLoadSmokeTest extends TestCase
             'balance_after' => 15000,
             'period_code' => 'S2-2526',
         ]);
-
-        $routes = [
-            route('dashboard'),
-            route('customers-web.index'),
-            route('customers-web.create'),
-            route('suppliers.index'),
-            route('sales-invoices.index'),
-            route('sales-invoices.create'),
-            route('sales-returns.index'),
-            route('sales-returns.create'),
-            route('delivery-notes.index'),
-            route('delivery-notes.create'),
-            route('order-notes.index'),
-            route('order-notes.create'),
-            route('outgoing-transactions.index'),
-            route('outgoing-transactions.create'),
-            route('school-bulk-transactions.index'),
-            route('school-bulk-transactions.create'),
-            route('receivables.index'),
-            route('receivables.global.index'),
-            route('receivables.semester.index'),
-            route('receivable-payments.index'),
-            route('receivable-payments.create'),
-            route('supplier-payables.index'),
-            route('supplier-payables.create'),
-            route('reports.index'),
-            route('audit-logs.index'),
-            route('ops-health.index'),
-            route('settings.edit'),
-            route('users.index'),
-        ];
-
-        foreach ($routes as $url) {
-            $response = $this->actingAs($admin)->get($url);
-            $response->assertOk("Failed asserting GET {$url} returns 200.");
-        }
     }
 }

@@ -116,6 +116,9 @@ Catatan:
 - Profiling query plan manual: `php artisan app:query-profile`
 - Performance probe / load test ringan: `php artisan app:load-test-light --loops=50`
 - Sinkronisasi ulang saldo customer/supplier jika integrity check anomali: `php artisan app:financial-rebuild`
+- Smoke test menu/sub-menu untuk cek `500 error` sebelum deploy:
+  - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
+  - aman dijalankan di server karena memakai environment `testing` + SQLite in-memory
 
 ## SOP
 - `docs/ops-runbook.md`
