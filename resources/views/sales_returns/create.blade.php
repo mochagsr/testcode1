@@ -334,6 +334,16 @@
             customerSearch?.classList.toggle('input-inline-error', hasMessage);
         }
 
+        function setProductFieldError(row, message = '') {
+            const hasMessage = String(message || '').trim() !== '';
+            const input = row?.querySelector('.product-search');
+            const error = row?.querySelector('.product-search-error');
+            if (error) {
+                error.textContent = hasMessage ? message : '';
+            }
+            input?.classList.toggle('input-inline-error', hasMessage);
+        }
+
         function setCurrentCustomer(customer) {
             currentCustomer = customer;
             customerIdField.value = customer ? customer.id : '';
@@ -457,6 +467,7 @@
                 <td>
                     <input type="text" class="product-search" list="products-list" placeholder="{{ __('txn.select_product') }}" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
+                    <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
                 <td class="stock">-</td>
                 <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required style="max-width: 88px;"></td>
@@ -467,6 +478,7 @@
             tbody.appendChild(tr);
 
             const onProductInput = debounce(async (event) => {
+                setProductFieldError(tr, '');
                 await fetchProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
@@ -481,6 +493,29 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.product-search').value = productLabel(product);
+                    setProductFieldError(tr, '');
+                } else if (String(event.currentTarget.value || '').trim() !== '') {
+                    setProductFieldError(tr, @json(__('txn.product_not_registered')));
+                } else {
+                    setProductFieldError(tr, '');
+                }
+                updateRowMeta(tr, product);
+            });
+            tr.querySelector('.product-search').addEventListener('blur', async (event) => {
+                const value = String(event.currentTarget.value || '').trim();
+                if (value === '') {
+                    tr.querySelector('.product-id').value = '';
+                    setProductFieldError(tr, '');
+                    updateRowMeta(tr, null);
+                    return;
+                }
+                const product = await resolveProductFromInput(value);
+                tr.querySelector('.product-id').value = product ? product.id : '';
+                if (product) {
+                    tr.querySelector('.product-search').value = productLabel(product);
+                    setProductFieldError(tr, '');
+                } else {
+                    setProductFieldError(tr, @json(__('txn.product_not_registered')));
                 }
                 updateRowMeta(tr, product);
             });
@@ -568,9 +603,29 @@
                         setCustomerFieldError(@json(__('txn.customer_not_registered')));
                     }
                 }
+                let hasMissingProduct = false;
+                for (const row of Array.from(tbody.querySelectorAll('tr'))) {
+                    const productIdField = row.querySelector('.product-id');
+                    const productSearchField = row.querySelector('.product-search');
+                    if (!productIdField || !productSearchField || String(productIdField.value || '').trim() !== '') {
+                        continue;
+                    }
+                    const product = await resolveProductFromInput(productSearchField.value || '');
+                    if (!product) {
+                        if (String(productSearchField.value || '').trim() !== '') {
+                            setProductFieldError(row, @json(__('txn.product_not_registered')));
+                        }
+                        hasMissingProduct = true;
+                        continue;
+                    }
+                    productIdField.value = product.id;
+                    productSearchField.value = productLabel(product);
+                    setProductFieldError(row, '');
+                    updateRowMeta(row, product);
+                }
                 const missing = Array.from(document.querySelectorAll('.product-id'))
                     .some(input => !input.value);
-                if (missing || !customerIdField.value) {
+                if (missing || hasMissingProduct || !customerIdField.value) {
                     event.preventDefault();
                     alert('{{ __('txn.select_customer') }} / {{ __('txn.select_product') }}');
                 }

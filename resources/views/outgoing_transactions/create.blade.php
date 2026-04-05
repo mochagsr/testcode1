@@ -609,6 +609,16 @@
                 });
             }
 
+            function setProductFieldError(row, message = '') {
+                const hasMessage = String(message || '').trim() !== '';
+                const input = row?.querySelector('.product-search');
+                const error = row?.querySelector('.product-search-error');
+                if (error) {
+                    error.textContent = hasMessage ? message : '';
+                }
+                input?.classList.toggle('input-inline-error', hasMessage);
+            }
+
             function buildUnitOptions(selectedUnit = '') {
                 const selected = String(selectedUnit || '').trim().toLowerCase();
                 const options = outgoingUnits.map((unit) => {
@@ -672,6 +682,7 @@
                         <input type="text" class="product-search" list="outgoing-products-list" value="${escapeAttribute(productSearchValue)}" placeholder="{{ __('txn.select_product') }}">
                         <input type="hidden" class="product-id" name="items[${index}][product_id]" value="${escapeAttribute(prefillProductId)}">
                         <input type="hidden" class="product-name" name="items[${index}][product_name]" value="${escapeAttribute(prefillProductName)}">
+                        <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                     </td>
                     <td>
                         <select class="item-category w-sm" name="items[${index}][item_category_id]">
@@ -711,6 +722,7 @@
                 }
 
                 const onProductInput = debounce(async () => {
+                    setProductFieldError(tr, '');
                     await fetchProductSuggestions(productSearch.value);
                     const typedName = String(productSearch.value || '').trim();
                     const product = findProductByLabel(productSearch.value);
@@ -741,11 +753,45 @@
                     if (!product) {
                         productId.value = '';
                         productName.value = typedName;
+                        if (typedName !== '') {
+                            setProductFieldError(tr, @json(__('txn.product_not_registered')));
+                        } else {
+                            setProductFieldError(tr, '');
+                        }
                         return;
                     }
                     productSearch.value = productLabel(product);
                     productId.value = product.id;
                     productName.value = product.name;
+                    setProductFieldError(tr, '');
+                    if (product.item_category_id) {
+                        categoryField.value = String(product.item_category_id);
+                    }
+                    unitField.value = product.unit || unitField.value;
+                    if (Number(unitCostField.value || 0) <= 0) {
+                        unitCostField.value = Number(product.price_general || 0);
+                    }
+                    recalc();
+                });
+                productSearch.addEventListener('blur', async () => {
+                    const typedName = String(productSearch.value || '').trim();
+                    if (typedName === '') {
+                        productId.value = '';
+                        productName.value = '';
+                        setProductFieldError(tr, '');
+                        return;
+                    }
+                    const product = await resolveProductFromInput(typedName);
+                    if (!product) {
+                        productId.value = '';
+                        productName.value = typedName;
+                        setProductFieldError(tr, @json(__('txn.product_not_registered')));
+                        return;
+                    }
+                    productSearch.value = productLabel(product);
+                    productId.value = product.id;
+                    productName.value = product.name;
+                    setProductFieldError(tr, '');
                     if (product.item_category_id) {
                         categoryField.value = String(product.item_category_id);
                     }
@@ -829,6 +875,30 @@
 
                 const rows = Array.from(tableBody.querySelectorAll('tr'));
                 const hasRows = rows.length > 0;
+                let hasInvalidProduct = false;
+                for (const row of rows) {
+                    const productIdField = row.querySelector('.product-id');
+                    const productSearchField = row.querySelector('.product-search');
+                    const productNameField = row.querySelector('.product-name');
+                    const typedName = String(productSearchField?.value || '').trim();
+                    if (!productIdField || typedName === '' || String(productIdField.value || '').trim() !== '') {
+                        continue;
+                    }
+                    const product = await resolveProductFromInput(typedName);
+                    if (!product) {
+                        setProductFieldError(row, @json(__('txn.product_not_registered')));
+                        hasInvalidProduct = true;
+                        continue;
+                    }
+                    productIdField.value = product.id;
+                    if (productSearchField) {
+                        productSearchField.value = productLabel(product);
+                    }
+                    if (productNameField) {
+                        productNameField.value = product.name;
+                    }
+                    setProductFieldError(row, '');
+                }
                 const invalidRows = rows.some((row) => {
                     const productId = String(row.querySelector('.product-id')?.value || '').trim();
                     const productName = String(row.querySelector('.product-name')?.value || '').trim();
@@ -841,7 +911,7 @@
                         || qty < 1
                         || cost < 0;
                 });
-                if (!hasSupplier || !hasRows || invalidRows) {
+                if (!hasSupplier || !hasRows || invalidRows || hasInvalidProduct) {
                     alert('{{ __('txn.select_supplier') }} / {{ __('txn.outgoing_items_required') }}');
                     if (!hasSupplier) {
                         supplierSearch.focus();

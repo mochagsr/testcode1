@@ -631,6 +631,16 @@
                 });
             }
 
+            function setSchoolItemProductError(row, message = '') {
+                const hasMessage = String(message || '').trim() !== '';
+                const input = row?.querySelector('.product-name');
+                const error = row?.querySelector('.product-name-error');
+                if (error) {
+                    error.textContent = hasMessage ? message : '';
+                }
+                input?.classList.toggle('input-inline-error', hasMessage);
+            }
+
             function addSchoolItemRow(cardEl, uid, initial = {}) {
                 const tbody = cardEl.querySelector('tbody');
                 if (!tbody) {
@@ -641,6 +651,7 @@
                     <td>
                         <input type="text" list="products-list" class="product-name" value="${initial.product_name || ''}" required>
                         <input type="hidden" class="product-id" value="${initial.product_id || ''}">
+                        <div class="field-inline-error product-name-error" style="display:block; margin-top:4px;"></div>
                     </td>
                     <td><input type="number" min="1" class="product-qty" value="${initial.quantity || 1}" required style="max-width: 92px;"></td>
                     <td><input type="text" class="product-unit" value="${initial.unit || ''}" style="max-width: 92px;"></td>
@@ -659,12 +670,14 @@
                         return;
                     }
                     productNameInput.value = productLabel(product);
+                    setSchoolItemProductError(tr, '');
                     productUnitInput.value = product.unit || productUnitInput.value || '';
                     if (!productPriceInput.value) {
                         productPriceInput.value = Math.round(Number(product.price_general || 0));
                     }
                 };
                 const onProductInput = debounce(async (event) => {
+                    setSchoolItemProductError(tr, '');
                     await fetchProductSuggestions(event.currentTarget.value);
                     const product = findProductByLabel(event.currentTarget.value);
                     applyProduct(product);
@@ -675,6 +688,26 @@
                 });
                 productNameInput?.addEventListener('change', (event) => {
                     const product = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
+                    applyProduct(product);
+                    if (!product && String(event.currentTarget.value || '').trim() !== '') {
+                        setSchoolItemProductError(tr, @json(__('txn.product_not_registered')));
+                    } else if (!product) {
+                        setSchoolItemProductError(tr, '');
+                    }
+                });
+                productNameInput?.addEventListener('blur', async (event) => {
+                    const value = String(event.currentTarget.value || '').trim();
+                    if (value === '') {
+                        productIdInput.value = '';
+                        setSchoolItemProductError(tr, '');
+                        return;
+                    }
+                    const product = await resolveProductFromInput(value);
+                    if (!product) {
+                        productIdInput.value = '';
+                        setSchoolItemProductError(tr, @json(__('txn.product_not_registered')));
+                        return;
+                    }
                     applyProduct(product);
                 });
                 tr.querySelector('.remove-item').addEventListener('click', () => {
@@ -909,7 +942,7 @@
                 renderSchoolItemCards();
             });
 
-            form?.addEventListener('submit', (event) => {
+            form?.addEventListener('submit', async (event) => {
                 if (!customerIdField.value && customerSearch?.value) {
                     event.preventDefault();
                     resolveCustomerFromInput(customerSearch.value).then((customer) => {
@@ -930,6 +963,34 @@
                     alert(@json(__('school_bulk.fill_school_locations')));
                     return;
                 }
+                let hasInvalidProductLookup = false;
+                for (const row of locationRows) {
+                    const uid = String(row.querySelector('.school-uid')?.value || '').trim();
+                    if (uid === '') {
+                        continue;
+                    }
+                    const card = schoolItemCards?.querySelector(`.school-item-card[data-location-uid="${uid}"]`);
+                    if (!card) {
+                        continue;
+                    }
+                    for (const itemRow of Array.from(card.querySelectorAll('tbody tr'))) {
+                        const productNameInput = itemRow.querySelector('.product-name');
+                        const productIdInput = itemRow.querySelector('.product-id');
+                        const typedName = String(productNameInput?.value || '').trim();
+                        if (typedName === '' || !productIdInput || String(productIdInput.value || '').trim() !== '') {
+                            continue;
+                        }
+                        const product = await resolveProductFromInput(typedName);
+                        if (!product) {
+                            setSchoolItemProductError(itemRow, @json(__('txn.product_not_registered')));
+                            hasInvalidProductLookup = true;
+                            continue;
+                        }
+                        productIdInput.value = product.id;
+                        productNameInput.value = productLabel(product);
+                        setSchoolItemProductError(itemRow, '');
+                    }
+                }
                 collectLocationItemsFromDom();
                 const hasInvalidItemRows = locationRows.some((row) => {
                     const uid = String(row.querySelector('.school-uid')?.value || '').trim();
@@ -941,9 +1002,9 @@
                     if (items.length === 0) {
                         return true;
                     }
-                    return items.some((item) => !String(item.product_name || '').trim());
+                    return items.some((item) => !String(item.product_name || '').trim() || !String(item.product_id || '').trim());
                 });
-                if (hasInvalidItemRows) {
+                if (hasInvalidItemRows || hasInvalidProductLookup) {
                     event.preventDefault();
                     alert(@json(__('school_bulk.fill_items')));
                 }

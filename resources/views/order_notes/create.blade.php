@@ -313,6 +313,16 @@
             customerSearch?.classList.toggle('input-inline-error', hasMessage);
         }
 
+        function setProductFieldError(row, message = '') {
+            const hasMessage = String(message || '').trim() !== '';
+            const input = row?.querySelector('.product-search');
+            const error = row?.querySelector('.product-search-error');
+            if (error) {
+                error.textContent = hasMessage ? message : '';
+            }
+            input?.classList.toggle('input-inline-error', hasMessage);
+        }
+
         function applyCustomerFields(customer) {
             customerIdField.value = customer ? customer.id : '';
             if (!customer) {
@@ -420,6 +430,7 @@
                 <td>
                     <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
+                    <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
                 <td><input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required style="max-width: 88px;"></td>
                 <td><input name="items[${index}][notes]"></td>
@@ -428,6 +439,7 @@
             tbody.appendChild(tr);
 
             const onProductInput = debounce(async (event) => {
+                setProductFieldError(tr, '');
                 await fetchProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
@@ -441,6 +453,27 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.product-search').value = productLabel(product);
+                    setProductFieldError(tr, '');
+                } else if (String(event.currentTarget.value || '').trim() !== '') {
+                    setProductFieldError(tr, @json(__('txn.product_not_registered')));
+                } else {
+                    setProductFieldError(tr, '');
+                }
+            });
+            tr.querySelector('.product-search').addEventListener('blur', async (event) => {
+                const value = String(event.currentTarget.value || '').trim();
+                if (value === '') {
+                    tr.querySelector('.product-id').value = '';
+                    setProductFieldError(tr, '');
+                    return;
+                }
+                const product = await resolveProductFromInput(value);
+                tr.querySelector('.product-id').value = product ? product.id : '';
+                if (product) {
+                    tr.querySelector('.product-search').value = productLabel(product);
+                    setProductFieldError(tr, '');
+                } else {
+                    setProductFieldError(tr, @json(__('txn.product_not_registered')));
                 }
             });
             tr.querySelector('.remove').addEventListener('click', () => tr.remove());
@@ -495,6 +528,30 @@
                     customerSearch.focus();
                     return;
                 }
+            }
+
+            let hasMissingProduct = false;
+            for (const row of Array.from(tbody.querySelectorAll('tr'))) {
+                const productIdField = row.querySelector('.product-id');
+                const productSearchField = row.querySelector('.product-search');
+                if (!productIdField || !productSearchField || String(productIdField.value || '').trim() !== '') {
+                    continue;
+                }
+                const product = await resolveProductFromInput(productSearchField.value || '');
+                if (!product) {
+                    if (String(productSearchField.value || '').trim() !== '') {
+                        setProductFieldError(row, @json(__('txn.product_not_registered')));
+                    }
+                    hasMissingProduct = true;
+                    continue;
+                }
+                productIdField.value = product.id;
+                productSearchField.value = productLabel(product);
+                setProductFieldError(row, '');
+            }
+
+            if (hasMissingProduct) {
+                event.preventDefault();
             }
         });
 
