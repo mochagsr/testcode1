@@ -54,6 +54,12 @@ async function shot(page, fileName) {
   return `assets/manuals/${fileName}`;
 }
 
+async function shotLocator(locator, fileName) {
+  const output = path.join(assetsDir, fileName);
+  await locator.screenshot({ path: output });
+  return `assets/manuals/${fileName}`;
+}
+
 async function selectIfExists(page, selector, value) {
   const optionExists = await page.$eval(
     selector,
@@ -94,7 +100,8 @@ async function captureInvoiceValidationExamples(page, prefix, loginIdentifier, p
   await customerInput.fill('Anto Tidak Ada');
   await invoiceDateInput.click();
   await waitForUi(page);
-  await shot(page, `${prefix}-customer-error.png`);
+  const customerBlock = customerInput.locator('xpath=ancestor::div[contains(@class,"col-12")][1]');
+  await shotLocator(customerBlock, `${prefix}-customer-error.png`);
 
   await ensureLoggedIn(page, loginIdentifier, password, '/sales-invoices/create');
   await page.evaluate(() => {
@@ -131,7 +138,8 @@ async function captureInvoiceValidationExamples(page, prefix, loginIdentifier, p
     await firstProductInput.fill('Barang Tidak Ada');
     await firstQtyInput.click();
     await waitForUi(page);
-    await shot(page, `${prefix}-product-error.png`);
+    const productCell = page.locator('#items-table tbody tr').first().locator('td').first();
+    await shotLocator(productCell, `${prefix}-product-error.png`);
   }
 }
 
