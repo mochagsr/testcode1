@@ -110,8 +110,8 @@
                             <div class="col-12">
                                 <label>{{ __('txn.payment_method') }}</label>
                                 <select name="payment_method" required>
-                                    <option value="tunai" @selected(old('payment_method', 'tunai') === 'tunai')>{{ __('txn.cash') }}</option>
-                                    <option value="kredit" @selected(old('payment_method') === 'kredit')>{{ __('txn.credit') }}</option>
+                                    <option value="tunai" @selected(old('payment_method') === 'tunai')>{{ __('txn.cash') }}</option>
+                                    <option value="kredit" @selected(old('payment_method', 'kredit') === 'kredit')>{{ __('txn.credit') }}</option>
                                 </select>
                             </div>
                             <div class="col-12">
