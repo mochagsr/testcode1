@@ -389,6 +389,16 @@
             customerSearch?.classList.toggle('input-inline-error', hasMessage);
         }
 
+        function setProductFieldError(row, message = '') {
+            const hasMessage = String(message || '').trim() !== '';
+            const input = row?.querySelector('.product-search');
+            const error = row?.querySelector('.product-search-error');
+            if (error) {
+                error.textContent = hasMessage ? message : '';
+            }
+            input?.classList.toggle('input-inline-error', hasMessage);
+        }
+
         async function resolveCustomerFromInput(rawValue) {
             const variants = customerSearchVariants(rawValue);
             if (variants.length === 0) {
@@ -763,12 +773,13 @@
             const prefillProductCode = String(prefill?.product_code || '');
             const productText = prefillProductCode !== '' ? `${prefillProductCode} - ${prefillProductName}` : prefillProductName;
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>
-                    <input type="text" class="product-search" list="products-list" placeholder="${selectProductLabel}" required value="${escapeAttribute(productText)}">
-                    <input type="hidden" name="items[${index}][product_id]" class="product-id">
-                    <input type="hidden" name="items[${index}][order_note_item_id]" class="order-note-item-id" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
-                </td>
+              tr.innerHTML = `
+                  <td>
+                      <input type="text" class="product-search" list="products-list" placeholder="${selectProductLabel}" required value="${escapeAttribute(productText)}">
+                      <input type="hidden" name="items[${index}][product_id]" class="product-id">
+                      <input type="hidden" name="items[${index}][order_note_item_id]" class="order-note-item-id" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
+                      <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
+                  </td>
                 <td class="stock">-</td>
                 <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="${initialQty}" required style="max-width: 88px;"></td>
                 <td><input class="price" type="number" min="0" step="1" name="items[${index}][unit_price]" value="0" required style="max-width: 88px;"></td>
@@ -784,6 +795,7 @@
             tbody.appendChild(tr);
 
             const onProductInput = debounce(async (event) => {
+                setProductFieldError(tr, '');
                 await fetchProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
@@ -801,8 +813,34 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.product-search').value = productLabel(product);
+                    setProductFieldError(tr, '');
                 } else {
                     tr.querySelector('.order-note-item-id').value = '';
+                    if (String(event.currentTarget.value || '').trim() !== '') {
+                        setProductFieldError(tr, @json(__('txn.product_not_registered')));
+                    } else {
+                        setProductFieldError(tr, '');
+                    }
+                }
+                updateRowMeta(tr, product);
+            });
+            tr.querySelector('.product-search').addEventListener('blur', async (event) => {
+                const value = String(event.currentTarget.value || '').trim();
+                if (value === '') {
+                    setProductFieldError(tr, '');
+                    tr.querySelector('.product-id').value = '';
+                    tr.querySelector('.order-note-item-id').value = '';
+                    updateRowMeta(tr, null);
+                    return;
+                }
+                const product = await resolveProductFromInput(value);
+                tr.querySelector('.product-id').value = product ? product.id : '';
+                if (product) {
+                    tr.querySelector('.product-search').value = productLabel(product);
+                    setProductFieldError(tr, '');
+                } else {
+                    tr.querySelector('.order-note-item-id').value = '';
+                    setProductFieldError(tr, @json(__('txn.product_not_registered')));
                 }
                 updateRowMeta(tr, product);
             });
@@ -1026,6 +1064,7 @@
                 }
 
                 const rows = Array.from(document.querySelectorAll('#items-table tbody tr'));
+                let hasMissingProduct = false;
                 for (const row of rows) {
                     const productIdField = row.querySelector('.product-id');
                     const productSearchField = row.querySelector('.product-search');
@@ -1034,16 +1073,21 @@
                     }
                     const product = await resolveProductFromInput(productSearchField.value || '');
                     if (!product) {
+                        if (String(productSearchField.value || '').trim() !== '') {
+                            setProductFieldError(row, @json(__('txn.product_not_registered')));
+                        }
+                        hasMissingProduct = true;
                         continue;
                     }
                     productIdField.value = product.id;
                     productSearchField.value = productLabel(product);
+                    setProductFieldError(row, '');
                     updateRowMeta(row, product);
                 }
 
                 const missing = Array.from(document.querySelectorAll('.product-id'))
                     .some(input => !input.value);
-                if (missing || !customerIdField.value) {
+                if (missing || hasMissingProduct || !customerIdField.value) {
                     if (!customerIdField.value && customerSearch?.value) {
                         setCustomerFieldError(@json(__('txn.customer_not_registered')));
                     }

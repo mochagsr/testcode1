@@ -230,6 +230,7 @@ return [
     'sub_total' => 'Sub Total',
     'grand_total' => 'Grand Total',
     'product_not_found' => 'Barang tidak ditemukan.',
+    'product_not_registered' => 'Barang tidak terdaftar.',
     'insufficient_stock_for' => 'Stok tidak cukup untuk :product.',
     'invoice_created_success' => 'Faktur :number berhasil dibuat.',
     'return_created_success' => 'Retur :number berhasil dibuat.',

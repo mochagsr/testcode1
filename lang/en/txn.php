@@ -230,6 +230,7 @@ return [
     'sub_total' => 'Sub Total',
     'grand_total' => 'Grand Total',
     'product_not_found' => 'Product not found.',
+    'product_not_registered' => 'Product is not registered.',
     'insufficient_stock_for' => 'Insufficient stock for :product.',
     'invoice_created_success' => 'Invoice :number has been created.',
     'return_created_success' => 'Return :number has been created.',
