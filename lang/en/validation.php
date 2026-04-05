@@ -1,0 +1,91 @@
+<?php
+
+return [
+    'accepted' => ':attribute must be accepted.',
+    'array' => ':attribute must be a list.',
+    'boolean' => ':attribute must be yes or no.',
+    'date' => ':attribute must be a valid date.',
+    'exists' => ':attribute is not registered.',
+    'in' => 'The selected :attribute is invalid.',
+    'integer' => ':attribute must be a whole number.',
+    'max' => [
+        'array' => ':attribute may not have more than :max items.',
+        'file' => ':attribute may not be greater than :max KB.',
+        'numeric' => ':attribute may not be greater than :max.',
+        'string' => ':attribute may not be greater than :max characters.',
+    ],
+    'min' => [
+        'array' => ':attribute must have at least :min items.',
+        'file' => ':attribute must be at least :min KB.',
+        'numeric' => ':attribute must be at least :min.',
+        'string' => ':attribute must be at least :min characters.',
+    ],
+    'numeric' => ':attribute must be a number.',
+    'required' => ':attribute is required.',
+    'string' => ':attribute must be text.',
+    'unique' => ':attribute has already been used.',
+    'after_or_equal' => ':attribute must be the same as or after :date.',
+
+    'custom' => [
+        'customer_id' => [
+            'required' => 'Please choose a customer from the list.',
+            'exists' => 'The customer is not registered.',
+        ],
+        'supplier_id' => [
+            'required' => 'Please choose a supplier from the list.',
+            'exists' => 'The supplier is not registered.',
+        ],
+        'items' => [
+            'required' => 'Please add at least one item.',
+            'array' => 'The item list is not valid.',
+            'min' => 'Please add at least one item.',
+        ],
+        'items.*.product_id' => [
+            'required' => 'Please choose an item from the list.',
+            'exists' => 'The item is not registered.',
+        ],
+        'items.*.quantity' => [
+            'required' => 'Qty is required.',
+            'integer' => 'Qty must be a whole number.',
+            'min' => 'Qty must be at least 1.',
+        ],
+        'items.*.unit_price' => [
+            'required' => 'Price is required.',
+            'numeric' => 'Price must be a number.',
+            'min' => 'Price may not be less than 0.',
+        ],
+        'items.*.discount' => [
+            'numeric' => 'Discount must be a number.',
+            'min' => 'Discount may not be less than 0.',
+            'max' => 'Discount may not be greater than 100.',
+        ],
+    ],
+
+    'attributes' => [
+        'customer_id' => 'customer',
+        'supplier_id' => 'supplier',
+        'order_note_id' => 'order note',
+        'sales_invoice_id' => 'invoice',
+        'invoice_date' => 'invoice date',
+        'return_date' => 'return date',
+        'delivery_date' => 'delivery note date',
+        'note_date' => 'order note date',
+        'transaction_date' => 'transaction date',
+        'payment_date' => 'payment date',
+        'due_date' => 'due date',
+        'semester_period' => 'semester',
+        'payment_method' => 'payment method',
+        'notes' => 'notes',
+        'name' => 'name',
+        'city' => 'city',
+        'address' => 'address',
+        'phone' => 'phone number 1',
+        'phone_secondary' => 'phone number 2',
+        'level_id' => 'customer level',
+        'items' => 'item list',
+        'items.*.product_id' => 'item',
+        'items.*.quantity' => 'qty',
+        'items.*.unit_price' => 'price',
+        'items.*.discount' => 'discount',
+    ],
+];

@@ -1233,6 +1233,42 @@ class ReceivableFlowsTest extends TestCase
         $response->assertDontSee('ship-to-address', false);
     }
 
+    public function test_sales_invoice_validation_messages_are_human_readable(): void
+    {
+        config()->set('app.locale', 'id');
+        session()->put('locale', 'id');
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->from(route('sales-invoices.create'))
+            ->post(route('sales-invoices.store'), [
+                'invoice_date' => now()->toDateString(),
+                'payment_method' => 'kredit',
+                'semester_period' => 'S2-2526',
+                'items' => [
+                    [
+                        'quantity' => 1,
+                        'unit_price' => 1000,
+                        'discount' => 0,
+                    ],
+                ],
+            ]);
+
+        $response->assertRedirect(route('sales-invoices.create'));
+        $response->assertSessionHasErrors([
+            'customer_id',
+            'items.0.product_id',
+        ]);
+
+        $page = $this->actingAs($user)->get(route('sales-invoices.create'));
+
+        $page->assertSee('Customer wajib dipilih dari daftar.');
+        $page->assertSee('Barang wajib dipilih dari daftar.');
+        $page->assertDontSee('The customer_id field is required.');
+        $page->assertDontSee('The items.0.product_id field is required.');
+    }
+
     public function test_sales_invoice_store_ignores_ship_fields_for_regular_transaction(): void
     {
         $user = User::factory()->create();
