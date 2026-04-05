@@ -1398,23 +1398,11 @@ class ReceivablePageController extends Controller
             })
             ->groupBy('customer_id');
 
-        $query = Customer::query()
+        $baseQuery = Customer::query()
             ->leftJoinSub($ledgerAggregate, 'semester_ledger', function ($join): void {
                 $join->on('customers.id', '=', 'semester_ledger.customer_id');
             })
             ->leftJoin('customer_levels', 'customer_levels.id', '=', 'customers.customer_level_id')
-            ->select([
-                'customers.id',
-                'customers.name',
-                'customers.city',
-                'customers.address',
-                DB::raw('COALESCE(customer_levels.code, \'\') as level_code'),
-                DB::raw('COALESCE(customer_levels.name, \'\') as level_name'),
-                DB::raw('COALESCE(semester_ledger.sales_total, 0) as sales_total'),
-                DB::raw('COALESCE(semester_ledger.payment_total, 0) as payment_total'),
-                DB::raw('COALESCE(semester_ledger.return_total, 0) as return_total'),
-                DB::raw('COALESCE(semester_ledger.outstanding_total, 0) as outstanding_total'),
-            ])
             ->when($search !== '', function ($builder) use ($search): void {
                 $builder->where(function ($subQuery) use ($search): void {
                     $subQuery->where('customers.name', 'like', '%' . $search . '%')
@@ -1430,11 +1418,24 @@ class ReceivablePageController extends Controller
             })
             ->when($status === 'credit', function ($builder): void {
                 $builder->whereRaw('COALESCE(semester_ledger.outstanding_total, 0) < 0');
-            })
+            });
+
+        $query = (clone $baseQuery)
+            ->select([
+                'customers.id',
+                'customers.name',
+                'customers.city',
+                'customers.address',
+                DB::raw('COALESCE(customer_levels.code, \'\') as level_code'),
+                DB::raw('COALESCE(customer_levels.name, \'\') as level_name'),
+                DB::raw('COALESCE(semester_ledger.sales_total, 0) as sales_total'),
+                DB::raw('COALESCE(semester_ledger.payment_total, 0) as payment_total'),
+                DB::raw('COALESCE(semester_ledger.return_total, 0) as return_total'),
+                DB::raw('COALESCE(semester_ledger.outstanding_total, 0) as outstanding_total'),
+            ])
             ->orderBy('customers.name');
 
-        $totalQuery = clone $query;
-        $totalsRow = $totalQuery
+        $totalsRow = (clone $baseQuery)
             ->selectRaw('
                 COALESCE(SUM(COALESCE(semester_ledger.sales_total, 0)), 0) as sales_total,
                 COALESCE(SUM(COALESCE(semester_ledger.payment_total, 0)), 0) as payment_total,

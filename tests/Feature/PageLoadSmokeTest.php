@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\CustomerLevel;
+use App\Models\OutgoingTransaction;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\ReceivableLedger;
@@ -151,7 +152,7 @@ class PageLoadSmokeTest extends TestCase
             'address' => 'Jl. Smoke Test',
         ]);
 
-        Supplier::query()->create([
+        $supplier = Supplier::query()->create([
             'name' => 'Supplier Smoke',
             'company_name' => 'PT Smoke',
             'phone' => '081234567890',
@@ -181,6 +182,17 @@ class PageLoadSmokeTest extends TestCase
             'credit' => 0,
             'balance_after' => 15000,
             'period_code' => 'S2-2526',
+        ]);
+
+        OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-SMOKE-001',
+            'transaction_date' => '2026-04-05',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'note_number' => 'NOTA-SMOKE-001',
+            'total' => 25000,
+            'notes' => 'Smoke transaction',
+            'created_by_user_id' => User::query()->value('id'),
         ]);
     }
 }

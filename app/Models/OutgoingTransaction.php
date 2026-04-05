@@ -95,7 +95,7 @@ class OutgoingTransaction extends Model
      */
     public function scopeWithSupplierInfo(Builder $query): Builder
     {
-        return $query->with('supplier:id,code,name,company_name,phone');
+        return $query->with('supplier:id,name,company_name,phone');
     }
 
     /**
