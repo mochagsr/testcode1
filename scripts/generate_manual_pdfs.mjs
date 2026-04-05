@@ -50,6 +50,12 @@ async function ensureLoggedIn(page, loginIdentifier, password, targetPath) {
 
 async function shot(page, fileName) {
   const output = path.join(assetsDir, fileName);
+  const mainContent = page.locator('.main').first();
+  const hasMainContent = await mainContent.count().catch(() => 0);
+  if (hasMainContent > 0) {
+    await mainContent.screenshot({ path: output });
+    return `assets/manuals/${fileName}`;
+  }
   await page.screenshot({ path: output, fullPage: true });
   return `assets/manuals/${fileName}`;
 }
