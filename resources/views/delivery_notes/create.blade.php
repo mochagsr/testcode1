@@ -637,6 +637,10 @@
             return null;
         }
 
+        function syncItemPricesForCurrentCustomer() {
+            return;
+        }
+
         function addRow() {
             const index = tbody.children.length;
             const tr = document.createElement('tr');
