@@ -9,7 +9,7 @@
         .container { max-width: 1380px; margin: 0 auto; }
         .no-print { margin-bottom: 10px; }
         .head { margin-bottom: 8px; position: relative; min-height: 34px; }
-        .head-title { text-align: center; font-size: 20px; font-weight: 800; text-transform: uppercase; }
+        .head-title { text-align: left; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-left: -18px; }
         .head-update { position: absolute; right: 0; bottom: 0; font-size: 13px; font-style: italic; font-weight: 800; }
         .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .report-table th, .report-table td { border: 1px solid #111; padding: 5px 6px; vertical-align: top; font-size: 12px; font-weight: 600; }

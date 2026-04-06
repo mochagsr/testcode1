@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class AppSetting extends Model
@@ -33,7 +34,7 @@ class AppSetting extends Model
                 return $default;
             }
 
-            $value = static::keyValueMap()[$key] ?? null;
+            $value = static::normalizedValue($key, static::keyValueMap()[$key] ?? null);
 
             return $value ?? $default;
         } catch (Throwable) {
@@ -55,7 +56,7 @@ class AppSetting extends Model
             $map = static::keyValueMap();
             $result = [];
             foreach ($defaults as $key => $default) {
-                $result[$key] = $map[$key] ?? $default;
+                $result[$key] = static::normalizedValue((string) $key, $map[$key] ?? null) ?? $default;
             }
 
             return $result;
@@ -141,5 +142,55 @@ class AppSetting extends Model
         static::$runtimeKeyValueMap = $raw;
 
         return static::$runtimeKeyValueMap;
+    }
+
+    private static function normalizedValue(string $key, ?string $value): ?string
+    {
+        if ($key !== 'company_logo_path') {
+            return $value;
+        }
+
+        $normalized = trim((string) $value);
+
+        if ($normalized !== '' && static::logoPathExists($normalized)) {
+            return $normalized;
+        }
+
+        return static::discoverCompanyLogoPath();
+    }
+
+    private static function logoPathExists(string $path): bool
+    {
+        try {
+            return Storage::disk('public')->exists($path);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private static function discoverCompanyLogoPath(): ?string
+    {
+        try {
+            $files = collect(Storage::disk('public')->files('company'))
+                ->filter(function (string $path): bool {
+                    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+                    return in_array($extension, ['png', 'jpg', 'jpeg', 'webp', 'svg'], true);
+                })
+                ->sortByDesc(function (string $path): int {
+                    try {
+                        return (int) Storage::disk('public')->lastModified($path);
+                    } catch (Throwable) {
+                        return 0;
+                    }
+                })
+                ->values();
+
+            $candidate = $files->first();
+
+            return is_string($candidate) && $candidate !== '' ? $candidate : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }

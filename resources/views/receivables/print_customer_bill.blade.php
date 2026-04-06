@@ -11,6 +11,19 @@
         .head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
         .company-left { display: flex; gap: 6px; min-width: 0; }
         .logo { width: 40px; height: 60px; object-fit: contain; border: none; padding: 0; background: transparent; }
+        .logo-fallback {
+            width: 40px;
+            height: 60px;
+            border: none;
+            padding: 0;
+            background: transparent;
+            display: grid;
+            place-items: center;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
         .company-name { font-size: 15px; font-weight: 800; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
         .company-meta { margin-top: 2px; white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
         .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; }
@@ -78,6 +91,8 @@
         <div class="company-left">
             @if($companyLogoSrc)
                 <img class="logo" src="{{ $companyLogoSrc }}" alt="Logo">
+            @else
+                <div class="logo-fallback">PG</div>
             @endif
             <div>
                 <div class="company-name">{{ $companyName !== '' ? $companyName : 'CV. PUSTAKA GRAFIKA' }}</div>

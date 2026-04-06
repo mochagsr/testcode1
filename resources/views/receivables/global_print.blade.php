@@ -15,7 +15,7 @@
         .num { text-align: right; white-space: nowrap; }
         .total-row td { font-weight: 700; background: #2f74c8; color: #fff; }
         .head { margin-bottom: 8px; position: relative; min-height: 34px; }
-        .head-title { text-align: center; font-size: 20px; font-weight: 800; text-transform: uppercase; }
+        .head-title { text-align: left; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-left: -18px; }
         .head-update { position: absolute; right: 0; bottom: 0; font-size: 13px; font-style: italic; font-weight: 800; }
         .invoice-wrap { width: 100%; }
         .invoice-grid {
@@ -27,9 +27,21 @@
         }
         .company-left { display: flex; gap: 10px; min-width: 0; }
         .logo { width: 52px; height: 72px; object-fit: contain; border: none; background: transparent; }
+        .logo-fallback {
+            width: 52px;
+            height: 72px;
+            border: none;
+            background: transparent;
+            display: grid;
+            place-items: center;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
         .company-name { font-size: 15px; font-weight: 800; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
         .company-meta { white-space: pre-line; margin-top: 3px; font-size: 12px; line-height: 1.35; font-weight: 600; }
-        .invoice-title { font-size: 24px; font-weight: 700; text-align: center; margin-top: 36px; }
+        .invoice-title { font-size: 24px; font-weight: 700; text-align: left; margin-top: 36px; margin-left: -18px; }
         .customer-meta { margin-top: 10px; width: 62%; }
         .customer-meta table { width: 100%; border-collapse: collapse; }
         .customer-meta td { padding: 2px 4px 2px 0; vertical-align: top; }
@@ -78,6 +90,8 @@
                     <div class="company-left">
                         @if($companyLogoSrc)
                             <img class="logo" src="{{ $companyLogoSrc }}" alt="Logo">
+                        @else
+                            <div class="logo-fallback">PG</div>
                         @endif
                         <div>
                             <div class="company-name">{{ $companyName }}</div>

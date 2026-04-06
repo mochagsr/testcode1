@@ -10,6 +10,18 @@
         .head { display: flex; justify-content: space-between; align-items: end; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 12px; gap: 10px; }
         .head-left { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
         .logo { width: 40px; height: 60px; object-fit: contain; border: none; background: transparent; flex-shrink: 0; }
+        .logo-fallback {
+            width: 40px;
+            height: 60px;
+            border: none;
+            background: transparent;
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
         .title-wrap { min-width: 0; }
         .title { font-size: 20px; font-weight: 800; text-transform: uppercase; }
         .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
@@ -49,6 +61,8 @@
         <div class="head-left">
             @if($companyLogoSrc)
                 <img class="logo" src="{{ $companyLogoSrc }}" alt="Logo">
+            @else
+                <div class="logo-fallback">PG</div>
             @endif
             <div class="title-wrap">
                 <div class="title">{{ $title }}</div>

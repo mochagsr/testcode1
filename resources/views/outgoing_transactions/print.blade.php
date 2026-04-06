@@ -14,12 +14,12 @@
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 15px; font-weight: 800; letter-spacing: 0; margin-bottom: 2px; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
         .company-detail { font-size: 12px; line-height: 1.35; white-space: pre-line; font-weight: 600; }
-        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: center; align-self: start; margin-top: -2px; min-width: 0; font-weight: 700; }
+        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: left; align-self: start; justify-self: start; margin-top: -2px; min-width: 0; font-weight: 700; margin-left: -18px; }
         .doc-meta-right { font-size: 12px; line-height: 1.3; min-width: 180px; max-width: 270px; justify-self: end; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-line .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
-        .doc-title { font-size: 20px; font-weight: 800; text-align: center; }
-        .doc-number { text-align: center; margin-bottom: 4px; }
+        .doc-title { font-size: 20px; font-weight: 800; text-align: left; }
+        .doc-number { text-align: left; margin-bottom: 4px; }
         @include('partials.print.table_styles')
         .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 130px 220px; align-items: flex-start; gap: 12px; margin-top: 10px; }
         .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }

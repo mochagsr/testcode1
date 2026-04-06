@@ -14,7 +14,7 @@
         .company-logo img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 15px; font-weight: 800; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
         .company-detail { white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
-        .doc-title-wrap { text-align: center; min-width: 210px; align-self: center; }
+        .doc-title-wrap { text-align: left; min-width: 210px; align-self: center; justify-self: start; margin-left: -18px; }
         .doc-title { font-size: 20px; font-weight: 800; text-transform: uppercase; }
         .doc-number { margin-top: 4px; font-size: 12px; }
         .doc-right { justify-self: end; width: 260px; }
