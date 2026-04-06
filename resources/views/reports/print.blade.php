@@ -8,6 +8,9 @@
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 1180px; margin: 0 auto; }
         .head { display: flex; justify-content: space-between; align-items: end; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 12px; gap: 10px; }
+        .head-left { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+        .logo { width: 40px; height: 60px; object-fit: contain; border: none; background: transparent; flex-shrink: 0; }
+        .title-wrap { min-width: 0; }
         .title { font-size: 20px; font-weight: 800; text-transform: uppercase; }
         .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .meta-box table { width: 100%; border-collapse: collapse; }
@@ -33,13 +36,24 @@
 </head>
 <body>
 <div class="container">
+    @php
+        $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) ($companyLogoPath ?? ''));
+    @endphp
     @if(empty($isPdf))
         <div class="no-print">
             <button onclick="window.print()">{{ __('report.print_save_pdf') }}</button>
         </div>
     @endif
     <div class="head">
-        <div class="title">{{ $title }}</div>
+        <div class="head-left">
+            @if($companyLogoSrc)
+                <img class="logo" src="{{ $companyLogoSrc }}" alt="Logo">
+            @endif
+            <div class="title-wrap">
+                <div class="title">{{ $title }}</div>
+            </div>
+        </div>
         <div>
             <div>{{ __('report.printed') }}: {{ $printedAt->format('d-m-Y H:i:s') }}</div>
         </div>

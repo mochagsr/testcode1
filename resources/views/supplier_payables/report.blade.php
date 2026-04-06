@@ -9,6 +9,9 @@
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
         .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .company-brand { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+        .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; overflow: hidden; flex-shrink: 0; }
+        .company-logo img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 15px; font-weight: 800; letter-spacing: 0; margin-bottom: 2px; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
         .company-detail { font-size: 12px; line-height: 1.35; white-space: pre-line; font-weight: 600; }
         .doc-title-center { font-size: 12px; line-height: 1.3; text-align: center; align-self: center; font-weight: 700; }
@@ -29,11 +32,13 @@
 <body>
 @php
     $settings = \App\Models\AppSetting::getValues([
+        'company_logo_path' => null,
         'company_name' => '',
         'company_address' => '',
         'company_phone' => '',
         'company_email' => '',
     ]);
+    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) ($settings['company_logo_path'] ?? ''));
     $companyName = trim((string) ($settings['company_name'] ?? ''));
     $companyAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($settings['company_address'] ?? '')), 5);
 @endphp
@@ -45,15 +50,22 @@
     @endif
 
     <div class="company-head">
-        <div>
-            <div class="company-name">{{ $companyName !== '' ? $companyName : '-' }}</div>
-            <div class="company-detail">{{ $companyAddress !== '' ? $companyAddress : '-' }}</div>
-            @if(($settings['company_phone'] ?? '') !== '')
-                <div class="company-detail">{{ $settings['company_phone'] }}</div>
+        <div class="company-brand">
+            @if($companyLogoSrc)
+                <div class="company-logo">
+                    <img src="{{ $companyLogoSrc }}" alt="Logo">
+                </div>
             @endif
-            @if(($settings['company_email'] ?? '') !== '')
-                <div class="company-detail">{{ $settings['company_email'] }}</div>
-            @endif
+            <div>
+                <div class="company-name">{{ $companyName !== '' ? $companyName : '-' }}</div>
+                <div class="company-detail">{{ $companyAddress !== '' ? $companyAddress : '-' }}</div>
+                @if(($settings['company_phone'] ?? '') !== '')
+                    <div class="company-detail">{{ $settings['company_phone'] }}</div>
+                @endif
+                @if(($settings['company_email'] ?? '') !== '')
+                    <div class="company-detail">{{ $settings['company_email'] }}</div>
+                @endif
+            </div>
         </div>
         <div class="doc-title-center">
             <div style="font-size:20px; font-weight:700;">{{ __('supplier_payable.report_title') }}</div>
