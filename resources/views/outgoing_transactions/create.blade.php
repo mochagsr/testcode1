@@ -94,22 +94,24 @@
                 <h3 style="margin: 0;">{{ __('txn.outgoing_items') }}</h3>
                 <button type="button" id="add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
             </div>
-            <table id="items-table" style="margin-top: 12px;">
-                <thead>
-                <tr>
-                    <th style="width: 22%">{{ __('txn.product') }} *</th>
-                    <th style="width: 16%">{{ __('ui.category') }}</th>
-                    <th style="width: 8%">{{ __('txn.unit') }}</th>
-                    <th style="width: 8%">{{ __('txn.qty') }} *</th>
-                    <th style="width: 10%">{{ __('txn.weight') }}</th>
-                    <th style="width: 12%">{{ __('txn.price') }}</th>
-                    <th style="width: 12%">{{ __('txn.subtotal') }}</th>
-                    <th style="width: 18%">{{ __('txn.notes') }}</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div class="table-mobile-scroll" style="margin-top: 12px;">
+                <table id="items-table">
+                    <thead>
+                    <tr>
+                        <th style="width: 22%">{{ __('txn.product') }} *</th>
+                        <th style="width: 16%">{{ __('ui.category') }}</th>
+                        <th style="width: 8%">{{ __('txn.unit') }}</th>
+                        <th style="width: 8%">{{ __('txn.qty') }} *</th>
+                        <th style="width: 10%">{{ __('txn.weight') }}</th>
+                        <th style="width: 12%">{{ __('txn.price') }}</th>
+                        <th style="width: 12%">{{ __('txn.subtotal') }}</th>
+                        <th style="width: 18%">{{ __('txn.notes') }}</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
             <div style="margin-top: 10px; text-align: right;">
                 <strong>{{ __('txn.total') }}: Rp <span id="grand-total">0</span></strong>
                 <br>

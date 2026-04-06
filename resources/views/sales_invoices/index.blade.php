@@ -14,9 +14,9 @@
         }
     </style>
 
-    <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
-        <h1 class="page-title" style="margin: 0;">{{ __('txn.sales_invoices_title') }}</h1>
-        <div class="flex">
+    <div class="page-header-actions">
+        <h1 class="page-title">{{ __('txn.sales_invoices_title') }}</h1>
+        <div class="actions">
             @if((auth()->user()?->role ?? '') === 'admin')
                 <a class="btn info-btn" href="{{ route('sales-invoices.import.template') }}">Template Import</a>
                 <form method="post" action="{{ route('sales-invoices.import') }}" enctype="multipart/form-data" class="flex">
@@ -30,22 +30,34 @@
     </div>
 
     <div class="card">
-        <form id="sales-invoices-filter-form" method="get" class="flex">
-            <input id="sales-invoices-search-input" type="text" name="search" placeholder="{{ __('txn.search_invoice_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <input id="sales-invoices-date-input" type="date" name="invoice_date" value="{{ $selectedInvoiceDate }}" style="max-width: 180px;">
-            <select id="sales-invoices-semester-input" name="semester" style="max-width: 180px;">
-                <option value="">{{ __('txn.all_semesters') }}</option>
-                @foreach($semesterOptions as $semester)
-                    <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
-                @endforeach
-            </select>
-            <select id="sales-invoices-status-input" name="status" style="max-width: 180px;">
-                <option value="">{{ __('txn.all_statuses') }}</option>
-                <option value="active" @selected($selectedStatus === 'active')>{{ __('txn.status_active') }}</option>
-                <option value="canceled" @selected($selectedStatus === 'canceled')>{{ __('txn.status_canceled') }}</option>
-            </select>
+        <form id="sales-invoices-filter-form" method="get" class="filter-toolbar">
+            <div class="filter-field">
+                <label for="sales-invoices-search-input">{{ __('txn.search') }}</label>
+                <input id="sales-invoices-search-input" type="text" name="search" placeholder="{{ __('txn.search_invoice_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+            </div>
+            <div class="filter-field">
+                <label for="sales-invoices-date-input">{{ __('txn.date') }}</label>
+                <input id="sales-invoices-date-input" type="date" name="invoice_date" value="{{ $selectedInvoiceDate }}" style="max-width: 180px;">
+            </div>
+            <div class="filter-field">
+                <label for="sales-invoices-semester-input">{{ __('txn.semester_period') }}</label>
+                <select id="sales-invoices-semester-input" name="semester" style="max-width: 180px;">
+                    <option value="">{{ __('txn.all_semesters') }}</option>
+                    @foreach($semesterOptions as $semester)
+                        <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="sales-invoices-status-input">{{ __('txn.status') }}</label>
+                <select id="sales-invoices-status-input" name="status" style="max-width: 180px;">
+                    <option value="">{{ __('txn.all_statuses') }}</option>
+                    <option value="active" @selected($selectedStatus === 'active')>{{ __('txn.status_active') }}</option>
+                    <option value="canceled" @selected($selectedStatus === 'canceled')>{{ __('txn.status_canceled') }}</option>
+                </select>
+            </div>
             <button type="submit">{{ __('txn.search') }}</button>
-            <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
+            <div class="stack-mobile" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
                 <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'status' => $selectedStatus, 'invoice_date' => $selectedInvoiceDate]) }}">{{ __('txn.all') }}</a>
                 <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'semester' => $currentSemester, 'status' => $selectedStatus, 'invoice_date' => $selectedInvoiceDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
                 <a class="btn secondary" href="{{ route('sales-invoices.index', ['search' => $search, 'semester' => $previousSemester, 'status' => $selectedStatus, 'invoice_date' => $selectedInvoiceDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
@@ -74,7 +86,8 @@
     </div>
 
     <div class="card invoice-list-card">
-        <table>
+        <div class="table-mobile-scroll">
+        <table class="mobile-stack-table">
             <thead>
             <tr>
                 <th>{{ __('txn.invoice') }}</th>
@@ -92,7 +105,7 @@
                     $adminAction = $invoiceAdminActionMap[(int) $invoice->id] ?? ['edited' => false, 'canceled' => false];
                 @endphp
                 <tr>
-                    <td>
+                    <td data-label="{{ __('txn.invoice') }}">
                         <div class="list-doc-cell">
                             <a class="list-doc-link" href="{{ route('sales-invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a>
                             @if($invoice->orderNote)
@@ -117,12 +130,12 @@
                             </span>
                         </div>
                     </td>
-                    <td>{{ $invoice->invoice_date->format('d-m-Y') }}</td>
-                    <td>
+                    <td data-label="{{ __('txn.date') }}">{{ $invoice->invoice_date->format('d-m-Y') }}</td>
+                    <td data-label="{{ __('txn.customer') }}">
                         {{ $invoice->customer->name }} <span class="muted">({{ $invoice->customer->city }})</span>
                     </td>
-                    <td>Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</td>
-                    <td>
+                    <td data-label="{{ __('txn.total') }}">Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</td>
+                    <td data-label="{{ __('txn.action') }}" class="action">
                         <div class="flex">
                             <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
@@ -140,6 +153,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
 
         <div style="margin-top: 12px;">
             {{ $invoices->links() }}

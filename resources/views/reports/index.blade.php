@@ -6,45 +6,55 @@
     <h1 class="page-title">{{ __('report.export_title') }}</h1>
 
     <div class="card">
-        <form method="get" class="flex" style="margin-bottom: 10px;">
-            <label for="semester" style="min-width: 130px; align-self: center;">{{ __('report.semester_filter') }}</label>
-            <select id="semester" name="semester" style="max-width: 180px;">
-                <option value="">{{ __('report.all_semesters') }}</option>
-                @foreach($semesterOptions as $semester)
-                    <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
-                @endforeach
-            </select>
-            <label for="customer_id" style="min-width: 130px; align-self: center;">{{ __('report.customer_filter') }}</label>
-            <select id="customer_id" name="customer_id" style="max-width: 140px;">
-                <option value="">{{ __('report.all_customers') }}</option>
-                @foreach($receivableCustomers as $customer)
-                    <option value="{{ $customer->id }}" @selected($selectedCustomerId === $customer->id)>{{ $customer->name }}</option>
-                @endforeach
-            </select>
-            <label for="user_role" style="min-width: 120px; align-self: center;">{{ __('report.user_role_filter') }}</label>
-            <select id="user_role" name="user_role" style="max-width: 180px;">
-                <option value="">{{ __('report.all_roles') }}</option>
-                <option value="admin" @selected($selectedUserRole === 'admin')>{{ __('report.values.role_admin') }}</option>
-                <option value="user" @selected($selectedUserRole === 'user')>{{ __('report.values.role_user') }}</option>
-            </select>
-            <label for="finance_lock" style="min-width: 130px; align-self: center;">{{ __('report.finance_lock_filter') }}</label>
-            <select id="finance_lock" name="finance_lock" style="max-width: 180px;">
-                <option value="">{{ __('report.all_finance_lock') }}</option>
-                <option value="1" @selected($selectedFinanceLock === 1)>{{ __('report.finance_lock_yes') }}</option>
-                <option value="0" @selected($selectedFinanceLock === 0)>{{ __('report.finance_lock_no') }}</option>
-            </select>
-            <label for="transaction_type" style="min-width: 130px; align-self: center;">{{ __('report.filters.type') }}</label>
-            <select id="transaction_type" name="transaction_type" style="max-width: 180px;">
-                <option value="" @selected($selectedTransactionType === null)>Semua</option>
-                <option value="all" @selected($selectedTransactionType === 'all')>Semua</option>
-                <option value="sales_invoice" @selected($selectedTransactionType === 'sales_invoice')>Faktur Penjualan</option>
-                <option value="sales_return" @selected($selectedTransactionType === 'sales_return')>Retur Penjualan</option>
-                <option value="delivery_note" @selected($selectedTransactionType === 'delivery_note')>Surat Jalan</option>
-                <option value="delivery_trip" @selected($selectedTransactionType === 'delivery_trip')>Catatan Perjalanan</option>
-                <option value="order_note" @selected($selectedTransactionType === 'order_note')>Surat Pesanan</option>
-                <option value="outgoing_transaction" @selected($selectedTransactionType === 'outgoing_transaction')>Tanda Terima Barang</option>
-                <option value="receivable_payment" @selected($selectedTransactionType === 'receivable_payment')>Pembayaran Piutang</option>
-            </select>
+        <form method="get" class="filter-toolbar" style="margin-bottom: 10px;">
+            <div class="filter-field">
+                <label for="semester">{{ __('report.semester_filter') }}</label>
+                <select id="semester" name="semester" style="max-width: 180px;">
+                    <option value="">{{ __('report.all_semesters') }}</option>
+                    @foreach($semesterOptions as $semester)
+                        <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="customer_id">{{ __('report.customer_filter') }}</label>
+                <select id="customer_id" name="customer_id" style="max-width: 180px;">
+                    <option value="">{{ __('report.all_customers') }}</option>
+                    @foreach($receivableCustomers as $customer)
+                        <option value="{{ $customer->id }}" @selected($selectedCustomerId === $customer->id)>{{ $customer->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="user_role">{{ __('report.user_role_filter') }}</label>
+                <select id="user_role" name="user_role" style="max-width: 180px;">
+                    <option value="">{{ __('report.all_roles') }}</option>
+                    <option value="admin" @selected($selectedUserRole === 'admin')>{{ __('report.values.role_admin') }}</option>
+                    <option value="user" @selected($selectedUserRole === 'user')>{{ __('report.values.role_user') }}</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="finance_lock">{{ __('report.finance_lock_filter') }}</label>
+                <select id="finance_lock" name="finance_lock" style="max-width: 180px;">
+                    <option value="">{{ __('report.all_finance_lock') }}</option>
+                    <option value="1" @selected($selectedFinanceLock === 1)>{{ __('report.finance_lock_yes') }}</option>
+                    <option value="0" @selected($selectedFinanceLock === 0)>{{ __('report.finance_lock_no') }}</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="transaction_type">{{ __('report.filters.type') }}</label>
+                <select id="transaction_type" name="transaction_type" style="max-width: 180px;">
+                    <option value="" @selected($selectedTransactionType === null)>Semua</option>
+                    <option value="all" @selected($selectedTransactionType === 'all')>Semua</option>
+                    <option value="sales_invoice" @selected($selectedTransactionType === 'sales_invoice')>Faktur Penjualan</option>
+                    <option value="sales_return" @selected($selectedTransactionType === 'sales_return')>Retur Penjualan</option>
+                    <option value="delivery_note" @selected($selectedTransactionType === 'delivery_note')>Surat Jalan</option>
+                    <option value="delivery_trip" @selected($selectedTransactionType === 'delivery_trip')>Catatan Perjalanan</option>
+                    <option value="order_note" @selected($selectedTransactionType === 'order_note')>Surat Pesanan</option>
+                    <option value="outgoing_transaction" @selected($selectedTransactionType === 'outgoing_transaction')>Tanda Terima Barang</option>
+                    <option value="receivable_payment" @selected($selectedTransactionType === 'receivable_payment')>Pembayaran Piutang</option>
+                </select>
+            </div>
             <button type="submit">{{ __('report.apply_filter') }}</button>
         </form>
         <p class="muted" style="margin-top: -4px;">
@@ -54,6 +64,7 @@
             {{ __('report.user_filter_note') }}
         </p>
         <p class="muted">{{ __('report.export_options') }}</p>
+        <div class="table-mobile-scroll">
         <table>
             <thead>
             <tr>
@@ -94,10 +105,12 @@
             @endforeach
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="card">
         <h2 class="page-title" style="font-size:16px; margin:0 0 10px 0;">{{ __('report.export_queue_title') }}</h2>
+        <div class="table-mobile-scroll">
         <table>
             <thead>
                 <tr>
@@ -142,6 +155,7 @@
                 @endforelse
             </tbody>
         </table>
+        </div>
     </div>
 
     <script>

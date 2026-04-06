@@ -3,20 +3,26 @@
 @section('title', __('ui.users_title').' - PgPOS ERP')
 
 @section('content')
-    <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
-        <h1 class="page-title" style="margin: 0;">{{ __('ui.users_title') }}</h1>
-        <a class="btn" href="{{ route('users.create') }}">{{ __('ui.add_user') }}</a>
+    <div class="page-header-actions">
+        <h1 class="page-title">{{ __('ui.users_title') }}</h1>
+        <div class="actions">
+            <a class="btn" href="{{ route('users.create') }}">{{ __('ui.add_user') }}</a>
+        </div>
     </div>
 
     <div class="card">
-        <form id="users-search-form" method="get" class="flex">
-            <input id="users-search-input" type="text" name="search" placeholder="{{ __('ui.search_users_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+        <form id="users-search-form" method="get" class="filter-toolbar">
+            <div class="filter-field">
+                <label for="users-search-input">{{ __('ui.search') }}</label>
+                <input id="users-search-input" type="text" name="search" placeholder="{{ __('ui.search_users_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+            </div>
             <button type="submit">{{ __('ui.search') }}</button>
         </form>
     </div>
 
     <div class="card">
-        <table>
+        <div class="table-mobile-scroll">
+        <table class="mobile-stack-table">
             <thead>
             <tr>
                 <th>{{ __('ui.name') }}</th>
@@ -32,14 +38,14 @@
             <tbody>
             @forelse($users as $user)
                 <tr>
-                    <td>{{ $user->name }}</td>
-                    <td>{{ $user->username }}</td>
-                    <td>{{ $user->email }}</td>
-                    <td>{{ strtoupper($user->role) }}</td>
-                    <td>{{ strtoupper($user->locale) }}</td>
-                    <td>{{ $user->theme }}</td>
-                    <td>{{ $user->finance_locked ? __('ui.yes') : __('ui.no') }}</td>
-                    <td>
+                    <td data-label="{{ __('ui.name') }}">{{ $user->name }}</td>
+                    <td data-label="{{ __('ui.username') }}">{{ $user->username }}</td>
+                    <td data-label="{{ __('ui.email') }}">{{ $user->email }}</td>
+                    <td data-label="{{ __('ui.role') }}">{{ strtoupper($user->role) }}</td>
+                    <td data-label="{{ __('ui.language') }}">{{ strtoupper($user->locale) }}</td>
+                    <td data-label="{{ __('ui.theme') }}">{{ $user->theme }}</td>
+                    <td data-label="{{ __('ui.finance_lock') }}">{{ $user->finance_locked ? __('ui.yes') : __('ui.no') }}</td>
+                    <td data-label="{{ __('ui.actions') }}" class="action">
                         <div class="flex">
                             <a class="btn edit-btn" href="{{ route('users.edit', $user) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('users.destroy', $user) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_user') }}');">
@@ -55,6 +61,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
         <div style="margin-top:12px;">
             {{ $users->links() }}
         </div>

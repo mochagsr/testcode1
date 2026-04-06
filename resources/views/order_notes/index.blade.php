@@ -14,23 +14,34 @@
         }
     </style>
 
-    <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
-        <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }}</h1>
-        <a class="btn create-transaction-btn" href="{{ route('order-notes.create') }}">{{ __('txn.create_order_note') }}</a>
+    <div class="page-header-actions">
+        <h1 class="page-title">{{ __('txn.order_notes_title') }}</h1>
+        <div class="actions">
+            <a class="btn create-transaction-btn" href="{{ route('order-notes.create') }}">{{ __('txn.create_order_note') }}</a>
+        </div>
     </div>
 
     <div class="card order-list-card">
-        <form id="order-notes-filter-form" method="get" class="flex">
-            <input id="order-notes-search-input" type="text" name="search" placeholder="{{ __('txn.search_order_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
-            <input id="order-notes-date-input" type="date" name="note_date" value="{{ $selectedNoteDate }}" style="max-width: 180px;">
-            <select id="order-notes-semester-input" name="semester" style="max-width: 180px;">
-                <option value="">{{ __('txn.all_semesters') }}</option>
-                @foreach($semesterOptions as $semester)
-                    <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
-                @endforeach
-            </select>
+        <form id="order-notes-filter-form" method="get" class="filter-toolbar">
+            <div class="filter-field">
+                <label for="order-notes-search-input">{{ __('txn.search') }}</label>
+                <input id="order-notes-search-input" type="text" name="search" placeholder="{{ __('txn.search_order_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
+            </div>
+            <div class="filter-field">
+                <label for="order-notes-date-input">{{ __('txn.date') }}</label>
+                <input id="order-notes-date-input" type="date" name="note_date" value="{{ $selectedNoteDate }}" style="max-width: 180px;">
+            </div>
+            <div class="filter-field">
+                <label for="order-notes-semester-input">{{ __('txn.semester_period') }}</label>
+                <select id="order-notes-semester-input" name="semester" style="max-width: 180px;">
+                    <option value="">{{ __('txn.all_semesters') }}</option>
+                    @foreach($semesterOptions as $semester)
+                        <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
+                    @endforeach
+                </select>
+            </div>
             <button type="submit">{{ __('txn.search') }}</button>
-            <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
+            <div class="stack-mobile" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
                 <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.all') }}</a>
                 <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'semester' => $currentSemester, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
                 <a class="btn secondary" href="{{ route('order-notes.index', ['search' => $search, 'semester' => $previousSemester, 'note_date' => $selectedNoteDate]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
@@ -60,7 +71,8 @@
     </div>
 
     <div class="card">
-        <table>
+        <div class="table-mobile-scroll">
+        <table class="mobile-stack-table">
             <thead>
             <tr>
                 <th>{{ __('txn.no') }}</th>
@@ -88,7 +100,7 @@
                     $statusLabel = ($progress['status'] ?? 'open') === 'finished' ? __('txn.order_note_status_finished') : __('txn.order_note_status_open');
                 @endphp
                 <tr>
-                    <td>
+                    <td data-label="{{ __('txn.no') }}">
                         <div class="list-doc-cell">
                             <a class="list-doc-link" href="{{ route('order-notes.show', $note) }}">{{ $note->note_number }}</a>
                             <span class="list-doc-badges">
@@ -98,12 +110,12 @@
                             </span>
                         </div>
                     </td>
-                    <td>{{ $note->note_date->format('d-m-Y') }}</td>
-                    <td>{{ $note->customer_name }}</td>
-                    <td>{{ $note->city ?: '-' }}</td>
-                    <td>{{ $progressLabel }}%</td>
-                    <td>{{ number_format((int) ($progress['remaining_total'] ?? 0), 0, ',', '.') }}</td>
-                    <td>
+                    <td data-label="{{ __('txn.date') }}">{{ $note->note_date->format('d-m-Y') }}</td>
+                    <td data-label="{{ __('txn.customer') }}">{{ $note->customer_name }}</td>
+                    <td data-label="{{ __('txn.city') }}">{{ $note->city ?: '-' }}</td>
+                    <td data-label="{{ __('txn.order_note_progress') }}">{{ $progressLabel }}%</td>
+                    <td data-label="{{ __('txn.balance') }}">{{ number_format((int) ($progress['remaining_total'] ?? 0), 0, ',', '.') }}</td>
+                    <td data-label="{{ __('txn.status') }}">
                         @if($note->is_canceled)
                             <span class="badge danger">{{ __('txn.status_canceled') }}</span>
                         @elseif(($progress['status'] ?? 'open') === 'finished')
@@ -112,8 +124,8 @@
                             <span class="badge warning">{{ $statusLabel }}</span>
                         @endif
                     </td>
-                    <td>{{ $note->created_by_name ?: '-' }}</td>
-                    <td>
+                    <td data-label="{{ __('txn.created_by') }}">{{ $note->created_by_name ?: '-' }}</td>
+                    <td data-label="{{ __('txn.action') }}" class="action">
                         <div class="flex">
                             <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
@@ -129,6 +141,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
 
         <div style="margin-top: 12px;">
             {{ $notes->links() }}

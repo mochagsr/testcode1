@@ -289,6 +289,7 @@
                     @endphp
                     <label>{{ __('ui.settings_semester_list') }} / {{ __('ui.active') }} {!! $settingsHintIcon($settingsHints['semester_list']) !!}</label>
                     <p class="muted" style="margin: 0 0 8px 0;">{{ __('ui.settings_semester_active_note') }}</p>
+                    <div class="table-mobile-scroll">
                     <table id="semester-codes-table">
                         <thead>
                         <tr>
@@ -364,6 +365,7 @@
                         @endforelse
                         </tbody>
                     </table>
+                    </div>
                     <button type="button" id="add-semester-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                 </div>
 
@@ -377,6 +379,7 @@
                                 $productCodes = collect(old('product_unit_codes', $unitOptionRows->pluck('code')->all()))->values();
                                 $productLabels = collect(old('product_unit_labels', $unitOptionRows->pluck('label')->all()))->values();
                             @endphp
+                            <div class="table-mobile-scroll">
                             <table id="product-units-table">
                                 <thead>
                                 <tr>
@@ -401,6 +404,7 @@
                                 @endfor
                                 </tbody>
                             </table>
+                            </div>
                             <button type="button" id="add-product-unit-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                         </div>
                         <div class="col-6">
@@ -409,6 +413,7 @@
                                 $outgoingCodes = collect(old('outgoing_unit_codes', $outgoingUnitOptionRows->pluck('code')->all()))->values();
                                 $outgoingLabels = collect(old('outgoing_unit_labels', $outgoingUnitOptionRows->pluck('label')->all()))->values();
                             @endphp
+                            <div class="table-mobile-scroll">
                             <table id="outgoing-units-table">
                                 <thead>
                                 <tr>
@@ -433,6 +438,7 @@
                                 @endfor
                                 </tbody>
                             </table>
+                            </div>
                             <button type="button" id="add-outgoing-unit-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                         </div>
                     </div>

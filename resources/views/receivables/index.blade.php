@@ -537,7 +537,7 @@
             <div class="card">
                 <h3>{{ __('receivable.customer') }}</h3>
                 <div class="receivable-scroll-wrap customer">
-                <table class="receivable-customer-table">
+                <table class="receivable-customer-table mobile-stack-table">
                     <colgroup>
                         <col style="width: 25%;">
                         <col style="width: 15%;">
@@ -560,7 +560,7 @@
                             $rowCustomerSemesterManualClosed = $selectedSemester ? ((bool) ($customerSemesterManualClosedMap[$customer->id] ?? false)) : false;
                         @endphp
                         <tr>
-                            <td class="customer-col">
+                            <td data-label="{{ __('receivable.customer') }}" class="customer-col">
                                 <span class="receivable-customer-name">{{ $customer->name }}</span>
                                 @if($selectedSemester)
                                     <span class="badge receivable-customer-lock {{ $rowCustomerSemesterClosed ? 'danger' : 'success' }}">
@@ -578,9 +578,9 @@
                                     </span>
                                 @endif
                             </td>
-                            <td class="city-col">{{ $customer->city ?: '-' }}</td>
-                            <td class="num outstanding-col">Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
-                            <td class="action-cell">
+                            <td data-label="{{ __('receivable.city') }}" class="city-col">{{ $customer->city ?: '-' }}</td>
+                            <td data-label="{{ __('receivable.outstanding') }}" class="num outstanding-col">Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
+                            <td data-label="{{ __('receivable.action') }}" class="action-cell">
                                 @php
                                     $ledgerUrl = route('receivables.index', [
                                         'customer_id' => $customer->id,

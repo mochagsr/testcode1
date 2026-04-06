@@ -129,20 +129,22 @@
                 <h3 style="margin: 0;">{{ __('txn.invoice_items') }}</h3>
                 <button type="button" id="add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
             </div>
-            <table id="items-table" style="margin-top: 12px;">
-                <thead>
-                <tr>
-                    <th style="width: 39%">{{ __('txn.product') }} *</th>
-                    <th style="width: 9%">{{ __('txn.current_stock') }}</th>
-                    <th style="width: 7%">{{ __('txn.qty') }} *</th>
-                    <th style="width: 11%">{{ __('txn.price') }} *</th>
-                    <th style="width: 10%">{{ __('txn.discount') }} (%)</th>
-                    <th style="width: 22%">{{ __('txn.subtotal') }}</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div class="table-mobile-scroll" style="margin-top: 12px;">
+                <table id="items-table">
+                    <thead>
+                    <tr>
+                        <th style="width: 39%">{{ __('txn.product') }} *</th>
+                        <th style="width: 9%">{{ __('txn.current_stock') }}</th>
+                        <th style="width: 7%">{{ __('txn.qty') }} *</th>
+                        <th style="width: 11%">{{ __('txn.price') }} *</th>
+                        <th style="width: 10%">{{ __('txn.discount') }} (%)</th>
+                        <th style="width: 22%">{{ __('txn.subtotal') }}</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
             <div style="margin-top: 10px; text-align: right;">
                 <strong>{{ __('txn.total') }}: Rp <span id="grand-total">0</span></strong>
             </div>

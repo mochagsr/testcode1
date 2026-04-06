@@ -116,26 +116,38 @@
     <h1 class="page-title">{{ __('supplier_payable.title') }}</h1>
 
     <div class="card">
-        <form method="get" class="flex" id="supplier-payable-filter-form">
-            <input id="supplier-payable-search" type="text" name="search" value="{{ $search }}" placeholder="{{ __('supplier_payable.search_placeholder') }}" style="max-width:320px;">
-            <select name="supplier_id" id="supplier-payable-supplier" style="max-width:240px;">
-                <option value="">{{ __('supplier_payable.all_suppliers') }}</option>
-                @foreach($suppliers as $supplier)
-                    <option value="{{ $supplier->id }}" @selected((int) $selectedSupplierId === (int) $supplier->id)>{{ $supplier->name }}</option>
-                @endforeach
-            </select>
-            <select name="year" id="supplier-payable-year" style="max-width:160px;">
-                <option value="">{{ __('supplier_payable.all_years') }}</option>
-                @foreach($yearOptions as $option)
-                    <option value="{{ $option }}" @selected($selectedYear === $option)>{{ $option }}</option>
-                @endforeach
-            </select>
-            <select name="month" id="supplier-payable-month" style="max-width:170px;">
-                <option value="">{{ __('supplier_payable.all_months') }}</option>
-                @foreach($monthOptions as $monthValue => $monthLabel)
-                    <option value="{{ $monthValue }}" @selected((int) ($selectedMonth ?? 0) === (int) $monthValue)>{{ $monthLabel }}</option>
-                @endforeach
-            </select>
+        <form method="get" class="filter-toolbar" id="supplier-payable-filter-form">
+            <div class="filter-field">
+                <label for="supplier-payable-search">{{ __('txn.search') }}</label>
+                <input id="supplier-payable-search" type="text" name="search" value="{{ $search }}" placeholder="{{ __('supplier_payable.search_placeholder') }}" style="max-width:320px;">
+            </div>
+            <div class="filter-field">
+                <label for="supplier-payable-supplier">{{ __('txn.supplier') }}</label>
+                <select name="supplier_id" id="supplier-payable-supplier" style="max-width:240px;">
+                    <option value="">{{ __('supplier_payable.all_suppliers') }}</option>
+                    @foreach($suppliers as $supplier)
+                        <option value="{{ $supplier->id }}" @selected((int) $selectedSupplierId === (int) $supplier->id)>{{ $supplier->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="supplier-payable-year">{{ __('txn.year') }}</label>
+                <select name="year" id="supplier-payable-year" style="max-width:160px;">
+                    <option value="">{{ __('supplier_payable.all_years') }}</option>
+                    @foreach($yearOptions as $option)
+                        <option value="{{ $option }}" @selected($selectedYear === $option)>{{ $option }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="supplier-payable-month">{{ __('supplier_payable.month_label') }}</label>
+                <select name="month" id="supplier-payable-month" style="max-width:170px;">
+                    <option value="">{{ __('supplier_payable.all_months') }}</option>
+                    @foreach($monthOptions as $monthValue => $monthLabel)
+                        <option value="{{ $monthValue }}" @selected((int) ($selectedMonth ?? 0) === (int) $monthValue)>{{ $monthLabel }}</option>
+                    @endforeach
+                </select>
+            </div>
             <button type="submit">{{ __('txn.search') }}</button>
             <a class="btn info-btn" href="{{ route('supplier-payables.print', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}" target="_blank">{{ __('txn.print') }}</a>
             <a class="btn info-btn" href="{{ route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">{{ __('txn.pdf') }}</a>
@@ -192,7 +204,7 @@
         <div class="col-4 supplier-payable-col-suppliers">
             <div class="card">
                 <div class="supplier-payable-scroll-wrap">
-                <table class="supplier-payable-customers-table">
+                <table class="supplier-payable-customers-table mobile-stack-table">
                     <colgroup>
                         <col style="width: 38%;">
                         <col style="width: 24%;">
@@ -208,9 +220,9 @@
                     <tbody>
                     @forelse($suppliers as $supplier)
                         <tr>
-                            <td class="supplier-name">{{ $supplier->name }}</td>
-                            <td class="num">Rp {{ number_format((int) ($supplier->outstanding_payable ?? 0), 0, ',', '.') }}</td>
-                            <td class="action">
+                            <td data-label="{{ __('txn.supplier') }}" class="supplier-name">{{ $supplier->name }}</td>
+                            <td data-label="{{ __('supplier_payable.outstanding') }}" class="num">Rp {{ number_format((int) ($supplier->outstanding_payable ?? 0), 0, ',', '.') }}</td>
+                            <td data-label="{{ __('txn.action') }}" class="action">
                                 <div class="supplier-payable-actions">
                                     <a class="btn orange-btn" href="{{ route('supplier-payables.index', ['supplier_id' => $supplier->id, 'search' => $search, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">
                                         {{ __('supplier_payable.mutation') }}

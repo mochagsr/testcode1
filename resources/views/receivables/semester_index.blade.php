@@ -40,6 +40,21 @@
                 justify-content: flex-start;
             }
         }
+        @media (max-width: 900px) {
+            .receivable-semester-toolbar,
+            .receivable-semester-toolbar .toolbar-left,
+            .receivable-semester-toolbar .toolbar-right {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .receivable-semester-toolbar .toolbar-left > div,
+            .receivable-semester-toolbar .toolbar-right > * {
+                width: 100%;
+            }
+            .receivable-semester-toolbar .toolbar-right .btn {
+                width: 100%;
+            }
+        }
     </style>
     <h1 class="page-title">{{ __('receivable.semester_page_title') }}</h1>
 
@@ -88,7 +103,7 @@
 
     <div class="card">
         <div class="receivable-semester-table-wrap">
-            <table class="receivable-semester-table">
+            <table class="receivable-semester-table mobile-stack-table">
                 <colgroup>
                     <col style="width: 52px;">
                     <col style="width: 220px;">
@@ -114,14 +129,14 @@
                 <tbody>
                 @forelse($rows as $index => $row)
                     <tr>
-                        <td>{{ (($paginator?->firstItem()) ?? 1) + $index }}</td>
-                        <td><a href="{{ route('receivables.index', ['customer_id' => $row['id'], 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ $row['name'] }}</a></td>
-                        <td>{{ $row['city'] }}</td>
-                        <td>{{ $row['address'] }}</td>
-                        <td class="num">Rp {{ number_format((int) $row['sales_total'], 0, ',', '.') }}</td>
-                        <td class="num">Rp {{ number_format((int) $row['payment_total'], 0, ',', '.') }}</td>
-                        <td class="num">Rp {{ number_format((int) $row['return_total'], 0, ',', '.') }}</td>
-                        <td class="num">Rp {{ number_format((int) $row['outstanding_total'], 0, ',', '.') }}</td>
+                        <td data-label="{{ __('report.columns.no') }}">{{ (($paginator?->firstItem()) ?? 1) + $index }}</td>
+                        <td data-label="{{ __('receivable.semester_customer_name') }}"><a href="{{ route('receivables.index', ['customer_id' => $row['id'], 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ $row['name'] }}</a></td>
+                        <td data-label="{{ __('receivable.city') }}">{{ $row['city'] }}</td>
+                        <td data-label="{{ __('txn.address') }}">{{ $row['address'] }}</td>
+                        <td data-label="{{ __('receivable.semester_sales') }}" class="num">Rp {{ number_format((int) $row['sales_total'], 0, ',', '.') }}</td>
+                        <td data-label="{{ __('receivable.semester_payment') }}" class="num">Rp {{ number_format((int) $row['payment_total'], 0, ',', '.') }}</td>
+                        <td data-label="{{ __('receivable.semester_return') }}" class="num">Rp {{ number_format((int) $row['return_total'], 0, ',', '.') }}</td>
+                        <td data-label="{{ __('receivable.semester_receivable') }}" class="num">Rp {{ number_format((int) $row['outstanding_total'], 0, ',', '.') }}</td>
                     </tr>
                 @empty
                     <tr>

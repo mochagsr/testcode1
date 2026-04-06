@@ -38,6 +38,7 @@
     <div class="ops-grid">
     <div class="card ops-col-12">
         <h1 class="page-title" style="margin:0 0 8px 0;">Ops Health</h1>
+        <div class="table-mobile-scroll">
         <table class="ops-kv">
             <tbody>
             <tr><th style="width:260px;">Environment</th><td>{{ $appEnv }}</td></tr>
@@ -50,6 +51,7 @@
             <tr><th>Total Backup Files</th><td>{{ number_format((int) $backupFileCount, 0, ',', '.') }}</td></tr>
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="card ops-col-6">

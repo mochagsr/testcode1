@@ -89,37 +89,54 @@
         }
     </style>
 
-    <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
-        <h1 class="page-title" style="margin: 0;">{{ __('txn.outgoing_transactions_title') }}</h1>
-        <a class="btn create-transaction-btn" href="{{ route('outgoing-transactions.create') }}">{{ __('txn.create_outgoing_transaction') }}</a>
+    <div class="page-header-actions">
+        <h1 class="page-title">{{ __('txn.outgoing_transactions_title') }}</h1>
+        <div class="actions">
+            <a class="btn create-transaction-btn" href="{{ route('outgoing-transactions.create') }}">{{ __('txn.create_outgoing_transaction') }}</a>
+        </div>
     </div>
 
     <div class="card">
-        <form id="outgoing-filter-form" method="get" class="flex">
-            <input id="outgoing-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('txn.search_outgoing_placeholder') }}" style="max-width: 320px;">
-            <input id="outgoing-date-input" type="date" name="transaction_date" value="{{ $selectedTransactionDate ?? '' }}" style="max-width: 150px;">
-            <select id="outgoing-semester-input" name="semester" style="max-width: 150px;">
-                <option value="">{{ __('txn.all_semesters') }}</option>
-                @foreach($semesterOptions as $semester)
-                    <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
-                @endforeach
-            </select>
-            <select id="outgoing-year-input" name="year" style="max-width: 120px;">
-                <option value="">{{ __('txn.all_years') }}</option>
-                @foreach($yearOptions as $yearOption)
-                    <option value="{{ $yearOption }}" @selected($selectedYear === $yearOption)>{{ $yearOption }}</option>
-                @endforeach
-            </select>
-            <select id="outgoing-supplier-input" name="supplier_id" style="max-width: 260px;">
-                <option value="">{{ __('txn.all_suppliers') }}</option>
-                @foreach($supplierOptions as $supplierOption)
-                    <option value="{{ $supplierOption->id }}" @selected((int) $selectedSupplierId === (int) $supplierOption->id)>
-                        {{ $supplierOption->name }}{{ $supplierOption->company_name ? ' ('.$supplierOption->company_name.')' : '' }}
-                    </option>
-                @endforeach
-            </select>
+        <form id="outgoing-filter-form" method="get" class="filter-toolbar">
+            <div class="filter-field">
+                <label for="outgoing-search-input">{{ __('txn.search') }}</label>
+                <input id="outgoing-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('txn.search_outgoing_placeholder') }}" style="max-width: 320px;">
+            </div>
+            <div class="filter-field">
+                <label for="outgoing-date-input">{{ __('txn.date') }}</label>
+                <input id="outgoing-date-input" type="date" name="transaction_date" value="{{ $selectedTransactionDate ?? '' }}" style="max-width: 150px;">
+            </div>
+            <div class="filter-field">
+                <label for="outgoing-semester-input">{{ __('txn.semester_period') }}</label>
+                <select id="outgoing-semester-input" name="semester" style="max-width: 150px;">
+                    <option value="">{{ __('txn.all_semesters') }}</option>
+                    @foreach($semesterOptions as $semester)
+                        <option value="{{ $semester }}" @selected($selectedSemester === $semester)>{{ $semester }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="outgoing-year-input">{{ __('txn.year') }}</label>
+                <select id="outgoing-year-input" name="year" style="max-width: 120px;">
+                    <option value="">{{ __('txn.all_years') }}</option>
+                    @foreach($yearOptions as $yearOption)
+                        <option value="{{ $yearOption }}" @selected($selectedYear === $yearOption)>{{ $yearOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="outgoing-supplier-input">{{ __('txn.supplier') }}</label>
+                <select id="outgoing-supplier-input" name="supplier_id" style="max-width: 260px;">
+                    <option value="">{{ __('txn.all_suppliers') }}</option>
+                    @foreach($supplierOptions as $supplierOption)
+                        <option value="{{ $supplierOption->id }}" @selected((int) $selectedSupplierId === (int) $supplierOption->id)>
+                            {{ $supplierOption->name }}{{ $supplierOption->company_name ? ' ('.$supplierOption->company_name.')' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
             <button type="submit">{{ __('txn.search') }}</button>
-            <div class="flex" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
+            <div class="stack-mobile" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
                 <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.all') }}</a>
                 <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $currentSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
                 <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $previousSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
@@ -128,7 +145,7 @@
     </div>
 
     <div class="card">
-        <div class="flex" style="justify-content: space-between;">
+        <div class="mobile-summary">
             <strong>{{ __('txn.summary') }}</strong>
             <div class="muted">
                 {{ __('txn.outgoing_transaction_count') }}: {{ (int) ($supplierRecapSummary->total_transactions ?? 0) }} |
@@ -143,7 +160,7 @@
             <div class="card">
                 <strong>{{ __('txn.outgoing_transactions_title') }}</strong>
                 <div class="outgoing-scroll-wrap" style="margin-top: 10px;">
-                <table class="outgoing-transactions-table">
+                <table class="outgoing-transactions-table mobile-stack-table">
                     <colgroup>
                         <col style="width: 22%;">
                         <col style="width: 11%;">
@@ -172,7 +189,7 @@
                             $adminAction = $transactionAdminActionMap[(int) $transaction->id] ?? ['edited' => false];
                         @endphp
                         <tr>
-                            <td>
+                            <td data-label="{{ __('txn.transaction_number') }}">
                                 <div class="list-doc-cell">
                                     <a class="list-doc-link" href="{{ route('outgoing-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a>
                                     <span class="list-doc-badges">
@@ -182,13 +199,13 @@
                                     </span>
                                 </div>
                             </td>
-                            <td>{{ optional($transaction->transaction_date)->format('d-m-Y') }}</td>
-                            <td class="supplier-col">{{ $transaction->supplier?->name ?: '-' }}</td>
-                            <td>{{ $transaction->note_number ?: '-' }}</td>
-                            <td>{{ $transaction->semester_period ?: '-' }}</td>
-                            <td class="num">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td>
-                            <td class="num">{{ number_format((float) ($transaction->total_weight ?? 0), 3, ',', '.') }}</td>
-                            <td class="action">
+                            <td data-label="{{ __('txn.date') }}">{{ optional($transaction->transaction_date)->format('d-m-Y') }}</td>
+                            <td data-label="{{ __('txn.supplier') }}" class="supplier-col">{{ $transaction->supplier?->name ?: '-' }}</td>
+                            <td data-label="{{ __('txn.note_number') }}">{{ $transaction->note_number ?: '-' }}</td>
+                            <td data-label="{{ __('txn.semester_period') }}">{{ $transaction->semester_period ?: '-' }}</td>
+                            <td data-label="{{ __('txn.total') }}" class="num">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td>
+                            <td data-label="{{ __('txn.total_weight') }}" class="num">{{ number_format((float) ($transaction->total_weight ?? 0), 3, ',', '.') }}</td>
+                            <td data-label="{{ __('txn.action') }}" class="action">
                                 <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                     <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                                     <option value="{{ route('outgoing-transactions.print', $transaction) }}">{{ __('txn.print') }}</option>

@@ -227,6 +227,7 @@
         }
         .main {
             padding: 24px;
+            min-width: 0;
         }
         .main a:not(.btn) {
             color: var(--link);
@@ -273,6 +274,7 @@
             border-radius: 10px;
             padding: 16px;
             margin-bottom: 16px;
+            min-width: 0;
         }
         .form-section {
             border: 1px dashed var(--border);
@@ -593,12 +595,87 @@
             display: grid;
             grid-template-columns: repeat(12, 1fr);
             gap: 10px;
+            min-width: 0;
         }
         .col-3 { grid-column: span 3; }
         .col-4 { grid-column: span 4; }
         .col-6 { grid-column: span 6; }
         .col-8 { grid-column: span 8; }
         .col-12 { grid-column: span 12; }
+        .table-mobile-scroll {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid color-mix(in srgb, var(--border) 78%, var(--text) 22%);
+            border-radius: 10px;
+            scrollbar-gutter: stable;
+            background: var(--table-bg);
+        }
+        .table-mobile-scroll > table {
+            min-width: 720px;
+            border: none;
+        }
+        .table-mobile-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-mobile-scroll::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, var(--border) 70%, var(--text) 30%);
+            border-radius: 999px;
+        }
+        .page-header-actions {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .page-header-actions .page-title {
+            margin: 0;
+        }
+        .page-header-actions .actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .filter-toolbar {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+        }
+        .filter-field label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+        .stack-mobile {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .mobile-summary {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .mobile-summary > * {
+            min-width: 0;
+        }
+        .mobile-stack-table {
+            width: 100%;
+        }
         .alert {
             padding: 10px 12px;
             border-radius: 8px;
@@ -775,8 +852,8 @@
                 top: 0;
                 left: 0;
                 bottom: 0;
-                width: min(84vw, 320px);
-                max-width: 320px;
+                width: min(86vw, 296px);
+                max-width: 296px;
                 z-index: 35;
                 overflow-y: auto;
                 box-shadow: 18px 0 36px rgba(15, 23, 42, 0.28);
@@ -801,7 +878,7 @@
                 margin-bottom: 0;
             }
             .main {
-                padding: 16px;
+                padding: 14px;
             }
             .col-3, .col-4, .col-6, .col-8, .col-12 { grid-column: span 12; }
             form .row > [class^="col-"] > input,
@@ -809,11 +886,168 @@
             form .row > [class^="col-"] > textarea {
                 max-width: 100%;
             }
+            .card {
+                padding: 12px;
+                border-radius: 12px;
+            }
             .form-section {
                 padding: 10px;
             }
             .page-title {
-                font-size: 22px;
+                font-size: 21px;
+                line-height: 1.2;
+            }
+            button,
+            .btn,
+            input[type="submit"],
+            input[type="button"] {
+                min-height: 42px;
+                padding: 10px 14px;
+            }
+            .label-with-feedback {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .field-inline-error {
+                text-align: left;
+                white-space: normal;
+                padding-left: 0;
+            }
+            .page-header-actions,
+            .page-header-actions .actions,
+            .filter-toolbar,
+            .stack-mobile,
+            .mobile-summary {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .page-header-actions .actions {
+                justify-content: flex-start;
+            }
+            .filter-field,
+            .filter-toolbar > *,
+            .stack-mobile > * {
+                width: 100%;
+                min-width: 0;
+            }
+            .filter-toolbar .btn,
+            .page-header-actions .actions .btn,
+            .page-header-actions .actions form,
+            .stack-mobile .btn,
+            .stack-mobile form {
+                width: 100%;
+            }
+            .page-header-actions .actions form .btn,
+            .stack-mobile form .btn {
+                width: 100%;
+            }
+            .action-menu,
+            .action-menu-sm,
+            .action-menu-md,
+            .action-menu-lg {
+                width: 100%;
+                max-width: 100%;
+                min-width: 0;
+            }
+            .table-mobile-scroll {
+                margin-inline: -2px;
+            }
+            .table-mobile-scroll > table {
+                min-width: 640px;
+            }
+            .table-mobile-scroll > table.mobile-stack-table {
+                min-width: 0;
+            }
+            .mobile-stack-table,
+            .mobile-stack-table tbody,
+            .mobile-stack-table tr,
+            .mobile-stack-table td {
+                display: block;
+                width: 100%;
+            }
+            .mobile-stack-table thead {
+                display: none;
+            }
+            .mobile-stack-table tr {
+                margin-bottom: 12px;
+                border: 1px solid var(--table-border);
+                border-radius: 10px;
+                overflow: hidden;
+                background: var(--table-bg);
+            }
+            .mobile-stack-table tbody td {
+                display: grid;
+                grid-template-columns: minmax(96px, 38%) minmax(0, 1fr);
+                gap: 8px;
+                align-items: start;
+                border-right: none;
+                padding: 10px 10px;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: initial;
+            }
+            .mobile-stack-table tbody td::before {
+                content: attr(data-label);
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                color: var(--muted);
+                line-height: 1.3;
+            }
+            .mobile-stack-table tbody td.num {
+                text-align: left;
+            }
+            .mobile-stack-table tbody td.action,
+            .mobile-stack-table tbody td.action-cell {
+                display: block;
+            }
+            .mobile-stack-table tbody td.action::before,
+            .mobile-stack-table tbody td.action-cell::before {
+                display: block;
+                margin-bottom: 8px;
+            }
+            .mobile-stack-table tbody td.action .flex,
+            .mobile-stack-table tbody td.action-cell .flex,
+            .mobile-stack-table tbody td.action .receivable-customer-actions,
+            .mobile-stack-table tbody td.action-cell .receivable-customer-actions,
+            .mobile-stack-table tbody td.action .supplier-payable-actions,
+            .mobile-stack-table tbody td.action-cell .supplier-payable-actions {
+                width: 100%;
+            }
+            .mobile-stack-table tbody td.action .btn,
+            .mobile-stack-table tbody td.action-cell .btn,
+            .mobile-stack-table tbody td.action .action-menu,
+            .mobile-stack-table tbody td.action-cell .action-menu,
+            .mobile-stack-table tbody td.action .supplier-payable-actions .btn,
+            .mobile-stack-table tbody td.action-cell .supplier-payable-actions .btn,
+            .mobile-stack-table tbody td.action .receivable-customer-actions .btn,
+            .mobile-stack-table tbody td.action-cell .receivable-customer-actions .btn {
+                width: 100%;
+                max-width: 100%;
+            }
+            .mobile-stack-table tbody td[colspan] {
+                display: block;
+                text-align: left;
+            }
+            .mobile-stack-table tbody td[colspan]::before {
+                content: none;
+            }
+            table:not(.calendar-table) {
+                font-size: 13px;
+            }
+            th, td {
+                padding: 9px 7px;
+            }
+            .list-doc-cell {
+                align-items: flex-start;
+            }
+            .pagination {
+                justify-content: center;
+            }
+            .pagination .page-link {
+                min-width: 38px;
+                min-height: 38px;
             }
         }
     </style>

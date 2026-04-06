@@ -95,17 +95,19 @@
                 <h3 style="margin: 0;">{{ __('txn.items') }}</h3>
                 <button type="button" id="add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
             </div>
-            <table id="items-table" style="margin-top: 12px;">
-                <thead>
-                <tr>
-                    <th style="width: 40%">{{ __('txn.product') }} *</th>
-                    <th style="width: 8%">{{ __('txn.qty') }} *</th>
-                    <th>{{ __('txn.notes') }}</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div class="table-mobile-scroll" style="margin-top: 12px;">
+                <table id="items-table">
+                    <thead>
+                    <tr>
+                        <th style="width: 40%">{{ __('txn.product') }} *</th>
+                        <th style="width: 8%">{{ __('txn.qty') }} *</th>
+                        <th>{{ __('txn.notes') }}</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
 
         <button class="btn" type="submit">{{ __('txn.save_order_note') }}</button>
