@@ -15,7 +15,7 @@
         .num { text-align: right; white-space: nowrap; }
         .total-row td { font-weight: 700; background: #2f74c8; color: #fff; }
         .head { margin-bottom: 8px; position: relative; min-height: 34px; }
-        .head-title { text-align: left; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-left: -18px; }
+        .head-title { text-align: center; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-left: -28px; }
         .head-update { position: absolute; right: 0; bottom: 0; font-size: 13px; font-style: italic; font-weight: 800; }
         .invoice-wrap { width: 100%; }
         .invoice-grid {
@@ -41,7 +41,7 @@
         }
         .company-name { font-size: 15px; font-weight: 800; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
         .company-meta { white-space: pre-line; margin-top: 3px; font-size: 12px; line-height: 1.35; font-weight: 600; }
-        .invoice-title { font-size: 24px; font-weight: 700; text-align: left; margin-top: 36px; margin-left: -18px; }
+        .invoice-title { font-size: 24px; font-weight: 700; text-align: center; margin-top: 36px; margin-left: -28px; }
         .customer-meta { margin-top: 10px; width: 62%; }
         .customer-meta table { width: 100%; border-collapse: collapse; }
         .customer-meta td { padding: 2px 4px 2px 0; vertical-align: top; }
@@ -245,4 +245,6 @@
 </div>
 </body>
 </html>
+
+
 

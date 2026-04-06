@@ -15,13 +15,13 @@
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 15px; font-weight: 800; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
         .company-detail { white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
-        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: left; align-self: center; justify-self: start; min-width: 0; font-weight: 700; margin-left: -18px; }
+        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: center; align-self: center; justify-self: start; min-width: 0; font-weight: 700; margin-left: -28px; }
         .doc-meta-right { font-size: 12px; line-height: 1.3; min-width: 180px; max-width: 270px; justify-self: end; text-align: left; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
-        .kwitansi-title { font-size: 18px; font-weight: 700; letter-spacing: 0.6px; text-align: left; }
+        .kwitansi-title { font-size: 18px; font-weight: 700; letter-spacing: 0.6px; text-align: center; }
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
-        .doc-number { text-align: left; margin-bottom: 4px; }
+        .doc-number { text-align: center; margin-bottom: 4px; }
         .line { display: flex; margin-bottom: 4px; }
         .line-label { width: 150px; flex-shrink: 0; }
         .line-sep { width: 12px; text-align: center; flex-shrink: 0; }
@@ -145,6 +145,9 @@
 </div>
 </body>
 </html>
+
+
+
 
 
 
