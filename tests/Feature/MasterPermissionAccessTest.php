@@ -23,6 +23,8 @@ class MasterPermissionAccessTest extends TestCase
         $this->actingAs($user)->get(route('customers-web.create'))->assertForbidden();
         $this->actingAs($user)->get(route('products.index'))->assertForbidden();
         $this->actingAs($user)->get(route('products.create'))->assertForbidden();
+        $this->actingAs($user)->get(route('customer-levels-web.index'))->assertForbidden();
+        $this->actingAs($user)->get(route('item-categories.index'))->assertForbidden();
     }
 
     public function test_user_with_detailed_master_permissions_can_manage_customers_and_products(): void
@@ -43,5 +45,9 @@ class MasterPermissionAccessTest extends TestCase
         $this->actingAs($user)->get(route('customers-web.create'))->assertOk();
         $this->actingAs($user)->get(route('products.index'))->assertOk();
         $this->actingAs($user)->get(route('products.create'))->assertOk();
+        $this->actingAs($user)->get(route('customer-levels-web.index'))->assertOk();
+        $this->actingAs($user)->get(route('customer-levels-web.create'))->assertOk();
+        $this->actingAs($user)->get(route('item-categories.index'))->assertOk();
+        $this->actingAs($user)->get(route('item-categories.create'))->assertOk();
     }
 }

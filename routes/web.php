@@ -234,8 +234,16 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/products/print', [ProductPageController::class, 'printReport'])->middleware('perm:masters.products.view')->name('products.print');
     Route::get('/products/pdf', [ProductPageController::class, 'exportPdf'])->middleware('perm:masters.products.view')->name('products.export.pdf');
     Route::get('/products/export.csv', [ProductPageController::class, 'exportCsv'])->middleware('perm:masters.products.view')->name('products.export.csv');
+    Route::get('/item-categories', [ItemCategoryPageController::class, 'index'])->middleware('perm:masters.products.manage')->name('item-categories.index');
+    Route::get('/item-categories/create', [ItemCategoryPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('item-categories.create');
+    Route::post('/item-categories', [ItemCategoryPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('item-categories.store');
+    Route::get('/item-categories/{itemCategory}/edit', [ItemCategoryPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('item-categories.edit');
+    Route::put('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('item-categories.update');
+    Route::delete('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('item-categories.destroy');
     Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:masters.products.manage')->name('products.import.template');
     Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:masters.products.manage')->name('products.import');
+    Route::get('/item-categories/import/template', [MassImportController::class, 'templateCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import.template');
+    Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import');
     Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('products.create');
     Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('products.store');
     Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
@@ -243,6 +251,12 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('products.update');
     Route::post('/products/{product}/quick-stock', [ProductPageController::class, 'quickUpdateStock'])->middleware('perm:masters.products.manage')->name('products.quick-stock');
     Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('products.destroy');
+    Route::get('/customer-levels-web', [CustomerLevelPageController::class, 'index'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.index');
+    Route::get('/customer-levels-web/create', [CustomerLevelPageController::class, 'create'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.create');
+    Route::post('/customer-levels-web', [CustomerLevelPageController::class, 'store'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.store');
+    Route::get('/customer-levels-web/{customerLevel}/edit', [CustomerLevelPageController::class, 'edit'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.edit');
+    Route::put('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'update'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.update');
+    Route::delete('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'destroy'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.destroy');
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('perm:settings.profile')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('perm:settings.profile')->name('settings.update');
     Route::post('/settings/semester-close', [SettingsController::class, 'closeSemester'])
@@ -294,25 +308,8 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->name('supplier-payables.admin-update');
 
     Route::middleware('admin')->group(function (): void {
-        Route::get('/item-categories', [ItemCategoryPageController::class, 'index'])->middleware('perm:masters.products.manage')->name('item-categories.index');
-        Route::get('/item-categories/create', [ItemCategoryPageController::class, 'create'])->name('item-categories.create');
-        Route::post('/item-categories', [ItemCategoryPageController::class, 'store'])->name('item-categories.store');
-        Route::get('/item-categories/{itemCategory}/edit', [ItemCategoryPageController::class, 'edit'])->name('item-categories.edit');
-        Route::put('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'update'])->name('item-categories.update');
-        Route::delete('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'destroy'])->name('item-categories.destroy');
-
         Route::get('/sales-invoices/import/template', [MassImportController::class, 'templateSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import.template');
         Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
-        Route::get('/item-categories/import/template', [MassImportController::class, 'templateCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import.template');
-        Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import');
-
-        Route::get('/customer-levels-web', [CustomerLevelPageController::class, 'index'])->name('customer-levels-web.index');
-        Route::get('/customer-levels-web/create', [CustomerLevelPageController::class, 'create'])->name('customer-levels-web.create');
-        Route::post('/customer-levels-web', [CustomerLevelPageController::class, 'store'])->name('customer-levels-web.store');
-        Route::get('/customer-levels-web/{customerLevel}/edit', [CustomerLevelPageController::class, 'edit'])->name('customer-levels-web.edit');
-        Route::put('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'update'])->name('customer-levels-web.update');
-        Route::delete('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'destroy'])->name('customer-levels-web.destroy');
-
         Route::get('/customer-ship-locations/import/template', [MassImportController::class, 'templateCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import.template');
         Route::post('/customer-ship-locations/import', [MassImportController::class, 'importCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import');
 
