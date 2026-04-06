@@ -66,11 +66,15 @@ class PrintLogoDataUriTest extends TestCase
     public function test_resolve_for_print_compresses_large_logo_for_faster_preview(): void
     {
         $resolved = PrintLogoDataUri::resolve($this->largeLogoRelativePath);
-        $printResolved = PrintLogoDataUri::resolveForPrint($this->largeLogoRelativePath, true);
+        $browserPrintResolved = PrintLogoDataUri::resolveForPrint($this->largeLogoRelativePath, true);
+        $pdfPrintResolved = PrintLogoDataUri::resolveForPrint($this->largeLogoRelativePath, false);
 
         $this->assertIsString($resolved);
-        $this->assertIsString($printResolved);
-        $this->assertStringStartsWith('data:image/', $printResolved);
-        $this->assertLessThan(strlen($resolved), strlen($printResolved));
+        $this->assertIsString($browserPrintResolved);
+        $this->assertIsString($pdfPrintResolved);
+        $this->assertStringStartsWith('data:image/', $browserPrintResolved);
+        $this->assertStringStartsWith('data:image/', $pdfPrintResolved);
+        $this->assertLessThan(strlen($resolved), strlen($browserPrintResolved));
+        $this->assertLessThan(strlen($browserPrintResolved), strlen($pdfPrintResolved));
     }
 }

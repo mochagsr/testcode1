@@ -6,11 +6,17 @@ use Illuminate\Support\Facades\Storage;
 
 final class PrintLogoDataUri
 {
-    private const PRINT_MAX_WIDTH = 180;
+    private const BROWSER_PRINT_MAX_WIDTH = 180;
 
-    private const PRINT_MAX_HEIGHT = 180;
+    private const BROWSER_PRINT_MAX_HEIGHT = 180;
 
-    private const PRINT_INLINE_FILESIZE_THRESHOLD = 122880; // 120 KB
+    private const BROWSER_PRINT_INLINE_FILESIZE_THRESHOLD = 122880; // 120 KB
+
+    private const PDF_PRINT_MAX_WIDTH = 140;
+
+    private const PDF_PRINT_MAX_HEIGHT = 140;
+
+    private const PDF_PRINT_INLINE_FILESIZE_THRESHOLD = 81920; // 80 KB
 
     public static function resolveForPrint(?string $logoPath, bool $preferPublicUrl = false): ?string
     {
@@ -25,7 +31,7 @@ final class PrintLogoDataUri
                 continue;
             }
 
-            $optimizedDataUri = static::optimizedDataUri($candidatePath);
+            $optimizedDataUri = static::optimizedDataUri($candidatePath, $preferPublicUrl);
             if ($optimizedDataUri !== null) {
                 return $optimizedDataUri;
             }
@@ -178,7 +184,7 @@ final class PrintLogoDataUri
             || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1;
     }
 
-    private static function optimizedDataUri(string $candidatePath): ?string
+    private static function optimizedDataUri(string $candidatePath, bool $preferPublicUrl): ?string
     {
         $imageInfo = @getimagesize($candidatePath);
         if (! is_array($imageInfo)) {
@@ -189,14 +195,19 @@ final class PrintLogoDataUri
         $height = (int) ($imageInfo[1] ?? 0);
         $mimeType = (string) ($imageInfo['mime'] ?? 'image/png');
         $fileSize = @filesize($candidatePath) ?: 0;
+        $maxWidth = $preferPublicUrl ? self::BROWSER_PRINT_MAX_WIDTH : self::PDF_PRINT_MAX_WIDTH;
+        $maxHeight = $preferPublicUrl ? self::BROWSER_PRINT_MAX_HEIGHT : self::PDF_PRINT_MAX_HEIGHT;
+        $inlineThreshold = $preferPublicUrl
+            ? self::BROWSER_PRINT_INLINE_FILESIZE_THRESHOLD
+            : self::PDF_PRINT_INLINE_FILESIZE_THRESHOLD;
 
         if (
             $width > 0
             && $height > 0
-            && $width <= self::PRINT_MAX_WIDTH
-            && $height <= self::PRINT_MAX_HEIGHT
+            && $width <= $maxWidth
+            && $height <= $maxHeight
             && $fileSize > 0
-            && $fileSize <= self::PRINT_INLINE_FILESIZE_THRESHOLD
+            && $fileSize <= $inlineThreshold
         ) {
             return static::fileDataUri($candidatePath, $mimeType);
         }
@@ -218,10 +229,10 @@ final class PrintLogoDataUri
         $targetWidth = $width;
         $targetHeight = $height;
 
-        if ($width > self::PRINT_MAX_WIDTH || $height > self::PRINT_MAX_HEIGHT) {
+        if ($width > $maxWidth || $height > $maxHeight) {
             $ratio = min(
-                self::PRINT_MAX_WIDTH / max(1, $width),
-                self::PRINT_MAX_HEIGHT / max(1, $height)
+                $maxWidth / max(1, $width),
+                $maxHeight / max(1, $height)
             );
 
             $targetWidth = max(1, (int) round($width * $ratio));
