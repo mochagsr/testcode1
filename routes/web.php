@@ -243,6 +243,16 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/suppliers/lookup', [SupplierPageController::class, 'lookup'])->name('suppliers.lookup');
     Route::get('/suppliers/{supplier}/edit', [SupplierPageController::class, 'edit'])->middleware('perm:masters.suppliers.edit')->name('suppliers.edit');
     Route::put('/suppliers/{supplier}', [SupplierPageController::class, 'update'])->middleware('perm:masters.suppliers.edit')->name('suppliers.update');
+    Route::get('/customers-web', [CustomerPageController::class, 'index'])->middleware('perm:masters.customers.view')->name('customers-web.index');
+    Route::get('/customers-web/level/{customerLevel}', [CustomerPageController::class, 'levelCustomers'])->middleware('perm:masters.customers.view')->name('customers-web.level-customers');
+    Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->middleware('perm:masters.customers.view')->name('customers-web.export.csv');
+    Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import.template');
+    Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import');
+    Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->middleware('perm:masters.customers.manage')->name('customers-web.create');
+    Route::post('/customers-web', [CustomerPageController::class, 'store'])->middleware('perm:masters.customers.manage')->name('customers-web.store');
+    Route::get('/customers-web/{customer}/edit', [CustomerPageController::class, 'edit'])->middleware('perm:masters.customers.manage')->name('customers-web.edit');
+    Route::put('/customers-web/{customer}', [CustomerPageController::class, 'update'])->middleware('perm:masters.customers.manage')->name('customers-web.update');
+    Route::delete('/customers-web/{customer}', [CustomerPageController::class, 'destroy'])->middleware('perm:masters.customers.manage')->name('customers-web.destroy');
     Route::get('/supplier-payables', [SupplierPayablePageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-payables.index');
     Route::get('/supplier-payables/print', [SupplierPayablePageController::class, 'printReport'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print');
     Route::get('/supplier-payables/pdf', [SupplierPayablePageController::class, 'exportReportPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export.pdf');
@@ -303,18 +313,8 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         Route::put('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'update'])->name('customer-levels-web.update');
         Route::delete('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'destroy'])->name('customer-levels-web.destroy');
 
-        Route::get('/customers-web', [CustomerPageController::class, 'index'])->middleware('perm:masters.customers.view')->name('customers-web.index');
-        Route::get('/customers-web/level/{customerLevel}', [CustomerPageController::class, 'levelCustomers'])->middleware('perm:masters.customers.view')->name('customers-web.level-customers');
-        Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->middleware('perm:masters.customers.view')->name('customers-web.export.csv');
-        Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import.template');
-        Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import');
         Route::get('/customer-ship-locations/import/template', [MassImportController::class, 'templateCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import.template');
         Route::post('/customer-ship-locations/import', [MassImportController::class, 'importCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import');
-        Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->middleware('perm:masters.customers.manage')->name('customers-web.create');
-        Route::post('/customers-web', [CustomerPageController::class, 'store'])->middleware('perm:masters.customers.manage')->name('customers-web.store');
-        Route::get('/customers-web/{customer}/edit', [CustomerPageController::class, 'edit'])->middleware('perm:masters.customers.manage')->name('customers-web.edit');
-        Route::put('/customers-web/{customer}', [CustomerPageController::class, 'update'])->middleware('perm:masters.customers.manage')->name('customers-web.update');
-        Route::delete('/customers-web/{customer}', [CustomerPageController::class, 'destroy'])->middleware('perm:masters.customers.manage')->name('customers-web.destroy');
 
         Route::get('/suppliers/create', [SupplierPageController::class, 'create'])->name('suppliers.create');
         Route::get('/suppliers/import/template', [MassImportController::class, 'templateSuppliers'])->middleware('perm:masters.suppliers.edit')->name('suppliers.import.template');

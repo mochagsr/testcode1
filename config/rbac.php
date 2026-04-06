@@ -25,6 +25,8 @@ return [
             'reports.view',
             'reports.export',
             'settings.profile',
+            'masters.customers.view',
+            'masters.customers.manage',
             'masters.suppliers.view',
             'masters.suppliers.edit',
         ],

@@ -144,4 +144,20 @@ class CustomerLevelListFilterTest extends TestCase
             'city' => 'Sidoarjo',
         ]);
     }
+
+    public function test_default_user_can_access_customer_pages(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => config('rbac.roles.user', []),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('customers-web.index'))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->get(route('customers-web.create'))
+            ->assertOk();
+    }
 }
