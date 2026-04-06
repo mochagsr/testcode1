@@ -600,6 +600,8 @@ Jadi kolom `Piutang` selalu dibaca sebagai:
 
 ## 13. Import dari Excel
 
+![Contoh Area Import Barang](assets/manuals/user-product-import.png)
+
 ### Kapan dipakai
 - saat user diberi hak akses import oleh admin
 - untuk memasukkan banyak data master sekaligus
@@ -608,6 +610,10 @@ Jadi kolom `Piutang` selalu dibaca sebagai:
 - selalu download `Template Import` dari menu modul
 - jangan membuat judul kolom sendiri
 - template terbaru sekarang memakai header Indonesia yang lebih mudah dibaca
+- area import biasanya berisi:
+  - pilih file Excel/CSV
+  - tombol `Import`
+  - tombol `Template Import`
 
 ### Contoh header barang
 - `kode`
@@ -625,6 +631,9 @@ Jadi kolom `Piutang` selalu dibaca sebagai:
 
 ### Contoh error yang mungkin muncul
 - `Kolom wajib pada file import belum lengkap: Kategori, Harga Umum. Gunakan template import terbaru.`
+- `Baris 8: Barang tidak terdaftar. Buat barang dulu atau samakan nama/kode barang.`
+- `Baris 12: Customer tidak terdaftar. Buat customer dulu atau samakan nama/kode customer.`
+- `Baris 20: Stok barang Matematika 1 tidak cukup untuk jumlah yang diimport.`
 
 Kalau muncul pesan seperti itu:
 1. download lagi template terbaru

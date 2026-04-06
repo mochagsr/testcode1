@@ -128,13 +128,13 @@ class MassImportController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    $errors[] = 'Baris '.($rowIndex + 2).': '.implode('; ', $validator->errors()->all());
+                    $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
                     continue;
                 }
 
                 $categoryId = $this->resolveCategoryId((string) $data['category']);
                 if ($categoryId === null) {
-                    $errors[] = 'Baris '.($rowIndex + 2).': kategori tidak ditemukan.';
+                    $errors[] = $this->formatImportRowError($rowIndex + 2, 'Kategori tidak terdaftar. Samakan nama kategori dengan data master.');
                     continue;
                 }
 
@@ -249,7 +249,7 @@ class MassImportController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    $errors[] = 'Baris '.($rowIndex + 2).': '.implode('; ', $validator->errors()->all());
+                    $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
                     continue;
                 }
 
@@ -326,7 +326,7 @@ class MassImportController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    $errors[] = 'Baris '.($rowIndex + 2).': '.implode('; ', $validator->errors()->all());
+                    $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
                     continue;
                 }
 
@@ -405,7 +405,7 @@ class MassImportController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    $errors[] = 'Baris '.($rowIndex + 2).': '.implode('; ', $validator->errors()->all());
+                    $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
                     continue;
                 }
 
@@ -415,7 +415,7 @@ class MassImportController extends Controller
                     ->orWhere('code', $customerLookup)
                     ->first();
                 if ($customer === null) {
-                    $errors[] = 'Baris '.($rowIndex + 2).': customer tidak ditemukan.';
+                    $errors[] = $this->formatImportRowError($rowIndex + 2, 'Customer tidak terdaftar. Buat customer dulu atau samakan nama/kode customer.');
                     continue;
                 }
 
@@ -494,7 +494,7 @@ class MassImportController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    $errors[] = 'Baris '.($rowIndex + 2).': '.implode('; ', $validator->errors()->all());
+                    $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
                     continue;
                 }
 
@@ -575,7 +575,7 @@ class MassImportController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    $errors[] = 'Baris '.$line.': '.implode('; ', $validator->errors()->all());
+                    $errors[] = $this->formatImportRowError($line, implode('; ', $validator->errors()->all()));
                     continue;
                 }
 
@@ -584,7 +584,7 @@ class MassImportController extends Controller
                     ->orWhere('code', (string) $data['customer'])
                     ->first();
                 if ($customer === null) {
-                    $errors[] = 'Baris '.$line.': customer tidak ditemukan.';
+                    $errors[] = $this->formatImportRowError($line, 'Customer tidak terdaftar. Buat customer dulu atau samakan nama/kode customer.');
                     continue;
                 }
 
@@ -593,13 +593,13 @@ class MassImportController extends Controller
                     ->orWhere('name', (string) $data['product'])
                     ->first();
                 if ($product === null) {
-                    $errors[] = 'Baris '.$line.': produk tidak ditemukan.';
+                    $errors[] = $this->formatImportRowError($line, 'Barang tidak terdaftar. Buat barang dulu atau samakan nama/kode barang.');
                     continue;
                 }
 
                 $quantity = (int) $data['quantity'];
                 if ((int) $product->stock < $quantity) {
-                    $errors[] = 'Baris '.$line.': stok produk '.$product->name.' tidak cukup.';
+                    $errors[] = $this->formatImportRowError($line, 'Stok barang '.$product->name.' tidak cukup untuk jumlah yang diimport.');
                     continue;
                 }
 
@@ -762,6 +762,11 @@ class MassImportController extends Controller
         }
 
         return $missing;
+    }
+
+    private function formatImportRowError(int $rowNumber, string $message): string
+    {
+        return 'Baris '.$rowNumber.': '.trim($message);
     }
 
     /**

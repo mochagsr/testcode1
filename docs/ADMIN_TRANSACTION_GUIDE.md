@@ -702,6 +702,8 @@ php artisan app:smoke test
 
 ## 20. Import massal
 
+![Contoh Area Import Barang](assets/manuals/admin-product-import.png)
+
 ### Tugas admin
 - download template
 - validasi file sebelum import
@@ -742,6 +744,10 @@ php artisan app:smoke test
   - `jumlah`
   - `harga_satuan`
 - admin tetap disarankan download `Template Import` terbaru dari menu modul
+- area import berisi:
+  - pilih file
+  - tombol `Import`
+  - tombol `Template Import`
 
 ### Contoh
 - import customer baru 300 data
@@ -762,6 +768,10 @@ Sebelum import besar:
 - kalau ada kolom wajib yang kurang, sistem sekarang menampilkan pesan yang mudah dibaca
   - contoh:
     - `Kolom wajib pada file import belum lengkap: Kategori, Harga Umum. Gunakan template import terbaru.`
+- contoh error per baris yang sekarang lebih mudah dibaca:
+  - `Baris 8: Barang tidak terdaftar. Buat barang dulu atau samakan nama/kode barang.`
+  - `Baris 12: Customer tidak terdaftar. Buat customer dulu atau samakan nama/kode customer.`
+  - `Baris 20: Stok barang Matematika 1 tidak cukup untuk jumlah yang diimport.`
 
 ## 21. Pengaturan
 

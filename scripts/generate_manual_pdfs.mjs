@@ -66,6 +66,27 @@ async function shotLocator(locator, fileName) {
   return `assets/manuals/${fileName}`;
 }
 
+async function captureProductImportArea(page, fileName, loginIdentifier, password) {
+  await ensureLoggedIn(page, loginIdentifier, password, '/products');
+  const importArea = page.locator('.products-toolbar .toolbar-right').first();
+  const hasImportArea = await importArea.count().catch(() => 0);
+
+  if (hasImportArea > 0) {
+    await shotLocator(importArea, fileName);
+    return true;
+  }
+
+  const toolbar = page.locator('.products-toolbar').first();
+  const hasToolbar = await toolbar.count().catch(() => 0);
+  if (hasToolbar > 0) {
+    await shotLocator(toolbar, fileName);
+    return true;
+  }
+
+  await shot(page, fileName);
+  return true;
+}
+
 async function selectIfExists(page, selector, value) {
   const optionExists = await page.$eval(
     selector,
@@ -501,6 +522,7 @@ async function main() {
   await ensureLoggedIn(admin, adminLogin || adminEmail, adminPassword, '/settings');
   await shot(admin, 'admin-settings.png');
   await captureInvoiceValidationExamples(admin, 'admin-validation', adminLogin || adminEmail, adminPassword);
+  await captureProductImportArea(admin, 'admin-product-import.png', adminLogin || adminEmail, adminPassword);
 
   const userContext = await browser.newContext({ viewport: { width: 1600, height: 980 } });
   const user = await userContext.newPage();
@@ -529,6 +551,13 @@ async function main() {
   await waitForUi(user);
   await shot(user, 'user-settings.png');
   await captureInvoiceValidationExamples(user, 'user-validation', userLogin || userEmail, userPassword);
+  const userImportCaptured = await captureProductImportArea(user, 'user-product-import.png', userLogin || userEmail, userPassword);
+  if (!userImportCaptured) {
+    await fs.copyFile(
+      path.join(assetsDir, 'admin-product-import.png'),
+      path.join(assetsDir, 'user-product-import.png'),
+    );
+  }
 
   await renderPdf(browser, 'USER_TRANSACTION_GUIDE.md', 'USER_TRANSACTION_GUIDE.pdf', 'Panduan User - Semua Jenis Transaksi');
   await renderPdf(browser, 'ADMIN_TRANSACTION_GUIDE.md', 'ADMIN_TRANSACTION_GUIDE.pdf', 'Panduan Admin - Semua Jenis Transaksi');
