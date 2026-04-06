@@ -6,18 +6,36 @@ use Illuminate\Support\Facades\Storage;
 
 final class PrintLogoDataUri
 {
+    private const PRINT_MAX_WIDTH = 180;
+
+    private const PRINT_MAX_HEIGHT = 180;
+
+    private const PRINT_INLINE_FILESIZE_THRESHOLD = 122880; // 120 KB
+
     public static function resolveForPrint(?string $logoPath, bool $preferPublicUrl = false): ?string
     {
-        $dataUri = static::resolve($logoPath);
-        if ($dataUri !== null) {
-            return $dataUri;
+        $rawLogoPath = trim((string) $logoPath);
+
+        if ($rawLogoPath === '') {
+            return $preferPublicUrl ? static::publicUrl($logoPath) : null;
+        }
+
+        foreach (static::candidatePaths($rawLogoPath) as $candidatePath) {
+            if (! is_file($candidatePath) || ! is_readable($candidatePath)) {
+                continue;
+            }
+
+            $optimizedDataUri = static::optimizedDataUri($candidatePath);
+            if ($optimizedDataUri !== null) {
+                return $optimizedDataUri;
+            }
         }
 
         if ($preferPublicUrl) {
             return static::publicUrl($logoPath);
         }
 
-        return null;
+        return static::resolve($logoPath);
     }
 
     public static function resolve(?string $logoPath): ?string
@@ -158,5 +176,96 @@ final class PrintLogoDataUri
     {
         return str_starts_with($path, DIRECTORY_SEPARATOR)
             || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1;
+    }
+
+    private static function optimizedDataUri(string $candidatePath): ?string
+    {
+        $imageInfo = @getimagesize($candidatePath);
+        if (! is_array($imageInfo)) {
+            return static::fileDataUri($candidatePath);
+        }
+
+        $width = (int) ($imageInfo[0] ?? 0);
+        $height = (int) ($imageInfo[1] ?? 0);
+        $mimeType = (string) ($imageInfo['mime'] ?? 'image/png');
+        $fileSize = @filesize($candidatePath) ?: 0;
+
+        if (
+            $width > 0
+            && $height > 0
+            && $width <= self::PRINT_MAX_WIDTH
+            && $height <= self::PRINT_MAX_HEIGHT
+            && $fileSize > 0
+            && $fileSize <= self::PRINT_INLINE_FILESIZE_THRESHOLD
+        ) {
+            return static::fileDataUri($candidatePath, $mimeType);
+        }
+
+        if (! function_exists('imagecreatefromstring')) {
+            return static::fileDataUri($candidatePath, $mimeType);
+        }
+
+        $contents = @file_get_contents($candidatePath);
+        if ($contents === false) {
+            return null;
+        }
+
+        $source = @imagecreatefromstring($contents);
+        if (! is_object($source) && ! is_resource($source)) {
+            return static::fileDataUri($candidatePath, $mimeType);
+        }
+
+        $targetWidth = $width;
+        $targetHeight = $height;
+
+        if ($width > self::PRINT_MAX_WIDTH || $height > self::PRINT_MAX_HEIGHT) {
+            $ratio = min(
+                self::PRINT_MAX_WIDTH / max(1, $width),
+                self::PRINT_MAX_HEIGHT / max(1, $height)
+            );
+
+            $targetWidth = max(1, (int) round($width * $ratio));
+            $targetHeight = max(1, (int) round($height * $ratio));
+        }
+
+        $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+        if (! $canvas) {
+            imagedestroy($source);
+            return static::fileDataUri($candidatePath, $mimeType);
+        }
+
+        imagealphablending($canvas, false);
+        imagesavealpha($canvas, true);
+        $transparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
+        imagefilledrectangle($canvas, 0, 0, $targetWidth, $targetHeight, $transparent);
+
+        imagecopyresampled($canvas, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, max(1, $width), max(1, $height));
+
+        ob_start();
+        imagepng($canvas, null, 8);
+        $optimizedBinary = ob_get_clean();
+
+        imagedestroy($canvas);
+        imagedestroy($source);
+
+        if (! is_string($optimizedBinary) || $optimizedBinary === '') {
+            return static::fileDataUri($candidatePath, $mimeType);
+        }
+
+        return 'data:image/png;base64,' . base64_encode($optimizedBinary);
+    }
+
+    private static function fileDataUri(string $candidatePath, ?string $mimeType = null): ?string
+    {
+        $contents = @file_get_contents($candidatePath);
+
+        if ($contents === false) {
+            return null;
+        }
+
+        $resolvedMimeType = $mimeType
+            ?: (function_exists('mime_content_type') ? (mime_content_type($candidatePath) ?: 'image/png') : 'image/png');
+
+        return 'data:' . $resolvedMimeType . ';base64,' . base64_encode($contents);
     }
 }
