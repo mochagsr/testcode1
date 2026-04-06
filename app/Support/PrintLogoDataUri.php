@@ -8,14 +8,16 @@ final class PrintLogoDataUri
 {
     public static function resolveForPrint(?string $logoPath, bool $preferPublicUrl = false): ?string
     {
-        if ($preferPublicUrl) {
-            $publicUrl = static::publicUrl($logoPath);
-            if ($publicUrl !== null) {
-                return $publicUrl;
-            }
+        $dataUri = static::resolve($logoPath);
+        if ($dataUri !== null) {
+            return $dataUri;
         }
 
-        return static::resolve($logoPath);
+        if ($preferPublicUrl) {
+            return static::publicUrl($logoPath);
+        }
+
+        return null;
     }
 
     public static function resolve(?string $logoPath): ?string
@@ -79,18 +81,18 @@ final class PrintLogoDataUri
 
             try {
                 if (Storage::disk('public')->exists($storageRelative)) {
-                    return Storage::disk('public')->url($storageRelative);
+                    return '/storage/' . str_replace('\\', '/', ltrim($storageRelative, '/\\'));
                 }
             } catch (\Throwable) {
                 // Fall through to public path checks.
             }
 
             if (is_file(public_path($normalized))) {
-                return asset(str_replace('\\', '/', $normalized));
+                return '/' . ltrim(str_replace('\\', '/', $normalized), '/');
             }
 
             if (is_file(public_path('storage/' . $storageRelative))) {
-                return asset('storage/' . str_replace('\\', '/', $storageRelative));
+                return '/storage/' . str_replace('\\', '/', ltrim($storageRelative, '/\\'));
             }
         }
 
