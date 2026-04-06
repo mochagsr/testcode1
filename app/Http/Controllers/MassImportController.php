@@ -44,7 +44,7 @@ class MassImportController extends Controller
     public function templateProducts(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-products.xlsx', [
-            ['code', 'name', 'category', 'unit', 'stock', 'price_agent', 'price_sales', 'price_general'],
+            ['kode', 'nama', 'kategori', 'satuan', 'stok', 'harga_agen', 'harga_sales', 'harga_umum'],
             ['', 'Matematika 1 Edisi 5 Smt 1 25/26', 'Buku', 'exp', 100, 50000, 55000, 60000],
         ], 'Products');
     }
@@ -101,6 +101,11 @@ class MassImportController extends Controller
         }
 
         $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $missingHeaders = $this->missingHeaders($headers, ['name', 'category', 'unit', 'stock', 'price_agent', 'price_sales', 'price_general']);
+        if ($missingHeaders !== []) {
+            return back()->with('error', 'Kolom wajib pada file import belum lengkap: '.implode(', ', $missingHeaders).'. Gunakan template import terbaru.');
+        }
+
         $errors = [];
         $created = 0;
         $updated = 0;
@@ -680,12 +685,85 @@ class MassImportController extends Controller
      */
     private function normalizeHeaders(array $rows): array
     {
+        $aliases = $this->headerAliases();
+
         return array_map(static function ($header): string {
             $normalized = strtolower(trim((string) $header));
             $normalized = str_replace([' ', '-'], '_', $normalized);
 
             return preg_replace('/[^a-z0-9_]/', '', $normalized) ?: '';
-        }, $rows);
+        }, array_map(static function ($header) use ($aliases): string {
+            $normalized = strtolower(trim((string) $header));
+            $normalized = str_replace([' ', '-'], '_', $normalized);
+            $normalized = preg_replace('/[^a-z0-9_]/', '', $normalized) ?: '';
+
+            return $aliases[$normalized] ?? $normalized;
+        }, $rows));
+    }
+
+    /**
+     * @param array<int, string> $headers
+     * @param array<int, string> $requiredHeaders
+     * @return array<int, string>
+     */
+    private function missingHeaders(array $headers, array $requiredHeaders): array
+    {
+        $presentHeaders = array_values(array_unique(array_filter($headers)));
+        $humanLabels = [
+            'name' => 'Nama',
+            'category' => 'Kategori',
+            'unit' => 'Satuan',
+            'stock' => 'Stok',
+            'price_agent' => 'Harga Agen',
+            'price_sales' => 'Harga Sales',
+            'price_general' => 'Harga Umum',
+        ];
+
+        $missing = [];
+        foreach ($requiredHeaders as $requiredHeader) {
+            if (! in_array($requiredHeader, $presentHeaders, true)) {
+                $missing[] = $humanLabels[$requiredHeader] ?? $requiredHeader;
+            }
+        }
+
+        return $missing;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function headerAliases(): array
+    {
+        return [
+            'kode' => 'code',
+            'nama' => 'name',
+            'kategori' => 'category',
+            'satuan' => 'unit',
+            'stok' => 'stock',
+            'hargaagen' => 'price_agent',
+            'harga_agen' => 'price_agent',
+            'hargasales' => 'price_sales',
+            'harga_sales' => 'price_sales',
+            'hargaumum' => 'price_general',
+            'harga_umum' => 'price_general',
+            'level_customer' => 'level',
+            'nohp' => 'phone',
+            'no_hp' => 'phone',
+            'telepon' => 'phone',
+            'perusahaan' => 'company_name',
+            'supplier' => 'supplier',
+            'pelanggan' => 'customer',
+            'barang' => 'product',
+            'jumlah' => 'quantity',
+            'kuantitas' => 'quantity',
+            'harga_satuan' => 'unit_price',
+            'metode_pembayaran' => 'payment_method',
+            'tanggal_faktur' => 'invoice_date',
+            'tanggal_jatuh_tempo' => 'due_date',
+            'semester' => 'semester_period',
+            'tipe_transaksi' => 'transaction_type',
+            'diskon_persen' => 'discount',
+        ];
     }
 
     /**
