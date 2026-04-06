@@ -114,7 +114,9 @@
     <div class="card ops-col-6">
         <h3 style="margin-top:0;">Performance Probe (List/Search)</h3>
         @if($latestPerformanceProbe)
-            @php($metrics = (array) ($latestPerformanceProbe->metrics ?? []))
+            @php
+                $metrics = (array) ($latestPerformanceProbe->metrics ?? []);
+            @endphp
             <table class="ops-kv">
                 <tbody>
                 <tr><th>Probed At</th><td>{{ optional($latestPerformanceProbe->probed_at)->format('d-m-Y H:i:s') ?: '-' }}</td></tr>

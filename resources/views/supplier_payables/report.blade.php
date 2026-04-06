@@ -79,7 +79,9 @@
         </thead>
         <tbody>
         @forelse($summarySuppliers as $index => $supplier)
-            @php($supplierId = (int) $supplier->id)
+            @php
+                $supplierId = (int) $supplier->id;
+            @endphp
             <tr>
                 <td>{{ $index + 1 }}</td>
                 <td>{{ $supplier->name }}</td>

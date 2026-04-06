@@ -36,7 +36,9 @@
                     <td>{{ $item->action }}</td>
                     <td>{{ strtoupper($item->status) }}</td>
                     <td>
-                        @php($execution = is_array($item->payload) ? ($item->payload['execution'] ?? null) : null)
+                        @php
+                            $execution = is_array($item->payload) ? ($item->payload['execution'] ?? null) : null;
+                        @endphp
                         @if(is_array($execution))
                             <span class="badge {{ ($execution['status'] ?? '') === 'success' ? 'success' : (($execution['status'] ?? '') === 'failed' ? 'danger' : 'warning') }}">
                                 {{ strtoupper((string) ($execution['status'] ?? '-')) }}
@@ -63,7 +65,9 @@
                                 </form>
                             </div>
                         @elseif($item->status === 'approved')
-                            @php($executionStatus = (string) data_get($item->payload, 'execution.status', ''))
+                            @php
+                                $executionStatus = (string) data_get($item->payload, 'execution.status', '');
+                            @endphp
                             @if(in_array($executionStatus, ['failed', 'skipped'], true))
                                 <form method="post" action="{{ route('approvals.re-execute', $item) }}">
                                     @csrf

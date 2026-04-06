@@ -284,7 +284,9 @@
                             <td>
                                 {{ $row->description ?: '-' }}
                                 @if($row->outgoingTransaction)
-                                    @php($isOutgoingEdited = (bool) ($outgoingTransactionAdminEditedMap[(int) $row->outgoing_transaction_id] ?? false))
+                                    @php
+                                        $isOutgoingEdited = (bool) ($outgoingTransactionAdminEditedMap[(int) $row->outgoing_transaction_id] ?? false);
+                                    @endphp
                                     <div class="list-doc-cell" style="margin-top: 4px;">
                                         <a class="list-doc-link" href="{{ route('outgoing-transactions.show', $row->outgoingTransaction) }}" target="_blank">{{ $row->outgoingTransaction->transaction_number }}</a>
                                         <span class="list-doc-badges">
@@ -295,7 +297,9 @@
                                     </div>
                                 @endif
                                 @if($row->supplierPayment)
-                                    @php($isPaymentEdited = (bool) ($supplierPaymentAdminEditedMap[(int) $row->supplier_payment_id] ?? false))
+                                    @php
+                                        $isPaymentEdited = (bool) ($supplierPaymentAdminEditedMap[(int) $row->supplier_payment_id] ?? false);
+                                    @endphp
                                     <div class="list-doc-cell" style="margin-top: 4px;">
                                         <a class="list-doc-link" href="{{ route('supplier-payables.show-payment', $row->supplierPayment) }}" target="_blank">{{ $row->supplierPayment->payment_number }}</a>
                                         <span class="list-doc-badges">

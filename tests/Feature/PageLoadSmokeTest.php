@@ -107,7 +107,6 @@ class PageLoadSmokeTest extends TestCase
         return [
             route('dashboard'),
             route('customers-web.index'),
-            route('customers-web.create'),
             route('suppliers.index'),
             route('outgoing-transactions.index'),
             route('outgoing-transactions.create'),

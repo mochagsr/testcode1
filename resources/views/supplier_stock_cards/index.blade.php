@@ -106,19 +106,25 @@
                 </tr>
                 </thead>
                 <tbody>
-                @php($lastSupplierId = null)
+                @php
+                    $lastSupplierId = null;
+                @endphp
                 @forelse($summaryPaginator as $row)
-                    @php($supplierId = (int) ($row['supplier_id'] ?? 0))
-                    @php($stockBalance = (int) ($row['balance'] ?? 0))
-                    @php($editableProductId = (int) ($row['editable_product_id'] ?? 0))
-                    @php($rowKey = md5(($row['product_code'] ?? '').'|'.($row['product_name'] ?? '').'|'.$supplierId.'|'.$editableProductId))
+                    @php
+                        $supplierId = (int) ($row['supplier_id'] ?? 0);
+                        $stockBalance = (int) ($row['balance'] ?? 0);
+                        $editableProductId = (int) ($row['editable_product_id'] ?? 0);
+                        $rowKey = md5(($row['product_code'] ?? '').'|'.($row['product_name'] ?? '').'|'.$supplierId.'|'.$editableProductId);
+                    @endphp
                     <tr>
                         <td>
                             @if($supplierId > 0 && $lastSupplierId !== $supplierId)
                                 <a href="{{ route('supplier-stock-cards.index', array_merge(request()->query(), ['supplier_id' => $supplierId])) }}">
                                     {{ $row['supplier_name'] ?? '-' }}
                                 </a>
-                                @php($lastSupplierId = $supplierId)
+                                @php
+                                    $lastSupplierId = $supplierId;
+                                @endphp
                             @endif
                         </td>
                         <td>{{ $row['category_name'] ?? '-' }}</td>

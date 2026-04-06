@@ -191,9 +191,14 @@
             }
         }
     </style>
+    @php
+        $canManageProducts = auth()->user()?->canAccess('masters.products.manage') ?? false;
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.products_title') }}</h1>
-        <a class="btn" href="{{ route('products.create') }}">{{ __('ui.add_product') }}</a>
+        @if($canManageProducts)
+            <a class="btn" href="{{ route('products.create') }}">{{ __('ui.add_product') }}</a>
+        @endif
     </div>
 
     <div class="card">
@@ -205,16 +210,18 @@
                 </form>
             </div>
             <div class="toolbar-right">
-                <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="import-form">
-                    @csrf
-                    <div class="import-file-wrap">
-                        <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                    </div>
-                    <div class="import-actions">
-                        <button type="submit" class="btn process-btn product-action-btn">Import</button>
-                        <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
-                    </div>
-                </form>
+                @if($canManageProducts)
+                    <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="import-form">
+                        @csrf
+                        <div class="import-file-wrap">
+                            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                        </div>
+                        <div class="import-actions">
+                            <button type="submit" class="btn process-btn product-action-btn">Import</button>
+                            <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
+                        </div>
+                    </form>
+                @endif
                 <div class="report-actions">
                     <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search]) }}" target="_blank">{{ __('txn.print') }}</a>
                     <a class="btn info-btn product-action-btn" href="{{ route('products.export.pdf', ['search' => $search]) }}">Export PDF</a>
@@ -271,19 +278,23 @@
                     <td class="price-col">Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
                     <td class="action-col">
                         <div class="product-actions">
-                            <button
-                                type="button"
-                                class="btn process-soft-btn product-action-btn js-open-product-stock-modal"
-                                data-product-id="{{ (int) $product->id }}"
-                                data-product-code="{{ (string) ($product->code ?? '') }}"
-                                data-product-name="{{ (string) ($product->name ?? '') }}"
-                                data-current-stock="{{ (int) round($product->stock) }}"
-                                data-update-url="{{ route('products.quick-stock', $product) }}"
-                            >
-                                {{ __('ui.edit_stock') }}
-                            </button>
+                            @if($canManageProducts)
+                                <button
+                                    type="button"
+                                    class="btn process-soft-btn product-action-btn js-open-product-stock-modal"
+                                    data-product-id="{{ (int) $product->id }}"
+                                    data-product-code="{{ (string) ($product->code ?? '') }}"
+                                    data-product-name="{{ (string) ($product->name ?? '') }}"
+                                    data-current-stock="{{ (int) round($product->stock) }}"
+                                    data-update-url="{{ route('products.quick-stock', $product) }}"
+                                >
+                                    {{ __('ui.edit_stock') }}
+                                </button>
+                            @endif
                             <a class="btn process-btn product-action-btn" href="{{ route('products.mutations', $product) }}">{{ __('ui.stock_mutations_title') }}</a>
-                            <a class="btn edit-btn product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
+                            @if($canManageProducts)
+                                <a class="btn edit-btn product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
+                            @endif
                         </div>
                     </td>
                 </tr>

@@ -3,11 +3,16 @@
 @section('title', __('ui.stock_mutations_title').' - PgPOS ERP')
 
 @section('content')
+    @php
+        $canManageProducts = auth()->user()?->canAccess('masters.products.manage') ?? false;
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.stock_mutations_title') }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('products.index') }}">{{ __('txn.back') }}</a>
-            <a class="btn edit-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit_product') }}</a>
+            @if($canManageProducts)
+                <a class="btn edit-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit_product') }}</a>
+            @endif
         </div>
     </div>
 

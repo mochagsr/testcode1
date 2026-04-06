@@ -1,4 +1,6 @@
-@php($editing = isset($supplier) && $supplier)
+@php
+    $editing = isset($supplier) && $supplier;
+@endphp
 <div class="row">
     <div class="col-6">
         <label>{{ __('ui.name') }} <span class="label-required">*</span></label>

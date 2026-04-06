@@ -230,6 +230,19 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/reports/queued/status', [ReportExportController::class, 'queuedExportsStatus'])->middleware('perm:reports.export')->name('reports.queue.status');
     Route::post('/reports/queued/{task}/retry', [ReportExportController::class, 'retryQueuedExport'])->middleware('perm:reports.export')->name('reports.queue.retry');
     Route::post('/reports/queued/{task}/cancel', [ReportExportController::class, 'cancelQueuedExport'])->middleware('perm:reports.export')->name('reports.queue.cancel');
+    Route::get('/products', [ProductPageController::class, 'index'])->middleware('perm:masters.products.view')->name('products.index');
+    Route::get('/products/print', [ProductPageController::class, 'printReport'])->middleware('perm:masters.products.view')->name('products.print');
+    Route::get('/products/pdf', [ProductPageController::class, 'exportPdf'])->middleware('perm:masters.products.view')->name('products.export.pdf');
+    Route::get('/products/export.csv', [ProductPageController::class, 'exportCsv'])->middleware('perm:masters.products.view')->name('products.export.csv');
+    Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:masters.products.manage')->name('products.import.template');
+    Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:masters.products.manage')->name('products.import');
+    Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('products.create');
+    Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('products.store');
+    Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
+    Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('products.edit');
+    Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('products.update');
+    Route::post('/products/{product}/quick-stock', [ProductPageController::class, 'quickUpdateStock'])->middleware('perm:masters.products.manage')->name('products.quick-stock');
+    Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('products.destroy');
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('perm:settings.profile')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('perm:settings.profile')->name('settings.update');
     Route::post('/settings/semester-close', [SettingsController::class, 'closeSemester'])
@@ -288,23 +301,10 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         Route::put('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'update'])->name('item-categories.update');
         Route::delete('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'destroy'])->name('item-categories.destroy');
 
-        Route::get('/products', [ProductPageController::class, 'index'])->middleware('perm:masters.products.view')->name('products.index');
-        Route::get('/products/print', [ProductPageController::class, 'printReport'])->middleware('perm:masters.products.view')->name('products.print');
-        Route::get('/products/pdf', [ProductPageController::class, 'exportPdf'])->middleware('perm:masters.products.view')->name('products.export.pdf');
-        Route::get('/products/export.csv', [ProductPageController::class, 'exportCsv'])->middleware('perm:masters.products.view')->name('products.export.csv');
-        Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:masters.products.manage')->name('products.import.template');
-        Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:masters.products.manage')->name('products.import');
         Route::get('/sales-invoices/import/template', [MassImportController::class, 'templateSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import.template');
         Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
         Route::get('/item-categories/import/template', [MassImportController::class, 'templateCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import.template');
         Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import');
-        Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('products.create');
-        Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('products.store');
-        Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
-        Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('products.edit');
-        Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('products.update');
-        Route::post('/products/{product}/quick-stock', [ProductPageController::class, 'quickUpdateStock'])->middleware('perm:masters.products.manage')->name('products.quick-stock');
-        Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('products.destroy');
 
         Route::get('/customer-levels-web', [CustomerLevelPageController::class, 'index'])->name('customer-levels-web.index');
         Route::get('/customer-levels-web/create', [CustomerLevelPageController::class, 'create'])->name('customer-levels-web.create');

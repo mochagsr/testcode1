@@ -113,9 +113,14 @@
             }
         }
     </style>
+    @php
+        $canManageCustomers = auth()->user()?->canAccess('masters.customers.manage') ?? false;
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.customers_title') }}</h1>
-        <a class="btn" href="{{ route('customers-web.create') }}">{{ __('ui.add_customer') }}</a>
+        @if($canManageCustomers)
+            <a class="btn" href="{{ route('customers-web.create') }}">{{ __('ui.add_customer') }}</a>
+        @endif
     </div>
 
     <div class="card">
@@ -133,17 +138,23 @@
                 </form>
             </div>
             <div class="toolbar-right">
-                <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data" class="import-form">
-                    @csrf
-                    <div class="import-file-wrap">
-                        <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                    </div>
+                @if($canManageCustomers)
+                    <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data" class="import-form">
+                        @csrf
+                        <div class="import-file-wrap">
+                            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                        </div>
+                        <div class="import-actions">
+                            <button type="submit" class="btn process-btn">Import</button>
+                            <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
+                            <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">Export Excel</a>
+                        </div>
+                    </form>
+                @else
                     <div class="import-actions">
-                        <button type="submit" class="btn process-btn">Import</button>
-                        <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
                         <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">Export Excel</a>
                     </div>
-                </form>
+                @endif
             </div>
         </div>
         @if(session('import_errors'))
@@ -209,14 +220,18 @@
                         @endif
                     </td>
                     <td>
-                        <div class="flex">
-                            <a class="btn edit-btn" href="{{ route('customers-web.edit', $customer) }}">{{ __('ui.edit') }}</a>
-                            <form method="post" action="{{ route('customers-web.destroy', $customer) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_customer') }}');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
-                            </form>
-                        </div>
+                        @if($canManageCustomers)
+                            <div class="flex">
+                                <a class="btn edit-btn" href="{{ route('customers-web.edit', $customer) }}">{{ __('ui.edit') }}</a>
+                                <form method="post" action="{{ route('customers-web.destroy', $customer) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_customer') }}');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
+                                </form>
+                            </div>
+                        @else
+                            -
+                        @endif
                     </td>
                 </tr>
             @empty

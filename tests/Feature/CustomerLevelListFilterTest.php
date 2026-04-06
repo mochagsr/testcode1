@@ -158,6 +158,6 @@ class CustomerLevelListFilterTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('customers-web.create'))
-            ->assertOk();
+            ->assertForbidden();
     }
 }
