@@ -52,15 +52,15 @@ class MassImportController extends Controller
     public function templateCustomers(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-customers.xlsx', [
-            ['name', 'level', 'phone', 'city', 'address', 'notes'],
-            ['Toko Sumber Ilmu', 'Agen', '08123456789', 'Malang', 'Jl. Soekarno Hatta 10', 'Customer lama'],
+            ['nama', 'level_customer', 'no_hp_1', 'no_hp_2', 'kota', 'alamat', 'catatan'],
+            ['Toko Sumber Ilmu', 'Agen', '08123456789', '08234567890', 'Malang', 'Jl. Soekarno Hatta 10', 'Customer lama'],
         ], 'Customers');
     }
 
     public function templateCategories(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-item-categories.xlsx', [
-            ['code', 'name', 'description'],
+            ['kode', 'nama', 'deskripsi'],
             ['', 'Paket SD', 'Kategori paket sekolah dasar'],
         ], 'ItemCategories');
     }
@@ -68,7 +68,7 @@ class MassImportController extends Controller
     public function templateCustomerShipLocations(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-customer-ship-locations.xlsx', [
-            ['customer', 'school_name', 'phone', 'city', 'address', 'notes', 'is_active'],
+            ['customer', 'nama_sekolah', 'no_hp', 'kota', 'alamat', 'catatan', 'aktif'],
             ['CUS-01012026-0001', 'SDN Prambon 1', '08123456789', 'Sidoarjo', 'Jl. Raya Prambon No. 1', 'Lokasi kirim utama', 1],
         ], 'ShipLocations');
     }
@@ -76,7 +76,7 @@ class MassImportController extends Controller
     public function templateSuppliers(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-suppliers.xlsx', [
-            ['name', 'company_name', 'phone', 'address', 'notes'],
+            ['nama', 'nama_perusahaan', 'no_hp', 'alamat', 'catatan'],
             ['PT Kertas Maju', 'PT Kertas Maju', '081212121212', 'Surabaya', 'Pembayaran 30 hari'],
         ], 'Suppliers');
     }
@@ -84,7 +84,7 @@ class MassImportController extends Controller
     public function templateSalesInvoices(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-sales-invoices.xlsx', [
-            ['customer', 'invoice_date', 'due_date', 'semester_period', 'transaction_type', 'payment_method', 'product', 'quantity', 'unit_price', 'discount', 'notes'],
+            ['customer', 'tanggal_faktur', 'tanggal_jatuh_tempo', 'semester', 'tipe_transaksi', 'metode_pembayaran', 'barang', 'jumlah', 'harga_satuan', 'diskon', 'catatan'],
             ['Toko Sumber Ilmu', '2026-02-20', '2026-02-27', 'S2-2526', 'product', 'kredit', 'MAT1E5S12526', 10, 50000, 0, 'Import transaksi awal'],
         ], 'SalesInvoices');
     }
@@ -223,6 +223,11 @@ class MassImportController extends Controller
         }
 
         $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $missingHeaders = $this->missingHeaders($headers, ['name', 'phone', 'city', 'address']);
+        if ($missingHeaders !== []) {
+            return back()->with('error', 'Kolom wajib pada file import belum lengkap: '.implode(', ', $missingHeaders).'. Gunakan template import terbaru.');
+        }
+
         $errors = [];
         $created = 0;
         $updated = 0;
@@ -253,6 +258,7 @@ class MassImportController extends Controller
                     'customer_level_id' => $levelId,
                     'name' => (string) $data['name'],
                     'phone' => (string) ($data['phone'] ?? ''),
+                    'phone_secondary' => (string) ($data['phone_secondary'] ?? ''),
                     'city' => (string) ($data['city'] ?? ''),
                     'address' => (string) ($data['address'] ?? ''),
                     'notes' => (string) ($data['notes'] ?? ''),
@@ -297,6 +303,11 @@ class MassImportController extends Controller
         }
 
         $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $missingHeaders = $this->missingHeaders($headers, ['name']);
+        if ($missingHeaders !== []) {
+            return back()->with('error', 'Kolom wajib pada file import belum lengkap: '.implode(', ', $missingHeaders).'. Gunakan template import terbaru.');
+        }
+
         $errors = [];
         $created = 0;
         $updated = 0;
@@ -367,6 +378,11 @@ class MassImportController extends Controller
         }
 
         $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $missingHeaders = $this->missingHeaders($headers, ['customer', 'school_name']);
+        if ($missingHeaders !== []) {
+            return back()->with('error', 'Kolom wajib pada file import belum lengkap: '.implode(', ', $missingHeaders).'. Gunakan template import terbaru.');
+        }
+
         $errors = [];
         $created = 0;
         $updated = 0;
@@ -453,6 +469,11 @@ class MassImportController extends Controller
         }
 
         $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $missingHeaders = $this->missingHeaders($headers, ['name']);
+        if ($missingHeaders !== []) {
+            return back()->with('error', 'Kolom wajib pada file import belum lengkap: '.implode(', ', $missingHeaders).'. Gunakan template import terbaru.');
+        }
+
         $errors = [];
         $created = 0;
         $updated = 0;
@@ -523,6 +544,11 @@ class MassImportController extends Controller
         }
 
         $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $missingHeaders = $this->missingHeaders($headers, ['customer', 'invoice_date', 'payment_method', 'product', 'quantity', 'unit_price']);
+        if ($missingHeaders !== []) {
+            return back()->with('error', 'Kolom wajib pada file import belum lengkap: '.implode(', ', $missingHeaders).'. Gunakan template import terbaru.');
+        }
+
         $errors = [];
         $created = 0;
 
@@ -711,12 +737,21 @@ class MassImportController extends Controller
         $presentHeaders = array_values(array_unique(array_filter($headers)));
         $humanLabels = [
             'name' => 'Nama',
+            'phone' => 'No HP 1',
+            'phone_secondary' => 'No HP 2',
             'category' => 'Kategori',
             'unit' => 'Satuan',
             'stock' => 'Stok',
             'price_agent' => 'Harga Agen',
             'price_sales' => 'Harga Sales',
             'price_general' => 'Harga Umum',
+            'customer' => 'Customer',
+            'school_name' => 'Nama Sekolah',
+            'invoice_date' => 'Tanggal Faktur',
+            'payment_method' => 'Metode Pembayaran',
+            'product' => 'Barang',
+            'quantity' => 'Jumlah',
+            'unit_price' => 'Harga Satuan',
         ];
 
         $missing = [];
@@ -747,13 +782,30 @@ class MassImportController extends Controller
             'hargaumum' => 'price_general',
             'harga_umum' => 'price_general',
             'level_customer' => 'level',
+            'levelcustomer' => 'level',
             'nohp' => 'phone',
             'no_hp' => 'phone',
+            'nohp1' => 'phone',
+            'no_hp_1' => 'phone',
+            'nomorhp1' => 'phone',
             'telepon' => 'phone',
+            'telepon1' => 'phone',
+            'nohp2' => 'phone_secondary',
+            'no_hp_2' => 'phone_secondary',
+            'nomorhp2' => 'phone_secondary',
+            'telepon2' => 'phone_secondary',
+            'kota' => 'city',
+            'alamat' => 'address',
+            'catatan' => 'notes',
+            'deskripsi' => 'description',
             'perusahaan' => 'company_name',
+            'nama_perusahaan' => 'company_name',
             'supplier' => 'supplier',
             'pelanggan' => 'customer',
             'barang' => 'product',
+            'namasekolah' => 'school_name',
+            'nama_sekolah' => 'school_name',
+            'aktif' => 'is_active',
             'jumlah' => 'quantity',
             'kuantitas' => 'quantity',
             'harga_satuan' => 'unit_price',

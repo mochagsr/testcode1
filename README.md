@@ -139,6 +139,23 @@ Catatan:
 - `docs/UAT_AAPANEL_POST_DEPLOY.md`
 - `docs/GO_LIVE_RUNBOOK.md`
 
+## Import massal dengan header Indonesia
+- Template import sekarang memakai header yang lebih natural untuk user awam.
+- Contoh header import `Barang`:
+  - `kode`
+  - `nama`
+  - `kategori`
+  - `satuan`
+  - `stok`
+  - `harga_agen`
+  - `harga_sales`
+  - `harga_umum`
+- Kolom `kode` pada import barang boleh kosong.
+  - kalau kosong, sistem akan membuat kode barang otomatis
+- Import `Customer`, `Supplier`, `Kategori Barang`, `Lokasi Kirim Customer`, dan `Faktur Penjualan` juga sudah menerima header Indonesia
+- Kalau ada kolom wajib yang belum lengkap, sistem sekarang menampilkan pesan yang mudah dibaca, misalnya:
+  - `Kolom wajib pada file import belum lengkap: Kategori, Harga Umum. Gunakan template import terbaru.`
+
 ## Deploy yang direkomendasikan
 - Untuk panel `aaPanel v8.0.1`, gunakan dokumen ini:
   - `docs/DEPLOY_AAPANEL.md`

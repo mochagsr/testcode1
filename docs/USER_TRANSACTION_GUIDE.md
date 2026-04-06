@@ -598,6 +598,40 @@ Jadi kolom `Piutang` selalu dibaca sebagai:
 - sistem mencatat pembayaran
 - saldo piutang turun
 
+## 13. Import dari Excel
+
+### Kapan dipakai
+- saat user diberi hak akses import oleh admin
+- untuk memasukkan banyak data master sekaligus
+
+### Aturan penting
+- selalu download `Template Import` dari menu modul
+- jangan membuat judul kolom sendiri
+- template terbaru sekarang memakai header Indonesia yang lebih mudah dibaca
+
+### Contoh header barang
+- `kode`
+- `nama`
+- `kategori`
+- `satuan`
+- `stok`
+- `harga_agen`
+- `harga_sales`
+- `harga_umum`
+
+### Catatan
+- pada import barang, kolom `kode` boleh kosong
+- kalau kosong, sistem akan membuat kode barang otomatis
+
+### Contoh error yang mungkin muncul
+- `Kolom wajib pada file import belum lengkap: Kategori, Harga Umum. Gunakan template import terbaru.`
+
+Kalau muncul pesan seperti itu:
+1. download lagi template terbaru
+2. cocokan nama kolom
+3. perbaiki file Excel
+4. import ulang
+
 ### Contoh lanjutan
 
 Sebelum bayar:

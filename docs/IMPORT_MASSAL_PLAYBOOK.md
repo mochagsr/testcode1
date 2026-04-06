@@ -30,14 +30,30 @@ Dokumen ini dipakai saat tim ingin isi data awal atau update master/transaksi da
 
 ## 4. Checklist per jenis import
 
+### Header template sekarang memakai istilah Indonesia
+- jangan ganti nama kolom sembarangan
+- ikuti header dari file template terbaru
+- contoh header yang sekarang didukung:
+  - `kode`, `nama`, `kategori`, `satuan`, `stok`
+  - `harga_agen`, `harga_sales`, `harga_umum`
+  - `level_customer`, `no_hp_1`, `no_hp_2`
+  - `nama_perusahaan`, `catatan`
+  - `tanggal_faktur`, `tanggal_jatuh_tempo`, `tipe_transaksi`, `metode_pembayaran`
+
+Kalau file lama masih memakai header Inggris, banyak kolom juga tetap bisa dibaca sistem.
+Tetapi untuk operasional harian, tetap pakai template terbaru supaya paling aman.
+
 ### Barang
 - pastikan kategori sudah ada
-- cek kode barang hasil generate
+- kolom `kode` boleh kosong
+  - sistem akan generate kode barang otomatis
 - cek stok awal benar
 - cek harga agen / sales / umum benar
 
 ### Customer
 - cek level customer sudah tersedia
+- `No HP 1` dipakai sebagai nomor utama
+- `No HP 2` opsional
 - cek kota dan alamat tidak tertukar
 - cek nomor telepon tidak berubah format aneh
 
@@ -66,6 +82,8 @@ Dokumen ini dipakai saat tim ingin isi data awal atau update master/transaksi da
 
 ## 5. Kalau ada error saat import
 - baca pesan `Baris X: ...`
+- kalau kolom wajib belum lengkap, sistem akan menampilkan pesan seperti:
+  - `Kolom wajib pada file import belum lengkap: Kategori, Harga Umum. Gunakan template import terbaru.`
 - perbaiki data di file sumber
 - import ulang file yang sudah dibetulkan
 - jangan edit database manual kalau masih bisa diperbaiki lewat import ulang

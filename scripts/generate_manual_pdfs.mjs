@@ -100,13 +100,20 @@ async function captureFirstOrderNoteDetail(page, fileName, loginIdentifier, pass
 async function captureInvoiceValidationExamples(page, prefix, loginIdentifier, password) {
   await ensureLoggedIn(page, loginIdentifier, password, '/sales-invoices/create');
 
-  const customerInput = page.locator('#customer-search');
-  const invoiceDateInput = page.locator('#invoice-date');
+  const customerInput = page.locator('#customer-search, input[list="customers-list"]').first();
+  const invoiceDateInput = page.locator('#invoice-date, input[name="invoice_date"]').first();
+
+  const hasCustomerInput = await customerInput.count().catch(() => 0);
+  const hasInvoiceDateInput = await invoiceDateInput.count().catch(() => 0);
+
+  if (hasCustomerInput === 0 || hasInvoiceDateInput === 0) {
+    return;
+  }
 
   await customerInput.fill('Anto Tidak Ada');
   await invoiceDateInput.click();
   await waitForUi(page);
-  const customerBlock = customerInput.locator('xpath=ancestor::div[contains(@class,"col-12")][1]');
+  const customerBlock = page.locator('#customer-search, input[list="customers-list"]').first().locator('xpath=ancestor::div[contains(@class,"col-12")][1]');
   await shotLocator(customerBlock, `${prefix}-customer-error.png`);
 
   await ensureLoggedIn(page, loginIdentifier, password, '/sales-invoices/create');
@@ -115,8 +122,8 @@ async function captureInvoiceValidationExamples(page, prefix, loginIdentifier, p
       return;
     }
     const selected = customers[0];
-    const customerSearch = document.getElementById('customer-search');
-    const customerId = document.getElementById('customer-id');
+    const customerSearch = document.getElementById('customer-search') || document.querySelector('input[list="customers-list"]');
+    const customerId = document.getElementById('customer-id') || document.querySelector('input[name="customer_id"]');
     const customerError = document.getElementById('customer-search-error');
     if (customerSearch) {
       customerSearch.value = `${selected.name} (${selected.city || '-'})`;

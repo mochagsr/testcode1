@@ -708,6 +708,41 @@ php artisan app:smoke test
 - lakukan import besar di env `tes` dulu
 - backup sebelum import besar di `prod`
 
+### Header template import
+- template import sekarang memakai header Indonesia yang lebih mudah dibaca
+- contoh:
+  - `kode`
+  - `nama`
+  - `kategori`
+  - `satuan`
+  - `stok`
+  - `harga_agen`
+  - `harga_sales`
+  - `harga_umum`
+- untuk import customer:
+  - `nama`
+  - `level_customer`
+  - `no_hp_1`
+  - `no_hp_2`
+  - `kota`
+  - `alamat`
+  - `catatan`
+- untuk import supplier:
+  - `nama`
+  - `nama_perusahaan`
+  - `no_hp`
+  - `alamat`
+  - `catatan`
+- untuk import faktur:
+  - `tanggal_faktur`
+  - `tanggal_jatuh_tempo`
+  - `tipe_transaksi`
+  - `metode_pembayaran`
+  - `barang`
+  - `jumlah`
+  - `harga_satuan`
+- admin tetap disarankan download `Template Import` terbaru dari menu modul
+
 ### Contoh
 - import customer baru 300 data
 - admin test di `tes`
@@ -720,6 +755,13 @@ Sebelum import besar:
 2. jalankan import di `tes`
 3. validasi hasil
 4. baru import ke `prod`
+
+### Catatan penting
+- pada import barang, kolom `kode` boleh kosong
+- kalau kosong, sistem akan membuat kode barang otomatis
+- kalau ada kolom wajib yang kurang, sistem sekarang menampilkan pesan yang mudah dibaca
+  - contoh:
+    - `Kolom wajib pada file import belum lengkap: Kategori, Harga Umum. Gunakan template import terbaru.`
 
 ## 21. Pengaturan
 
