@@ -83,7 +83,7 @@
     $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
         ->filter(fn ($line) => trim((string) $line) !== '');
 
-    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
+    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) $companyLogoPath, empty($isPdf));
 @endphp
 
 <div class="no-print" style="margin-bottom:10px;">

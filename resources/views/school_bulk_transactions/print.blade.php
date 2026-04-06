@@ -57,7 +57,7 @@
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
-        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) $companyLogoPath, empty($isPdf));
     @endphp
 
     @if(empty($isPdf))

@@ -72,7 +72,7 @@
         $transferText = trim((string) ($companyTransferAccounts ?? ''));
         $maxBlankRows = 3;
         $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($customer->address ?? ''), 4);
-        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) $companyLogoPath, empty($isPdf));
         $companyMetaLines = collect([
             $companyAddress,
             $companyPhone !== '' ? 'Telp: '.$companyPhone : '',

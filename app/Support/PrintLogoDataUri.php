@@ -6,6 +6,18 @@ use Illuminate\Support\Facades\Storage;
 
 final class PrintLogoDataUri
 {
+    public static function resolveForPrint(?string $logoPath, bool $preferPublicUrl = false): ?string
+    {
+        if ($preferPublicUrl) {
+            $publicUrl = static::publicUrl($logoPath);
+            if ($publicUrl !== null) {
+                return $publicUrl;
+            }
+        }
+
+        return static::resolve($logoPath);
+    }
+
     public static function resolve(?string $logoPath): ?string
     {
         $rawLogoPath = trim((string) $logoPath);
@@ -34,6 +46,52 @@ final class PrintLogoDataUri
 
         if (preg_match('#^https?://#i', $rawLogoPath) === 1) {
             return $rawLogoPath;
+        }
+
+        return null;
+    }
+
+    public static function publicUrl(?string $logoPath): ?string
+    {
+        $rawLogoPath = trim((string) $logoPath);
+
+        if ($rawLogoPath === '') {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $rawLogoPath) === 1) {
+            return $rawLogoPath;
+        }
+
+        foreach (array_filter([
+            $rawLogoPath,
+            static::pathFromUrl($rawLogoPath),
+        ]) as $possiblePath) {
+            $normalized = ltrim((string) $possiblePath, '/\\');
+
+            if ($normalized === '') {
+                continue;
+            }
+
+            $storageRelative = str_starts_with($normalized, 'storage/')
+                ? substr($normalized, strlen('storage/'))
+                : $normalized;
+
+            try {
+                if (Storage::disk('public')->exists($storageRelative)) {
+                    return Storage::disk('public')->url($storageRelative);
+                }
+            } catch (\Throwable) {
+                // Fall through to public path checks.
+            }
+
+            if (is_file(public_path($normalized))) {
+                return asset(str_replace('\\', '/', $normalized));
+            }
+
+            if (is_file(public_path('storage/' . $storageRelative))) {
+                return asset('storage/' . str_replace('\\', '/', $storageRelative));
+            }
         }
 
         return null;

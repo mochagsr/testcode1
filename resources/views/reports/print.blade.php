@@ -50,7 +50,7 @@
 <div class="container">
     @php
         $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');
-        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) ($companyLogoPath ?? ''));
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) ($companyLogoPath ?? ''), empty($isPdf));
     @endphp
     @if(empty($isPdf))
         <div class="no-print">

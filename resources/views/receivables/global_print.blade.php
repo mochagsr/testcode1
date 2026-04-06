@@ -80,7 +80,7 @@
             $customerAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($selectedCustomer->address ?? '')), 4);
             $notesText = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($companyInvoiceNotes ?? '')), 4);
             $transferText = trim((string) ($companyTransferAccounts ?? ''));
-            $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) ($companyLogoPath ?? ''));
+            $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) ($companyLogoPath ?? ''), empty($isPdf));
             $blankRows = max(0, 7 - $customerInvoiceRows->count());
         @endphp
 

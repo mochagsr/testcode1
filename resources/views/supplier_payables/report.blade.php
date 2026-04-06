@@ -38,7 +38,7 @@
         'company_phone' => '',
         'company_email' => '',
     ]);
-    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) ($settings['company_logo_path'] ?? ''));
+    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) ($settings['company_logo_path'] ?? ''), empty($isPdf));
     $companyName = trim((string) ($settings['company_name'] ?? ''));
     $companyAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($settings['company_address'] ?? '')), 5);
 @endphp

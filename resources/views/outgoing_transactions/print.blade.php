@@ -8,13 +8,13 @@
         @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
-        .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 46%) minmax(220px, 26%) minmax(0, 28%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
         .company-left { display: flex; gap: 6px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 15px; font-weight: 800; letter-spacing: 0; margin-bottom: 2px; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
         .company-detail { font-size: 12px; line-height: 1.35; white-space: pre-line; font-weight: 600; }
-        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: left; align-self: start; justify-self: start; margin-top: -2px; min-width: 0; font-weight: 700; margin-left: -18px; }
+        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 220px; text-align: left; align-self: start; justify-self: start; margin-top: -2px; min-width: 0; font-weight: 700; margin-left: -36px; }
         .doc-meta-right { font-size: 12px; line-height: 1.3; min-width: 180px; max-width: 270px; justify-self: end; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-line .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
@@ -60,7 +60,7 @@
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
             ->values();
-        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) $companyLogoPath);
+        $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) $companyLogoPath, empty($isPdf));
         $supplierInvoicePhotoSrc = null;
 
         if (!empty($transaction->supplier_invoice_photo_path)) {

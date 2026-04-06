@@ -28,7 +28,7 @@
 <body>
 @php
     $companyLogoPath = \App\Models\AppSetting::getValue('company_logo_path');
-    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolve((string) ($companyLogoPath ?? ''));
+    $companyLogoSrc = \App\Support\PrintLogoDataUri::resolveForPrint((string) ($companyLogoPath ?? ''), empty($isPdf));
     $companyName = trim((string) ($settings['company_name'] ?? ''));
     $companyAddress = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($settings['company_address'] ?? '')), 5);
 @endphp
