@@ -31,22 +31,39 @@
         #admin-outgoing-items-table th.admin-col-qty,
         #admin-outgoing-items-table td.admin-col-qty {
             width: 4.5%;
+            padding-left: 4px;
+            padding-right: 4px;
         }
         #admin-outgoing-items-table th.admin-col-weight,
         #admin-outgoing-items-table td.admin-col-weight {
             width: 7%;
+            padding-left: 5px;
+            padding-right: 5px;
         }
         #admin-outgoing-items-table th.admin-col-price,
         #admin-outgoing-items-table td.admin-col-price {
             width: 8%;
+            padding-left: 5px;
+            padding-right: 5px;
         }
         #admin-outgoing-items-table th.admin-col-tax,
         #admin-outgoing-items-table td.admin-col-tax {
             width: 8%;
+            padding-left: 4px;
+            padding-right: 4px;
         }
         #admin-outgoing-items-table th.admin-col-notes,
         #admin-outgoing-items-table td.admin-col-notes {
             width: 14%;
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+        #admin-outgoing-items-table th.admin-col-action,
+        #admin-outgoing-items-table td.admin-col-action {
+            width: 1%;
+            white-space: nowrap;
+            padding-left: 4px;
+            padding-right: 4px;
         }
         #admin-outgoing-items-table .admin-qty-input {
             max-width: 62px;
@@ -71,6 +88,10 @@
             min-width: 136px;
             max-width: 100%;
             width: 100%;
+        }
+        #admin-outgoing-items-table .admin-remove-btn {
+            min-height: 34px;
+            padding: 7px 10px;
         }
 
         @media (max-width: 900px) {
@@ -227,7 +248,7 @@
                             <th class="admin-col-price">{{ __('txn.price') }}</th>
                             <th class="admin-col-tax">{{ __('txn.vat_percent_short') }}</th>
                             <th class="admin-col-notes">{{ __('txn.notes') }}</th>
-                            <th></th>
+                            <th class="admin-col-action"></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -263,18 +284,18 @@
                                     <input type="hidden" class="admin-product-id" name="items[{{ $idx }}][product_id]" value="{{ (int) ($item['product_id'] ?? 0) }}">
                                 </td>
                                 <td><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
-                                <td><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
-                                <td><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
-                                <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (isset($item['unit_cost']) && (float) $item['unit_cost'] > 0) ? (int) $item['unit_cost'] : '' }}" placeholder="0"></td>
-                                <td>
+                                <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
+                                <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
+                                <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (isset($item['unit_cost']) && (float) $item['unit_cost'] > 0) ? (int) $item['unit_cost'] : '' }}" placeholder="0"></td>
+                                <td class="admin-col-tax">
                                     <div class="dual-inline-inputs admin-tax-inputs">
                                         <input type="number" min="0" step="0.01" class="admin-tax-percent" name="items[{{ $idx }}][tax_percent]" value="{{ (isset($item['tax_percent']) && (float) $item['tax_percent'] > 0) ? number_format((float) $item['tax_percent'], 2, '.', '') : '' }}" placeholder="%">
                                         <input type="number" min="0" step="1" class="admin-tax-amount" name="items[{{ $idx }}][tax_amount]" value="{{ (isset($item['tax_amount']) && (float) $item['tax_amount'] > 0) ? (int) round((float) $item['tax_amount'], 0) : '' }}" placeholder="nilai">
                                         <input type="hidden" class="admin-tax-input-mode" name="items[{{ $idx }}][tax_input_mode]" value="{{ ($item['tax_input_mode'] ?? 'percent') === 'amount' ? 'amount' : 'percent' }}">
                                     </div>
                                 </td>
-                                <td><input type="text" class="admin-item-notes admin-notes-input" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
-                                <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
+                                <td class="admin-col-notes"><input type="text" class="admin-item-notes admin-notes-input" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
+                                <td class="admin-col-action"><button type="button" class="btn danger-btn admin-remove-item admin-remove-btn">{{ __('txn.remove') }}</button></td>
                             </tr>
                         @endforeach
                         </tbody>
@@ -445,18 +466,18 @@
                     tr.innerHTML = `
                         <td><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"><div class="field-inline-error admin-product-error" style="display:block; margin-top:4px;"></div></td>
                         <td><input type="text" class="admin-unit"></td>
-                        <td><input type="number" min="1" class="admin-qty admin-qty-input" value="1" required></td>
-                        <td><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" value=""></td>
-                        <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="" placeholder="0"></td>
-                        <td>
+                        <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" value="1" required></td>
+                        <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" value=""></td>
+                        <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="" placeholder="0"></td>
+                        <td class="admin-col-tax">
                             <div class="dual-inline-inputs admin-tax-inputs">
                                 <input type="number" min="0" step="0.01" class="admin-tax-percent" value="" placeholder="%">
                                 <input type="number" min="0" step="1" class="admin-tax-amount" value="" placeholder="nilai">
                                 <input type="hidden" class="admin-tax-input-mode" value="percent">
                             </div>
                         </td>
-                        <td><input type="text" class="admin-item-notes admin-notes-input"></td>
-                        <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
+                        <td class="admin-col-notes"><input type="text" class="admin-item-notes admin-notes-input"></td>
+                        <td class="admin-col-action"><button type="button" class="btn danger-btn admin-remove-item admin-remove-btn">{{ __('txn.remove') }}</button></td>
                     `;
                     body.appendChild(tr);
                     bindRow(tr);

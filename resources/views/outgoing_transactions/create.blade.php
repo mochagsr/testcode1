@@ -7,48 +7,72 @@
 
     <style>
         #items-table th.outgoing-col-category,
-        #items-table td.outgoing-col-category {
-            width: 9%;
-        }
+        #items-table td.outgoing-col-category,
+        #items-table th.outgoing-col-unit,
+        #items-table td.outgoing-col-unit,
         #items-table th.outgoing-col-qty,
-        #items-table td.outgoing-col-qty {
-            width: 4.5%;
-        }
+        #items-table td.outgoing-col-qty,
         #items-table th.outgoing-col-weight,
-        #items-table td.outgoing-col-weight {
-            width: 7%;
-        }
+        #items-table td.outgoing-col-weight,
         #items-table th.outgoing-col-price,
-        #items-table td.outgoing-col-price {
-            width: 8%;
+        #items-table td.outgoing-col-price,
+        #items-table th.outgoing-col-tax,
+        #items-table td.outgoing-col-tax,
+        #items-table th.outgoing-col-action,
+        #items-table td.outgoing-col-action {
+            width: 1%;
+            white-space: nowrap;
         }
+        #items-table th.outgoing-col-category,
+        #items-table td.outgoing-col-category,
+        #items-table th.outgoing-col-unit,
+        #items-table td.outgoing-col-unit,
+        #items-table th.outgoing-col-qty,
+        #items-table td.outgoing-col-qty,
         #items-table th.outgoing-col-tax,
         #items-table td.outgoing-col-tax {
-            width: 8%;
+            padding-left: 4px;
+            padding-right: 4px;
+        }
+        #items-table th.outgoing-col-weight,
+        #items-table td.outgoing-col-weight,
+        #items-table th.outgoing-col-price,
+        #items-table td.outgoing-col-price {
+            padding-left: 5px;
+            padding-right: 5px;
         }
         #items-table th.outgoing-col-notes,
         #items-table td.outgoing-col-notes {
             width: 14%;
+            padding-left: 6px;
+            padding-right: 6px;
         }
         #items-table .outgoing-category-select {
-            max-width: 128px;
-            width: 100%;
+            width: 174px;
+            max-width: 174px;
+        }
+        #items-table .outgoing-unit-select {
+            width: 146px;
+            max-width: 146px;
         }
         #items-table .outgoing-qty-input {
             max-width: 62px;
+            width: 62px;
         }
         #items-table .outgoing-weight-input {
             max-width: 88px;
+            width: 88px;
         }
         #items-table .outgoing-price-input {
-            max-width: 96px;
+            max-width: 112px;
+            width: 112px;
         }
         #items-table .outgoing-tax-inputs {
             display: grid;
-            grid-template-columns: 40px 72px;
-            gap: 6px;
-            min-width: 118px;
-            max-width: 118px;
+            grid-template-columns: 54px 98px;
+            gap: 4px;
+            min-width: 156px;
+            max-width: 156px;
         }
         #items-table .outgoing-tax-inputs input {
             text-align: center;
@@ -58,9 +82,14 @@
             max-width: 100%;
             width: 100%;
         }
+        #items-table .outgoing-remove-btn {
+            min-height: 34px;
+            padding: 7px 10px;
+        }
 
         @media (max-width: 900px) {
             #items-table .outgoing-category-select,
+            #items-table .outgoing-unit-select,
             #items-table .outgoing-qty-input,
             #items-table .outgoing-weight-input,
             #items-table .outgoing-price-input,
@@ -69,7 +98,7 @@
                 max-width: 100%;
             }
             #items-table .outgoing-tax-inputs {
-                min-width: 112px;
+                min-width: 126px;
             }
             #items-table .outgoing-notes-input {
                 min-width: 120px;
@@ -170,16 +199,16 @@
                 <table id="items-table">
                     <thead>
                     <tr>
-                        <th style="width: 22%">{{ __('txn.product') }} *</th>
+                        <th style="width: 19%">{{ __('txn.product') }} *</th>
                         <th class="outgoing-col-category">{{ __('ui.category') }}</th>
-                        <th style="width: 8%">{{ __('txn.unit') }}</th>
+                        <th class="outgoing-col-unit">{{ __('txn.unit') }}</th>
                         <th class="outgoing-col-qty">{{ __('txn.qty') }} *</th>
                         <th class="outgoing-col-weight">{{ __('txn.weight') }}</th>
                         <th class="outgoing-col-price">{{ __('txn.price') }}</th>
                         <th class="outgoing-col-tax">{{ __('txn.vat_percent_short') }}</th>
-                        <th style="width: 12%">{{ __('txn.subtotal') }}</th>
+                        <th style="width: 9%">{{ __('txn.subtotal') }}</th>
                         <th class="outgoing-col-notes">{{ __('txn.notes') }}</th>
-                        <th></th>
+                        <th class="outgoing-col-action"></th>
                     </tr>
                     </thead>
                     <tbody></tbody>
@@ -822,24 +851,24 @@
                         <input type="hidden" class="product-name" name="items[${index}][product_name]" value="${escapeAttribute(prefillProductName)}">
                         <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                     </td>
-                    <td>
+                    <td class="outgoing-col-category">
                         <select class="item-category outgoing-category-select" name="items[${index}][item_category_id]">
                             ${buildCategoryOptions(categoryValue)}
                         </select>
                     </td>
-                    <td>
-                        <select class="unit" name="items[${index}][unit]" style="max-width: 150px;">${buildUnitOptions(unitValue)}</select>
+                    <td class="outgoing-col-unit">
+                        <select class="unit outgoing-unit-select" name="items[${index}][unit]">${buildUnitOptions(unitValue)}</select>
                     </td>
-                    <td>
+                    <td class="outgoing-col-qty">
                         <input type="number" min="1" class="qty outgoing-qty-input" name="items[${index}][quantity]" value="${qtyValue}" required>
                     </td>
-                    <td>
+                    <td class="outgoing-col-weight">
                         <input type="number" min="0" step="0.001" class="weight outgoing-weight-input" name="items[${index}][weight]" value="${escapeAttribute(weightValue)}">
                     </td>
-                    <td>
+                    <td class="outgoing-col-price">
                         <input type="number" min="0" step="1" class="unit-cost outgoing-price-input" name="items[${index}][unit_cost]" value="${unitCostValue}" placeholder="0">
                     </td>
-                    <td>
+                    <td class="outgoing-col-tax">
                         <div class="dual-inline-inputs outgoing-tax-inputs">
                             <input type="number" min="0" step="0.01" class="tax-percent" name="items[${index}][tax_percent]" value="${taxPercentValue}" placeholder="%">
                             <input type="number" min="0" step="1" class="tax-amount" name="items[${index}][tax_amount]" value="${taxAmountValue}" placeholder="nilai">
@@ -847,8 +876,8 @@
                         </div>
                     </td>
                     <td style="white-space: nowrap;">Rp <span class="line-total">0</span></td>
-                    <td><input type="text" class="item-notes outgoing-notes-input" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
-                    <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
+                    <td class="outgoing-col-notes"><input type="text" class="item-notes outgoing-notes-input" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
+                    <td class="outgoing-col-action"><button type="button" class="btn danger-btn remove outgoing-remove-btn">{{ __('txn.remove') }}</button></td>
                 `;
                 tableBody.appendChild(tr);
 
