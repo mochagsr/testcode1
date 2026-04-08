@@ -58,8 +58,11 @@
             max-width: 96px;
         }
         #admin-outgoing-items-table .admin-tax-inputs {
-            min-width: 78px;
-            max-width: 78px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+            min-width: 128px;
+            max-width: 128px;
         }
         #admin-outgoing-items-table .admin-tax-inputs input {
             text-align: center;
@@ -79,7 +82,7 @@
                 max-width: 100%;
             }
             #admin-outgoing-items-table .admin-tax-inputs {
-                min-width: 72px;
+                min-width: 120px;
             }
             #admin-outgoing-items-table .admin-notes-input {
                 min-width: 140px;
@@ -262,7 +265,7 @@
                                 <td><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
                                 <td><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
                                 <td><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
-                                <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
+                                <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (isset($item['unit_cost']) && (float) $item['unit_cost'] > 0) ? (int) $item['unit_cost'] : '' }}" placeholder="0"></td>
                                 <td>
                                     <div class="dual-inline-inputs admin-tax-inputs">
                                         <input type="number" min="0" step="0.01" class="admin-tax-percent" name="items[{{ $idx }}][tax_percent]" value="{{ (isset($item['tax_percent']) && (float) $item['tax_percent'] > 0) ? number_format((float) $item['tax_percent'], 2, '.', '') : '' }}" placeholder="%">
@@ -444,7 +447,7 @@
                         <td><input type="text" class="admin-unit"></td>
                         <td><input type="number" min="1" class="admin-qty admin-qty-input" value="1" required></td>
                         <td><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" value=""></td>
-                        <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="0"></td>
+                        <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="" placeholder="0"></td>
                         <td>
                             <div class="dual-inline-inputs admin-tax-inputs">
                                 <input type="number" min="0" step="0.01" class="admin-tax-percent" value="" placeholder="%">

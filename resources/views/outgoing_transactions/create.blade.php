@@ -44,8 +44,11 @@
             max-width: 96px;
         }
         #items-table .outgoing-tax-inputs {
-            min-width: 78px;
-            max-width: 78px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+            min-width: 128px;
+            max-width: 128px;
         }
         #items-table .outgoing-tax-inputs input {
             text-align: center;
@@ -66,7 +69,7 @@
                 max-width: 100%;
             }
             #items-table .outgoing-tax-inputs {
-                min-width: 72px;
+                min-width: 120px;
             }
             #items-table .outgoing-notes-input {
                 min-width: 140px;
@@ -791,10 +794,11 @@
                 const weightValue = weightRaw === null || weightRaw === undefined || String(weightRaw).trim() === ''
                     ? ''
                     : String(weightRaw);
+                const hasUnitCostPrefill = rowPrefill?.unit_cost !== undefined && rowPrefill?.unit_cost !== null && String(rowPrefill?.unit_cost).trim() !== '';
                 const unitCostCandidate = Number(rowPrefill?.unit_cost ?? prefillProduct?.price_general ?? 0);
-                const unitCostValue = Number.isFinite(unitCostCandidate) && unitCostCandidate >= 0
+                const unitCostValue = hasUnitCostPrefill && Number.isFinite(unitCostCandidate) && unitCostCandidate >= 0
                     ? Math.round(unitCostCandidate)
-                    : 0;
+                    : '';
                 const hasTaxPercentPrefill = rowPrefill?.tax_percent !== undefined && rowPrefill?.tax_percent !== null && String(rowPrefill?.tax_percent).trim() !== '';
                 const taxPercentCandidate = Number(rowPrefill?.tax_percent ?? 0);
                 const taxPercentValue = hasTaxPercentPrefill && Number.isFinite(taxPercentCandidate) && taxPercentCandidate >= 0
@@ -833,7 +837,7 @@
                         <input type="number" min="0" step="0.001" class="weight outgoing-weight-input" name="items[${index}][weight]" value="${escapeAttribute(weightValue)}">
                     </td>
                     <td>
-                        <input type="number" min="0" step="1" class="unit-cost outgoing-price-input" name="items[${index}][unit_cost]" value="${unitCostValue}">
+                        <input type="number" min="0" step="1" class="unit-cost outgoing-price-input" name="items[${index}][unit_cost]" value="${unitCostValue}" placeholder="0">
                     </td>
                     <td>
                         <div class="dual-inline-inputs outgoing-tax-inputs">
