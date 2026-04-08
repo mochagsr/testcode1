@@ -26,6 +26,8 @@ class OutgoingTransaction extends Model
         'semester_period',
         'note_number',
         'supplier_invoice_photo_path',
+        'subtotal_before_tax',
+        'total_tax',
         'total',
         'notes',
         'created_by_user_id',
@@ -38,6 +40,8 @@ class OutgoingTransaction extends Model
     {
         return [
             'transaction_date' => 'date',
+            'subtotal_before_tax' => 'integer',
+            'total_tax' => 'integer',
             'total' => 'integer',
             'deleted_at' => 'datetime',
         ];
@@ -82,6 +86,8 @@ class OutgoingTransaction extends Model
             'supplier_id',
             'semester_period',
             'note_number',
+            'subtotal_before_tax',
+            'total_tax',
             'total',
             'created_by_user_id',
         ]);

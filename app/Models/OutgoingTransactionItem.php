@@ -25,6 +25,9 @@ class OutgoingTransactionItem extends Model
         'quantity',
         'weight',
         'unit_cost',
+        'tax_percent',
+        'tax_amount',
+        'line_subtotal',
         'line_total',
         'notes',
     ];
@@ -38,6 +41,9 @@ class OutgoingTransactionItem extends Model
             'quantity' => 'integer',
             'weight' => 'decimal:3',
             'unit_cost' => 'integer',
+            'tax_percent' => 'decimal:2',
+            'tax_amount' => 'integer',
+            'line_subtotal' => 'integer',
             'line_total' => 'integer',
         ];
     }

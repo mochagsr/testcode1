@@ -51,6 +51,8 @@
                 <div class="col-8"><strong>{{ __('txn.address') }}</strong><div>{{ $transaction->supplier?->address ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.created_by') }}</strong><div>{{ $transaction->creator?->name ?: __('txn.system_user') }}</div></div>
                 <div class="col-8"><strong>{{ __('txn.notes') }}</strong><div>{{ $transaction->notes ?: '-' }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.total_before_vat') }}</strong><div>Rp {{ number_format((int) round((float) ($transaction->subtotal_before_tax ?? $transaction->total), 0), 0, ',', '.') }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.vat_total') }}</strong><div>Rp {{ number_format((int) round((float) ($transaction->total_tax ?? 0), 0), 0, ',', '.') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.grand_total') }}</strong><div>Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.total_weight') }}</strong><div>{{ number_format($totalWeight, 3, ',', '.') }}</div></div>
             </div>
@@ -70,6 +72,7 @@
                     <th>{{ __('txn.qty') }}</th>
                     <th>{{ __('txn.weight') }}</th>
                     <th>{{ __('txn.price') }}</th>
+                    <th>{{ __('txn.vat_percent_short') }}</th>
                     <th>{{ __('txn.subtotal') }}</th>
                     <th>{{ __('txn.notes') }}</th>
                 </tr>
@@ -84,6 +87,7 @@
                         <td>{{ (int) round((float) $item->quantity, 0) }}</td>
                         <td>{{ $item->weight !== null ? number_format((float) $item->weight, 3, ',', '.') : '-' }}</td>
                         <td>Rp {{ number_format((int) round((float) $item->unit_cost, 0), 0, ',', '.') }}</td>
+                        <td>{{ number_format((float) ($item->tax_percent ?? 0), 0, ',', '.') }}%</td>
                         <td>Rp {{ number_format((int) round((float) $item->line_total, 0), 0, ',', '.') }}</td>
                         <td>{{ $item->notes ?: '-' }}</td>
                     </tr>
@@ -91,8 +95,20 @@
                 </tbody>
                 <tfoot>
                 <tr>
-                    <th colspan="6" style="text-align: right;">{{ __('txn.total_weight') }}</th>
+                    <th colspan="7" style="text-align: right;">{{ __('txn.total_weight') }}</th>
                     <th>{{ number_format($totalWeight, 3, ',', '.') }}</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+                <tr>
+                    <th colspan="7" style="text-align: right;">{{ __('txn.total_before_vat') }}</th>
+                    <th>Rp {{ number_format((int) round((float) ($transaction->subtotal_before_tax ?? $transaction->total), 0), 0, ',', '.') }}</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+                <tr>
+                    <th colspan="7" style="text-align: right;">{{ __('txn.vat_total') }}</th>
+                    <th>Rp {{ number_format((int) round((float) ($transaction->total_tax ?? 0), 0), 0, ',', '.') }}</th>
                     <th></th>
                     <th></th>
                 </tr>
@@ -111,7 +127,7 @@
             <div class="form-section">
                 <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
                 <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
-                <form method="post" action="{{ route('outgoing-transactions.admin-update', $transaction) }}">
+                <form id="admin-outgoing-edit-form" method="post" action="{{ route('outgoing-transactions.admin-update', $transaction) }}">
                     @csrf
                     @method('PUT')
                     <div class="row">
@@ -146,6 +162,7 @@
                             <th>{{ __('txn.qty') }}</th>
                             <th>{{ __('txn.weight') }}</th>
                             <th>{{ __('txn.price') }}</th>
+                            <th>{{ __('txn.vat_percent_short') }}</th>
                             <th>{{ __('txn.notes') }}</th>
                             <th></th>
                         </tr>
@@ -162,6 +179,7 @@
                                         'quantity' => (int) round((float) $item->quantity),
                                         'weight' => $item->weight !== null ? (float) $item->weight : null,
                                         'unit_cost' => (int) round((float) $item->unit_cost),
+                                        'tax_percent' => (float) ($item->tax_percent ?? 0),
                                         'notes' => $item->notes,
                                     ];
                                 })->all();
@@ -183,6 +201,7 @@
                                 <td><input type="number" min="1" class="admin-qty w-xs" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
                                 <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
                                 <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
+                                <td><input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" name="items[{{ $idx }}][tax_percent]" value="{{ number_format((float) ($item['tax_percent'] ?? 12), 2, '.', '') }}"></td>
                                 <td><input type="text" class="admin-item-notes" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
                                 <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                             </tr>
@@ -262,6 +281,7 @@
                         row.querySelector('.admin-qty').name = `items[${idx}][quantity]`;
                         row.querySelector('.admin-weight').name = `items[${idx}][weight]`;
                         row.querySelector('.admin-unit-cost').name = `items[${idx}][unit_cost]`;
+                        row.querySelector('.admin-tax-percent').name = `items[${idx}][tax_percent]`;
                         row.querySelector('.admin-item-notes').name = `items[${idx}][notes]`;
                     });
                 };
@@ -323,6 +343,7 @@
                         <td><input type="number" min="1" class="admin-qty w-xs" value="1" required></td>
                         <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" value=""></td>
                         <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0"></td>
+                        <td><input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" value="12.00"></td>
                         <td><input type="text" class="admin-item-notes"></td>
                         <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                     `;

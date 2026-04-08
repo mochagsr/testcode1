@@ -104,6 +104,7 @@
                         <th style="width: 8%">{{ __('txn.qty') }} *</th>
                         <th style="width: 10%">{{ __('txn.weight') }}</th>
                         <th style="width: 12%">{{ __('txn.price') }}</th>
+                        <th style="width: 10%">{{ __('txn.vat_percent_short') }}</th>
                         <th style="width: 12%">{{ __('txn.subtotal') }}</th>
                         <th style="width: 18%">{{ __('txn.notes') }}</th>
                         <th></th>
@@ -113,7 +114,11 @@
                 </table>
             </div>
             <div style="margin-top: 10px; text-align: right;">
-                <strong>{{ __('txn.total') }}: Rp <span id="grand-total">0</span></strong>
+                <strong>{{ __('txn.total_before_vat') }}: Rp <span id="subtotal-before-tax">0</span></strong>
+                <br>
+                <strong>{{ __('txn.vat_total') }}: Rp <span id="total-tax">0</span></strong>
+                <br>
+                <strong>{{ __('txn.grand_total') }}: Rp <span id="grand-total">0</span></strong>
                 <br>
                 <strong>{{ __('txn.total_weight') }}: <span id="total-weight">0</span></strong>
             </div>
@@ -161,6 +166,8 @@
             const LOOKUP_LIMIT = 20;
             const tableBody = document.querySelector('#items-table tbody');
             const addButton = document.getElementById('add-item');
+            const subtotalBeforeTaxNode = document.getElementById('subtotal-before-tax');
+            const totalTaxNode = document.getElementById('total-tax');
             const grandTotal = document.getElementById('grand-total');
             const totalWeightNode = document.getElementById('total-weight');
             const supplierSearch = document.getElementById('supplier-search');
@@ -485,13 +492,20 @@
             }
 
             function recalc() {
+                let subtotalBeforeTax = 0;
+                let totalTax = 0;
                 let total = 0;
                 let totalWeight = 0;
                 tableBody.querySelectorAll('tr').forEach((row) => {
                     const qty = Math.max(0, Number(row.querySelector('.qty')?.value || 0));
                     const weight = Math.max(0, Number(row.querySelector('.weight')?.value || 0));
                     const unitCost = Math.max(0, Number(row.querySelector('.unit-cost')?.value || 0));
-                    const lineTotal = qty * unitCost;
+                    const taxPercent = Math.max(0, Number(row.querySelector('.tax-percent')?.value || 0));
+                    const lineSubtotal = qty * unitCost;
+                    const lineTax = Math.round(lineSubtotal * (taxPercent / 100));
+                    const lineTotal = lineSubtotal + lineTax;
+                    subtotalBeforeTax += lineSubtotal;
+                    totalTax += lineTax;
                     total += lineTotal;
                     totalWeight += weight;
                     const lineNode = row.querySelector('.line-total');
@@ -499,6 +513,12 @@
                         lineNode.textContent = numberFormat(lineTotal);
                     }
                 });
+                if (subtotalBeforeTaxNode) {
+                    subtotalBeforeTaxNode.textContent = numberFormat(subtotalBeforeTax);
+                }
+                if (totalTaxNode) {
+                    totalTaxNode.textContent = numberFormat(totalTax);
+                }
                 grandTotal.textContent = numberFormat(total);
                 if (totalWeightNode) {
                     totalWeightNode.textContent = weightFormat(totalWeight);
@@ -606,6 +626,7 @@
                         ['.qty', `items[${index}][quantity]`],
                         ['.weight', `items[${index}][weight]`],
                         ['.unit-cost', `items[${index}][unit_cost]`],
+                        ['.tax-percent', `items[${index}][tax_percent]`],
                         ['.item-notes', `items[${index}][notes]`],
                     ];
                     mapping.forEach(([selector, name]) => {
@@ -686,6 +707,10 @@
                 const unitCostValue = Number.isFinite(unitCostCandidate) && unitCostCandidate >= 0
                     ? Math.round(unitCostCandidate)
                     : 0;
+                const taxPercentCandidate = Number(rowPrefill?.tax_percent ?? 12);
+                const taxPercentValue = Number.isFinite(taxPercentCandidate) && taxPercentCandidate >= 0
+                    ? taxPercentCandidate.toFixed(2)
+                    : '12.00';
                 const notesValue = String(rowPrefill?.notes ?? '');
                 const prefillProductId = rowPrefill?.product_id ? String(rowPrefill.product_id) : '';
                 const prefillProductName = String(rowPrefill?.product_name || prefillProduct?.name || '').trim();
@@ -714,6 +739,9 @@
                     </td>
                     <td>
                         <input type="number" min="0" step="1" class="unit-cost w-xs" name="items[${index}][unit_cost]" value="${unitCostValue}">
+                    </td>
+                    <td>
+                        <input type="number" min="0" step="0.01" class="tax-percent w-xs" name="items[${index}][tax_percent]" value="${taxPercentValue}">
                     </td>
                     <td style="white-space: nowrap;">Rp <span class="line-total">0</span></td>
                     <td><input type="text" class="item-notes" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
@@ -816,7 +844,7 @@
                     recalc();
                 });
 
-                tr.querySelectorAll('.qty,.unit-cost').forEach((field) => field.addEventListener('input', recalc));
+                tr.querySelectorAll('.qty,.unit-cost,.tax-percent,.weight').forEach((field) => field.addEventListener('input', recalc));
                 categoryField?.addEventListener('change', () => {
                     if (categoryField.value === NEW_CATEGORY_VALUE) {
                         openCategoryModal(categoryField);

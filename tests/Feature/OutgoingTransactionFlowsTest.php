@@ -103,7 +103,9 @@ class OutgoingTransactionFlowsTest extends TestCase
             'supplier_id' => $supplier->id,
             'semester_period' => 'S2-2526',
             'note_number' => 'NOTA-001',
-            'total' => 75000,
+            'subtotal_before_tax' => 75000,
+            'total_tax' => 9000,
+            'total' => 84000,
         ]);
 
         $product->refresh();
@@ -119,6 +121,10 @@ class OutgoingTransactionFlowsTest extends TestCase
             'outgoing_transaction_id' => $transactionId,
             'product_id' => $product->id,
             'weight' => 12.5,
+            'tax_percent' => 12.00,
+            'tax_amount' => 9000,
+            'line_subtotal' => 75000,
+            'line_total' => 84000,
         ]);
     }
 
@@ -174,6 +180,62 @@ class OutgoingTransactionFlowsTest extends TestCase
 
         $product->refresh();
         $this->assertSame(5.0, (float) $product->stock);
+    }
+
+    public function test_outgoing_transaction_store_allows_manual_tax_percent_override(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'finance_locked' => false,
+        ]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier PPN Manual',
+            'company_name' => 'PT PPN Manual',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-TAX-OT',
+            'name' => 'Kategori Tax OT',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'BRG-TAX-OT',
+            'name' => 'Barang Tax OT',
+            'unit' => 'pcs',
+            'stock' => 1,
+            'price_general' => 10000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('outgoing-transactions.store'), [
+            'supplier_id' => $supplier->id,
+            'transaction_date' => '2026-02-12',
+            'semester_period' => 'S2-2526',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'unit' => 'pcs',
+                    'quantity' => 2,
+                    'unit_cost' => 10000,
+                    'tax_percent' => 5,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+
+        $transaction = OutgoingTransaction::query()->latest('id')->firstOrFail();
+        $item = OutgoingTransactionItem::query()
+            ->where('outgoing_transaction_id', $transaction->id)
+            ->firstOrFail();
+
+        $this->assertSame(20000.0, (float) $transaction->subtotal_before_tax);
+        $this->assertSame(1000.0, (float) $transaction->total_tax);
+        $this->assertSame(21000.0, (float) $transaction->total);
+        $this->assertSame(5.0, (float) $item->tax_percent);
+        $this->assertSame(1000.0, (float) $item->tax_amount);
+        $this->assertSame(20000.0, (float) $item->line_subtotal);
+        $this->assertSame(21000.0, (float) $item->line_total);
     }
 
     public function test_outgoing_transaction_store_auto_creates_master_product_for_manual_item(): void
@@ -399,11 +461,13 @@ class OutgoingTransactionFlowsTest extends TestCase
         $productB->refresh();
         $supplier->refresh();
 
-        $this->assertSame(50000.0, (float) $transaction->total);
+        $this->assertSame(50000.0, (float) $transaction->subtotal_before_tax);
+        $this->assertSame(6000.0, (float) $transaction->total_tax);
+        $this->assertSame(56000.0, (float) $transaction->total);
         $this->assertSame('NOTA-NEW', (string) $transaction->note_number);
         $this->assertSame(8.0, (float) $productA->stock);
         $this->assertSame(9.0, (float) $productB->stock);
-        $this->assertSame(50000.0, (float) $supplier->outstanding_payable);
+        $this->assertSame(56000.0, (float) $supplier->outstanding_payable);
     }
 
     public function test_admin_can_update_supplier_payment_and_adjust_outstanding(): void

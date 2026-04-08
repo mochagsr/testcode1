@@ -56,6 +56,8 @@
         $printNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($transaction->notes ?: $companyInvoiceNotes)), 4);
         $totalQty = (int) round((float) $transaction->items->sum('quantity'), 0);
         $totalWeight = (float) $transaction->items->sum(fn($item) => (float) ($item->weight ?? 0));
+        $totalBeforeVat = (int) round((float) ($transaction->subtotal_before_tax ?? $transaction->total), 0);
+        $totalVat = (int) round((float) ($transaction->total_tax ?? 0), 0);
         $supplierAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($transaction->supplier?->address ?: ''), 4);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')
@@ -116,6 +118,7 @@
             <th class="num" style="width: 7">{{ __('txn.qty') }}</th>
             <th class="num" style="width: 7%">{{ __('txn.weight') }}</th>
             <th class="num" style="width: 10%">{{ __('txn.price') }}</th>
+            <th class="num" style="width: 8%">{{ __('txn.vat_percent_short') }}</th>
             <th class="num" style="width: 15%">{{ __('txn.subtotal') }}</th>
         </tr>
         </thead>
@@ -123,6 +126,7 @@
         @foreach($transaction->items as $item)
             @php
                 $unitCost = (int) round((float) $item->unit_cost, 0);
+                $taxPercent = (float) ($item->tax_percent ?? 0);
                 $lineTotal = (int) round((float) $item->line_total, 0);
                 $unitCostText = $unitCost > 0 ? 'Rp ' . number_format($unitCost, 0, ',', '.') : '';
                 $lineTotalText = $lineTotal > 0 ? 'Rp ' . number_format($lineTotal, 0, ',', '.') : '';
@@ -134,6 +138,7 @@
                 <td class="num">{{ (int) round((float) $item->quantity, 0) }}</td>
                 <td class="num">{{ $item->weight !== null ? number_format((float) $item->weight, 3, ',', '.') : '-' }}</td>
                 <td class="num">{{ $unitCostText }}</td>
+                <td class="num">{{ number_format($taxPercent, 0, ',', '.') }}%</td>
                 <td class="num">{{ $lineTotalText }}</td>
             </tr>
         @endforeach
@@ -151,6 +156,8 @@
             </table>
         </div>
         <table class="total-box">
+            <tr><td style="width: 50%;">{{ __('txn.total_before_vat') }}</td><td class="num" style="width: 50%;">Rp {{ number_format($totalBeforeVat, 0, ',', '.') }}</td></tr>
+            <tr><td style="width: 50%;">{{ __('txn.vat_total') }}</td><td class="num" style="width: 50%;">Rp {{ number_format($totalVat, 0, ',', '.') }}</td></tr>
             <tr><td style="width: 50%;">{{ __('txn.grand_total') }}</td><td class="num" style="width: 50%;">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td></tr>
         </table>
     </div>

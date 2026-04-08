@@ -283,6 +283,7 @@ class OutgoingTransactionPageController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.weight' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'items.*.tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
         $selectedSemester = $this->normalizeSemesterPeriod(
@@ -323,14 +324,26 @@ class OutgoingTransactionPageController extends Controller
                 ->get()
                 ->keyBy('id');
 
+            $subtotalBeforeTaxTotal = 0;
+            $totalTax = 0;
             $grandTotal = 0;
             $computedRows = [];
 
             foreach ($rows as $index => $row) {
                 $quantity = (int) $row['quantity'];
                 $weight = $this->parseNullableWeight($row['weight'] ?? null);
-                $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
-                $lineTotal = $quantity * $unitCost;
+                $lineValues = $this->calculateOutgoingLineValues(
+                    quantity: $quantity,
+                    unitCost: (float) ($row['unit_cost'] ?? 0),
+                    taxPercent: (float) ($row['tax_percent'] ?? 12)
+                );
+                $unitCost = $lineValues['unit_cost'];
+                $taxPercent = $lineValues['tax_percent'];
+                $lineSubtotal = $lineValues['line_subtotal'];
+                $taxAmount = $lineValues['tax_amount'];
+                $lineTotal = $lineValues['line_total'];
+                $subtotalBeforeTaxTotal += $lineSubtotal;
+                $totalTax += $taxAmount;
                 $grandTotal += $lineTotal;
                 $product = null;
                 $productId = (int) ($row['product_id'] ?? 0);
@@ -359,6 +372,9 @@ class OutgoingTransactionPageController extends Controller
                     'quantity' => $quantity,
                     'weight' => $weight,
                     'unit_cost' => $unitCost,
+                    'tax_percent' => $taxPercent,
+                    'tax_amount' => $taxAmount,
+                    'line_subtotal' => $lineSubtotal,
                     'line_total' => $lineTotal,
                     'notes' => (string) ($row['notes'] ?? ''),
                 ];
@@ -371,6 +387,8 @@ class OutgoingTransactionPageController extends Controller
                 'semester_period' => $selectedSemester,
                 'note_number' => $data['note_number'] ?? null,
                 'supplier_invoice_photo_path' => $supplierInvoicePhotoPath,
+                'subtotal_before_tax' => $subtotalBeforeTaxTotal,
+                'total_tax' => $totalTax,
                 'total' => $grandTotal,
                 'notes' => $data['notes'] ?? null,
                 'created_by_user_id' => $request->user()?->id,
@@ -392,6 +410,9 @@ class OutgoingTransactionPageController extends Controller
                     'quantity' => $quantity,
                     'weight' => $row['weight'],
                     'unit_cost' => $row['unit_cost'],
+                    'tax_percent' => $row['tax_percent'],
+                    'tax_amount' => $row['tax_amount'],
+                    'line_subtotal' => $row['line_subtotal'],
                     'line_total' => $row['line_total'],
                     'notes' => $row['notes'] !== '' ? $row['notes'] : null,
                 ]);
@@ -463,6 +484,7 @@ class OutgoingTransactionPageController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.weight' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'items.*.tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -495,7 +517,9 @@ class OutgoingTransactionPageController extends Controller
                 ->map(function ($item): string {
                     $weight = $item->weight !== null ? (float) $item->weight : null;
                     $weightLabel = $weight !== null ? ":w{$weight}" : '';
-                    return "{$item->product_name}:qty{$item->quantity}{$weightLabel}:cost" . (int) round((float) $item->unit_cost);
+                    $tax = (float) ($item->tax_percent ?? 0);
+
+                    return "{$item->product_name}:qty{$item->quantity}{$weightLabel}:cost" . (int) round((float) $item->unit_cost) . ":ppn{$tax}";
                 })
                 ->implode(' | ');
 
@@ -538,8 +562,16 @@ class OutgoingTransactionPageController extends Controller
             foreach ($rows as $row) {
                 $quantity = (int) ($row['quantity'] ?? 0);
                 $weight = $this->parseNullableWeight($row['weight'] ?? null);
-                $unitCost = (int) round((float) ($row['unit_cost'] ?? 0));
-                $lineTotal = $quantity * $unitCost;
+                $lineValues = $this->calculateOutgoingLineValues(
+                    quantity: $quantity,
+                    unitCost: (float) ($row['unit_cost'] ?? 0),
+                    taxPercent: (float) ($row['tax_percent'] ?? 12)
+                );
+                $unitCost = $lineValues['unit_cost'];
+                $taxPercent = $lineValues['tax_percent'];
+                $lineSubtotal = $lineValues['line_subtotal'];
+                $taxAmount = $lineValues['tax_amount'];
+                $lineTotal = $lineValues['line_total'];
                 $productId = (int) ($row['product_id'] ?? 0);
                 $product = $productId > 0 ? $products->get($productId) : null;
                 if ($productId > 0 && ! $product) {
@@ -568,6 +600,9 @@ class OutgoingTransactionPageController extends Controller
                     'quantity' => $quantity,
                     'weight' => $weight,
                     'unit_cost' => $unitCost,
+                    'tax_percent' => $taxPercent,
+                    'tax_amount' => $taxAmount,
+                    'line_subtotal' => $lineSubtotal,
                     'line_total' => $lineTotal,
                     'notes' => (string) ($row['notes'] ?? ''),
                     'item_category_id' => $product
@@ -639,12 +674,19 @@ class OutgoingTransactionPageController extends Controller
             }
 
             $transaction->items()->delete();
+            $newSubtotalBeforeTax = 0.0;
+            $newTotalTax = 0.0;
             $newTotal = 0.0;
 
             foreach ($resolvedRows as $resolvedRow) {
                 $quantity = (int) $resolvedRow['quantity'];
                 $unitCost = (int) $resolvedRow['unit_cost'];
+                $taxPercent = (float) $resolvedRow['tax_percent'];
+                $taxAmount = (int) $resolvedRow['tax_amount'];
+                $lineSubtotal = (int) $resolvedRow['line_subtotal'];
                 $lineTotal = (int) $resolvedRow['line_total'];
+                $newSubtotalBeforeTax += $lineSubtotal;
+                $newTotalTax += $taxAmount;
                 $newTotal += $lineTotal;
 
                 /** @var Product|null $product */
@@ -662,6 +704,9 @@ class OutgoingTransactionPageController extends Controller
                     'quantity' => $quantity,
                     'weight' => $resolvedRow['weight'],
                     'unit_cost' => $unitCost,
+                    'tax_percent' => $taxPercent,
+                    'tax_amount' => $taxAmount,
+                    'line_subtotal' => $lineSubtotal,
                     'line_total' => $lineTotal,
                     'notes' => (string) $resolvedRow['notes'],
                 ]);
@@ -672,6 +717,8 @@ class OutgoingTransactionPageController extends Controller
                 'semester_period' => $selectedSemester,
                 'note_number' => $data['note_number'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                'subtotal_before_tax' => (int) round($newSubtotalBeforeTax),
+                'total_tax' => (int) round($newTotalTax),
                 'total' => (int) round($newTotal),
             ]);
 
@@ -705,8 +752,9 @@ class OutgoingTransactionPageController extends Controller
                     $weight = $resolvedRow['weight'] !== null ? (float) $resolvedRow['weight'] : null;
                     $weightLabel = $weight !== null ? ":w{$weight}" : '';
                     $cost = (int) ($resolvedRow['unit_cost'] ?? 0);
+                    $tax = (float) ($resolvedRow['tax_percent'] ?? 0);
 
-                    return "{$name}:qty{$qty}{$weightLabel}:cost{$cost}";
+                    return "{$name}:qty{$qty}{$weightLabel}:cost{$cost}:ppn{$tax}";
                 })
                 ->implode(' | ');
         });
@@ -897,6 +945,7 @@ class OutgoingTransactionPageController extends Controller
                 __('txn.qty'),
                 __('txn.weight'),
                 __('txn.price'),
+                __('txn.vat_percent_short'),
                 __('txn.subtotal'),
                 __('txn.notes'),
             ];
@@ -909,6 +958,7 @@ class OutgoingTransactionPageController extends Controller
                     (int) round((float) $item->quantity),
                     $item->weight !== null ? (float) $item->weight : '',
                     (int) round((float) $item->unit_cost),
+                    (float) ($item->tax_percent ?? 0),
                     (int) round((float) $item->line_total),
                     (string) ($item->notes ?: '-'),
                 ];
@@ -917,15 +967,17 @@ class OutgoingTransactionPageController extends Controller
             $rowsOut[] = [];
             $rowsOut[] = [__('txn.notes'), $notes !== '' ? $notes : '-'];
             $rowsOut[] = [__('txn.summary_total_qty'), $totalQty];
+            $rowsOut[] = [__('txn.total_before_vat'), (int) round((float) ($outgoingTransaction->subtotal_before_tax ?? $outgoingTransaction->total))];
+            $rowsOut[] = [__('txn.vat_total'), (int) round((float) ($outgoingTransaction->total_tax ?? 0))];
             $rowsOut[] = [__('txn.total_weight'), $totalWeight];
             $rowsOut[] = [__('txn.grand_total'), (int) round((float) $outgoingTransaction->total)];
 
             $sheet->fromArray($rowsOut, null, 'A1');
             $itemsCount = $outgoingTransaction->items->count();
             $itemsHeaderRow = 9;
-            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 8, $itemsCount, true);
-            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [1, 4, 6, 7], '#,##0');
-            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [5], '#,##0.###');
+            ExcelExportStyler::styleTable($sheet, $itemsHeaderRow, 9, $itemsCount, true);
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [4, 6, 8], '#,##0');
+            ExcelExportStyler::formatNumberColumns($sheet, $itemsHeaderRow + 1, $itemsHeaderRow + $itemsCount, [5, 7], '#,##0.###');
             $sheet->getStyle('B1:B'.(15 + $itemsCount))->getAlignment()->setWrapText(true);
 
             $writer = new Xlsx($spreadsheet);
@@ -1115,6 +1167,26 @@ class OutgoingTransactionPageController extends Controller
         }
 
         return round(max(0, (float) $raw), 3);
+    }
+
+    /**
+     * @return array{unit_cost:int,tax_percent:float,line_subtotal:int,tax_amount:int,line_total:int}
+     */
+    private function calculateOutgoingLineValues(int $quantity, float $unitCost, float $taxPercent): array
+    {
+        $resolvedUnitCost = max(0, (int) round($unitCost));
+        $resolvedTaxPercent = round(max(0, min(100, $taxPercent)), 2);
+        $lineSubtotal = max(0, $quantity) * $resolvedUnitCost;
+        $taxAmount = (int) round($lineSubtotal * ($resolvedTaxPercent / 100), 0);
+        $lineTotal = $lineSubtotal + $taxAmount;
+
+        return [
+            'unit_cost' => $resolvedUnitCost,
+            'tax_percent' => $resolvedTaxPercent,
+            'line_subtotal' => $lineSubtotal,
+            'tax_amount' => $taxAmount,
+            'line_total' => $lineTotal,
+        ];
     }
 
     /**
