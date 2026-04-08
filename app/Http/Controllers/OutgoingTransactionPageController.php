@@ -284,6 +284,8 @@ class OutgoingTransactionPageController extends Controller
             'items.*.weight' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'items.*.tax_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.tax_input_mode' => ['nullable', 'string', 'in:percent,amount'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
         $selectedSemester = $this->normalizeSemesterPeriod(
@@ -335,7 +337,9 @@ class OutgoingTransactionPageController extends Controller
                 $lineValues = $this->calculateOutgoingLineValues(
                     quantity: $quantity,
                     unitCost: (float) ($row['unit_cost'] ?? 0),
-                    taxPercent: (float) ($row['tax_percent'] ?? 12)
+                    taxPercent: (float) ($row['tax_percent'] ?? 12),
+                    taxAmount: $row['tax_amount'] ?? null,
+                    taxInputMode: (string) ($row['tax_input_mode'] ?? 'percent')
                 );
                 $unitCost = $lineValues['unit_cost'];
                 $taxPercent = $lineValues['tax_percent'];
@@ -485,6 +489,8 @@ class OutgoingTransactionPageController extends Controller
             'items.*.weight' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'items.*.tax_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.tax_input_mode' => ['nullable', 'string', 'in:percent,amount'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -565,7 +571,9 @@ class OutgoingTransactionPageController extends Controller
                 $lineValues = $this->calculateOutgoingLineValues(
                     quantity: $quantity,
                     unitCost: (float) ($row['unit_cost'] ?? 0),
-                    taxPercent: (float) ($row['tax_percent'] ?? 12)
+                    taxPercent: (float) ($row['tax_percent'] ?? 12),
+                    taxAmount: $row['tax_amount'] ?? null,
+                    taxInputMode: (string) ($row['tax_input_mode'] ?? 'percent')
                 );
                 $unitCost = $lineValues['unit_cost'];
                 $taxPercent = $lineValues['tax_percent'];
@@ -1172,19 +1180,35 @@ class OutgoingTransactionPageController extends Controller
     /**
      * @return array{unit_cost:int,tax_percent:float,line_subtotal:int,tax_amount:int,line_total:int}
      */
-    private function calculateOutgoingLineValues(int $quantity, float $unitCost, float $taxPercent): array
+    private function calculateOutgoingLineValues(
+        int $quantity,
+        float $unitCost,
+        float $taxPercent,
+        mixed $taxAmount = null,
+        string $taxInputMode = 'percent'
+    ): array
     {
         $resolvedUnitCost = max(0, (int) round($unitCost));
-        $resolvedTaxPercent = round(max(0, min(100, $taxPercent)), 2);
         $lineSubtotal = max(0, $quantity) * $resolvedUnitCost;
-        $taxAmount = (int) round($lineSubtotal * ($resolvedTaxPercent / 100), 0);
-        $lineTotal = $lineSubtotal + $taxAmount;
+        $resolvedTaxPercent = round(max(0, min(100, $taxPercent)), 2);
+        $resolvedTaxAmount = 0;
+
+        if ($taxInputMode === 'amount') {
+            $resolvedTaxAmount = max(0, (int) round((float) $taxAmount));
+            $resolvedTaxPercent = $lineSubtotal > 0
+                ? round(($resolvedTaxAmount / $lineSubtotal) * 100, 2)
+                : 0.0;
+        } else {
+            $resolvedTaxAmount = (int) round($lineSubtotal * ($resolvedTaxPercent / 100), 0);
+        }
+
+        $lineTotal = $lineSubtotal + $resolvedTaxAmount;
 
         return [
             'unit_cost' => $resolvedUnitCost,
             'tax_percent' => $resolvedTaxPercent,
             'line_subtotal' => $lineSubtotal,
-            'tax_amount' => $taxAmount,
+            'tax_amount' => $resolvedTaxAmount,
             'line_total' => $lineTotal,
         ];
     }

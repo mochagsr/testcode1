@@ -104,9 +104,9 @@
                         <th style="width: 8%">{{ __('txn.qty') }} *</th>
                         <th style="width: 10%">{{ __('txn.weight') }}</th>
                         <th style="width: 12%">{{ __('txn.price') }}</th>
-                        <th style="width: 10%">{{ __('txn.vat_percent_short') }}</th>
+                        <th style="width: 14%">{{ __('txn.vat_percent_short') }}</th>
                         <th style="width: 12%">{{ __('txn.subtotal') }}</th>
-                        <th style="width: 18%">{{ __('txn.notes') }}</th>
+                        <th style="width: 14%">{{ __('txn.notes') }}</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -500,9 +500,23 @@
                     const qty = Math.max(0, Number(row.querySelector('.qty')?.value || 0));
                     const weight = Math.max(0, Number(row.querySelector('.weight')?.value || 0));
                     const unitCost = Math.max(0, Number(row.querySelector('.unit-cost')?.value || 0));
-                    const taxPercent = Math.max(0, Number(row.querySelector('.tax-percent')?.value || 0));
+                    const taxPercentField = row.querySelector('.tax-percent');
+                    const taxAmountField = row.querySelector('.tax-amount');
+                    const taxModeField = row.querySelector('.tax-input-mode');
+                    const taxPercent = Math.max(0, Number(taxPercentField?.value || 0));
                     const lineSubtotal = qty * unitCost;
-                    const lineTax = Math.round(lineSubtotal * (taxPercent / 100));
+                    let lineTax = 0;
+                    if ((taxModeField?.value || 'percent') === 'amount') {
+                        lineTax = Math.max(0, Math.round(Number(taxAmountField?.value || 0)));
+                        if (taxPercentField) {
+                            taxPercentField.value = lineSubtotal > 0 ? ((lineTax / lineSubtotal) * 100).toFixed(2) : '0.00';
+                        }
+                    } else {
+                        lineTax = Math.round(lineSubtotal * (taxPercent / 100));
+                        if (taxAmountField) {
+                            taxAmountField.value = String(lineTax);
+                        }
+                    }
                     const lineTotal = lineSubtotal + lineTax;
                     subtotalBeforeTax += lineSubtotal;
                     totalTax += lineTax;
@@ -627,6 +641,8 @@
                         ['.weight', `items[${index}][weight]`],
                         ['.unit-cost', `items[${index}][unit_cost]`],
                         ['.tax-percent', `items[${index}][tax_percent]`],
+                        ['.tax-amount', `items[${index}][tax_amount]`],
+                        ['.tax-input-mode', `items[${index}][tax_input_mode]`],
                         ['.item-notes', `items[${index}][notes]`],
                     ];
                     mapping.forEach(([selector, name]) => {
@@ -711,6 +727,11 @@
                 const taxPercentValue = Number.isFinite(taxPercentCandidate) && taxPercentCandidate >= 0
                     ? taxPercentCandidate.toFixed(2)
                     : '12.00';
+                const taxAmountCandidate = Number(rowPrefill?.tax_amount ?? 0);
+                const taxAmountValue = Number.isFinite(taxAmountCandidate) && taxAmountCandidate >= 0
+                    ? Math.round(taxAmountCandidate)
+                    : 0;
+                const taxInputMode = String(rowPrefill?.tax_input_mode || 'percent') === 'amount' ? 'amount' : 'percent';
                 const notesValue = String(rowPrefill?.notes ?? '');
                 const prefillProductId = rowPrefill?.product_id ? String(rowPrefill.product_id) : '';
                 const prefillProductName = String(rowPrefill?.product_name || prefillProduct?.name || '').trim();
@@ -741,7 +762,11 @@
                         <input type="number" min="0" step="1" class="unit-cost w-xs" name="items[${index}][unit_cost]" value="${unitCostValue}">
                     </td>
                     <td>
-                        <input type="number" min="0" step="0.01" class="tax-percent w-xs" name="items[${index}][tax_percent]" value="${taxPercentValue}">
+                        <div style="display:grid; gap:4px;">
+                            <input type="number" min="0" step="0.01" class="tax-percent w-xs" name="items[${index}][tax_percent]" value="${taxPercentValue}" placeholder="%">
+                            <input type="number" min="0" step="1" class="tax-amount w-xs" name="items[${index}][tax_amount]" value="${taxAmountValue}" placeholder="nilai">
+                            <input type="hidden" class="tax-input-mode" name="items[${index}][tax_input_mode]" value="${taxInputMode}">
+                        </div>
                     </td>
                     <td style="white-space: nowrap;">Rp <span class="line-total">0</span></td>
                     <td><input type="text" class="item-notes" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
@@ -844,7 +869,26 @@
                     recalc();
                 });
 
-                tr.querySelectorAll('.qty,.unit-cost,.tax-percent,.weight').forEach((field) => field.addEventListener('input', recalc));
+                const taxPercentField = tr.querySelector('.tax-percent');
+                const taxAmountField = tr.querySelector('.tax-amount');
+                const taxModeField = tr.querySelector('.tax-input-mode');
+                tr.querySelectorAll('.qty,.unit-cost,.weight').forEach((field) => field.addEventListener('input', recalc));
+                taxPercentField?.addEventListener('input', () => {
+                    if (taxModeField) taxModeField.value = 'percent';
+                    recalc();
+                });
+                taxPercentField?.addEventListener('change', () => {
+                    if (taxModeField) taxModeField.value = 'percent';
+                    recalc();
+                });
+                taxAmountField?.addEventListener('input', () => {
+                    if (taxModeField) taxModeField.value = 'amount';
+                    recalc();
+                });
+                taxAmountField?.addEventListener('change', () => {
+                    if (taxModeField) taxModeField.value = 'amount';
+                    recalc();
+                });
                 categoryField?.addEventListener('change', () => {
                     if (categoryField.value === NEW_CATEGORY_VALUE) {
                         openCategoryModal(categoryField);

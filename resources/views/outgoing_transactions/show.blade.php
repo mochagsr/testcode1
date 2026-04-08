@@ -180,6 +180,8 @@
                                         'weight' => $item->weight !== null ? (float) $item->weight : null,
                                         'unit_cost' => (int) round((float) $item->unit_cost),
                                         'tax_percent' => (float) ($item->tax_percent ?? 0),
+                                        'tax_amount' => (int) round((float) ($item->tax_amount ?? 0)),
+                                        'tax_input_mode' => 'percent',
                                         'notes' => $item->notes,
                                     ];
                                 })->all();
@@ -201,7 +203,13 @@
                                 <td><input type="number" min="1" class="admin-qty w-xs" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
                                 <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
                                 <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
-                                <td><input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" name="items[{{ $idx }}][tax_percent]" value="{{ number_format((float) ($item['tax_percent'] ?? 12), 2, '.', '') }}"></td>
+                                <td>
+                                    <div style="display:grid; gap:4px;">
+                                        <input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" name="items[{{ $idx }}][tax_percent]" value="{{ number_format((float) ($item['tax_percent'] ?? 12), 2, '.', '') }}" placeholder="%">
+                                        <input type="number" min="0" step="1" class="admin-tax-amount w-xs" name="items[{{ $idx }}][tax_amount]" value="{{ (int) round((float) ($item['tax_amount'] ?? 0), 0) }}" placeholder="nilai">
+                                        <input type="hidden" class="admin-tax-input-mode" name="items[{{ $idx }}][tax_input_mode]" value="{{ ($item['tax_input_mode'] ?? 'percent') === 'amount' ? 'amount' : 'percent' }}">
+                                    </div>
+                                </td>
                                 <td><input type="text" class="admin-item-notes" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
                                 <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                             </tr>
@@ -282,6 +290,8 @@
                         row.querySelector('.admin-weight').name = `items[${idx}][weight]`;
                         row.querySelector('.admin-unit-cost').name = `items[${idx}][unit_cost]`;
                         row.querySelector('.admin-tax-percent').name = `items[${idx}][tax_percent]`;
+                        row.querySelector('.admin-tax-amount').name = `items[${idx}][tax_amount]`;
+                        row.querySelector('.admin-tax-input-mode').name = `items[${idx}][tax_input_mode]`;
                         row.querySelector('.admin-item-notes').name = `items[${idx}][notes]`;
                     });
                 };
@@ -308,7 +318,27 @@
                     const nameField = row.querySelector('.admin-product-name');
                     const unitField = row.querySelector('.admin-unit');
                     const costField = row.querySelector('.admin-unit-cost');
+                    const qtyField = row.querySelector('.admin-qty');
+                    const taxPercentField = row.querySelector('.admin-tax-percent');
+                    const taxAmountField = row.querySelector('.admin-tax-amount');
+                    const taxModeField = row.querySelector('.admin-tax-input-mode');
                     const removeBtn = row.querySelector('.admin-remove-item');
+                    const syncTaxFields = () => {
+                        const qty = Math.max(0, Number(qtyField?.value || 0));
+                        const unitCost = Math.max(0, Number(costField?.value || 0));
+                        const lineSubtotal = qty * unitCost;
+                        if ((taxModeField?.value || 'percent') === 'amount') {
+                            const taxAmount = Math.max(0, Math.round(Number(taxAmountField?.value || 0)));
+                            if (taxPercentField) {
+                                taxPercentField.value = lineSubtotal > 0 ? ((taxAmount / lineSubtotal) * 100).toFixed(2) : '0.00';
+                            }
+                        } else {
+                            const taxPercent = Math.max(0, Number(taxPercentField?.value || 0));
+                            if (taxAmountField) {
+                                taxAmountField.value = String(Math.round(lineSubtotal * (taxPercent / 100)));
+                            }
+                        }
+                    };
                     nameField.addEventListener('change', () => {
                         const p = findProduct(nameField.value);
                         if (!p) {
@@ -333,6 +363,17 @@
                         }
                         reindex();
                     });
+                    qtyField?.addEventListener('input', syncTaxFields);
+                    costField?.addEventListener('input', syncTaxFields);
+                    taxPercentField?.addEventListener('input', () => {
+                        if (taxModeField) taxModeField.value = 'percent';
+                        syncTaxFields();
+                    });
+                    taxAmountField?.addEventListener('input', () => {
+                        if (taxModeField) taxModeField.value = 'amount';
+                        syncTaxFields();
+                    });
+                    syncTaxFields();
                 };
 
                 const addRow = () => {
@@ -343,7 +384,13 @@
                         <td><input type="number" min="1" class="admin-qty w-xs" value="1" required></td>
                         <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" value=""></td>
                         <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0"></td>
-                        <td><input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" value="12.00"></td>
+                        <td>
+                            <div style="display:grid; gap:4px;">
+                                <input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" value="12.00" placeholder="%">
+                                <input type="number" min="0" step="1" class="admin-tax-amount w-xs" value="0" placeholder="nilai">
+                                <input type="hidden" class="admin-tax-input-mode" value="percent">
+                            </div>
+                        </td>
                         <td><input type="text" class="admin-item-notes"></td>
                         <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                     `;
