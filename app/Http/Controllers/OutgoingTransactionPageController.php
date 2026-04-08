@@ -337,7 +337,7 @@ class OutgoingTransactionPageController extends Controller
                 $lineValues = $this->calculateOutgoingLineValues(
                     quantity: $quantity,
                     unitCost: (float) ($row['unit_cost'] ?? 0),
-                    taxPercent: (float) ($row['tax_percent'] ?? 12),
+                    taxPercent: (float) ($row['tax_percent'] ?? 0),
                     taxAmount: $row['tax_amount'] ?? null,
                     taxInputMode: (string) ($row['tax_input_mode'] ?? 'percent')
                 );
@@ -571,7 +571,7 @@ class OutgoingTransactionPageController extends Controller
                 $lineValues = $this->calculateOutgoingLineValues(
                     quantity: $quantity,
                     unitCost: (float) ($row['unit_cost'] ?? 0),
-                    taxPercent: (float) ($row['tax_percent'] ?? 12),
+                    taxPercent: (float) ($row['tax_percent'] ?? 0),
                     taxAmount: $row['tax_amount'] ?? null,
                     taxInputMode: (string) ($row['tax_input_mode'] ?? 'percent')
                 );

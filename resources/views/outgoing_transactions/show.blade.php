@@ -27,6 +27,66 @@
         </div>
     </div>
 
+    <style>
+        #admin-outgoing-items-table th.admin-col-qty,
+        #admin-outgoing-items-table td.admin-col-qty {
+            width: 6%;
+        }
+        #admin-outgoing-items-table th.admin-col-weight,
+        #admin-outgoing-items-table td.admin-col-weight {
+            width: 7%;
+        }
+        #admin-outgoing-items-table th.admin-col-price,
+        #admin-outgoing-items-table td.admin-col-price {
+            width: 8%;
+        }
+        #admin-outgoing-items-table th.admin-col-tax,
+        #admin-outgoing-items-table td.admin-col-tax {
+            width: 8%;
+        }
+        #admin-outgoing-items-table th.admin-col-notes,
+        #admin-outgoing-items-table td.admin-col-notes {
+            width: 18%;
+        }
+        #admin-outgoing-items-table .admin-qty-input {
+            max-width: 72px;
+        }
+        #admin-outgoing-items-table .admin-weight-input {
+            max-width: 88px;
+        }
+        #admin-outgoing-items-table .admin-price-input {
+            max-width: 96px;
+        }
+        #admin-outgoing-items-table .admin-tax-inputs {
+            min-width: 78px;
+            max-width: 78px;
+        }
+        #admin-outgoing-items-table .admin-tax-inputs input {
+            text-align: center;
+        }
+        #admin-outgoing-items-table .admin-notes-input {
+            min-width: 180px;
+            max-width: 100%;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            #admin-outgoing-items-table .admin-qty-input,
+            #admin-outgoing-items-table .admin-weight-input,
+            #admin-outgoing-items-table .admin-price-input,
+            #admin-outgoing-items-table .admin-tax-inputs,
+            #admin-outgoing-items-table .admin-notes-input {
+                max-width: 100%;
+            }
+            #admin-outgoing-items-table .admin-tax-inputs {
+                min-width: 72px;
+            }
+            #admin-outgoing-items-table .admin-notes-input {
+                min-width: 140px;
+            }
+        }
+    </style>
+
     <div class="card">
         <div class="form-section">
             <h3 class="form-section-title">{{ __('txn.outgoing_header') }}</h3>
@@ -159,11 +219,11 @@
                         <tr>
                             <th>{{ __('txn.name') }}</th>
                             <th>{{ __('txn.unit') }}</th>
-                            <th>{{ __('txn.qty') }}</th>
-                            <th>{{ __('txn.weight') }}</th>
-                            <th>{{ __('txn.price') }}</th>
-                            <th>{{ __('txn.vat_percent_short') }}</th>
-                            <th>{{ __('txn.notes') }}</th>
+                            <th class="admin-col-qty">{{ __('txn.qty') }}</th>
+                            <th class="admin-col-weight">{{ __('txn.weight') }}</th>
+                            <th class="admin-col-price">{{ __('txn.price') }}</th>
+                            <th class="admin-col-tax">{{ __('txn.vat_percent_short') }}</th>
+                            <th class="admin-col-notes">{{ __('txn.notes') }}</th>
                             <th></th>
                         </tr>
                         </thead>
@@ -200,17 +260,17 @@
                                     <input type="hidden" class="admin-product-id" name="items[{{ $idx }}][product_id]" value="{{ (int) ($item['product_id'] ?? 0) }}">
                                 </td>
                                 <td><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
-                                <td><input type="number" min="1" class="admin-qty w-xs" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
-                                <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
-                                <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
+                                <td><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
+                                <td><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
+                                <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
                                 <td>
-                                    <div class="dual-inline-inputs">
-                                        <input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" name="items[{{ $idx }}][tax_percent]" value="{{ number_format((float) ($item['tax_percent'] ?? 12), 2, '.', '') }}" placeholder="%">
-                                        <input type="number" min="0" step="1" class="admin-tax-amount w-xs" name="items[{{ $idx }}][tax_amount]" value="{{ (int) round((float) ($item['tax_amount'] ?? 0), 0) }}" placeholder="nilai">
+                                    <div class="dual-inline-inputs admin-tax-inputs">
+                                        <input type="number" min="0" step="0.01" class="admin-tax-percent" name="items[{{ $idx }}][tax_percent]" value="{{ (isset($item['tax_percent']) && (float) $item['tax_percent'] > 0) ? number_format((float) $item['tax_percent'], 2, '.', '') : '' }}" placeholder="%">
+                                        <input type="number" min="0" step="1" class="admin-tax-amount" name="items[{{ $idx }}][tax_amount]" value="{{ (isset($item['tax_amount']) && (float) $item['tax_amount'] > 0) ? (int) round((float) $item['tax_amount'], 0) : '' }}" placeholder="nilai">
                                         <input type="hidden" class="admin-tax-input-mode" name="items[{{ $idx }}][tax_input_mode]" value="{{ ($item['tax_input_mode'] ?? 'percent') === 'amount' ? 'amount' : 'percent' }}">
                                     </div>
                                 </td>
-                                <td><input type="text" class="admin-item-notes" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
+                                <td><input type="text" class="admin-item-notes admin-notes-input" name="items[{{ $idx }}][notes]" value="{{ $item['notes'] ?? '' }}"></td>
                                 <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                             </tr>
                         @endforeach
@@ -330,12 +390,13 @@
                         if ((taxModeField?.value || 'percent') === 'amount') {
                             const taxAmount = Math.max(0, Math.round(Number(taxAmountField?.value || 0)));
                             if (taxPercentField) {
-                                taxPercentField.value = lineSubtotal > 0 ? ((taxAmount / lineSubtotal) * 100).toFixed(2) : '0.00';
+                                taxPercentField.value = lineSubtotal > 0 ? ((taxAmount / lineSubtotal) * 100).toFixed(2) : '';
                             }
                         } else {
                             const taxPercent = Math.max(0, Number(taxPercentField?.value || 0));
                             if (taxAmountField) {
-                                taxAmountField.value = String(Math.round(lineSubtotal * (taxPercent / 100)));
+                                const computedTaxAmount = Math.round(lineSubtotal * (taxPercent / 100));
+                                taxAmountField.value = computedTaxAmount > 0 ? String(computedTaxAmount) : '';
                             }
                         }
                     };
@@ -381,17 +442,17 @@
                     tr.innerHTML = `
                         <td><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"><div class="field-inline-error admin-product-error" style="display:block; margin-top:4px;"></div></td>
                         <td><input type="text" class="admin-unit"></td>
-                        <td><input type="number" min="1" class="admin-qty w-xs" value="1" required></td>
-                        <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" value=""></td>
-                        <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0"></td>
+                        <td><input type="number" min="1" class="admin-qty admin-qty-input" value="1" required></td>
+                        <td><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" value=""></td>
+                        <td><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="0"></td>
                         <td>
-                            <div class="dual-inline-inputs">
-                                <input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" value="12.00" placeholder="%">
-                                <input type="number" min="0" step="1" class="admin-tax-amount w-xs" value="0" placeholder="nilai">
+                            <div class="dual-inline-inputs admin-tax-inputs">
+                                <input type="number" min="0" step="0.01" class="admin-tax-percent" value="" placeholder="%">
+                                <input type="number" min="0" step="1" class="admin-tax-amount" value="" placeholder="nilai">
                                 <input type="hidden" class="admin-tax-input-mode" value="percent">
                             </div>
                         </td>
-                        <td><input type="text" class="admin-item-notes"></td>
+                        <td><input type="text" class="admin-item-notes admin-notes-input"></td>
                         <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                     `;
                     body.appendChild(tr);

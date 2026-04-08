@@ -5,6 +5,75 @@
 @section('content')
     <h1 class="page-title">{{ __('txn.create_outgoing_transaction_title') }}</h1>
 
+    <style>
+        #items-table th.outgoing-col-category,
+        #items-table td.outgoing-col-category {
+            width: 11%;
+        }
+        #items-table th.outgoing-col-qty,
+        #items-table td.outgoing-col-qty {
+            width: 5.5%;
+        }
+        #items-table th.outgoing-col-weight,
+        #items-table td.outgoing-col-weight {
+            width: 7%;
+        }
+        #items-table th.outgoing-col-price,
+        #items-table td.outgoing-col-price {
+            width: 8%;
+        }
+        #items-table th.outgoing-col-tax,
+        #items-table td.outgoing-col-tax {
+            width: 8%;
+        }
+        #items-table th.outgoing-col-notes,
+        #items-table td.outgoing-col-notes {
+            width: 20%;
+        }
+        #items-table .outgoing-category-select {
+            max-width: 150px;
+            width: 100%;
+        }
+        #items-table .outgoing-qty-input {
+            max-width: 72px;
+        }
+        #items-table .outgoing-weight-input {
+            max-width: 88px;
+        }
+        #items-table .outgoing-price-input {
+            max-width: 96px;
+        }
+        #items-table .outgoing-tax-inputs {
+            min-width: 78px;
+            max-width: 78px;
+        }
+        #items-table .outgoing-tax-inputs input {
+            text-align: center;
+        }
+        #items-table .outgoing-notes-input {
+            min-width: 180px;
+            max-width: 100%;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            #items-table .outgoing-category-select,
+            #items-table .outgoing-qty-input,
+            #items-table .outgoing-weight-input,
+            #items-table .outgoing-price-input,
+            #items-table .outgoing-tax-inputs,
+            #items-table .outgoing-notes-input {
+                max-width: 100%;
+            }
+            #items-table .outgoing-tax-inputs {
+                min-width: 72px;
+            }
+            #items-table .outgoing-notes-input {
+                min-width: 140px;
+            }
+        }
+    </style>
+
     <form method="post" action="{{ route('outgoing-transactions.store') }}" enctype="multipart/form-data">
         @csrf
 
@@ -99,14 +168,14 @@
                     <thead>
                     <tr>
                         <th style="width: 22%">{{ __('txn.product') }} *</th>
-                        <th style="width: 16%">{{ __('ui.category') }}</th>
+                        <th class="outgoing-col-category">{{ __('ui.category') }}</th>
                         <th style="width: 8%">{{ __('txn.unit') }}</th>
-                        <th style="width: 8%">{{ __('txn.qty') }} *</th>
-                        <th style="width: 10%">{{ __('txn.weight') }}</th>
-                        <th style="width: 12%">{{ __('txn.price') }}</th>
-                        <th style="width: 14%">{{ __('txn.vat_percent_short') }}</th>
+                        <th class="outgoing-col-qty">{{ __('txn.qty') }} *</th>
+                        <th class="outgoing-col-weight">{{ __('txn.weight') }}</th>
+                        <th class="outgoing-col-price">{{ __('txn.price') }}</th>
+                        <th class="outgoing-col-tax">{{ __('txn.vat_percent_short') }}</th>
                         <th style="width: 12%">{{ __('txn.subtotal') }}</th>
-                        <th style="width: 14%">{{ __('txn.notes') }}</th>
+                        <th class="outgoing-col-notes">{{ __('txn.notes') }}</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -503,18 +572,21 @@
                     const taxPercentField = row.querySelector('.tax-percent');
                     const taxAmountField = row.querySelector('.tax-amount');
                     const taxModeField = row.querySelector('.tax-input-mode');
-                    const taxPercent = Math.max(0, Number(taxPercentField?.value || 0));
+                    const taxPercentRaw = String(taxPercentField?.value || '').trim();
+                    const taxAmountRaw = String(taxAmountField?.value || '').trim();
+                    const taxMode = taxModeField?.value || 'percent';
+                    const taxPercent = Math.max(0, Number(taxPercentRaw || 0));
                     const lineSubtotal = qty * unitCost;
                     let lineTax = 0;
-                    if ((taxModeField?.value || 'percent') === 'amount') {
-                        lineTax = Math.max(0, Math.round(Number(taxAmountField?.value || 0)));
+                    if (taxMode === 'amount') {
+                        lineTax = Math.max(0, Math.round(Number(taxAmountRaw || 0)));
                         if (taxPercentField) {
-                            taxPercentField.value = lineSubtotal > 0 ? ((lineTax / lineSubtotal) * 100).toFixed(2) : '0.00';
+                            taxPercentField.value = lineSubtotal > 0 ? ((lineTax / lineSubtotal) * 100).toFixed(2) : '';
                         }
                     } else {
                         lineTax = Math.round(lineSubtotal * (taxPercent / 100));
                         if (taxAmountField) {
-                            taxAmountField.value = String(lineTax);
+                            taxAmountField.value = lineTax > 0 ? String(lineTax) : '';
                         }
                     }
                     const lineTotal = lineSubtotal + lineTax;
@@ -723,14 +795,16 @@
                 const unitCostValue = Number.isFinite(unitCostCandidate) && unitCostCandidate >= 0
                     ? Math.round(unitCostCandidate)
                     : 0;
-                const taxPercentCandidate = Number(rowPrefill?.tax_percent ?? 12);
-                const taxPercentValue = Number.isFinite(taxPercentCandidate) && taxPercentCandidate >= 0
+                const hasTaxPercentPrefill = rowPrefill?.tax_percent !== undefined && rowPrefill?.tax_percent !== null && String(rowPrefill?.tax_percent).trim() !== '';
+                const taxPercentCandidate = Number(rowPrefill?.tax_percent ?? 0);
+                const taxPercentValue = hasTaxPercentPrefill && Number.isFinite(taxPercentCandidate) && taxPercentCandidate >= 0
                     ? taxPercentCandidate.toFixed(2)
-                    : '12.00';
+                    : '';
+                const hasTaxAmountPrefill = rowPrefill?.tax_amount !== undefined && rowPrefill?.tax_amount !== null && String(rowPrefill?.tax_amount).trim() !== '';
                 const taxAmountCandidate = Number(rowPrefill?.tax_amount ?? 0);
-                const taxAmountValue = Number.isFinite(taxAmountCandidate) && taxAmountCandidate >= 0
+                const taxAmountValue = hasTaxAmountPrefill && Number.isFinite(taxAmountCandidate) && taxAmountCandidate >= 0
                     ? Math.round(taxAmountCandidate)
-                    : 0;
+                    : '';
                 const taxInputMode = String(rowPrefill?.tax_input_mode || 'percent') === 'amount' ? 'amount' : 'percent';
                 const notesValue = String(rowPrefill?.notes ?? '');
                 const prefillProductId = rowPrefill?.product_id ? String(rowPrefill.product_id) : '';
@@ -745,31 +819,31 @@
                         <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                     </td>
                     <td>
-                        <select class="item-category w-sm" name="items[${index}][item_category_id]">
+                        <select class="item-category outgoing-category-select" name="items[${index}][item_category_id]">
                             ${buildCategoryOptions(categoryValue)}
                         </select>
                     </td>
                     <td>
-                        <select class="unit w-xs" name="items[${index}][unit]">${buildUnitOptions(unitValue)}</select>
+                        <select class="unit" name="items[${index}][unit]" style="max-width: 150px;">${buildUnitOptions(unitValue)}</select>
                     </td>
                     <td>
-                        <input type="number" min="1" class="qty w-xs" name="items[${index}][quantity]" value="${qtyValue}" required>
+                        <input type="number" min="1" class="qty outgoing-qty-input" name="items[${index}][quantity]" value="${qtyValue}" required>
                     </td>
                     <td>
-                        <input type="number" min="0" step="0.001" class="weight w-xs" name="items[${index}][weight]" value="${escapeAttribute(weightValue)}">
+                        <input type="number" min="0" step="0.001" class="weight outgoing-weight-input" name="items[${index}][weight]" value="${escapeAttribute(weightValue)}">
                     </td>
                     <td>
-                        <input type="number" min="0" step="1" class="unit-cost w-xs" name="items[${index}][unit_cost]" value="${unitCostValue}">
+                        <input type="number" min="0" step="1" class="unit-cost outgoing-price-input" name="items[${index}][unit_cost]" value="${unitCostValue}">
                     </td>
                     <td>
-                        <div class="dual-inline-inputs">
-                            <input type="number" min="0" step="0.01" class="tax-percent w-xs" name="items[${index}][tax_percent]" value="${taxPercentValue}" placeholder="%">
-                            <input type="number" min="0" step="1" class="tax-amount w-xs" name="items[${index}][tax_amount]" value="${taxAmountValue}" placeholder="nilai">
+                        <div class="dual-inline-inputs outgoing-tax-inputs">
+                            <input type="number" min="0" step="0.01" class="tax-percent" name="items[${index}][tax_percent]" value="${taxPercentValue}" placeholder="%">
+                            <input type="number" min="0" step="1" class="tax-amount" name="items[${index}][tax_amount]" value="${taxAmountValue}" placeholder="nilai">
                             <input type="hidden" class="tax-input-mode" name="items[${index}][tax_input_mode]" value="${taxInputMode}">
                         </div>
                     </td>
                     <td style="white-space: nowrap;">Rp <span class="line-total">0</span></td>
-                    <td><input type="text" class="item-notes" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
+                    <td><input type="text" class="item-notes outgoing-notes-input" name="items[${index}][notes]" value="${escapeAttribute(notesValue)}" placeholder="{{ __('txn.optional') }}"></td>
                     <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
                 `;
                 tableBody.appendChild(tr);

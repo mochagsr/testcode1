@@ -104,8 +104,8 @@ class OutgoingTransactionFlowsTest extends TestCase
             'semester_period' => 'S2-2526',
             'note_number' => 'NOTA-001',
             'subtotal_before_tax' => 75000,
-            'total_tax' => 9000,
-            'total' => 84000,
+            'total_tax' => 0,
+            'total' => 75000,
         ]);
 
         $product->refresh();
@@ -121,10 +121,10 @@ class OutgoingTransactionFlowsTest extends TestCase
             'outgoing_transaction_id' => $transactionId,
             'product_id' => $product->id,
             'weight' => 12.5,
-            'tax_percent' => 12.00,
-            'tax_amount' => 9000,
+            'tax_percent' => 0.00,
+            'tax_amount' => 0,
             'line_subtotal' => 75000,
-            'line_total' => 84000,
+            'line_total' => 75000,
         ]);
     }
 
@@ -462,12 +462,12 @@ class OutgoingTransactionFlowsTest extends TestCase
         $supplier->refresh();
 
         $this->assertSame(50000.0, (float) $transaction->subtotal_before_tax);
-        $this->assertSame(6000.0, (float) $transaction->total_tax);
-        $this->assertSame(56000.0, (float) $transaction->total);
+        $this->assertSame(0.0, (float) $transaction->total_tax);
+        $this->assertSame(50000.0, (float) $transaction->total);
         $this->assertSame('NOTA-NEW', (string) $transaction->note_number);
         $this->assertSame(8.0, (float) $productA->stock);
         $this->assertSame(9.0, (float) $productB->stock);
-        $this->assertSame(56000.0, (float) $supplier->outstanding_payable);
+        $this->assertSame(50000.0, (float) $supplier->outstanding_payable);
     }
 
     public function test_admin_can_update_supplier_payment_and_adjust_outstanding(): void
