@@ -762,7 +762,7 @@
                         <input type="number" min="0" step="1" class="unit-cost w-xs" name="items[${index}][unit_cost]" value="${unitCostValue}">
                     </td>
                     <td>
-                        <div style="display:grid; gap:4px;">
+                        <div class="dual-inline-inputs">
                             <input type="number" min="0" step="0.01" class="tax-percent w-xs" name="items[${index}][tax_percent]" value="${taxPercentValue}" placeholder="%">
                             <input type="number" min="0" step="1" class="tax-amount w-xs" name="items[${index}][tax_amount]" value="${taxAmountValue}" placeholder="nilai">
                             <input type="hidden" class="tax-input-mode" name="items[${index}][tax_input_mode]" value="${taxInputMode}">

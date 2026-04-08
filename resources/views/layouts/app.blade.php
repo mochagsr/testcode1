@@ -479,6 +479,15 @@
         .w-sm { max-width: 260px !important; }
         .w-md { max-width: 380px !important; }
         .w-lg { max-width: 560px !important; }
+        .dual-inline-inputs {
+            display: grid;
+            gap: 4px;
+            min-width: 120px;
+        }
+        .dual-inline-inputs input {
+            width: 100%;
+            min-width: 0;
+        }
         form > .btn,
         form > .btn.secondary {
             margin-right: 6px;
@@ -949,6 +958,14 @@
                 width: 100%;
                 max-width: 100%;
                 min-width: 0;
+            }
+            .dual-inline-inputs {
+                min-width: 108px;
+                gap: 6px;
+            }
+            .dual-inline-inputs input {
+                min-height: 40px;
+                font-size: 14px;
             }
             .table-mobile-scroll {
                 margin-inline: -2px;

@@ -204,7 +204,7 @@
                                 <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
                                 <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" name="items[{{ $idx }}][unit_cost]" value="{{ (int) ($item['unit_cost'] ?? 0) }}"></td>
                                 <td>
-                                    <div style="display:grid; gap:4px;">
+                                    <div class="dual-inline-inputs">
                                         <input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" name="items[{{ $idx }}][tax_percent]" value="{{ number_format((float) ($item['tax_percent'] ?? 12), 2, '.', '') }}" placeholder="%">
                                         <input type="number" min="0" step="1" class="admin-tax-amount w-xs" name="items[{{ $idx }}][tax_amount]" value="{{ (int) round((float) ($item['tax_amount'] ?? 0), 0) }}" placeholder="nilai">
                                         <input type="hidden" class="admin-tax-input-mode" name="items[{{ $idx }}][tax_input_mode]" value="{{ ($item['tax_input_mode'] ?? 'percent') === 'amount' ? 'amount' : 'percent' }}">
@@ -385,7 +385,7 @@
                         <td><input type="number" min="0" step="0.001" class="admin-weight w-xs" value=""></td>
                         <td><input type="number" min="0" step="1" class="admin-unit-cost w-xs" value="0"></td>
                         <td>
-                            <div style="display:grid; gap:4px;">
+                            <div class="dual-inline-inputs">
                                 <input type="number" min="0" step="0.01" class="admin-tax-percent w-xs" value="12.00" placeholder="%">
                                 <input type="number" min="0" step="1" class="admin-tax-amount w-xs" value="0" placeholder="nilai">
                                 <input type="hidden" class="admin-tax-input-mode" value="percent">
