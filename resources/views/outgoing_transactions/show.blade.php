@@ -30,7 +30,7 @@
     <style>
         #admin-outgoing-items-table th.admin-col-qty,
         #admin-outgoing-items-table td.admin-col-qty {
-            width: 6%;
+            width: 4.5%;
         }
         #admin-outgoing-items-table th.admin-col-weight,
         #admin-outgoing-items-table td.admin-col-weight {
@@ -46,10 +46,10 @@
         }
         #admin-outgoing-items-table th.admin-col-notes,
         #admin-outgoing-items-table td.admin-col-notes {
-            width: 18%;
+            width: 14%;
         }
         #admin-outgoing-items-table .admin-qty-input {
-            max-width: 72px;
+            max-width: 62px;
         }
         #admin-outgoing-items-table .admin-weight-input {
             max-width: 88px;
@@ -59,16 +59,16 @@
         }
         #admin-outgoing-items-table .admin-tax-inputs {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: 40px 72px;
             gap: 6px;
-            min-width: 128px;
-            max-width: 128px;
+            min-width: 118px;
+            max-width: 118px;
         }
         #admin-outgoing-items-table .admin-tax-inputs input {
             text-align: center;
         }
         #admin-outgoing-items-table .admin-notes-input {
-            min-width: 180px;
+            min-width: 136px;
             max-width: 100%;
             width: 100%;
         }
@@ -82,10 +82,10 @@
                 max-width: 100%;
             }
             #admin-outgoing-items-table .admin-tax-inputs {
-                min-width: 120px;
+                min-width: 112px;
             }
             #admin-outgoing-items-table .admin-notes-input {
-                min-width: 140px;
+                min-width: 120px;
             }
         }
     </style>

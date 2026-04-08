@@ -8,11 +8,11 @@
     <style>
         #items-table th.outgoing-col-category,
         #items-table td.outgoing-col-category {
-            width: 11%;
+            width: 9%;
         }
         #items-table th.outgoing-col-qty,
         #items-table td.outgoing-col-qty {
-            width: 5.5%;
+            width: 4.5%;
         }
         #items-table th.outgoing-col-weight,
         #items-table td.outgoing-col-weight {
@@ -28,14 +28,14 @@
         }
         #items-table th.outgoing-col-notes,
         #items-table td.outgoing-col-notes {
-            width: 20%;
+            width: 14%;
         }
         #items-table .outgoing-category-select {
-            max-width: 150px;
+            max-width: 128px;
             width: 100%;
         }
         #items-table .outgoing-qty-input {
-            max-width: 72px;
+            max-width: 62px;
         }
         #items-table .outgoing-weight-input {
             max-width: 88px;
@@ -45,16 +45,16 @@
         }
         #items-table .outgoing-tax-inputs {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: 40px 72px;
             gap: 6px;
-            min-width: 128px;
-            max-width: 128px;
+            min-width: 118px;
+            max-width: 118px;
         }
         #items-table .outgoing-tax-inputs input {
             text-align: center;
         }
         #items-table .outgoing-notes-input {
-            min-width: 180px;
+            min-width: 136px;
             max-width: 100%;
             width: 100%;
         }
@@ -69,10 +69,10 @@
                 max-width: 100%;
             }
             #items-table .outgoing-tax-inputs {
-                min-width: 120px;
+                min-width: 112px;
             }
             #items-table .outgoing-notes-input {
-                min-width: 140px;
+                min-width: 120px;
             }
         }
     </style>
