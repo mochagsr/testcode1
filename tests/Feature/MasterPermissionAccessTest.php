@@ -50,4 +50,21 @@ class MasterPermissionAccessTest extends TestCase
         $this->actingAs($user)->get(route('item-categories.index'))->assertOk();
         $this->actingAs($user)->get(route('item-categories.create'))->assertOk();
     }
+
+    public function test_user_with_supplier_permission_can_manage_suppliers(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'dashboard.view',
+                'settings.profile',
+                'masters.suppliers.view',
+                'masters.suppliers.edit',
+            ],
+        ]);
+
+        $this->actingAs($user)->get(route('suppliers.index'))->assertOk();
+        $this->actingAs($user)->get(route('suppliers.create'))->assertOk();
+        $this->actingAs($user)->get(route('suppliers.import.template'))->assertOk();
+    }
 }

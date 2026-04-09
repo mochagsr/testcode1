@@ -42,7 +42,7 @@
         'masters.customers.view' => 'Lihat customer',
         'masters.customers.manage' => 'Kelola customer (tambah/edit/hapus/import)',
         'masters.suppliers.view' => 'Lihat supplier',
-        'masters.suppliers.edit' => 'Kelola supplier',
+        'masters.suppliers.edit' => 'Kelola supplier (tambah/edit/hapus/import)',
         'imports.transactions' => 'Import transaksi',
         'semester.bulk' => 'Buka/tutup semester massal',
         'users.manage' => 'Kelola user',

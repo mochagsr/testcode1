@@ -107,9 +107,12 @@
             }
         }
     </style>
+    @php
+        $canManageSuppliers = auth()->user()?->canAccess('masters.suppliers.edit') ?? false;
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.suppliers_title') }}</h1>
-        @if(auth()->user()->role === 'admin')
+        @if($canManageSuppliers)
             <a class="btn" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
         @endif
     </div>
@@ -123,16 +126,18 @@
                 </form>
             </div>
             <div class="toolbar-right">
-                <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="import-form">
-                    @csrf
-                    <div class="import-file-wrap">
-                        <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                    </div>
-                    <div class="import-actions">
-                        <button type="submit" class="btn process-btn">Import</button>
-                        <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
-                    </div>
-                </form>
+                @if($canManageSuppliers)
+                    <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="import-form">
+                        @csrf
+                        <div class="import-file-wrap">
+                            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                        </div>
+                        <div class="import-actions">
+                            <button type="submit" class="btn process-btn">Import</button>
+                            <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
+                        </div>
+                    </form>
+                @endif
             </div>
         </div>
         @if(session('import_errors'))
@@ -169,13 +174,15 @@
                     <td>{{ $supplier->address ?: '-' }}</td>
                     <td>{{ $supplier->notes ?: '-' }}</td>
                     <td>
-                        <a class="btn edit-btn" href="{{ route('suppliers.edit', $supplier) }}">{{ __('ui.edit') }}</a>
-                        @if(auth()->user()->role === 'admin')
+                        @if($canManageSuppliers)
+                            <a class="btn edit-btn" href="{{ route('suppliers.edit', $supplier) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('suppliers.destroy', $supplier) }}" style="display:inline;" onsubmit="return confirm('{{ __('ui.confirm_delete_supplier') }}')">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
                             </form>
+                        @else
+                            <span class="muted">-</span>
                         @endif
                     </td>
                 </tr>
