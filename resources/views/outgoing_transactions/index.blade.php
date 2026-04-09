@@ -89,10 +89,15 @@
         }
     </style>
 
+    @php
+        $canCreateOutgoingTransaction = auth()->user()?->canAccess('transactions.create') ?? false;
+    @endphp
     <div class="page-header-actions">
         <h1 class="page-title">{{ __('txn.outgoing_transactions_title') }}</h1>
         <div class="actions">
-            <a class="btn create-transaction-btn" href="{{ route('outgoing-transactions.create') }}">{{ __('txn.create_outgoing_transaction') }}</a>
+            @if($canCreateOutgoingTransaction)
+                <a class="btn create-transaction-btn" href="{{ route('outgoing-transactions.create') }}">{{ __('txn.create_outgoing_transaction') }}</a>
+            @endif
         </div>
     </div>
 

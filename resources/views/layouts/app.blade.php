@@ -1156,7 +1156,12 @@
                             <a href="{{ route('suppliers.index') }}" class="{{ request()->routeIs('suppliers.*') ? 'active' : '' }}">{{ __('menu.suppliers') }}</a>
                         @endif
                         @if($canTransactionsView || $canTransactionsCreate)
-                            <a href="{{ route('outgoing-transactions.index') }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
+                            @php
+                                $outgoingTransactionsRoute = $canTransactionsView
+                                    ? route('outgoing-transactions.index')
+                                    : route('outgoing-transactions.create');
+                            @endphp
+                            <a href="{{ $outgoingTransactionsRoute }}" class="{{ request()->routeIs('outgoing-transactions.*') ? 'active' : '' }}">{{ __('menu.outgoing_transactions') }}</a>
                         @endif
                         @if($canSupplierPayablesView)
                             <a href="{{ route('supplier-payables.index') }}" class="{{ request()->routeIs('supplier-payables.*') ? 'active' : '' }}">{{ __('menu.supplier_payables') }}</a>

@@ -67,4 +67,42 @@ class MasterPermissionAccessTest extends TestCase
         $this->actingAs($user)->get(route('suppliers.create'))->assertOk();
         $this->actingAs($user)->get(route('suppliers.import.template'))->assertOk();
     }
+
+
+    public function test_outgoing_create_button_hidden_without_create_permission(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'dashboard.view',
+                'transactions.view',
+                'settings.profile',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('outgoing-transactions.index'));
+
+        $response->assertOk();
+        $response->assertDontSee(route('outgoing-transactions.create'), false);
+    }
+
+    public function test_outgoing_create_button_visible_with_create_permission(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'dashboard.view',
+                'transactions.view',
+                'transactions.create',
+                'settings.profile',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('outgoing-transactions.index'));
+
+        $response->assertOk();
+        $response->assertSee(route('outgoing-transactions.create'), false);
+        $this->actingAs($user)->get(route('outgoing-transactions.create'))->assertOk();
+    }
+
 }
