@@ -638,6 +638,8 @@
             gap: 12px;
             flex-wrap: wrap;
             margin-bottom: 12px;
+            position: relative;
+            z-index: 4;
         }
         .page-header-actions .page-title {
             margin: 0;
@@ -648,6 +650,16 @@
             gap: 8px;
             flex-wrap: wrap;
             justify-content: flex-end;
+            position: relative;
+            z-index: 5;
+        }
+        .page-header-actions .actions .btn:not(.secondary),
+        .page-header-actions .actions button:not(.secondary),
+        .page-header-actions .actions input[type="submit"]:not(.secondary),
+        .page-header-actions .actions input[type="button"]:not(.secondary) {
+            background: var(--btn-create-bg) !important;
+            border-color: var(--btn-create-border) !important;
+            color: var(--btn-create-text) !important;
         }
         .filter-toolbar {
             display: flex;
@@ -1437,6 +1449,9 @@
                 closeMobileSidebar();
             }
         });
+
+        closeMobileSidebar();
+        window.addEventListener('pageshow', closeMobileSidebar);
     })();
 </script>
 <script>
