@@ -1569,8 +1569,8 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('INV-11042026-0001');
         $response->assertSee('KWT-06042026-0001');
         $response->assertSee('RTR-28022026-0001');
-        $response->assertSee(route('receivable-payments.show', $receivablePayment), false);
-        $response->assertSee(route('sales-returns.show', $salesReturn), false);
+        $response->assertDontSee(route('receivable-payments.show', $receivablePayment), false);
+        $response->assertDontSee(route('sales-returns.show', $salesReturn), false);
 
         $screenResponse = $this->actingAs($user)->get(route('receivables.index', [
             'customer_id' => $customer->id,
