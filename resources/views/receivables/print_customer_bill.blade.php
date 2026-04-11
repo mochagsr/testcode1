@@ -149,7 +149,21 @@
                     <tr>
                         <td>{{ $row['date_label'] ?? '' }}</td>
                         <td>
-                            {{ $row['proof_number'] ?? '' }}
+                            @if(!empty($row['receivable_payment_id']))
+                                <a href="{{ route('receivable-payments.show', (int) $row['receivable_payment_id']) }}" target="_blank" rel="noopener noreferrer">
+                                    {{ $row['proof_number'] ?? '' }}
+                                </a>
+                            @elseif(!empty($row['sales_return_id']))
+                                <a href="{{ route('sales-returns.show', (int) $row['sales_return_id']) }}" target="_blank" rel="noopener noreferrer">
+                                    {{ $row['proof_number'] ?? '' }}
+                                </a>
+                            @elseif(!empty($row['invoice_id']))
+                                <a href="{{ route('sales-invoices.show', (int) $row['invoice_id']) }}" target="_blank" rel="noopener noreferrer">
+                                    {{ $row['proof_number'] ?? '' }}
+                                </a>
+                            @else
+                                {{ $row['proof_number'] ?? '' }}
+                            @endif
                             @if((int) ($row['adjustment_amount'] ?? 0) !== 0)
                                 <br>
                                 <span style="font-size:10px;">

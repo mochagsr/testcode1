@@ -860,7 +860,15 @@
                                         <tr>
                                             <td>{{ $billRow['date_label'] ?? '' }}</td>
                                             <td>
-                                                @if(!empty($billRow['invoice_id']))
+                                                @if(!empty($billRow['receivable_payment_id']))
+                                                    <a href="{{ route('receivable-payments.show', (int) $billRow['receivable_payment_id']) }}" target="_blank" rel="noopener noreferrer">
+                                                        {{ $billRow['proof_number'] ?? '' }}
+                                                    </a>
+                                                @elseif(!empty($billRow['sales_return_id']))
+                                                    <a href="{{ route('sales-returns.show', (int) $billRow['sales_return_id']) }}" target="_blank" rel="noopener noreferrer">
+                                                        {{ $billRow['proof_number'] ?? '' }}
+                                                    </a>
+                                                @elseif(!empty($billRow['invoice_id']))
                                                     <a href="{{ route('sales-invoices.show', (int) $billRow['invoice_id']) }}" target="_blank" rel="noopener noreferrer">
                                                         {{ $billRow['proof_number'] ?? '' }}
                                                     </a>

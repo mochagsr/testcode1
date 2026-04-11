@@ -13,6 +13,7 @@ use App\Models\OrderNote;
 use App\Models\OrderNoteItem;
 use App\Models\Product;
 use App\Models\ReceivableLedger;
+use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
 use App\Models\SalesReturn;
@@ -1500,6 +1501,28 @@ class ReceivableFlowsTest extends TestCase
             'balance' => 4950000,
             'payment_status' => 'unpaid',
         ]);
+        $receivablePayment = ReceivablePayment::query()->create([
+            'payment_number' => 'KWT-06042026-0001',
+            'customer_id' => $customer->id,
+            'payment_date' => '2026-04-06',
+            'customer_address' => 'Jl Sidoarjo',
+            'amount' => 10000,
+            'amount_in_words' => 'sepuluh ribu rupiah',
+            'customer_signature' => 'Angga',
+            'user_signature' => 'Kasir',
+            'notes' => 'Pembayaran piutang',
+            'created_by_user_id' => $user->id,
+        ]);
+        $salesReturn = SalesReturn::query()->create([
+            'return_number' => 'RTR-28022026-0001',
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'return_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'total' => 3500,
+            'reason' => 'Retur uji cetak piutang',
+        ]);
 
         ReceivableLedger::query()->create([
             'customer_id' => $customer->id,
@@ -1546,6 +1569,123 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('INV-11042026-0001');
         $response->assertSee('KWT-06042026-0001');
         $response->assertSee('RTR-28022026-0001');
+        $response->assertSee(route('receivable-payments.show', $receivablePayment), false);
+        $response->assertSee(route('sales-returns.show', $salesReturn), false);
+
+        $screenResponse = $this->actingAs($user)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $screenResponse->assertOk();
+        $screenResponse->assertSee(route('receivable-payments.show', $receivablePayment), false);
+        $screenResponse->assertSee(route('sales-returns.show', $salesReturn), false);
+    }
+
+    public function test_customer_bill_excel_export_keeps_payment_and_return_document_numbers(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-EXCEL-001',
+            'name' => 'Angga Excel',
+            'city' => 'Sidoarjo',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-11042026-0002',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-04-11',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'subtotal' => 100000,
+            'total' => 100000,
+            'total_paid' => 0,
+            'balance' => 100000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        ReceivablePayment::query()->create([
+            'payment_number' => 'KWT-06042026-0002',
+            'customer_id' => $customer->id,
+            'payment_date' => '2026-04-06',
+            'customer_address' => 'Jl Sidoarjo',
+            'amount' => 15000,
+            'amount_in_words' => 'lima belas ribu rupiah',
+            'customer_signature' => 'Angga Excel',
+            'user_signature' => 'Kasir',
+            'notes' => 'Pembayaran piutang',
+            'created_by_user_id' => $user->id,
+        ]);
+
+        SalesReturn::query()->create([
+            'return_number' => 'RTR-28022026-0002',
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'return_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'total' => 4500,
+            'reason' => 'Retur uji excel piutang',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-11',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-11042026-0002',
+            'debit' => 100000,
+            'credit' => 0,
+            'balance_after' => 100000,
+            'period_code' => 'S2-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-06',
+            'transaction_type' => 'product',
+            'description' => 'Pembayaran KWT-06042026-0002',
+            'debit' => 0,
+            'credit' => 15000,
+            'balance_after' => 85000,
+            'period_code' => 'S2-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'transaction_type' => 'product',
+            'description' => 'Retur RTR-28022026-0002',
+            'debit' => 0,
+            'credit' => 4500,
+            'balance_after' => 80500,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.export-customer-bill-excel', [
+            'customer' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+        $tempFile = tempnam(sys_get_temp_dir(), 'bill-xlsx-');
+        file_put_contents($tempFile, $content);
+
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($tempFile) === true);
+        $workbookPayload = '';
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = (string) $zip->getNameIndex($index);
+            if (str_starts_with($name, 'xl/') && str_ends_with($name, '.xml')) {
+                $workbookPayload .= (string) $zip->getFromIndex($index);
+            }
+        }
+        $zip->close();
+        @unlink($tempFile);
+
+        $this->assertStringContainsString('KWT-06042026-0002', $workbookPayload);
+        $this->assertStringContainsString('RTR-28022026-0002', $workbookPayload);
     }
 
     public function test_receivable_semester_page_hides_closed_semester_from_dropdown(): void

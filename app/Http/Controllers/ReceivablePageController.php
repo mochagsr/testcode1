@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\CustomerLevel;
 use App\Models\InvoicePayment;
 use App\Models\ReceivableLedger;
+use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Services\ReceivableLedgerService;
@@ -1670,6 +1671,8 @@ class ReceivablePageController extends Controller
             [
                 'date_label' => __('receivable.bill_opening_balance'),
                 'invoice_id' => null,
+                'receivable_payment_id' => null,
+                'sales_return_id' => null,
                 'proof_number' => '',
                 'entry_type' => 'opening',
                 'transaction_type' => null,
@@ -1690,6 +1693,35 @@ class ReceivablePageController extends Controller
             'adjustment_amount' => 0,
             'running_balance' => $openingBalance,
         ];
+
+        $paymentRefs = $ledgerRows
+            ->map(fn (ReceivableLedger $ledgerRow): string => $this->extractDocumentReference((string) ($ledgerRow->description ?? ''), ['KWT', 'PYT']))
+            ->filter(fn (string $reference): bool => $reference !== '')
+            ->unique()
+            ->values();
+        $returnRefs = $ledgerRows
+            ->map(fn (ReceivableLedger $ledgerRow): string => $this->extractDocumentReference((string) ($ledgerRow->description ?? ''), ['RTR', 'RET', 'RTN']))
+            ->filter(fn (string $reference): bool => $reference !== '')
+            ->unique()
+            ->values();
+        $paymentIdMap = $paymentRefs->isEmpty()
+            ? collect()
+            : ReceivablePayment::query()
+                ->where('customer_id', $customerId)
+                ->whereIn('payment_number', $paymentRefs->all())
+                ->get(['id', 'payment_number'])
+                ->mapWithKeys(fn (ReceivablePayment $payment): array => [
+                    strtoupper((string) $payment->payment_number) => (int) $payment->id,
+                ]);
+        $salesReturnIdMap = $returnRefs->isEmpty()
+            ? collect()
+            : SalesReturn::query()
+                ->where('customer_id', $customerId)
+                ->whereIn('return_number', $returnRefs->all())
+                ->get(['id', 'return_number'])
+                ->mapWithKeys(fn (SalesReturn $salesReturn): array => [
+                    strtoupper((string) $salesReturn->return_number) => (int) $salesReturn->id,
+                ]);
 
         $groupedRows = [];
         foreach ($ledgerRows as $ledgerRow) {
@@ -1735,6 +1767,8 @@ class ReceivablePageController extends Controller
             }
             $paymentNumber = $this->extractDocumentReference($rawDescription, ['KWT', 'PYT']);
             $returnNumber = $this->extractDocumentReference($rawDescription, ['RTR', 'RET', 'RTN']);
+            $paymentId = $paymentNumber !== '' ? (int) ($paymentIdMap[$paymentNumber] ?? 0) : 0;
+            $salesReturnId = $returnNumber !== '' ? (int) ($salesReturnIdMap[$returnNumber] ?? 0) : 0;
             $baseProofNumber = match ($entryType) {
                 'return' => $returnNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),
                 'payment' => $paymentNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),
@@ -1765,6 +1799,8 @@ class ReceivablePageController extends Controller
                     'date_value' => $dateValue,
                     'date_ts' => $this->toTimestamp($dateValue),
                     'invoice_id' => $invoiceId,
+                    'receivable_payment_id' => $paymentId > 0 ? $paymentId : null,
+                    'sales_return_id' => $salesReturnId > 0 ? $salesReturnId : null,
                     'proof_number' => $proofNumber,
                     'entry_type' => $entryType,
                     'transaction_type' => $transactionType,
@@ -1806,6 +1842,8 @@ class ReceivablePageController extends Controller
             $statementRows->push([
                 'date_label' => $this->formatBillDate($groupedRow['date_value']),
                 'invoice_id' => $groupedRow['invoice_id'],
+                'receivable_payment_id' => $groupedRow['receivable_payment_id'] ?? null,
+                'sales_return_id' => $groupedRow['sales_return_id'] ?? null,
                 'proof_number' => $groupedRow['proof_number'],
                 'entry_type' => (string) ($groupedRow['entry_type'] ?? 'payment'),
                 'transaction_type' => $groupedRow['transaction_type'] ?? null,
