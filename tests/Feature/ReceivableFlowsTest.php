@@ -1154,7 +1154,7 @@ class ReceivableFlowsTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee(__('receivable.customer_bill_title'));
+        $response->assertSee('Rekap Piutang');
         $response->assertSee('Customer Zeta');
         $response->assertSee(__('receivable.bill_opening_balance'));
         $response->assertSee('100.000');

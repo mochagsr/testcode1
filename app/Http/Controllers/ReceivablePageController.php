@@ -1580,17 +1580,15 @@ class ReceivablePageController extends Controller
 
     private function customerBillReportTitle(Customer $customer, ?string $selectedSemester, ?string $selectedTransactionType = null): string
     {
-        $customerName = trim((string) $customer->name);
-        $namePart = $customerName !== '' ? $customerName : 'Customer';
         $typeSuffix = $selectedTransactionType !== null && trim($selectedTransactionType) !== ''
             ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType))
             : '';
 
         if ($selectedSemester !== null) {
-            return sprintf('Rekap Piutang %s %s%s', $namePart, strtoupper($selectedSemester), $typeSuffix);
+            return sprintf('Rekap Piutang %s%s', strtoupper($selectedSemester), $typeSuffix);
         }
 
-        return sprintf('Rekap Piutang %s%s', $namePart, $typeSuffix);
+        return sprintf('Rekap Piutang%s', $typeSuffix);
     }
 
     private function normalizeSemester(string $semester): string

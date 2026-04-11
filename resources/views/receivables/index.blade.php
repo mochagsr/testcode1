@@ -857,9 +857,20 @@
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                                         </tr>
                                     @else
+                                        @php
+                                            $proofBadge = !empty($billRow['receivable_payment_id'])
+                                                ? 'KWT'
+                                                : (!empty($billRow['sales_return_id']) ? 'RTR' : (!empty($billRow['invoice_id']) ? 'INV' : 'DOC'));
+                                            $proofBadgeStyle = !empty($billRow['receivable_payment_id'])
+                                                ? 'display:inline-block; margin-right:6px; padding:2px 6px; border-radius:999px; background:#e8f1ff; color:#0d47a1; font-size:10px; font-weight:700;'
+                                                : (!empty($billRow['sales_return_id'])
+                                                    ? 'display:inline-block; margin-right:6px; padding:2px 6px; border-radius:999px; background:#fff0e0; color:#b45309; font-size:10px; font-weight:700;'
+                                                    : 'display:inline-block; margin-right:6px; padding:2px 6px; border-radius:999px; background:#e8f7ed; color:#166534; font-size:10px; font-weight:700;');
+                                        @endphp
                                         <tr>
                                             <td>{{ $billRow['date_label'] ?? '' }}</td>
                                             <td>
+                                                <span style="{{ $proofBadgeStyle }}">{{ $proofBadge }}</span>
                                                 @if(!empty($billRow['receivable_payment_id']))
                                                     <a href="{{ route('receivable-payments.show', (int) $billRow['receivable_payment_id']) }}" target="_blank" rel="noopener noreferrer">
                                                         {{ $billRow['proof_number'] ?? '' }}

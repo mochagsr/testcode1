@@ -26,7 +26,7 @@
         }
         .company-name { font-size: 15px; font-weight: 800; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
         .company-meta { margin-top: 2px; white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
-        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; }
+        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: start; padding-left: 4px; }
         .doc-title { font-size: 20px; font-weight: 800; text-transform: uppercase; line-height: 1.1; }
         .doc-number { margin-top: 2px; }
         .doc-right { font-size: 12px; line-height: 1.3; min-width: 180px; max-width: 270px; justify-self: end; width: 100%; margin-left: auto; font-weight: 700; }
@@ -46,6 +46,16 @@
         .footer-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 10px; }
         .footer-box { border: 1px solid #111; padding: 8px; min-height: 64px; }
         .muted { color: #444; }
+        .proof-badge {
+            display: inline-block;
+            margin-right: 6px;
+            padding: 1px 5px;
+            border: 1px solid #111;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+        }
         @media print {
             .no-print { display: none; }
             body { margin: 4mm; font-size: 12px; line-height: 1.28; font-weight: 600; }
@@ -103,7 +113,11 @@
         </div>
         <div class="doc-center">
             <div class="doc-title">{{ $reportTitle ?? __('receivable.customer_bill_title') }}</div>
-            <div class="doc-number">{{ __('receivable.customer_bill_title') }}</div>
+            @if($selectedSemester)
+                <div class="doc-number">Semester: {{ $selectedSemester }}</div>
+            @elseif(!empty($selectedTransactionType))
+                <div class="doc-number">{{ strtoupper($selectedTransactionType) }}</div>
+            @endif
             <div class="doc-number">{{ __('txn.no') }}: {{ $customer->code ?: $customer->id }}</div>
         </div>
         <div class="doc-right">
@@ -146,9 +160,15 @@
                         <td class="num">Rp {{ number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.') }}</td>
                     </tr>
                 @else
+                    @php
+                        $proofBadge = !empty($row['receivable_payment_id'])
+                            ? 'KWT'
+                            : (!empty($row['sales_return_id']) ? 'RTR' : (!empty($row['invoice_id']) ? 'INV' : 'DOC'));
+                    @endphp
                     <tr>
                         <td>{{ $row['date_label'] ?? '' }}</td>
                         <td>
+                            <span class="proof-badge">{{ $proofBadge }}</span>
                             @if(!empty($row['receivable_payment_id']))
                                 <a href="{{ route('receivable-payments.show', (int) $row['receivable_payment_id']) }}" target="_blank" rel="noopener noreferrer">
                                     {{ $row['proof_number'] ?? '' }}
