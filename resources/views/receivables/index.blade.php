@@ -662,7 +662,7 @@
                             <th>{{ __('receivable.date') }}</th>
                             <th>{{ __('receivable.description') }}</th>
                             <th>{{ __('receivable.transaction_type') }}</th>
-                            <th>{{ __('receivable.printing_subtype') }}</th>
+                            <th>{{ __('receivable.transaction_subtype') }}</th>
                             <th class="num">{{ __('receivable.debit') }}</th>
                             <th class="num">{{ __('receivable.credit') }}</th>
                             <th class="num">{{ __('receivable.balance') }}</th>
@@ -739,16 +739,25 @@
                                         @php
                                             $rowTransactionType = trim((string) ($row->transaction_type ?? '')) !== '' ? (string) $row->transaction_type : (string) ($row->invoice?->transaction_type ?? '');
                                             $rowPrintingSubtype = trim((string) ($row->printing_subtype_name ?? '')) !== '' ? trim((string) $row->printing_subtype_name) : trim((string) ($row->invoice?->printing_subtype_name ?? ''));
+                                            $descriptionLower = mb_strtolower(trim((string) ($row->description ?? '')), 'UTF-8');
+                                            $isReturnEntry = str_contains($descriptionLower, 'retur') || str_contains($descriptionLower, 'return');
+                                            $isCreditEntry = (float) $row->credit > 0;
+                                            if ($isReturnEntry) {
+                                                $rowTransactionTypeLabel = __('receivable.transaction_type_return');
+                                                $rowTransactionSubtypeLabel = __('receivable.printing_subtype_none');
+                                            } elseif ($isCreditEntry) {
+                                                $rowTransactionTypeLabel = __('receivable.transaction_type_payment');
+                                                $rowTransactionSubtypeLabel = __('receivable.printing_subtype_none');
+                                            } else {
+                                                $rowTransactionTypeLabel = __('receivable.transaction_type_sale');
+                                                $rowTransactionSubtypeLabel = $rowTransactionType === 'printing'
+                                                    ? ($rowPrintingSubtype !== '' ? __('receivable.transaction_subtype_printing_named', ['name' => $rowPrintingSubtype]) : __('receivable.transaction_type_printing'))
+                                                    : __('receivable.transaction_subtype_product');
+                                            }
                                         @endphp
-                                        @if($rowTransactionType === 'printing')
-                                            {{ __('receivable.transaction_type_printing') }}
-                                        @elseif($rowTransactionType === 'product')
-                                            {{ __('receivable.transaction_type_product') }}
-                                        @else
-                                            {{ __('receivable.transaction_type_none') }}
-                                        @endif
+                                        {{ $rowTransactionTypeLabel }}
                                     </td>
-                                    <td>{{ $rowPrintingSubtype !== '' ? $rowPrintingSubtype : __('receivable.printing_subtype_none') }}</td>
+                                    <td>{{ $rowTransactionSubtypeLabel }}</td>
                                     <td class="num">
                                         @if($row->debit > 0)
                                             Rp {{ number_format((int) round($row->debit), 0, ',', '.') }}
@@ -840,7 +849,7 @@
                                     <th>{{ __('receivable.bill_date') }}</th>
                                     <th>{{ __('receivable.bill_proof_number') }}</th>
                                     <th>{{ __('receivable.transaction_type') }}</th>
-                                    <th>{{ __('receivable.printing_subtype') }}</th>
+                                    <th>{{ __('receivable.transaction_subtype') }}</th>
                                     <th class="num">{{ __('receivable.bill_credit_sales') }}</th>
                                     <th class="num">{{ __('receivable.bill_installment_payment') }}</th>
                                     <th class="num">{{ __('receivable.bill_sales_return') }}</th>
@@ -893,7 +902,7 @@
                                                 @endif
                                             </td>
                                             <td>{{ $billRow['transaction_type_label'] ?? __('receivable.transaction_type_none') }}</td>
-                                            <td>{{ ($billRow['printing_subtype_name'] ?? null) ? $billRow['printing_subtype_name'] : __('receivable.printing_subtype_none') }}</td>
+                                            <td>{{ $billRow['transaction_subtype_label'] ?? __('receivable.printing_subtype_none') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['credit_sales'] ?? 0)), 0, ',', '.') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['installment_payment'] ?? 0)), 0, ',', '.') }}</td>
                                             <td class="num">Rp {{ number_format((int) round((float) ($billRow['sales_return'] ?? 0)), 0, ',', '.') }}</td>

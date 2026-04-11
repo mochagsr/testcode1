@@ -1501,6 +1501,19 @@ class ReceivableFlowsTest extends TestCase
             'balance' => 4950000,
             'payment_status' => 'unpaid',
         ]);
+        $printingInvoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-12042026-0001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-04-12',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'printing',
+            'printing_subtype_name' => 'Brosur',
+            'subtotal' => 250000,
+            'total' => 250000,
+            'total_paid' => 0,
+            'balance' => 250000,
+            'payment_status' => 'unpaid',
+        ]);
         $receivablePayment = ReceivablePayment::query()->create([
             'payment_number' => 'KWT-06042026-0001',
             'customer_id' => $customer->id,
@@ -1559,6 +1572,18 @@ class ReceivableFlowsTest extends TestCase
             'balance_after' => 4936500,
             'period_code' => 'S2-2526',
         ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $printingInvoice->id,
+            'entry_date' => '2026-04-12',
+            'transaction_type' => 'printing',
+            'printing_subtype_name' => 'Brosur',
+            'description' => 'Invoice INV-12042026-0001',
+            'debit' => 250000,
+            'credit' => 0,
+            'balance_after' => 5186500,
+            'period_code' => 'S2-2526',
+        ]);
 
         $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
             'customer' => $customer->id,
@@ -1567,8 +1592,14 @@ class ReceivableFlowsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('INV-11042026-0001');
+        $response->assertSee('INV-12042026-0001');
         $response->assertSee('KWT-06042026-0001');
         $response->assertSee('RTR-28022026-0001');
+        $response->assertSee(__('receivable.transaction_type_sale'));
+        $response->assertSee(__('receivable.transaction_type_payment'));
+        $response->assertSee(__('receivable.transaction_type_return'));
+        $response->assertSee(__('receivable.transaction_subtype_product'));
+        $response->assertSee(__('receivable.transaction_subtype_printing_named', ['name' => 'Brosur']));
         $response->assertDontSee(route('receivable-payments.show', $receivablePayment), false);
         $response->assertDontSee(route('sales-returns.show', $salesReturn), false);
 
@@ -1580,6 +1611,11 @@ class ReceivableFlowsTest extends TestCase
         $screenResponse->assertOk();
         $screenResponse->assertSee(route('receivable-payments.show', $receivablePayment), false);
         $screenResponse->assertSee(route('sales-returns.show', $salesReturn), false);
+        $screenResponse->assertSee(__('receivable.transaction_type_sale'));
+        $screenResponse->assertSee(__('receivable.transaction_type_payment'));
+        $screenResponse->assertSee(__('receivable.transaction_type_return'));
+        $screenResponse->assertSee(__('receivable.transaction_subtype_product'));
+        $screenResponse->assertSee(__('receivable.transaction_subtype_printing_named', ['name' => 'Brosur']));
     }
 
     public function test_customer_bill_excel_export_keeps_payment_and_return_document_numbers(): void

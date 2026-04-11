@@ -1089,8 +1089,8 @@ class ReceivablePageController extends Controller
         $rowsOut = [[
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
-                __('receivable.transaction_type'),
-                __('receivable.printing_subtype'),
+                    __('receivable.transaction_type'),
+                    __('receivable.transaction_subtype'),
                 __('receivable.bill_credit_sales'),
                 __('receivable.bill_installment_payment'),
                 __('receivable.bill_sales_return'),
@@ -1111,7 +1111,7 @@ class ReceivablePageController extends Controller
                     (string) ($row['date_label'] ?? ''),
                     $proofNumber,
                     (string) ($row['transaction_type_label'] ?? __('receivable.transaction_type_none')),
-                    (string) (($row['printing_subtype_name'] ?? null) ?: __('receivable.printing_subtype_none')),
+                    (string) ($row['transaction_subtype_label'] ?? __('receivable.printing_subtype_none')),
                     number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.'),
@@ -1676,6 +1676,7 @@ class ReceivablePageController extends Controller
                 'transaction_type' => null,
                 'transaction_type_label' => __('receivable.transaction_type_none'),
                 'printing_subtype_name' => null,
+                'transaction_subtype_label' => __('receivable.printing_subtype_none'),
                 'adjustment_amount' => 0,
                 'credit_sales' => 0,
                 'installment_payment' => 0,
@@ -1845,8 +1846,16 @@ class ReceivablePageController extends Controller
                 'proof_number' => $groupedRow['proof_number'],
                 'entry_type' => (string) ($groupedRow['entry_type'] ?? 'payment'),
                 'transaction_type' => $groupedRow['transaction_type'] ?? null,
-                'transaction_type_label' => $this->transactionTypeLabel($groupedRow['transaction_type'] ?? null),
+                'transaction_type_label' => $this->customerBillEntryTransactionTypeLabel(
+                    $groupedRow['transaction_type'] ?? null,
+                    (string) ($groupedRow['entry_type'] ?? 'payment')
+                ),
                 'printing_subtype_name' => $groupedRow['printing_subtype_name'] ?? null,
+                'transaction_subtype_label' => $this->customerBillEntrySubtypeLabel(
+                    $groupedRow['transaction_type'] ?? null,
+                    $groupedRow['printing_subtype_name'] ?? null,
+                    (string) ($groupedRow['entry_type'] ?? 'payment')
+                ),
                 'adjustment_amount' => (int) ($groupedRow['adjustment_amount'] ?? 0),
                 'credit_sales' => (int) $groupedRow['credit_sales'],
                 'installment_payment' => (int) $groupedRow['installment_payment'],
@@ -1878,6 +1887,35 @@ class ReceivablePageController extends Controller
             TransactionType::PRODUCT => __('receivable.transaction_type_product'),
             default => __('receivable.transaction_type_none'),
         };
+    }
+
+    private function customerBillEntryTransactionTypeLabel(?string $transactionType, string $entryType): string
+    {
+        return match ($entryType) {
+            'payment', 'writeoff', 'discount' => __('receivable.transaction_type_payment'),
+            'return' => __('receivable.transaction_type_return'),
+            default => __('receivable.transaction_type_sale'),
+        };
+    }
+
+    private function customerBillEntrySubtypeLabel(?string $transactionType, ?string $printingSubtypeName, string $entryType): string
+    {
+        if (in_array($entryType, ['payment', 'writeoff', 'discount', 'return'], true)) {
+            return __('receivable.printing_subtype_none');
+        }
+
+        $normalized = $transactionType !== null && trim($transactionType) !== ''
+            ? TransactionType::normalize($transactionType)
+            : '';
+        $subtype = trim((string) ($printingSubtypeName ?? ''));
+
+        if ($normalized === TransactionType::PRINTING) {
+            return $subtype !== ''
+                ? __('receivable.transaction_subtype_printing_named', ['name' => $subtype])
+                : __('receivable.transaction_type_printing');
+        }
+
+        return __('receivable.transaction_subtype_product');
     }
 
     /**
