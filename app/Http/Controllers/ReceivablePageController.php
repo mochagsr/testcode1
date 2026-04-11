@@ -1704,7 +1704,8 @@ class ReceivablePageController extends Controller
             if ($printingSubtypeName === '') {
                 $printingSubtypeName = trim((string) ($ledgerRow->invoice?->printing_subtype_name ?? ''));
             }
-            $description = strtolower((string) ($ledgerRow->description ?? ''));
+            $rawDescription = trim((string) ($ledgerRow->description ?? ''));
+            $description = strtolower($rawDescription);
             $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
             $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
             $isDiscount = str_contains($description, 'diskon') || str_contains($description, 'discount');
@@ -1714,7 +1715,6 @@ class ReceivablePageController extends Controller
                 || str_contains($description, 'invoice adjustment');
             $salesReturn = $isReturn ? $credit : 0;
             $installment = $isReturn ? 0 : $credit;
-            $baseProofNumber = $ledgerRow->invoice?->invoice_number ?: (trim((string) ($ledgerRow->description ?? '')) ?: '-');
             $entryType = 'payment';
             if ($debit > 0) {
                 $entryType = 'debit';
@@ -1729,11 +1729,22 @@ class ReceivablePageController extends Controller
                 $entryType = 'adjustment';
             }
 
+            $invoiceNumber = trim((string) ($ledgerRow->invoice?->invoice_number ?? ''));
+            if ($invoiceNumber === '') {
+                $invoiceNumber = $this->extractDocumentReference($rawDescription, ['INV']);
+            }
+            $paymentNumber = $this->extractDocumentReference($rawDescription, ['KWT', 'PYT']);
+            $returnNumber = $this->extractDocumentReference($rawDescription, ['RTR', 'RET', 'RTN']);
+            $baseProofNumber = match ($entryType) {
+                'return' => $returnNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),
+                'payment' => $paymentNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),
+                default => $invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-'),
+            };
             $proofNumber = match ($entryType) {
                 'writeoff' => $baseProofNumber . ' - ' . __('receivable.method_writeoff'),
                 'discount' => $baseProofNumber . ' - ' . __('receivable.method_discount'),
-                'adjustment' => (trim((string) ($ledgerRow->description ?? '')) !== '')
-                    ? trim((string) $ledgerRow->description)
+                'adjustment' => $rawDescription !== ''
+                    ? $rawDescription
                     : $baseProofNumber,
                 default => $baseProofNumber,
             };
@@ -1831,6 +1842,24 @@ class ReceivablePageController extends Controller
             TransactionType::PRODUCT => __('receivable.transaction_type_product'),
             default => __('receivable.transaction_type_none'),
         };
+    }
+
+    /**
+     * @param array<int, string> $prefixes
+     */
+    private function extractDocumentReference(string $text, array $prefixes): string
+    {
+        $normalized = trim($text);
+        if ($normalized === '' || $prefixes === []) {
+            return '';
+        }
+
+        $pattern = '/\b(?:' . implode('|', array_map('preg_quote', $prefixes)) . ')-[0-9A-Z]+(?:-[0-9A-Z]+)+\b/i';
+        if (preg_match($pattern, $normalized, $match) !== 1) {
+            return '';
+        }
+
+        return strtoupper((string) $match[0]);
     }
 
     /**

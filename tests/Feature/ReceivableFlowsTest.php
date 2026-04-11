@@ -1478,6 +1478,76 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('Rp 40.000');
     }
 
+    public function test_customer_bill_print_uses_payment_and_return_document_numbers(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-001',
+            'name' => 'Angga',
+            'city' => 'Sidoarjo',
+            'address' => 'Jl Sidoarjo',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-11042026-0001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-04-11',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'subtotal' => 4950000,
+            'total' => 4950000,
+            'total_paid' => 0,
+            'balance' => 4950000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-11',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-11042026-0001',
+            'debit' => 4950000,
+            'credit' => 0,
+            'balance_after' => 4950000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-06',
+            'transaction_type' => 'product',
+            'description' => 'Pembayaran KWT-06042026-0001',
+            'debit' => 0,
+            'credit' => 10000,
+            'balance_after' => 4940000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'transaction_type' => 'product',
+            'description' => 'Retur RTR-28022026-0001',
+            'debit' => 0,
+            'credit' => 3500,
+            'balance_after' => 4936500,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('INV-11042026-0001');
+        $response->assertSee('KWT-06042026-0001');
+        $response->assertSee('RTR-28022026-0001');
+    }
+
     public function test_receivable_semester_page_hides_closed_semester_from_dropdown(): void
     {
         $user = User::factory()->create();
