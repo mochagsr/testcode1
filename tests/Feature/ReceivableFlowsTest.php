@@ -1722,6 +1722,10 @@ class ReceivableFlowsTest extends TestCase
 
         $this->assertStringContainsString('KWT-06042026-0002', $workbookPayload);
         $this->assertStringContainsString('RTR-28022026-0002', $workbookPayload);
+        $this->assertStringContainsString(__('receivable.transaction_type'), $workbookPayload);
+        $this->assertStringContainsString(__('receivable.transaction_subtype'), $workbookPayload);
+        $this->assertStringContainsString(__('receivable.transaction_type_payment'), $workbookPayload);
+        $this->assertStringContainsString(__('receivable.transaction_type_return'), $workbookPayload);
     }
 
     public function test_receivable_semester_page_hides_closed_semester_from_dropdown(): void
