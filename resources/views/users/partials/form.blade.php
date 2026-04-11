@@ -4,55 +4,171 @@
         ->all();
 
     $groupLabelMap = [
-        'dashboard' => 'Dashboard',
-        'transactions' => 'Transaksi',
-        'receivables' => 'Piutang Customer',
-        'supplier_payables' => 'Hutang Supplier',
-        'reports' => 'Laporan',
-        'settings' => 'Pengaturan',
-        'masters' => 'Master Data',
-        'imports' => 'Import Data',
-        'semester' => 'Semester',
-        'users' => 'Manajemen User',
-        'audit_logs' => 'Audit Log',
+        'dashboard' => 'Menu Dashboard',
+        'transactions' => 'Menu Transaksi',
+        'receivables' => 'Menu Piutang Customer',
+        'suppliers' => 'Menu Supplier',
+        'reports' => 'Menu Laporan',
+        'system' => 'Menu Sistem',
+        'products' => 'Menu Barang',
+        'customers' => 'Menu Customer',
     ];
 
-    $permissionLabelMap = [
-        'dashboard.view' => 'Lihat dashboard',
-        'transactions.view' => 'Lihat transaksi',
-        'transactions.create' => 'Buat transaksi',
-        'transactions.edit' => 'Edit transaksi',
-        'transactions.export' => 'Export transaksi',
-        'transactions.cancel' => 'Batalkan transaksi',
-        'transactions.correction.request' => 'Ajukan koreksi transaksi',
-        'transactions.correction.approve' => 'Setujui koreksi transaksi',
-        'receivables.view' => 'Lihat piutang customer',
-        'receivables.pay' => 'Input pembayaran piutang',
-        'receivables.adjust' => 'Write-off / diskon piutang',
-        'receivables.lock' => 'Lock semester piutang per customer',
-        'supplier_payables.view' => 'Lihat hutang supplier',
-        'supplier_payables.pay' => 'Input pembayaran hutang supplier',
-        'supplier_payables.adjust' => 'Penyesuaian hutang supplier',
-        'reports.view' => 'Lihat laporan',
-        'reports.export' => 'Export laporan',
-        'settings.profile' => 'Ubah profil sendiri',
-        'settings.admin' => 'Ubah pengaturan admin',
-        'masters.products.view' => 'Lihat barang',
-        'masters.products.manage' => 'Kelola barang (tambah/edit/hapus/ubah stok/kategori/satuan)',
-        'masters.customers.view' => 'Lihat customer',
-        'masters.customers.manage' => 'Kelola customer (tambah/edit/hapus/import)',
-        'masters.suppliers.view' => 'Lihat supplier',
-        'masters.suppliers.edit' => 'Kelola supplier (tambah/edit/hapus/import)',
-        'imports.transactions' => 'Import transaksi',
-        'semester.bulk' => 'Buka/tutup semester massal',
-        'users.manage' => 'Kelola user',
-        'audit_logs.view' => 'Lihat audit log',
+    $permissionDetailMap = [
+        'dashboard.view' => [
+            'title' => 'Dashboard',
+            'note' => 'Bisa membuka halaman Dashboard.',
+        ],
+        'transactions.view' => [
+            'title' => 'Lihat menu transaksi',
+            'note' => 'Faktur Penjualan, Retur Penjualan, Surat Jalan, Surat Pesanan, Catatan Perjalanan, Tanda Terima Barang, dan Sebar Sekolah.',
+        ],
+        'transactions.create' => [
+            'title' => 'Tambah transaksi',
+            'note' => 'Bisa membuat transaksi baru di menu Faktur, Retur, Surat Jalan, Surat Pesanan, Catatan Perjalanan, Tanda Terima Barang, dan Sebar Sekolah.',
+        ],
+        'transactions.edit' => [
+            'title' => 'Edit transaksi',
+            'note' => 'Bisa edit transaksi dari halaman detail dokumen transaksi.',
+        ],
+        'transactions.export' => [
+            'title' => 'Cetak / PDF / Excel transaksi',
+            'note' => 'Bisa print, export PDF, atau Excel untuk dokumen transaksi.',
+        ],
+        'transactions.cancel' => [
+            'title' => 'Batalkan transaksi',
+            'note' => 'Bisa membatalkan dokumen transaksi yang masih boleh dibatalkan.',
+        ],
+        'transactions.correction.request' => [
+            'title' => 'Ajukan koreksi transaksi',
+            'note' => 'Bisa memakai Wizard Koreksi pada transaksi yang perlu diperbaiki.',
+        ],
+        'transactions.correction.approve' => [
+            'title' => 'Approval koreksi transaksi',
+            'note' => 'Menu Sistem > Approval. Bisa menyetujui, menolak, atau jalankan ulang koreksi transaksi.',
+        ],
+        'receivables.view' => [
+            'title' => 'Lihat menu piutang customer',
+            'note' => 'Piutang, Piutang Global, Piutang Semester, dan Rekap/Cetak Piutang Customer.',
+        ],
+        'receivables.pay' => [
+            'title' => 'Input pembayaran piutang',
+            'note' => 'Menu Bayar Piutang dan pembuatan kwitansi pembayaran customer.',
+        ],
+        'receivables.adjust' => [
+            'title' => 'Penyesuaian piutang',
+            'note' => 'Write-off atau diskon piutang customer.',
+        ],
+        'receivables.lock' => [
+            'title' => 'Tutup / buka semester piutang customer',
+            'note' => 'Bisa lock atau unlock semester piutang per customer.',
+        ],
+        'supplier_payables.view' => [
+            'title' => 'Lihat menu hutang supplier',
+            'note' => 'Hutang Supplier, Kartu Stok Supplier, detail pembayaran supplier, dan cetaknya.',
+        ],
+        'supplier_payables.pay' => [
+            'title' => 'Input pembayaran hutang supplier',
+            'note' => 'Menu Hutang Supplier > Bayar dan dokumen pembayaran supplier.',
+        ],
+        'supplier_payables.adjust' => [
+            'title' => 'Tutup / buka bulan hutang supplier',
+            'note' => 'Bisa lock atau unlock periode hutang supplier.',
+        ],
+        'reports.view' => [
+            'title' => 'Lihat menu laporan',
+            'note' => 'Bisa membuka halaman Laporan dan memilih data laporan.',
+        ],
+        'reports.export' => [
+            'title' => 'Print / PDF / Excel laporan',
+            'note' => 'Bisa cetak dan export laporan dari menu Laporan.',
+        ],
+        'settings.profile' => [
+            'title' => 'Menu Pengaturan',
+            'note' => 'Bisa membuka Pengaturan untuk profil/tema/bahasa sendiri.',
+        ],
+        'settings.admin' => [
+            'title' => 'Pengaturan admin',
+            'note' => 'Menu Sistem > Pengaturan, Semester Transaksi, dan Ops Health untuk pengaturan tingkat admin.',
+        ],
+        'masters.products.view' => [
+            'title' => 'Lihat menu Barang',
+            'note' => 'Barang, Kategori Barang, dan Satuan Barang.',
+        ],
+        'masters.products.manage' => [
+            'title' => 'Kelola menu Barang',
+            'note' => 'Tambah, edit, hapus, import, ubah stok, serta kelola Kategori Barang dan Satuan Barang.',
+        ],
+        'masters.customers.view' => [
+            'title' => 'Lihat menu Customer',
+            'note' => 'Customer dan informasi level customer.',
+        ],
+        'masters.customers.manage' => [
+            'title' => 'Kelola menu Customer',
+            'note' => 'Tambah, edit, hapus, import Customer dan kelola Level Customer.',
+        ],
+        'masters.suppliers.view' => [
+            'title' => 'Lihat menu Supplier',
+            'note' => 'Bisa membuka daftar Supplier.',
+        ],
+        'masters.suppliers.edit' => [
+            'title' => 'Kelola menu Supplier',
+            'note' => 'Tambah, edit, hapus, dan import Supplier.',
+        ],
+        'imports.transactions' => [
+            'title' => 'Import Faktur Penjualan',
+            'note' => 'Bisa memakai fitur import pada menu Faktur Penjualan.',
+        ],
+        'semester.bulk' => [
+            'title' => 'Semester Transaksi',
+            'note' => 'Menu Sistem > Semester Transaksi untuk aksi massal buka/tutup semester.',
+        ],
+        'users.manage' => [
+            'title' => 'Menu Pengguna',
+            'note' => 'Bisa tambah, edit, dan atur hak akses user lain di menu Sistem > Pengguna.',
+        ],
+        'audit_logs.view' => [
+            'title' => 'Menu Audit Log',
+            'note' => 'Bisa membuka menu Sistem > Audit Log.',
+        ],
+    ];
+
+    $permissionUiGroupMap = [
+        'dashboard.view' => 'dashboard',
+        'transactions.view' => 'transactions',
+        'transactions.create' => 'transactions',
+        'transactions.edit' => 'transactions',
+        'transactions.export' => 'transactions',
+        'transactions.cancel' => 'transactions',
+        'transactions.correction.request' => 'transactions',
+        'receivables.view' => 'receivables',
+        'receivables.pay' => 'receivables',
+        'receivables.adjust' => 'receivables',
+        'receivables.lock' => 'receivables',
+        'supplier_payables.view' => 'suppliers',
+        'supplier_payables.pay' => 'suppliers',
+        'supplier_payables.adjust' => 'suppliers',
+        'masters.suppliers.view' => 'suppliers',
+        'masters.suppliers.edit' => 'suppliers',
+        'reports.view' => 'reports',
+        'reports.export' => 'reports',
+        'masters.products.view' => 'products',
+        'masters.products.manage' => 'products',
+        'masters.customers.view' => 'customers',
+        'masters.customers.manage' => 'customers',
+        'settings.profile' => 'system',
+        'settings.admin' => 'system',
+        'imports.transactions' => 'system',
+        'semester.bulk' => 'system',
+        'users.manage' => 'system',
+        'audit_logs.view' => 'system',
+        'transactions.correction.approve' => 'system',
     ];
 
     $permissionGroups = collect($availablePermissions ?? [])
         ->map(fn (string $permission): string => strtolower(trim($permission)))
         ->filter(fn (string $permission): bool => $permission !== '')
-        ->groupBy(fn (string $permission): string => explode('.', $permission)[0] ?? 'other')
+        ->groupBy(fn (string $permission): string => $permissionUiGroupMap[$permission] ?? 'system')
         ->map(function ($permissions, string $prefix) use ($groupLabelMap): array {
             $prefixLabel = $groupLabelMap[$prefix] ?? \Illuminate\Support\Str::headline((string) $prefix);
             return [
@@ -132,6 +248,21 @@
         margin: 0 0 6px;
         font-size: 12px;
         line-height: 1.35;
+    }
+    .permission-item-text {
+        min-width: 0;
+    }
+    .permission-item-title {
+        display: block;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 2px;
+    }
+    .permission-item-note {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
     }
     .permission-grid input[type="checkbox"] {
         width: 16px !important;
@@ -240,13 +371,13 @@
 
 <div class="card permission-card" id="permission-grid-wrapper" style="{{ old('role', $user?->role ?? 'user') === 'admin' ? 'display:none;' : '' }}">
     <p class="permission-detail-title">Hak Akses Detail</p>
-    <p class="permission-detail-note">Pilih akses per modul. Centang judul modul untuk pilih semua di modul tersebut.</p>
+    <p class="permission-detail-note">Pilih akses berdasarkan menu yang benar-benar muncul di aplikasi. Centang judul menu untuk memilih semua akses di menu itu.</p>
     <div class="permission-toolbar">
         <div class="permission-toolbar-left">
             <input
                 type="text"
                 id="permission-filter-input"
-                placeholder="Cari modul / izin..."
+                placeholder="Cari menu / submenu / akses..."
                 style="max-width: 280px;"
             >
             <span id="permission-filter-count" class="muted">0 izin terlihat</span>
@@ -268,12 +399,21 @@
                 </label>
                 @foreach(($group['permissions'] ?? []) as $permission)
                     @php
-                        $permissionLabel = $permissionLabelMap[$permission]
-                            ?? \Illuminate\Support\Str::headline(str_replace('.', ' ', (string) $permission));
+                        $permissionMeta = $permissionDetailMap[$permission] ?? [
+                            'title' => \Illuminate\Support\Str::headline(str_replace('.', ' ', (string) $permission)),
+                            'note' => '',
+                        ];
+                        $permissionLabel = (string) ($permissionMeta['title'] ?? $permission);
+                        $permissionNote = (string) ($permissionMeta['note'] ?? '');
                     @endphp
-                    <label class="permission-item" data-permission-label="{{ strtolower($permissionLabel) }}" data-permission-key="{{ strtolower((string) $permission) }}">
+                    <label class="permission-item" data-permission-label="{{ strtolower($permissionLabel.' '.$permissionNote) }}" data-permission-key="{{ strtolower((string) $permission) }}">
                         <input type="checkbox" class="permission-checkbox permission-group-{{ $groupKey }}" name="permissions[]" value="{{ $permission }}" @checked(in_array($permission, $selectedPermissions, true))>
-                        <span class="permission-item-text">{{ $permissionLabel }}</span>
+                        <span class="permission-item-text">
+                            <span class="permission-item-title">{{ $permissionLabel }}</span>
+                            @if($permissionNote !== '')
+                                <span class="permission-item-note">{{ $permissionNote }}</span>
+                            @endif
+                        </span>
                     </label>
                 @endforeach
             </div>
