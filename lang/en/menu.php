@@ -3,6 +3,7 @@
 return [
     'dashboard' => 'Dashboard',
     'item_categories' => 'Item Categories',
+    'product_units' => 'Product Units',
     'items' => 'Items',
     'customer_levels' => 'Customer Levels',
     'customers' => 'Customers',

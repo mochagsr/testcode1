@@ -10,6 +10,7 @@ use App\Models\CustomerLevel;
 use App\Models\InvoicePayment;
 use App\Models\ItemCategory;
 use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
 use App\Models\StockMutation;
@@ -149,7 +150,7 @@ class MassImportController extends Controller
                     'item_category_id' => $categoryId,
                     'name' => (string) $data['name'],
                     'code' => $code,
-                    'unit' => (string) $data['unit'],
+                    'unit' => ProductUnit::ensureExists((string) $data['unit'])->code,
                     'stock' => (int) $data['stock'],
                     'price_agent' => (int) round((float) $data['price_agent']),
                     'price_sales' => (int) round((float) $data['price_sales']),

@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesProductUnits;
 use App\Models\ItemCategory;
 use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
 use App\Support\ValidatesSearchTokens;
@@ -14,7 +15,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -96,7 +96,7 @@ class ProductController extends Controller
             'item_category_id' => ['required', 'integer', 'exists:item_categories,id'],
             'code' => ['nullable', 'string', 'max:60', 'unique:products,code'],
             'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30', Rule::in($this->configuredProductUnitCodes())],
+            'unit' => ['required', 'string', 'max:30'],
             'stock' => ['nullable', 'integer', 'min:0'],
             'price_agent' => ['nullable', 'numeric', 'min:0'],
             'price_sales' => ['nullable', 'numeric', 'min:0'],
@@ -108,6 +108,7 @@ class ProductController extends Controller
         $categoryName = ItemCategory::query()
             ->whereKey((int) ($data['item_category_id'] ?? 0))
             ->value('name');
+        $data['unit'] = ProductUnit::ensureExists((string) ($data['unit'] ?? $this->defaultProductUnitCode()))->code;
         $data['code'] = $this->productCodeGenerator->resolve(
             $data['code'] ?? null,
             (string) $data['name'],
@@ -155,7 +156,7 @@ class ProductController extends Controller
                 Rule::unique('products', 'code')->ignore($product->id),
             ],
             'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30', Rule::in($this->configuredProductUnitCodes())],
+            'unit' => ['required', 'string', 'max:30'],
             'stock' => ['nullable', 'integer', 'min:0'],
             'price_agent' => ['nullable', 'numeric', 'min:0'],
             'price_sales' => ['nullable', 'numeric', 'min:0'],
@@ -167,6 +168,7 @@ class ProductController extends Controller
         $categoryName = ItemCategory::query()
             ->whereKey((int) ($data['item_category_id'] ?? 0))
             ->value('name');
+        $data['unit'] = ProductUnit::ensureExists((string) ($data['unit'] ?? $this->defaultProductUnitCode()))->code;
         $data['code'] = $this->productCodeGenerator->resolve(
             $data['code'] ?? null,
             (string) $data['name'],

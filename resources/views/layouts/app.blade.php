@@ -1133,11 +1133,12 @@
             @endif
             @auth
                 @if($showItemsGroup)
-                    <div class="nav-group {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-group>
-                        <button type="button" class="nav-group-title {{ request()->routeIs('item-categories.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_items_group') }}</button>
+                    <div class="nav-group {{ request()->routeIs('item-categories.*') || request()->routeIs('product-units.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-group>
+                        <button type="button" class="nav-group-title {{ request()->routeIs('item-categories.*') || request()->routeIs('product-units.*') || request()->routeIs('products.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_items_group') }}</button>
                         <div class="nav-sub">
                             @if($canProductsManage)
                                 <a href="{{ route('item-categories.index') }}" class="{{ request()->routeIs('item-categories.*') ? 'active' : '' }}">{{ __('menu.item_categories') }}</a>
+                                <a href="{{ route('product-units.index') }}" class="{{ request()->routeIs('product-units.*') ? 'active' : '' }}">{{ __('menu.product_units') }}</a>
                             @endif
                             @if($canProductsView)
                                 <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'active' : '' }}">{{ __('menu.items') }}</a>

@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Models\AppSetting;
+use App\Models\ProductUnit;
 
 trait ResolvesProductUnits
 {
-    /**
-     * @var array{product_unit_options:string|null,product_default_unit:string|null}|null
-     */
-    private ?array $productUnitSettingsCache = null;
-
     /**
      * @var array<int, array{code:string,label:string}>|null
      */
@@ -27,30 +22,7 @@ trait ResolvesProductUnits
             return $this->productUnitOptionsCache;
         }
 
-        $settings = $this->productUnitSettings();
-        $raw = (string) ($settings['product_unit_options'] ?? 'exp|Exemplar');
-        $options = collect(preg_split('/[\r\n,]+/', $raw) ?: [])
-            ->map(fn(string $item): string => trim($item))
-            ->filter(fn(string $item): bool => $item !== '')
-            ->map(function (string $item): array {
-                [$code, $label] = array_pad(array_map('trim', explode('|', $item, 2)), 2, '');
-                $normalizedCode = strtolower((string) preg_replace('/[^a-z0-9\-]/', '', $code));
-                $normalizedLabel = $label !== '' ? $label : ucfirst($normalizedCode);
-
-                return [
-                    'code' => $normalizedCode,
-                    'label' => $normalizedLabel,
-                ];
-            })
-            ->filter(fn(array $item): bool => $item['code'] !== '')
-            ->unique('code')
-            ->values();
-
-        $withoutExp = $options->filter(fn(array $item): bool => $item['code'] !== 'exp')->values();
-        $this->productUnitOptionsCache = collect([[
-            'code' => 'exp',
-            'label' => 'Exemplar',
-        ]])->merge($withoutExp)->values()->all();
+        $this->productUnitOptionsCache = ProductUnit::optionRows();
 
         return $this->productUnitOptionsCache;
     }
@@ -69,10 +41,7 @@ trait ResolvesProductUnits
 
     protected function defaultProductUnitCode(): string
     {
-        $settings = $this->productUnitSettings();
-        $default = strtolower((string) ($settings['product_default_unit'] ?? 'exp'));
-
-        return $default !== '' ? $default : 'exp';
+        return ProductUnit::defaultCode();
     }
 
     protected function normalizeProductUnitInput(mixed $unit): string
@@ -81,22 +50,4 @@ trait ResolvesProductUnits
 
         return $normalized !== '' ? $normalized : $this->defaultProductUnitCode();
     }
-
-    /**
-     * @return array{product_unit_options:string|null,product_default_unit:string|null}
-     */
-    private function productUnitSettings(): array
-    {
-        if (is_array($this->productUnitSettingsCache)) {
-            return $this->productUnitSettingsCache;
-        }
-
-        $this->productUnitSettingsCache = AppSetting::getValues([
-            'product_unit_options' => 'exp|Exemplar',
-            'product_default_unit' => 'exp',
-        ]);
-
-        return $this->productUnitSettingsCache;
-    }
 }
-

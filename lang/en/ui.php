@@ -247,6 +247,7 @@ return [
     'confirm_delete_supplier' => 'Delete this supplier?',
     'confirm_delete_user' => 'Delete this user?',
     'item_categories_title' => 'Item Categories',
+    'product_units_title' => 'Product Units',
     'customer_levels_title' => 'Customer Levels',
     'customers_title' => 'Customers',
     'products_title' => 'Products',
@@ -406,7 +407,9 @@ return [
     'add_customer' => 'Add Customer',
     'edit_customer' => 'Edit Customer',
     'add_category' => 'Add Category',
+    'add_product_unit' => 'Add Product Unit',
     'edit_category' => 'Edit Category',
+    'edit_product_unit' => 'Edit Product Unit',
     'add_product' => 'Add Product',
     'add_supplier' => 'Add Supplier',
     'edit_product' => 'Edit Product',
@@ -425,6 +428,13 @@ return [
     'supplier_updated_success' => 'Supplier updated successfully.',
     'supplier_deleted_success' => 'Supplier deleted successfully.',
     'duplicate_submit_blocked' => 'Duplicate submission detected. Please wait a few seconds and try again.',
+    'search_product_units_placeholder' => 'Search unit code or name...',
+    'no_product_units' => 'No product units found.',
+    'confirm_delete_product_unit' => 'Delete this product unit?',
+    'product_unit_created_success' => 'Product unit created successfully.',
+    'product_unit_updated_success' => 'Product unit updated successfully.',
+    'product_unit_deleted_success' => 'Product unit deleted successfully.',
+    'product_unit_delete_in_use' => 'This unit is still used by product data and cannot be deleted yet.',
 ];
 
 

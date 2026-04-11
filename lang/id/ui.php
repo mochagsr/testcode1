@@ -247,6 +247,7 @@ return [
     'confirm_delete_supplier' => 'Hapus supplier ini?',
     'confirm_delete_user' => 'Hapus user ini?',
     'item_categories_title' => 'Kategori Barang',
+    'product_units_title' => 'Satuan Barang',
     'customer_levels_title' => 'Level Customer',
     'customers_title' => 'Customer',
     'products_title' => 'Barang',
@@ -406,7 +407,9 @@ return [
     'add_customer' => 'Tambah Customer',
     'edit_customer' => 'Edit Customer',
     'add_category' => 'Tambah Kategori',
+    'add_product_unit' => 'Tambah Satuan Barang',
     'edit_category' => 'Edit Kategori',
+    'edit_product_unit' => 'Edit Satuan Barang',
     'add_product' => 'Tambah Barang',
     'add_supplier' => 'Tambah Supplier',
     'edit_product' => 'Edit Barang',
@@ -425,6 +428,13 @@ return [
     'supplier_updated_success' => 'Supplier berhasil diperbarui.',
     'supplier_deleted_success' => 'Supplier berhasil dihapus.',
     'duplicate_submit_blocked' => 'Submit ganda terdeteksi. Silakan tunggu beberapa detik sebelum mencoba lagi.',
+    'search_product_units_placeholder' => 'Cari kode atau nama satuan...',
+    'no_product_units' => 'Belum ada data satuan barang.',
+    'confirm_delete_product_unit' => 'Hapus satuan barang ini?',
+    'product_unit_created_success' => 'Satuan barang berhasil ditambahkan.',
+    'product_unit_updated_success' => 'Satuan barang berhasil diperbarui.',
+    'product_unit_deleted_success' => 'Satuan barang berhasil dihapus.',
+    'product_unit_delete_in_use' => 'Satuan ini masih dipakai oleh data barang, jadi belum bisa dihapus.',
 ];
 
 

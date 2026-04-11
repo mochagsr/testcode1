@@ -3,6 +3,7 @@
 return [
     'dashboard' => 'Dashboard',
     'item_categories' => 'Kategori Barang',
+    'product_units' => 'Satuan Barang',
     'items' => 'Barang',
     'customer_levels' => 'Level Customer',
     'customers' => 'Customer',

@@ -56,6 +56,8 @@ class PageLoadSmokeTest extends TestCase
             route('dashboard'),
             route('item-categories.index'),
             route('item-categories.create'),
+            route('product-units.index'),
+            route('product-units.create'),
             route('products.index'),
             route('products.create'),
             route('customer-levels-web.index'),

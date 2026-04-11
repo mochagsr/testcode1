@@ -22,8 +22,8 @@ class SettingsPageTest extends TestCase
         $response->assertSee('name="company_name"', false);
         $response->assertSee('name="semester_period_codes[]"', false);
         $response->assertSee('name="semester_active_period_codes[]"', false);
-        $response->assertSee('name="product_unit_codes[]"', false);
-        $response->assertSee('name="outgoing_unit_codes[]"', false);
+        $response->assertDontSee('name="product_unit_codes[]"', false);
+        $response->assertDontSee('name="outgoing_unit_codes[]"', false);
     }
 
     public function test_settings_update_accepts_legacy_semester_and_company_fields(): void

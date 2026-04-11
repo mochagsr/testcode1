@@ -30,9 +30,6 @@
             'semester_list' => $isEnglishSettings ? 'Only open semesters can appear in transaction dropdowns.' : 'Hanya semester yang masih terbuka yang bisa tampil di dropdown transaksi.',
             'semester_active' => $isEnglishSettings ? 'Use this flag to allow a semester in transaction dropdowns.' : 'Centang ini jika semester boleh muncul di dropdown transaksi.',
             'semester_action' => $isEnglishSettings ? 'Close a semester to prevent new transactions from using it.' : 'Tutup semester jika ingin menghentikan transaksi baru pada periode itu.',
-            'units_title' => $isEnglishSettings ? 'Manage unit options shown in sales and supplier goods receipt forms.' : 'Kelola daftar satuan yang tampil di form penjualan dan tanda terima barang.',
-            'product_units' => $isEnglishSettings ? 'Units shown in Sales Invoice item rows.' : 'Satuan yang tampil di baris item Faktur Penjualan.',
-            'outgoing_units' => $isEnglishSettings ? 'Units shown in Supplier Goods Receipt item rows.' : 'Satuan yang tampil di baris item Tanda Terima Barang.',
         ];
         $settingsHintIcon = static fn (string $text): string => '<span class="settings-help" tabindex="0" title="'.e($text).'" aria-label="'.e($text).'">?</span>';
     @endphp
@@ -369,90 +366,6 @@
                     <button type="button" id="add-semester-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
                 </div>
 
-                <div class="form-section">
-                    <h3 class="form-section-title">{{ __('ui.settings_units_title') }} {!! $settingsHintIcon($settingsHints['units_title']) !!}</h3>
-                    <p class="form-section-note">{{ __('ui.settings_units_note') }}</p>
-                    <div class="row inline">
-                        <div class="col-6">
-                            <label>{{ __('ui.settings_units_list') }} ({{ __('txn.sales_invoice') }}) {!! $settingsHintIcon($settingsHints['product_units']) !!}</label>
-                            @php
-                                $productCodes = collect(old('product_unit_codes', $unitOptionRows->pluck('code')->all()))->values();
-                                $productLabels = collect(old('product_unit_labels', $unitOptionRows->pluck('label')->all()))->values();
-                            @endphp
-                            <div class="table-mobile-scroll">
-                            <table id="product-units-table">
-                                <thead>
-                                <tr>
-                                    <th style="width: 35%;">{{ __('txn.code') }}</th>
-                                    <th>{{ __('txn.name') }}</th>
-                                    <th style="width: 90px;">{{ __('txn.action') }}</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @for($i = 0; $i < max($productCodes->count(), 1); $i++)
-                                    <tr>
-                                        <td>
-                                            <input type="text" name="product_unit_codes[]" value="{{ $productCodes[$i] ?? '' }}" list="product-unit-code-suggestions" placeholder="exp">
-                                        </td>
-                                        <td>
-                                            <input type="text" name="product_unit_labels[]" value="{{ $productLabels[$i] ?? '' }}" placeholder="Exemplar">
-                                        </td>
-                                        <td>
-                                            <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
-                                        </td>
-                                    </tr>
-                                @endfor
-                                </tbody>
-                            </table>
-                            </div>
-                            <button type="button" id="add-product-unit-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
-                        </div>
-                        <div class="col-6">
-                            <label>{{ __('ui.settings_units_list') }} ({{ __('txn.outgoing_transactions_title') }}) {!! $settingsHintIcon($settingsHints['outgoing_units']) !!}</label>
-                            @php
-                                $outgoingCodes = collect(old('outgoing_unit_codes', $outgoingUnitOptionRows->pluck('code')->all()))->values();
-                                $outgoingLabels = collect(old('outgoing_unit_labels', $outgoingUnitOptionRows->pluck('label')->all()))->values();
-                            @endphp
-                            <div class="table-mobile-scroll">
-                            <table id="outgoing-units-table">
-                                <thead>
-                                <tr>
-                                    <th style="width: 35%;">{{ __('txn.code') }}</th>
-                                    <th>{{ __('txn.name') }}</th>
-                                    <th style="width: 90px;">{{ __('txn.action') }}</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @for($i = 0; $i < max($outgoingCodes->count(), 1); $i++)
-                                    <tr>
-                                        <td>
-                                            <input type="text" name="outgoing_unit_codes[]" value="{{ $outgoingCodes[$i] ?? '' }}" list="outgoing-unit-code-suggestions" placeholder="exp">
-                                        </td>
-                                        <td>
-                                            <input type="text" name="outgoing_unit_labels[]" value="{{ $outgoingLabels[$i] ?? '' }}" placeholder="Exemplar">
-                                        </td>
-                                        <td>
-                                            <button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button>
-                                        </td>
-                                    </tr>
-                                @endfor
-                                </tbody>
-                            </table>
-                            </div>
-                            <button type="button" id="add-outgoing-unit-row" class="btn process-soft-btn" style="margin-top: 8px;">{{ __('txn.add_row') }}</button>
-                        </div>
-                    </div>
-                    <datalist id="product-unit-code-suggestions">
-                        @foreach($unitCodeSuggestions as $codeSuggestion)
-                            <option value="{{ $codeSuggestion }}"></option>
-                        @endforeach
-                    </datalist>
-                    <datalist id="outgoing-unit-code-suggestions">
-                        @foreach($outgoingUnitCodeSuggestions as $codeSuggestion)
-                            <option value="{{ $codeSuggestion }}"></option>
-                        @endforeach
-                    </datalist>
-                </div>
             @endif
         </div>
 
@@ -540,26 +453,8 @@
                 `);
             });
 
-            document.getElementById('add-product-unit-row')?.addEventListener('click', () => {
-                addRow('product-units-table', `
-                    <td><input type="text" name="product_unit_codes[]" value="" list="product-unit-code-suggestions" placeholder="exp"></td>
-                    <td><input type="text" name="product_unit_labels[]" value="" placeholder="Exemplar"></td>
-                    <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
-                `);
-            });
-
-            document.getElementById('add-outgoing-unit-row')?.addEventListener('click', () => {
-                addRow('outgoing-units-table', `
-                    <td><input type="text" name="outgoing_unit_codes[]" value="" list="outgoing-unit-code-suggestions" placeholder="exp"></td>
-                    <td><input type="text" name="outgoing_unit_labels[]" value="" placeholder="Exemplar"></td>
-                    <td><button type="button" class="btn danger-btn remove-row">{{ __('txn.remove') }}</button></td>
-                `);
-            });
-
             bindRemoveButtons('semester-codes-table');
             bindSemesterRowSync();
-            bindRemoveButtons('product-units-table');
-            bindRemoveButtons('outgoing-units-table');
         })();
     </script>
 @endsection

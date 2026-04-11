@@ -1350,6 +1350,7 @@ Artisan::command('app:http-smoke-test', function () {
     $adminRoutes = [
         'Dashboard' => route('dashboard'),
         'Kategori Barang' => route('item-categories.index'),
+        'Satuan Barang' => route('product-units.index'),
         'Barang' => route('products.index'),
         'Level Customer' => route('customer-levels-web.index'),
         'Customer' => route('customers-web.index'),

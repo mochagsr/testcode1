@@ -38,7 +38,7 @@
         'settings.profile' => 'Ubah profil sendiri',
         'settings.admin' => 'Ubah pengaturan admin',
         'masters.products.view' => 'Lihat barang',
-        'masters.products.manage' => 'Kelola barang (tambah/edit/hapus/ubah stok)',
+        'masters.products.manage' => 'Kelola barang (tambah/edit/hapus/ubah stok/kategori/satuan)',
         'masters.customers.view' => 'Lihat customer',
         'masters.customers.manage' => 'Kelola customer (tambah/edit/hapus/import)',
         'masters.suppliers.view' => 'Lihat supplier',

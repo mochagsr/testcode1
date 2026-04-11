@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Services\AuditLogService;
@@ -1091,7 +1092,9 @@ class OutgoingTransactionPageController extends Controller
             'item_category_id' => $categoryId,
             'code' => $resolvedCode,
             'name' => $productName,
-            'unit' => trim((string) ($row['unit'] ?? '')) !== '' ? trim((string) ($row['unit'] ?? '')) : 'exp',
+            'unit' => ProductUnit::ensureExists(
+                trim((string) ($row['unit'] ?? '')) !== '' ? trim((string) ($row['unit'] ?? '')) : 'exp'
+            )->code,
             'stock' => 0,
             'price_agent' => max(0, $unitCost),
             'price_sales' => max(0, $unitCost),
@@ -1102,35 +1105,7 @@ class OutgoingTransactionPageController extends Controller
 
     private function configuredOutgoingUnitOptions()
     {
-        $options = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('outgoing_unit_options', 'exp|Exemplar')) ?: [])
-            ->map(fn(string $item): string => trim($item))
-            ->filter(fn(string $item): bool => $item !== '')
-            ->map(function (string $item): array {
-                $rawCode = '';
-                $rawLabel = $item;
-                if (str_contains($item, '|')) {
-                    [$rawCode, $rawLabel] = array_pad(array_map('trim', explode('|', $item, 2)), 2, '');
-                }
-                $code = strtolower((string) preg_replace('/[^a-z0-9\-]/', '', (string) $rawCode));
-                if ($code === '' && $rawLabel !== '') {
-                    $code = strtolower((string) preg_replace('/[^a-z0-9\-]/', '', $rawLabel));
-                }
-                $label = trim($rawLabel) !== '' ? trim($rawLabel) : ucfirst($code);
-
-                return [
-                    'code' => $code,
-                    'label' => $label,
-                ];
-            })
-            ->filter(fn(array $item): bool => $item['code'] !== '' && $item['label'] !== '')
-            ->unique('code')
-            ->values();
-
-        if ($options->isEmpty()) {
-            return collect([['code' => 'exp', 'label' => 'Exemplar']]);
-        }
-
-        return $options;
+        return collect(ProductUnit::optionRows());
     }
 
     private function fillMissingProductSellingPricesFromUnitCost(Product $product, int $unitCost): void

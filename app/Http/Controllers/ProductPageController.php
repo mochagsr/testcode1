@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ResolvesProductUnits;
 use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\AppSetting;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
@@ -178,6 +179,7 @@ class ProductPageController extends Controller
         ]);
 
         $data = $this->validatePayload($request);
+        $data['unit'] = ProductUnit::ensureExists((string) ($data['unit'] ?? $this->defaultProductUnitCode()))->code;
         $categoryName = ItemCategory::query()
             ->whereKey((int) ($data['item_category_id'] ?? 0))
             ->value('name');
@@ -246,6 +248,7 @@ class ProductPageController extends Controller
         ]);
 
         $data = $this->validatePayload($request, $product->id);
+        $data['unit'] = ProductUnit::ensureExists((string) ($data['unit'] ?? $this->defaultProductUnitCode()))->code;
         $categoryName = ItemCategory::query()
             ->whereKey((int) ($data['item_category_id'] ?? 0))
             ->value('name');
@@ -428,7 +431,7 @@ class ProductPageController extends Controller
                 Rule::unique('products', 'code')->ignore($ignoreId),
             ],
             'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30', Rule::in($this->configuredProductUnitCodes())],
+            'unit' => ['required', 'string', 'max:30'],
             'stock' => ['required', 'integer', 'min:0'],
             'price_agent' => ['required', 'numeric', 'min:0'],
             'price_sales' => ['required', 'numeric', 'min:0'],
