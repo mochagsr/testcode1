@@ -23,8 +23,12 @@
         .doc-title { font-size: 20px; font-weight: 800; text-align: center; }
         .doc-number { text-align: center; margin-bottom: 4px; }
         @include('partials.print.table_styles')
-        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr); align-items: flex-start; gap: 16px; margin-top: 12px; }
+        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 220px; align-items: flex-start; gap: 16px; margin-top: 12px; }
         .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
+        .qty-box { width: 100%; table-layout: fixed; }
+        .qty-box table { margin-top: 0; }
+        .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 66%; }
+        .qty-box td:last-child { width: 34%; text-align: right; font-weight: 700; white-space: nowrap; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
@@ -61,6 +65,7 @@
 
     @php
         $itemsByLocation = $transaction->items->groupBy(fn($item) => (int) ($item->school_bulk_transaction_location_id ?? 0));
+        $overallQty = (int) round((float) $transaction->items->sum('quantity'), 0);
     @endphp
     @forelse($transaction->locations as $location)
         @php
@@ -128,6 +133,11 @@
             <div class="table-summary">
                 <div class="notes-box">
                     <strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}
+                </div>
+                <div class="qty-box">
+                    <table>
+                        <tr><td style="width: 66%;">{{ __('school_bulk.qty_total_all_schools') }}</td><td style="width: 34%;">{{ number_format($overallQty, 0, ',', '.') }}</td></tr>
+                    </table>
                 </div>
             </div>
 
