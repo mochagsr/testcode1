@@ -1,6 +1,12 @@
 @php
-    $selectedPermissions = collect(old('permissions', (array) ($user?->permissions ?? [])))
+    $selectedPermissions = collect(match (true) {
+        old('permissions') !== null => (array) old('permissions', []),
+        $user !== null => $user->resolvedPermissions(),
+        default => (array) config('rbac.roles.'.old('role', 'user'), []),
+    })
         ->map(fn ($permission) => strtolower((string) $permission))
+        ->filter(fn (string $permission): bool => $permission !== '' && $permission !== '*')
+        ->values()
         ->all();
 
     $groupLabelMap = [

@@ -108,4 +108,24 @@ class MasterPermissionAccessTest extends TestCase
         $this->actingAs($user)->get(route('outgoing-transactions.create'))->assertOk();
     }
 
+    public function test_user_edit_form_checks_effective_default_role_permissions(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [],
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('users.edit', $user));
+
+        $response->assertOk();
+        $response->assertSee('value="dashboard.view" checked', false);
+        $response->assertSee('value="transactions.create" checked', false);
+        $response->assertSee('value="masters.suppliers.edit" checked', false);
+    }
+
 }
