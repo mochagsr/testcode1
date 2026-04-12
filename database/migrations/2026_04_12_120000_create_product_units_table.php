@@ -20,7 +20,7 @@ return new class extends Migration
         });
 
         $rows = collect([
-            ['code' => 'exp', 'name' => 'Exemplar'],
+            $this->normalizeRow('exp|Exemplar'),
         ]);
 
         $rows = $rows
