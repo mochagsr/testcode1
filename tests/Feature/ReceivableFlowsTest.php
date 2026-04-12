@@ -1805,6 +1805,51 @@ class ReceivableFlowsTest extends TestCase
         $screenResponse->assertSee(route('receivable-payments.show', $receivablePayment), false);
     }
 
+    public function test_customer_bill_print_hides_internal_admin_adjustment_prefix(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-ADJ-001',
+            'name' => 'Angga Adjustment',
+            'city' => 'Sidoarjo',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-28022026-0001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'subtotal' => 52500,
+            'total' => 52500,
+            'total_paid' => 0,
+            'balance' => 52500,
+            'payment_status' => 'unpaid',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'transaction_type' => 'product',
+            'description' => '[ADMIN EDIT FAKTUR +] Penyesuaian nilai faktur INV-28022026-0001',
+            'debit' => 52500,
+            'credit' => 0,
+            'balance_after' => 52500,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Penyesuaian nilai faktur INV-28022026-0001');
+        $response->assertDontSee('[ADMIN EDIT FAKTUR +]');
+        $response->assertDontSee('(+Rp 52.500)');
+    }
+
     public function test_receivable_semester_page_hides_closed_semester_from_dropdown(): void
     {
         $user = User::factory()->create();

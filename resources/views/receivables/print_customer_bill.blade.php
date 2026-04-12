@@ -142,7 +142,15 @@
             </tr>
         @else
             @foreach($rows as $row)
-                @php $isOpening = ($row['date_label'] ?? '') === __('receivable.bill_opening_balance'); @endphp
+                @php
+                    $isOpening = ($row['date_label'] ?? '') === __('receivable.bill_opening_balance');
+                    $entryType = (string) ($row['entry_type'] ?? '');
+                    $proofNumber = (string) ($row['proof_number'] ?? '');
+                    if ($entryType === 'adjustment') {
+                        $proofNumber = preg_replace('/^\[ADMIN EDIT FAKTUR [+-]\]\s*/i', '', $proofNumber) ?? $proofNumber;
+                        $proofNumber = trim($proofNumber);
+                    }
+                @endphp
                 @if($isOpening)
                     <tr>
                         <td>{{ $row['date_label'] ?? '' }}</td>
@@ -153,8 +161,8 @@
                     <tr>
                         <td>{{ $row['date_label'] ?? '' }}</td>
                         <td>
-                            {{ $row['proof_number'] ?? '' }}
-                            @if((int) ($row['adjustment_amount'] ?? 0) !== 0)
+                            {{ $proofNumber }}
+                            @if($entryType !== 'adjustment' && (int) ($row['adjustment_amount'] ?? 0) !== 0)
                                 <br>
                                 <span style="font-size:10px;">
                                     ({{ (int) ($row['adjustment_amount'] ?? 0) > 0 ? '+' : '-' }}Rp {{ number_format(abs((int) ($row['adjustment_amount'] ?? 0)), 0, ',', '.') }})
