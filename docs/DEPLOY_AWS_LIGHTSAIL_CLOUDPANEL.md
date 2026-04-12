@@ -7,7 +7,7 @@ Dokumen ini disiapkan untuk deploy aplikasi ke server Linux yang memakai:
 
 Dokumen ini meniru alur panduan `aaPanel`, tetapi disesuaikan untuk:
 - `teserpos.mitrasejatiberkah.com` sebagai env `tes`
-- `erpos.mitrasejaitberkah.com` sebagai env `prod`
+- `erpos.mitrasejatiberkah.com` sebagai env `prod`
 
 Istilah menu yang dipakai di dokumen ini mengikuti CloudPanel:
 - `Sites`
@@ -143,6 +143,12 @@ Install CloudPanel.
 
 Pilih database engine yang kamu inginkan. Untuk contoh ini kita pakai `MariaDB`.
 
+Catatan penting:
+- walaupun server memakai `MariaDB`, file `.env` aplikasi Laravel tetap memakai:
+  - `DB_CONNECTION=mysql`
+- ini normal
+- driver `mysql` di Laravel / PDO dipakai juga untuk koneksi ke `MariaDB`
+
 ```bash
 curl -sSL https://installer.cloudpanel.io/ce/v2/install.sh | DB_ENGINE=MARIADB_11.4 bash
 ```
@@ -233,10 +239,10 @@ Contoh yang dipakai di dokumen ini:
   - document root: `/home/teserpos/htdocs/teserpos.mitrasejatiberkah.com/public`
 
 - env `prod`
-  - domain: `erpos.mitrasejaitberkah.com`
+  - domain: `erpos.mitrasejatiberkah.com`
   - site user: `erpos`
-  - path code: `/home/erpos/htdocs/erpos.mitrasejaitberkah.com`
-  - document root: `/home/erpos/htdocs/erpos.mitrasejaitberkah.com/public`
+  - path code: `/home/erpos/htdocs/erpos.mitrasejatiberkah.com`
+  - document root: `/home/erpos/htdocs/erpos.mitrasejatiberkah.com/public`
 
 Catatan penting:
 - di CloudPanel, usahakan semua file project dimiliki oleh `site user`
@@ -249,7 +255,7 @@ Bagian ini penting karena domain aplikasi kamu diarahkan lewat `Cloudflare`.
 
 Contoh target:
 - `teserpos.mitrasejatiberkah.com`
-- `erpos.mitrasejaitberkah.com`
+- `erpos.mitrasejatiberkah.com`
 - opsional panel:
   - `cp.mitrasejatiberkah.com`
 
@@ -326,7 +332,7 @@ Cek dari laptop atau server:
 
 ```bash
 nslookup teserpos.mitrasejatiberkah.com
-nslookup erpos.mitrasejaitberkah.com
+nslookup erpos.mitrasejatiberkah.com
 ```
 
 Kalau IP sudah mengarah ke static IP Lightsail, lanjut ke step berikut.
@@ -379,7 +385,7 @@ Untuk env `tes`:
 
 Untuk env `prod`:
 - `Domain Name`:
-  - `erpos.mitrasejaitberkah.com`
+  - `erpos.mitrasejatiberkah.com`
 - `PHP Version`:
   - `PHP 8.3`
 - `Site User`:
@@ -404,7 +410,7 @@ Di tiap site:
 
 Lakukan untuk:
 - `teserpos.mitrasejatiberkah.com`
-- `erpos.mitrasejaitberkah.com`
+- `erpos.mitrasejatiberkah.com`
 
 Kalau kamu juga pakai:
 - `cp.mitrasejatiberkah.com`
@@ -459,7 +465,7 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs && git clone https://gith
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs && git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejaitberkah.com"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs && git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejatiberkah.com"
 ```
 
 Kalau repo private:
@@ -480,7 +486,7 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && cp .env.cloudpanel.prod.example .env"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && cp .env.cloudpanel.prod.example .env"
 ```
 
 Lalu edit `.env`.
@@ -507,7 +513,7 @@ Contoh `prod`:
 APP_NAME=PgPOS-ERP
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://erpos.mitrasejaitberkah.com
+APP_URL=https://erpos.mitrasejatiberkah.com
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -528,7 +534,7 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan key:generate"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan key:generate"
 ```
 
 ## 15. Arahkan document root ke `public`
@@ -541,7 +547,7 @@ Pastikan document root tiap site mengarah ke:
 - `/home/teserpos/htdocs/teserpos.mitrasejatiberkah.com/public`
 
 ### Env prod
-- `/home/erpos/htdocs/erpos.mitrasejaitberkah.com/public`
+- `/home/erpos/htdocs/erpos.mitrasejatiberkah.com/public`
 
 Kalau document root masih ke root project:
 - route seperti `/login` bisa gagal
@@ -560,8 +566,8 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && composer install --no-dev --optimize-autoloader"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && npm install"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && composer install --no-dev --optimize-autoloader"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && npm install"
 ```
 
 ## 17. Inisialisasi database
@@ -581,15 +587,15 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 Pilihan aman:
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan migrate --force"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan db:seed --force"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan migrate --force"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan db:seed --force"
 ```
 
 Atau kalau mau import bootstrap:
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && mysql -u pgpos_prod_user -p pgpos_prod < database/sql/tespgpos_mysql_prod_bootstrap.sql"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan db:seed --force"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && mysql -u pgpos_prod_user -p pgpos_prod < database/sql/tespgpos_mysql_prod_bootstrap.sql"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan db:seed --force"
 ```
 
 ## 18. Build asset frontend
@@ -603,7 +609,7 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && npm run build"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && npm run build"
 ```
 
 Urutan normal:
@@ -628,10 +634,10 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan storage:link"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan optimize:clear"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan config:cache"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan view:cache"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan storage:link"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan optimize:clear"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan config:cache"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan view:cache"
 ```
 
 Catatan:
@@ -681,7 +687,7 @@ User:
 Command:
 
 ```bash
-cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan schedule:run >> /dev/null 2>&1
+cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Interval:
@@ -695,7 +701,7 @@ User:
 Command:
 
 ```bash
-cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
+cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
 ```
 
 Interval:
@@ -716,10 +722,10 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan app:db-backup"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan app:integrity-check"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan app:smoke-test"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan app:deploy-check --skip-ops"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan app:db-backup"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan app:integrity-check"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan app:smoke-test"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan app:deploy-check --skip-ops"
 ```
 
 ## 22. Contoh alur lengkap env `tes`
@@ -748,19 +754,19 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ```bash
 ssh ubuntu@YOUR_STATIC_IP
 sudo -i
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs && git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejaitberkah.com"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && cp .env.cloudpanel.prod.example .env"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan key:generate"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && composer install --no-dev --optimize-autoloader"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && npm install"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan migrate --force"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan db:seed --force"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && npm run build"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan storage:link"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan optimize:clear"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan config:cache"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan view:cache"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan app:deploy-check --skip-ops"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs && git clone https://github.com/mochagsr/testcode1.git erpos.mitrasejatiberkah.com"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && cp .env.cloudpanel.prod.example .env"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan key:generate"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && composer install --no-dev --optimize-autoloader"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && npm install"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan migrate --force"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan db:seed --force"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && npm run build"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan storage:link"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan optimize:clear"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan config:cache"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan view:cache"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan app:deploy-check --skip-ops"
 ```
 
 ## 24. Langkah uji setelah deploy
@@ -807,9 +813,9 @@ sudo -u teserpos -H bash -lc "cd /home/teserpos/htdocs/teserpos.mitrasejatiberka
 ### Env prod
 
 ```bash
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && git pull origin master"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan optimize:clear"
-sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejaitberkah.com && php artisan view:cache"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && git pull origin master"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan optimize:clear"
+sudo -u erpos -H bash -lc "cd /home/erpos/htdocs/erpos.mitrasejatiberkah.com && php artisan view:cache"
 ```
 
 ### 25B. Update dengan migration
@@ -866,3 +872,4 @@ Catatan:
 8. batasi port `22` dan `8443` ke IP admin kalau memungkinkan
 9. buat snapshot / backup instance Lightsail sebelum upgrade besar
 10. lakukan update di `teserpos` dulu sebelum `erpos`
+

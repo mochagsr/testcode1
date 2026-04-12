@@ -186,7 +186,7 @@ Catatan aaPanel:
   - `.env.cloudpanel.prod.example`
 - contoh nama website yang dipakai di dokumen:
   - `teserpos.mitrasejatiberkah.com` untuk `tes`
-  - `erpos.mitrasejaitberkah.com` untuk `prod`
+  - `erpos.mitrasejatiberkah.com` untuk `prod`
 - untuk first deploy, tetap disarankan mulai dari `Terminal + git clone`
 - `Create for Git` aman dipakai juga, tapi tetap harus dilanjutkan dengan setup Laravel lengkap
 
@@ -205,3 +205,4 @@ npm install --no-save playwright marked
 npx playwright install chromium
 node scripts/generate_manual_pdfs.mjs
 ```
+
