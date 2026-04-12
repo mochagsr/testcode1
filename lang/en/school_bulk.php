@@ -51,7 +51,7 @@ return [
     'total_per_school' => 'Total per School',
     'grand_total_all_schools' => 'Grand Total All Schools',
     'qty_total_per_school' => 'School Total Qty',
-    'qty_total_all_schools' => 'Overall Total Qty',
+    'qty_total_all_schools' => 'Grand Total Qty',
     'bill_to' => 'Bill To',
     'ship_to' => 'Ship To',
 ];

@@ -51,7 +51,7 @@ return [
     'total_per_school' => 'Total per Sekolah',
     'grand_total_all_schools' => 'Grand Total Semua Sekolah',
     'qty_total_per_school' => 'Total Qty Sekolah',
-    'qty_total_all_schools' => 'Total Qty Keseluruhan',
+    'qty_total_all_schools' => 'Grand Total Qty',
     'bill_to' => 'Tagihan ke',
     'ship_to' => 'Kirim ke',
 ];
