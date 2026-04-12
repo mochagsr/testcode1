@@ -16,22 +16,15 @@
         .company-logo-img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 15px; font-weight: 800; letter-spacing: 0; margin-bottom: 2px; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
         .company-detail { font-size: 12px; line-height: 1.35; white-space: pre-line; font-weight: 600; }
-        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: center; align-self: center; justify-self: start; min-width: 0; font-weight: 700; margin-left: -28px; }
+        .doc-title-center { font-size: 12px; line-height: 1.3; min-width: 180px; text-align: center; align-self: center; justify-self: start; min-width: 0; font-weight: 700; margin-left: -46px; }
         .doc-meta-right { font-size: 12px; line-height: 1.3; min-width: 180px; max-width: 270px; justify-self: end; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-value { white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
         .doc-title { font-size: 20px; font-weight: 800; text-align: center; }
         .doc-number { text-align: center; margin-bottom: 4px; }
         @include('partials.print.table_styles')
-        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 220px 340px; align-items: flex-start; gap: 16px; margin-top: 12px; }
+        .table-summary { display: grid; grid-template-columns: minmax(0, 1fr); align-items: flex-start; gap: 16px; margin-top: 12px; }
         .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
-        .qty-box { width: 100%; table-layout: fixed; }
-        .qty-box table,
-        .total-box { margin-top: 0; }
-        .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 66%; }
-        .qty-box td:last-child { width: 34%; text-align: right; font-weight: 700; white-space: nowrap; }
-        .total-box { width: 100%; }
-        .total-box td { border: 1px solid #111; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
@@ -68,7 +61,6 @@
 
     @php
         $itemsByLocation = $transaction->items->groupBy(fn($item) => (int) ($item->school_bulk_transaction_location_id ?? 0));
-        $overallQty = (int) round((float) $transaction->items->sum('quantity'), 0);
     @endphp
     @forelse($transaction->locations as $location)
         @php
@@ -76,10 +68,6 @@
             if ($locationItems->isEmpty()) {
                 $locationItems = collect($itemsByLocation->get(0, []))->values();
             }
-            $perSchoolSubtotal = (int) $locationItems->sum(function ($item): int {
-                return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
-            });
-            $perSchoolQty = (int) round((float) $locationItems->sum('quantity'), 0);
             $shipAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($location->address ?: ($transaction->customer?->address ?: '')), 4);
             $noteNumber = $transaction->transaction_number . '-' . str_pad((string) $loop->iteration, 3, '0', STR_PAD_LEFT);
         @endphp
@@ -120,25 +108,18 @@
                 <tr>
                     <th style="width: 6%">{{ __('txn.no') }}</th>
                     <th>{{ __('txn.name') }}</th>
-                    <th class="num" style="width: 10%">{{ __('txn.qty') }}</th>
-                    <th style="width: 12%">{{ __('txn.unit') }}</th>
-                    <th class="num" style="width: 18%">{{ __('txn.price') }}</th>
-                    <th class="num" style="width: 20%">{{ __('txn.subtotal') }}</th>
+                    <th class="num" style="width: 14%">{{ __('txn.qty') }}</th>
+                    <th style="width: 14%">{{ __('txn.unit') }}</th>
                 </tr>
                 </thead>
                 <tbody>
                 @foreach($locationItems as $item)
-                    @php
-                        $adjustedQuantity = (int) ($item->quantity ?? 0);
-                        $lineTotal = $adjustedQuantity * ((int) ($item->unit_price ?? 0));
-                    @endphp
+                    @php $adjustedQuantity = (int) ($item->quantity ?? 0); @endphp
                     <tr>
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $item->product_name }}</td>
                         <td class="num">{{ $adjustedQuantity }}</td>
                         <td>{{ $item->unit ?: '-' }}</td>
-                        <td class="num">Rp {{ number_format((int) ($item->unit_price ?? 0), 0, ',', '.') }}</td>
-                        <td class="num">Rp {{ number_format($lineTotal, 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
                 </tbody>
@@ -148,17 +129,6 @@
                 <div class="notes-box">
                     <strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}
                 </div>
-                <div class="qty-box">
-                    <table>
-                        <tr><td style="width: 66%;">{{ __('school_bulk.qty_total_per_school') }}</td><td style="width: 34%;">{{ number_format($perSchoolQty, 0, ',', '.') }}</td></tr>
-                        <tr><td style="width: 66%;">{{ __('school_bulk.qty_total_all_schools') }}</td><td style="width: 34%;">{{ number_format($overallQty, 0, ',', '.') }}</td></tr>
-                    </table>
-                </div>
-                <table class="total-box">
-                    <tr><td style="width: 58%;">{{ __('txn.sub_total') }}</td><td class="num" style="width: 42%;">Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</td></tr>
-                    <tr><td style="width: 58%;">{{ __('txn.discount') }}</td><td class="num" style="width: 42%;">Rp 0</td></tr>
-                    <tr><td style="width: 58%;"><strong>{{ __('txn.grand_total') }}</strong></td><td class="num" style="width: 42%;"><strong>Rp {{ number_format($perSchoolSubtotal, 0, ',', '.') }}</strong></td></tr>
-                </table>
             </div>
 
             <table class="signature-table">
