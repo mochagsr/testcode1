@@ -136,6 +136,7 @@ Catatan:
 - `docs/BACKUP_OPS_HEALTH_README.md`
 - `docs/RECOVERY_SOP.md`
 - `docs/DEPLOY_AAPANEL.md`
+- `docs/DEPLOY_AWS_LIGHTSAIL_CLOUDPANEL.md`
 - `docs/UAT_AAPANEL_POST_DEPLOY.md`
 - `docs/GO_LIVE_RUNBOOK.md`
 
@@ -162,6 +163,8 @@ Catatan:
   - `docs/UAT_AAPANEL_POST_DEPLOY.md`
   - `docs/BACKUP_OPS_HEALTH_README.md`
   - `docs/GO_LIVE_RUNBOOK.md`
+- Untuk `AWS Lightsail + CloudPanel + Cloudflare`, gunakan dokumen ini:
+  - `docs/DEPLOY_AWS_LIGHTSAIL_CLOUDPANEL.md`
 
 Catatan aaPanel:
 - dokumentasi deploy sekarang mencakup 2 metode:
@@ -178,6 +181,9 @@ Catatan aaPanel:
 - file env contoh untuk aaPanel:
   - `.env.aapanel.test.example`
   - `.env.aapanel.prod.example`
+- file env contoh untuk CloudPanel:
+  - `.env.cloudpanel.test.example`
+  - `.env.cloudpanel.prod.example`
 - contoh nama website yang dipakai di dokumen:
   - `teserpos.mitrasejatiberkah.com` untuk `tes`
   - `erpos.mitrasejaitberkah.com` untuk `prod`
