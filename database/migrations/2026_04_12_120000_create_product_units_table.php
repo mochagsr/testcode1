@@ -11,13 +11,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('product_units', function (Blueprint $table): void {
-            $table->id();
-            $table->string('code', 30)->unique();
-            $table->string('name', 120);
-            $table->text('description')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('product_units')) {
+            Schema::create('product_units', function (Blueprint $table): void {
+                $table->id();
+                $table->string('code', 30)->unique();
+                $table->string('name', 120);
+                $table->text('description')->nullable();
+                $table->timestamps();
+            });
+        }
 
         $rows = collect([
             $this->normalizeRow('exp|Exemplar'),
