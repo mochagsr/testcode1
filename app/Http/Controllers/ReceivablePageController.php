@@ -1623,6 +1623,7 @@ class ReceivablePageController extends Controller
                 'customer_id' => $customerId,
                 'semester' => (string) ($normalizedSemester ?? ''),
                 'transaction_type' => (string) ($normalizedTransactionType ?? ''),
+                'version' => 'v2',
             ]),
             now()->addSeconds(45),
             fn() => $this->buildCustomerBillStatement($customerId, $normalizedSemester, $normalizedTransactionType)
@@ -1712,6 +1713,35 @@ class ReceivablePageController extends Controller
                 ->mapWithKeys(fn (ReceivablePayment $payment): array => [
                     strtoupper((string) $payment->payment_number) => (int) $payment->id,
                 ]);
+        $legacyPaymentLookup = ReceivablePayment::query()
+            ->where('customer_id', $customerId)
+            ->when($ledgerRows->isNotEmpty(), function ($query) use ($ledgerRows): void {
+                $query->whereBetween('payment_date', [
+                    $ledgerRows->min('entry_date'),
+                    $ledgerRows->max('entry_date'),
+                ]);
+            })
+            ->active()
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get(['id', 'payment_number', 'payment_date', 'amount'])
+            ->groupBy(fn (ReceivablePayment $payment): string => $payment->payment_date?->toDateString() . '|' . (int) $payment->amount)
+            ->map(function (Collection $group): ?array {
+                if ($group->count() !== 1) {
+                    return null;
+                }
+
+                $payment = $group->first();
+                if (! $payment instanceof ReceivablePayment) {
+                    return null;
+                }
+
+                return [
+                    'id' => (int) $payment->id,
+                    'payment_number' => strtoupper((string) $payment->payment_number),
+                ];
+            })
+            ->filter();
         $salesReturnIdMap = $returnRefs->isEmpty()
             ? collect()
             : SalesReturn::query()
@@ -1765,8 +1795,25 @@ class ReceivablePageController extends Controller
                 $invoiceNumber = $this->extractDocumentReference($rawDescription, ['INV']);
             }
             $paymentNumber = $this->extractDocumentReference($rawDescription, ['KWT', 'PYT']);
+            if ($paymentNumber === '' && $entryType === 'payment') {
+                $legacyPaymentKey = $ledgerRow->entry_date?->toDateString() . '|' . $installment;
+                $legacyPayment = $legacyPaymentLookup->get($legacyPaymentKey);
+                if (is_array($legacyPayment)) {
+                    $paymentNumber = (string) ($legacyPayment['payment_number'] ?? '');
+                }
+            }
             $returnNumber = $this->extractDocumentReference($rawDescription, ['RTR', 'RET', 'RTN']);
-            $paymentId = $paymentNumber !== '' ? (int) ($paymentIdMap[$paymentNumber] ?? 0) : 0;
+            $paymentId = 0;
+            if ($paymentNumber !== '') {
+                $paymentId = (int) ($paymentIdMap[$paymentNumber] ?? 0);
+                if ($paymentId === 0 && $entryType === 'payment') {
+                    $legacyPaymentKey = $ledgerRow->entry_date?->toDateString() . '|' . $installment;
+                    $legacyPayment = $legacyPaymentLookup->get($legacyPaymentKey);
+                    if (is_array($legacyPayment) && (string) ($legacyPayment['payment_number'] ?? '') === $paymentNumber) {
+                        $paymentId = (int) ($legacyPayment['id'] ?? 0);
+                    }
+                }
+            }
             $salesReturnId = $returnNumber !== '' ? (int) ($salesReturnIdMap[$returnNumber] ?? 0) : 0;
             $baseProofNumber = match ($entryType) {
                 'return' => $returnNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),

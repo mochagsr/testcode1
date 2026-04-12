@@ -1728,6 +1728,83 @@ class ReceivableFlowsTest extends TestCase
         $this->assertStringContainsString(__('receivable.transaction_type_return'), $workbookPayload);
     }
 
+    public function test_customer_bill_resolves_legacy_payment_rows_to_kwt_number(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-LEGACY-001',
+            'name' => 'Angga Legacy',
+            'city' => 'Sidoarjo',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-11032026-0001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-03-11',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'subtotal' => 70000,
+            'total' => 70000,
+            'total_paid' => 0,
+            'balance' => 70000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        $receivablePayment = ReceivablePayment::query()->create([
+            'payment_number' => 'KWT-11032026-0001',
+            'customer_id' => $customer->id,
+            'payment_date' => '2026-03-11',
+            'customer_address' => 'Jl Sidoarjo',
+            'amount' => 70000,
+            'amount_in_words' => 'tujuh puluh ribu rupiah',
+            'customer_signature' => 'Angga Legacy',
+            'user_signature' => 'Kasir',
+            'notes' => 'Pembayaran piutang lama',
+            'created_by_user_id' => $user->id,
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-03-11',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-11032026-0001',
+            'debit' => 70000,
+            'credit' => 0,
+            'balance_after' => 70000,
+            'period_code' => 'S2-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-03-11',
+            'transaction_type' => 'product',
+            'description' => 'Pembayaran untuk INV-11032026-0001',
+            'debit' => 0,
+            'credit' => 70000,
+            'balance_after' => 0,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $printResponse = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $printResponse->assertOk();
+        $printResponse->assertSee('KWT-11032026-0001');
+        $printResponse->assertDontSee('Pembayaran untuk INV-11032026-0001');
+
+        $screenResponse = $this->actingAs($user)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $screenResponse->assertOk();
+        $screenResponse->assertSee('KWT-11032026-0001');
+        $screenResponse->assertSee(route('receivable-payments.show', $receivablePayment), false);
+    }
+
     public function test_receivable_semester_page_hides_closed_semester_from_dropdown(): void
     {
         $user = User::factory()->create();
