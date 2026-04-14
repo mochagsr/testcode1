@@ -709,6 +709,14 @@ Interval:
 
 ## 21. Backup awal dan smoke test
 
+Catatan penting:
+- di server production, jalur yang disarankan adalah:
+  - `php artisan app:deploy-check --skip-ops`
+- ini cocok setelah `composer install --no-dev`
+- kalau `artisan test` tidak tersedia di server, command ini akan otomatis fallback ke:
+  - `php artisan app:http-smoke-test`
+- `php artisan test ...` lebih cocok dijalankan di lokal / development yang masih punya `dev dependencies`
+
 ### Env tes
 
 ```bash
