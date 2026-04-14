@@ -17,6 +17,200 @@ Catatan:
   - `.env.aapanel.test.example`
   - `.env.aapanel.prod.example`
 
+## 0. Persiapan VPS di AWS Lightsail
+
+Bagian ini dipakai kalau kamu ingin mulai dari nol dari:
+- `AWS Lightsail`
+- lalu install `aaPanel`
+- lalu arahkan DNS lewat `Cloudflare`
+
+Kalau VPS kamu sudah jadi dan `aaPanel` sudah terpasang, kamu bisa lompat ke:
+- `## 1. Stack aplikasi`
+
+### 0.1. Buat instance baru di AWS Lightsail
+
+Di `AWS Lightsail`:
+1. buat `Linux/Unix instance`
+2. pilih image:
+   - `Ubuntu 24.04 LTS`
+3. beri nama instance yang jelas, misalnya:
+   - `pgpos-aapanel-01`
+
+Saran ukuran server:
+- minimum untuk `tes`:
+  - `2 vCPU`
+  - `4 GB RAM`
+  - `80 GB SSD`
+- rekomendasi kalau mau menampung:
+  - `teserpos.mitrasejatiberkah.com`
+  - `erpos.mitrasejatiberkah.com`
+  - panel `aaPanel`
+  - cron, queue, backup, print, dan export
+- rekomendasi realistis:
+  - `4 vCPU`
+  - `8 GB RAM`
+  - `160 GB SSD`
+
+### 0.2. Buat dan attach Static IP
+
+Jangan deploy ke IP dinamis.
+
+Di `Lightsail`:
+1. buka instance
+2. buka tab `Networking`
+3. buat `Static IP`
+4. attach ke instance kamu
+
+Catat IP public final.
+
+Contoh:
+- `18.141.23.45`
+
+IP ini nanti dipakai di:
+- DNS `Cloudflare`
+- akses panel
+- akses domain aplikasi
+
+### 0.3. Firewall / networking Lightsail
+
+Pastikan port ini dibuka:
+- `22` untuk SSH
+- `80` untuk HTTP
+- `443` untuk HTTPS
+- `7800` untuk panel `aaPanel`
+
+Catatan:
+- beberapa instalasi `aaPanel` bisa memakai port panel yang berbeda
+- tetap cek output installer setelah pemasangan selesai
+- kalau port panel yang keluar bukan `7800`, buka port itu juga di `Lightsail`
+
+Saran praktik:
+- `22` sebaiknya dibatasi ke IP admin kalau memungkinkan
+- port panel `aaPanel` juga sebaiknya dibatasi ke IP admin kalau memungkinkan
+- `3306` tidak perlu dibuka ke publik
+
+### 0.4. Login awal ke server
+
+Masuk ke server:
+
+```bash
+ssh ubuntu@YOUR_STATIC_IP
+sudo -i
+```
+
+Update server:
+
+```bash
+apt update
+apt upgrade -y
+apt install -y curl wget sudo git unzip
+```
+
+### 0.5. Install aaPanel
+
+Jalankan installer resmi `aaPanel`:
+
+```bash
+URL=https://www.aapanel.com/script/install_7.0_en.sh && if [ -f /usr/bin/curl ];then curl -ksSO "$URL";else wget --no-check-certificate -O install_7.0_en.sh "$URL";fi; bash install_7.0_en.sh aapanel
+```
+
+Tunggu sampai selesai.
+
+Biasanya installer akan menampilkan:
+- URL panel
+- username panel
+- password panel
+- port panel
+
+Catat semuanya baik-baik.
+
+Contoh format output:
+- panel URL:
+  - `http://YOUR_STATIC_IP:7800/xxxxxx`
+- username:
+  - `admin`
+- password:
+  - auto-generate dari installer
+
+Catatan penting:
+- setelah install selesai, cek lagi port panel final
+- kalau berbeda dari `7800`, buka port itu di firewall `Lightsail`
+
+### 0.6. Login pertama ke aaPanel
+
+Buka URL dari hasil installer.
+
+Contoh:
+
+```text
+http://YOUR_STATIC_IP:7800/xxxxxx
+```
+
+Lalu login dengan:
+- username panel
+- password panel
+
+Setelah berhasil login:
+1. ganti password panel kalau perlu
+2. aktifkan bind email panel kalau kamu pakai
+3. catat kredensial final internal tim
+
+### 0.7. Setup DNS di Cloudflare
+
+Kalau domain kamu dikelola di `Cloudflare`, buat record berikut:
+
+#### Env tes
+- `Type`: `A`
+- `Name`: `teserpos`
+- `IPv4 address`: `YOUR_STATIC_IP`
+- `Proxy status`: `DNS only`
+- `TTL`: `Auto`
+
+#### Env prod
+- `Type`: `A`
+- `Name`: `erpos`
+- `IPv4 address`: `YOUR_STATIC_IP`
+- `Proxy status`: `DNS only`
+- `TTL`: `Auto`
+
+Saran awal:
+- mulai dari `DNS only`
+- setelah website dan SSL normal, baru pertimbangkan `Proxied`
+
+Kalau nanti domain sudah aktif HTTPS di origin server:
+- set `Cloudflare SSL/TLS mode` ke:
+  - `Full (strict)`
+
+Jangan pakai:
+- `Flexible`
+
+Karena:
+- bisa memicu redirect loop
+- dan sering bikin setup origin jadi membingungkan
+
+### 0.8. Cek propagasi DNS
+
+Cek dari lokal atau server:
+
+```bash
+nslookup teserpos.mitrasejatiberkah.com
+nslookup erpos.mitrasejatiberkah.com
+```
+
+Kalau hasilnya sudah mengarah ke static IP Lightsail, lanjut ke langkah deploy aplikasi.
+
+### 0.9. Urutan ringkas dari nol
+
+Kalau mulai dari benar-benar kosong, urutannya begini:
+1. buat instance `Lightsail`
+2. attach `Static IP`
+3. buka firewall `22`, `80`, `443`, dan port panel `aaPanel`
+4. install `aaPanel`
+5. login ke `aaPanel`
+6. arahkan DNS `Cloudflare`
+7. tunggu propagasi
+8. baru lanjut deploy aplikasi di dokumen ini
+
 ## Akun default setelah seed
 - Admin
   - username: `admin`
@@ -122,12 +316,12 @@ Contoh yang dipakai di dokumen ini:
   - website: `teserpos.mitrasejatiberkah.com`
   - folder: `/www/wwwroot/teserpos.mitrasejatiberkah.com`
 - env `prod`:
-  - website: `erpos.mitrasejaitberkah.com`
-  - folder: `/www/wwwroot/erpos.mitrasejaitberkah.com`
+  - website: `erpos.mitrasejatiberkah.com`
+  - folder: `/www/wwwroot/erpos.mitrasejatiberkah.com`
 
 Running directory website harus ke:
 - `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
-- `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
+- `/www/wwwroot/erpos.mitrasejatiberkah.com/public`
 
 ## 6.1. Setup subdomain: DomaiNesia + VPS aaPanel di IDCloudHost
 
@@ -137,7 +331,7 @@ Bagian ini penting kalau:
 
 Contoh target:
 - `teserpos.mitrasejatiberkah.com` untuk env `tes`
-- `erpos.mitrasejaitberkah.com` untuk env `prod`
+- `erpos.mitrasejatiberkah.com` untuk env `prod`
 
 Alurnya:
 1. ambil IP public VPS dari `IDCloudHost`
@@ -186,7 +380,7 @@ Kalau kamu ingin domain utama dipakai untuk prod:
 Kalau butuh `www`:
 - `Type`: `CNAME`
 - `Name / Host`: `www`
-- `Value / Points to`: `erpos.mitrasejaitberkah.com`
+- `Value / Points to`: `erpos.mitrasejatiberkah.com`
 
 ### 6.1C. Opsi DNS 2 - Buat record subdomain di Cloudflare
 
@@ -242,14 +436,14 @@ Cara cek di server:
 
 ```bash
 ping teserpos.mitrasejatiberkah.com
-ping erpos.mitrasejaitberkah.com
+ping erpos.mitrasejatiberkah.com
 ```
 
 Atau cek dengan:
 
 ```bash
 nslookup teserpos.mitrasejatiberkah.com
-nslookup erpos.mitrasejaitberkah.com
+nslookup erpos.mitrasejatiberkah.com
 ```
 
 Kalau hasil IP sudah sama dengan IP VPS `IDCloudHost`, berarti DNS sudah benar.
@@ -258,7 +452,7 @@ Kalau hasil IP sudah sama dengan IP VPS `IDCloudHost`, berarti DNS sudah benar.
 
 Setelah DNS benar:
 - buat site `teserpos.mitrasejatiberkah.com` di aaPanel untuk env `tes`
-- buat site `erpos.mitrasejaitberkah.com` di aaPanel untuk env `prod`
+- buat site `erpos.mitrasejatiberkah.com` di aaPanel untuk env `prod`
 
 Catatan penting:
 - jangan buat site dulu lalu berharap subdomain otomatis hidup
@@ -317,7 +511,7 @@ Alur:
 
 Contoh:
 - `teserpos` -> `/www/wwwroot/teserpos.mitrasejatiberkah.com`
-- `erpos` -> `/www/wwwroot/erpos.mitrasejaitberkah.com`
+- `erpos` -> `/www/wwwroot/erpos.mitrasejatiberkah.com`
 
 ## 7B. Opsi B - `Website -> Add site -> Create for Git`
 
@@ -417,7 +611,7 @@ DB_PASSWORD=password_user_database_mysql
 ```
 
 Untuk env `prod` dengan domain:
-- `erpos.mitrasejaitberkah.com`
+- `erpos.mitrasejatiberkah.com`
 
 ## 7C. Running Directory dan URL Rewrite Laravel
 
@@ -441,9 +635,9 @@ Contoh yang benar:
 
 - `prod`
   - `Website Path`
-    - `/www/wwwroot/erpos.mitrasejaitberkah.com`
+    - `/www/wwwroot/erpos.mitrasejatiberkah.com`
   - `Running directory`
-    - `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
+    - `/www/wwwroot/erpos.mitrasejatiberkah.com/public`
 
 Kalau `Running directory` masih menunjuk ke root project dan belum ke `public`, URL seperti `/login` biasanya gagal.
 
@@ -494,13 +688,13 @@ Kalau `/login` masih gagal, cek lagi:
 isi form seperti ini:
 
 - `Domain name`
-  - `erpos.mitrasejaitberkah.com`
+  - `erpos.mitrasejatiberkah.com`
 - `Description`
   - biarkan auto dari aaPanel
   - atau isi:
-    - `erpos_mitrasejaitberkah_com`
+    - `erpos_mitrasejatiberkah_com`
 - `Website Path`
-  - `/www/wwwroot/erpos.mitrasejaitberkah.com`
+  - `/www/wwwroot/erpos.mitrasejatiberkah.com`
 - `FTP`
   - `Not create`
 - `Database`
@@ -519,9 +713,9 @@ isi form seperti ini:
 
 Contoh hasil database prod:
 - `DB name`
-  - `sql_erpos_mitrasejaitberkah_com`
+  - `sql_erpos_mitrasejatiberkah_com`
 - `DB username`
-  - `sql_erpos_mitrasejaitberkah_com`
+  - `sql_erpos_mitrasejatiberkah_com`
 - `DB password`
   - `password_dari_aapanel`
 
@@ -531,8 +725,8 @@ Lalu di `.env` prod nanti:
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=sql_erpos_mitrasejaitberkah_com
-DB_USERNAME=sql_erpos_mitrasejaitberkah_com
+DB_DATABASE=sql_erpos_mitrasejatiberkah_com
+DB_USERNAME=sql_erpos_mitrasejatiberkah_com
 DB_PASSWORD=password_user_database_mysql
 ```
 
@@ -554,7 +748,7 @@ Setelah site berhasil dibuat lewat `Create for Git`, lanjutkan:
 1. buka detail site
 2. cek dulu apakah source code Laravel sudah benar-benar masuk ke:
    - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
-   - atau `/www/wwwroot/erpos.mitrasejaitberkah.com`
+   - atau `/www/wwwroot/erpos.mitrasejatiberkah.com`
 3. kalau folder `public` Laravel sudah ada, baru set:
    - `Running directory = public`
 4. masuk `Terminal`
@@ -591,7 +785,7 @@ php artisan app:smoke-test
 Contoh untuk env `prod` setelah `Create for Git`:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 composer install --no-dev --optimize-autoloader
 cp .env.aapanel.prod.example .env
 php artisan key:generate
@@ -625,7 +819,7 @@ Langkah:
 4. pilih `PHP 8.3`
 5. set path:
    - `/www/wwwroot/teserpos.mitrasejatiberkah.com`
-   - atau `/www/wwwroot/erpos.mitrasejaitberkah.com`
+   - atau `/www/wwwroot/erpos.mitrasejatiberkah.com`
 6. simpan
 
 Catatan penting:
@@ -641,7 +835,7 @@ Jadi pada tahap ini:
 
 Set `Running directory = public` dilakukan **setelah repo berhasil di-clone**, karena barulah folder berikut tersedia:
 - `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
-- atau `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
+- atau `/www/wwwroot/erpos.mitrasejatiberkah.com/public`
 
 ## 9A. Clone code dari GitHub untuk Opsi A
 
@@ -678,7 +872,7 @@ composer install --no-dev --optimize-autoloader
 ### Env prod
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git clone https://github.com/mochagsr/testcode1.git .
 git switch -c master --track origin/master
 composer install --no-dev --optimize-autoloader
@@ -698,7 +892,7 @@ Setelah clone selesai:
 2. masuk ke `Site directory`
 3. set `Running directory` ke:
    - `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
-   - atau `/www/wwwroot/erpos.mitrasejaitberkah.com/public`
+   - atau `/www/wwwroot/erpos.mitrasejatiberkah.com/public`
 
 Ringkas:
 - `Website Path` = folder project Laravel
@@ -737,7 +931,7 @@ Cara edit `.env` di aaPanel:
 1. buka `Files`
 2. masuk ke folder project:
    - `tes`: `/www/wwwroot/teserpos.mitrasejatiberkah.com`
-   - `prod`: `/www/wwwroot/erpos.mitrasejaitberkah.com`
+   - `prod`: `/www/wwwroot/erpos.mitrasejatiberkah.com`
 3. kalau file `.env` belum ada:
    - copy dari file contoh
 4. klik file `.env`
@@ -757,7 +951,7 @@ nano .env
 Contoh untuk `prod`:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 cp .env.aapanel.prod.example .env
 nano .env
 ```
@@ -789,7 +983,7 @@ php artisan key:generate
 ### Prod
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 cp .env.aapanel.prod.example .env
 php artisan key:generate
 ```
@@ -858,7 +1052,7 @@ Silakan sesuaikan hanya bagian:
 APP_NAME="PgPOS ERP"
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://erpos.mitrasejaitberkah.com
+APP_URL=https://erpos.mitrasejatiberkah.com
 
 LOG_CHANNEL=stack
 LOG_STACK=single
@@ -867,8 +1061,8 @@ LOG_LEVEL=error
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=sql_erpos_mitrasejaitberkah_com
-DB_USERNAME=sql_erpos_mitrasejaitberkah_com
+DB_DATABASE=sql_erpos_mitrasejatiberkah_com
+DB_USERNAME=sql_erpos_mitrasejatiberkah_com
 DB_PASSWORD=password_dari_aapanel
 
 BROADCAST_CONNECTION=log
@@ -952,13 +1146,13 @@ Di aaPanel `v8.0.1`:
 Scheduler `prod`:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan schedule:run >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejatiberkah.com && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Queue `prod`:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejatiberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
 ```
 
 ## 16A. Backup awal dan smoke test untuk Opsi A
@@ -980,7 +1174,7 @@ php artisan app:deploy-check --skip-ops
 ### Env prod
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:integrity-check
@@ -1059,7 +1253,7 @@ php artisan app:smoke-test
 ### Env prod
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git clone https://github.com/mochagsr/testcode1.git .
 git switch -c master --track origin/master
 composer install --no-dev --optimize-autoloader
@@ -1137,7 +1331,7 @@ php artisan key:generate
 ### Prod
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 cp .env.aapanel.prod.example .env
 php artisan key:generate
 ```
@@ -1189,13 +1383,13 @@ php artisan view:cache
 Scheduler `prod`:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan schedule:run >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejatiberkah.com && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Queue `prod`:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
+cd /www/wwwroot/erpos.mitrasejatiberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
 ```
 
 ## 16B. Backup awal dan smoke test untuk Opsi B
@@ -1214,7 +1408,7 @@ php artisan app:smoke-test
 ### Env prod
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 php artisan app:db-backup
 php artisan app:db-restore-test
 php artisan app:integrity-check
@@ -1251,7 +1445,7 @@ php artisan app:smoke-test
 ### Env prod
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 composer install --no-dev --optimize-autoloader
 cp .env.aapanel.prod.example .env
 php artisan key:generate
@@ -1314,7 +1508,7 @@ maka untuk update berikutnya:
 Contoh:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git pull origin master
 ```
 
@@ -1334,7 +1528,7 @@ Kalau site pertama kali dibuat manual:
 maka pola update juga sama:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git pull origin master
 ```
 
@@ -1366,7 +1560,7 @@ Konsekuensi:
 - `composer install`, `npm build`, dan `migrate` tetap dijalankan walaupun kadang tidak selalu perlu
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git pull origin master
 composer install --no-dev --optimize-autoloader
 npm install
@@ -1398,7 +1592,7 @@ Jangan pakai opsi ini kalau ada:
 - perubahan asset hasil build
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git pull origin master
 php artisan optimize:clear
 php artisan config:cache
@@ -1418,7 +1612,7 @@ Kenapa perlu:
 - tanpa `php artisan migrate --force`, aplikasi bisa error karena schema DB tertinggal
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git pull origin master
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
@@ -1441,7 +1635,7 @@ Kenapa perlu:
 - kalau `npm run build` tidak dijalankan, browser bisa tetap memakai asset lama atau asset baru tidak ditemukan
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git pull origin master
 composer install --no-dev --optimize-autoloader
 npm install
@@ -1465,7 +1659,7 @@ php artisan view:cache
 Kalau sesudah update muncul error dan kamu perlu rollback cepat:
 
 ```bash
-cd /www/wwwroot/erpos.mitrasejaitberkah.com
+cd /www/wwwroot/erpos.mitrasejatiberkah.com
 git log --oneline -5
 git reset --hard <commit-sebelumnya>
 php artisan optimize:clear
@@ -1497,3 +1691,4 @@ Catatan:
 ```bash
 php artisan optimize:clear
 ```
+
