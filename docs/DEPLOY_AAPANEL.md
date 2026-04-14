@@ -1205,8 +1205,6 @@ php artisan app:db-restore-test
 php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
-php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
-php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure
 php artisan app:deploy-check --skip-ops
 ```
 
@@ -1219,8 +1217,6 @@ php artisan app:db-restore-test
 php artisan app:integrity-check
 php artisan app:load-test-light --loops=80 --search=ang
 php artisan app:smoke-test
-php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure
-php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure
 php artisan app:deploy-check --skip-ops
 ```
 
@@ -1235,12 +1231,16 @@ Catatan:
   - lalu ulangi `php artisan app:integrity-check`
   - dan tutup dengan `php artisan app:smoke-test`
 - untuk mengisi `PERFORMANCE_PROBE`, pakai `app:load-test-light`, bukan `app:query-profile`
-- untuk cek cepat semua menu dan sub-menu utama dari sisi halaman, jalankan:
+- untuk cek cepat semua menu dan sub-menu utama dari sisi halaman di lokal / development, jalankan:
   - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
   - `php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure`
-  - test ini aman dijalankan di server karena memakai environment `testing` dan SQLite in-memory, bukan database operasional
+  - ini cocok dipakai kalau environment masih punya `dev dependencies`
   - `ActionSmokeTest` menambah cek untuk lookup API, preview POST, queue export, cancel/retry queue, dan generate invoice bulk di database test
 - untuk cek sekali jalan setelah deploy, jalankan:
+  - `php artisan app:deploy-check --skip-ops`
+  - ini jalur yang disarankan untuk server production setelah `composer install --no-dev`
+  - kalau `artisan test` tidak tersedia di server, command ini akan fallback ke `app:http-smoke-test`
+- kalau ingin cek lebih lengkap, jalankan:
   - `php artisan app:deploy-check`
   - command ini menjalankan:
     - `app:smoke-test`

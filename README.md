@@ -116,17 +116,18 @@ Catatan:
 - Profiling query plan manual: `php artisan app:query-profile`
 - Performance probe / load test ringan: `php artisan app:load-test-light --loops=50`
 - Sinkronisasi ulang saldo customer/supplier jika integrity check anomali: `php artisan app:financial-rebuild`
-- Smoke test menu/sub-menu untuk cek `500 error` sebelum deploy:
+- Smoke test menu/sub-menu untuk lokal / development:
   - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
   - `php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure`
-  - aman dijalankan di server karena memakai environment `testing` + SQLite in-memory
-- Deploy check sekali jalan:
+  - cocok dipakai kalau environment masih punya `dev dependencies`
+- Deploy check sekali jalan untuk server production:
+  - `php artisan app:deploy-check --skip-ops`
+  - ini jalur yang disarankan setelah `composer install --no-dev`
+  - kalau `artisan test` tidak tersedia di server, command ini akan fallback ke `app:http-smoke-test`
+- Deploy check lengkap:
   - `php artisan app:deploy-check`
   - menjalankan `app:smoke-test` + smoke test halaman menu/sub-menu + dokumen detail/print/PDF/Excel + report print/PDF/Excel + lookup/preview action penting
-  - untuk server yang sedang bermasalah di permission log/cache dan ingin cek halaman saja:
-    - `php artisan app:deploy-check --skip-ops`
-  - untuk menjalankan full test suite dari command yang sama:
-    - `php artisan app:deploy-check --full-suite`
+  - cocok dipakai kalau server memang siap untuk ops check juga
 
 ## SOP
 - `docs/ops-runbook.md`

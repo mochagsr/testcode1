@@ -35,9 +35,13 @@ Gunakan salah satu:
 - `Ops Health` menampilkan environment dan DB yang benar.
 - `Debug Mode` harus `OFF`.
 - Jalankan `php artisan app:smoke-test` dan pastikan tidak ada status `FAIL`.
-- Jalankan `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure` untuk memastikan menu dan sub-menu utama tidak mengembalikan `500 error`.
-- Jalankan `php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure` untuk memastikan lookup API, preview POST, queue export, dan generate invoice bulk tidak mengembalikan `500 error`.
-- Jalankan `php artisan app:deploy-check` untuk cek sekali jalan:
+- Untuk lokal / environment development yang masih punya `dev dependencies`, jalankan:
+  - `php artisan test tests/Feature/PageLoadSmokeTest.php --stop-on-failure`
+  - `php artisan test tests/Feature/ActionSmokeTest.php --stop-on-failure`
+- Untuk server production, jalankan:
+  - `php artisan app:deploy-check --skip-ops`
+  - kalau `artisan test` tidak tersedia di server, command ini akan fallback ke `app:http-smoke-test`
+- Jalankan `php artisan app:deploy-check` kalau ingin cek sekali jalan yang lebih lengkap:
   - ops smoke test
   - menu/sub-menu
   - halaman detail dokumen
