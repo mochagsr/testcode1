@@ -157,6 +157,15 @@ Setelah berhasil login:
 
 ### 0.7. Setup DNS di Cloudflare
 
+Catatan penting:
+- domain kamu bisa saja dibeli di `DomaiNesia`, tetapi DNS-nya tetap dikelola di `Cloudflare`
+- yang menentukan tempat membuat record DNS bukan registrar domainnya, tetapi nameserver aktif domain itu
+- kalau nameserver domain sudah diarahkan ke `Cloudflare`, maka record `A` / `CNAME` dibuat di `Cloudflare`, bukan di panel DNS `DomaiNesia`
+
+Panduan cepat:
+- kalau nameserver masih milik `DomaiNesia`, buat record di `DomaiNesia`
+- kalau nameserver sudah milik `Cloudflare`, buat record di `Cloudflare`
+
 Kalau domain kamu dikelola di `Cloudflare`, buat record berikut:
 
 #### Env tes
@@ -176,6 +185,7 @@ Kalau domain kamu dikelola di `Cloudflare`, buat record berikut:
 Saran awal:
 - mulai dari `DNS only`
 - setelah website dan SSL normal, baru pertimbangkan `Proxied`
+- kalau kamu masih tahap setup server, `DNS only` jauh lebih mudah untuk troubleshooting
 
 Kalau nanti domain sudah aktif HTTPS di origin server:
 - set `Cloudflare SSL/TLS mode` ke:
@@ -197,7 +207,29 @@ nslookup teserpos.mitrasejatiberkah.com
 nslookup erpos.mitrasejatiberkah.com
 ```
 
-Kalau hasilnya sudah mengarah ke static IP Lightsail, lanjut ke langkah deploy aplikasi.
+Cara membaca hasilnya:
+- kalau record di `Cloudflare` masih `DNS only`, hasil `nslookup` harus mengarah ke `Static IP` Lightsail
+- kalau record di `Cloudflare` sudah `Proxied`, hasil `nslookup` akan menampilkan IP `Cloudflare`, bukan IP `Lightsail`
+
+Jadi:
+- `DNS only` -> normal kalau `nslookup` menunjukkan IP VPS
+- `Proxied` -> normal kalau `nslookup` menunjukkan IP `Cloudflare`
+
+Contoh kasus yang sering membingungkan:
+- domain dibeli di `DomaiNesia`
+- nameserver sudah dipindah ke `Cloudflare`
+- `nslookup` menampilkan IP seperti `172.67.x.x` atau `104.21.x.x`
+
+Itu berarti:
+- record domain sudah melewati `Cloudflare`
+- bukan berarti DNS salah
+- yang perlu dicek berikutnya adalah apakah record di dashboard `Cloudflare` memang menunjuk ke `Static IP` Lightsail yang benar
+
+Kalau kamu masih tahap instalasi `aaPanel`, `Let's Encrypt`, atau pengecekan sertifikat awal, lebih aman pakai:
+- `Proxy status = DNS only`
+
+Setelah website normal dan SSL aman, kamu boleh ubah ke:
+- `Proxy status = Proxied`
 
 ### 0.9. Urutan ringkas dari nol
 
