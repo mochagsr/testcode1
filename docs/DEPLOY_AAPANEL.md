@@ -360,30 +360,32 @@ Running directory website harus ke:
 - `/www/wwwroot/teserpos.mitrasejatiberkah.com/public`
 - `/www/wwwroot/erpos.mitrasejatiberkah.com/public`
 
-## 6.1. Setup subdomain: DomaiNesia + VPS aaPanel di IDCloudHost
+## 6.1. Setup subdomain: DomaiNesia + VPS aaPanel di AWS Lightsail
 
 Bagian ini penting kalau:
 - domain kamu ada di `DomaiNesia`
-- VPS Linux + `aaPanel` ada di `IDCloudHost`
+- VPS Linux + `aaPanel` ada di `AWS Lightsail`
 
 Contoh target:
 - `teserpos.mitrasejatiberkah.com` untuk env `tes`
 - `erpos.mitrasejatiberkah.com` untuk env `prod`
 
 Alurnya:
-1. ambil IP public VPS dari `IDCloudHost`
+1. ambil `Static IP` VPS dari `AWS Lightsail`
 2. arahkan subdomain ke IP VPS itu
 3. kalau DNS dikelola di `DomaiNesia`, buat record di `DomaiNesia`
 4. kalau DNS dikelola di `Cloudflare`, buat record di `Cloudflare`
 5. baru buat site di `aaPanel`
 
-### 6.1A. Ambil IP public VPS di IDCloudHost
+### 6.1A. Ambil `Static IP` VPS di AWS Lightsail
 
-Di panel `IDCloudHost`, cari detail VM/VPS kamu lalu catat:
-- `Public IPv4`
+Di panel `AWS Lightsail`:
+1. buka instance kamu
+2. buka tab `Networking`
+3. lihat `Static IP` yang sudah di-attach ke instance
 
-Contoh:
-- `103.123.45.67`
+Contoh untuk server kamu saat ini:
+- `54.251.187.162`
 
 IP ini yang nanti dipakai di record DNS domain.
 
@@ -400,19 +402,19 @@ Contoh record:
 #### Untuk env tes
 - `Type`: `A`
 - `Name / Host`: `teserpos`
-- `Value / Points to`: `103.123.45.67`
+- `Value / Points to`: `54.251.187.162`
 - `TTL`: default
 
 #### Untuk env prod
 - `Type`: `A`
 - `Name / Host`: `erpos`
-- `Value / Points to`: `103.123.45.67`
+- `Value / Points to`: `54.251.187.162`
 - `TTL`: default
 
 Kalau kamu ingin domain utama dipakai untuk prod:
 - `Type`: `A`
 - `Name / Host`: `@`
-- `Value / Points to`: `103.123.45.67`
+- `Value / Points to`: `54.251.187.162`
 
 Kalau butuh `www`:
 - `Type`: `CNAME`
@@ -436,21 +438,21 @@ Contoh record:
 #### Untuk env tes
 - `Type`: `A`
 - `Name`: `teserpos`
-- `IPv4 address`: `103.123.45.67`
+- `IPv4 address`: `54.251.187.162`
 - `Proxy status`: mulai dari `DNS only`
 - `TTL`: `Auto`
 
 #### Untuk env prod
 - `Type`: `A`
 - `Name`: `erpos`
-- `IPv4 address`: `103.123.45.67`
+- `IPv4 address`: `54.251.187.162`
 - `Proxy status`: mulai dari `DNS only`
 - `TTL`: `Auto`
 
 Kalau prod mau pakai root domain:
 - `Type`: `A`
 - `Name`: `@`
-- `IPv4 address`: `103.123.45.67`
+- `IPv4 address`: `54.251.187.162`
 - `Proxy status`: `DNS only`
 
 Saran awal:
@@ -483,7 +485,7 @@ nslookup teserpos.mitrasejatiberkah.com
 nslookup erpos.mitrasejatiberkah.com
 ```
 
-Kalau hasil IP sudah sama dengan IP VPS `IDCloudHost`, berarti DNS sudah benar.
+Kalau hasil IP sudah sama dengan `Static IP` Lightsail `54.251.187.162`, berarti DNS sudah benar.
 
 ### 6.1E. Baru lanjut buat site di aaPanel
 
