@@ -63,8 +63,8 @@ Di `Lightsail`:
 
 Catat IP public final.
 
-Contoh:
-- `18.141.23.45`
+Contoh untuk server kamu saat ini:
+- `54.251.187.162`
 
 IP ini nanti dipakai di:
 - DNS `Cloudflare`
@@ -77,12 +77,13 @@ Pastikan port ini dibuka:
 - `22` untuk SSH
 - `80` untuk HTTP
 - `443` untuk HTTPS
-- `7800` untuk panel `aaPanel`
+- `21218` untuk panel `aaPanel` di server kamu saat ini
 
 Catatan:
 - beberapa instalasi `aaPanel` bisa memakai port panel yang berbeda
 - tetap cek output installer setelah pemasangan selesai
-- kalau port panel yang keluar bukan `7800`, buka port itu juga di `Lightsail`
+- di server kamu sekarang, port panel yang aktif adalah `21218`
+- kalau nanti port panel berubah, buka port final itu di `Lightsail`
 
 Saran praktik:
 - `22` sebaiknya dibatasi ke IP admin kalau memungkinkan
@@ -94,7 +95,7 @@ Saran praktik:
 Masuk ke server:
 
 ```bash
-ssh ubuntu@YOUR_STATIC_IP
+ssh ubuntu@54.251.187.162
 sudo -i
 ```
 
@@ -126,7 +127,7 @@ Catat semuanya baik-baik.
 
 Contoh format output:
 - panel URL:
-  - `http://YOUR_STATIC_IP:7800/xxxxxx`
+  - `https://54.251.187.162:21218/xxxxxx`
 - username:
   - `admin`
 - password:
@@ -134,7 +135,8 @@ Contoh format output:
 
 Catatan penting:
 - setelah install selesai, cek lagi port panel final
-- kalau berbeda dari `7800`, buka port itu di firewall `Lightsail`
+- untuk server kamu sekarang, port panel final adalah `21218`
+- buka port itu di firewall `Lightsail`
 
 ### 0.6. Login pertama ke aaPanel
 
@@ -143,7 +145,7 @@ Buka URL dari hasil installer.
 Contoh:
 
 ```text
-http://YOUR_STATIC_IP:7800/xxxxxx
+https://54.251.187.162:21218/xxxxxx
 ```
 
 Lalu login dengan:
@@ -171,14 +173,14 @@ Kalau domain kamu dikelola di `Cloudflare`, buat record berikut:
 #### Env tes
 - `Type`: `A`
 - `Name`: `teserpos`
-- `IPv4 address`: `YOUR_STATIC_IP`
+- `IPv4 address`: `54.251.187.162`
 - `Proxy status`: `DNS only`
 - `TTL`: `Auto`
 
 #### Env prod
 - `Type`: `A`
 - `Name`: `erpos`
-- `IPv4 address`: `YOUR_STATIC_IP`
+- `IPv4 address`: `54.251.187.162`
 - `Proxy status`: `DNS only`
 - `TTL`: `Auto`
 
@@ -210,6 +212,9 @@ nslookup erpos.mitrasejatiberkah.com
 Cara membaca hasilnya:
 - kalau record di `Cloudflare` masih `DNS only`, hasil `nslookup` harus mengarah ke `Static IP` Lightsail
 - kalau record di `Cloudflare` sudah `Proxied`, hasil `nslookup` akan menampilkan IP `Cloudflare`, bukan IP `Lightsail`
+
+Contoh untuk server kamu:
+- kalau masih `DNS only`, hasil yang diharapkan mengarah ke `54.251.187.162`
 
 Jadi:
 - `DNS only` -> normal kalau `nslookup` menunjukkan IP VPS
