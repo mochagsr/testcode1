@@ -1539,7 +1539,8 @@ Artisan::command('app:deploy-check {--skip-ops} {--full-suite}', function () {
         }
     }
 
-    $hasArtisanTest = array_key_exists('test', Artisan::all());
+    $hasArtisanTest = array_key_exists('test', Artisan::all())
+        && (file_exists(base_path('vendor/bin/phpunit')) || file_exists(base_path('vendor/bin/pest')));
 
     if ($hasArtisanTest) {
         $files = [
@@ -1563,7 +1564,18 @@ Artisan::command('app:deploy-check {--skip-ops} {--full-suite}', function () {
             $this->output->write($buffer);
         });
 
-        if (! $process->isSuccessful()) {
+        $processOutput = $process->getOutput().$process->getErrorOutput();
+        $artisanTestMissing = str_contains($processOutput, 'Command "test" is not defined');
+
+        if ($artisanTestMissing) {
+            $this->warn('Command "artisan test" tidak tersedia di server ini. Fallback ke app:http-smoke-test.');
+            $httpSmokeExitCode = Artisan::call('app:http-smoke-test');
+            $this->output->write(Artisan::output());
+            if ($httpSmokeExitCode !== 0) {
+                $failed = true;
+                $this->error('HTTP smoke test gagal.');
+            }
+        } elseif (! $process->isSuccessful()) {
             $failed = true;
             $this->error('Smoke test halaman/dokumen gagal.');
         }
