@@ -1805,7 +1805,7 @@ class ReceivableFlowsTest extends TestCase
         $screenResponse->assertSee(route('receivable-payments.show', $receivablePayment), false);
     }
 
-    public function test_customer_bill_print_hides_internal_admin_adjustment_prefix(): void
+    public function test_customer_bill_print_formats_admin_adjustment_details(): void
     {
         $user = User::factory()->create();
         $customer = Customer::query()->create([
@@ -1845,9 +1845,93 @@ class ReceivableFlowsTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Penyesuaian nilai faktur INV-28022026-0001');
+        $response->assertSee('Admin - Penyesuaian nilai faktur INV-28022026-0001 (+Rp 52.500)');
         $response->assertDontSee('[ADMIN EDIT FAKTUR +]');
-        $response->assertDontSee('(+Rp 52.500)');
+    }
+
+    public function test_customer_bill_keeps_same_day_adjustment_before_later_payment(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-ORDER-001',
+            'name' => 'Angga Order',
+            'city' => 'Sidoarjo',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-12042026-0001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-04-12',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'subtotal' => 100000,
+            'total' => 100000,
+            'total_paid' => 0,
+            'balance' => 100000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        $payment = ReceivablePayment::query()->create([
+            'payment_number' => 'KWT-12042026-0001',
+            'customer_id' => $customer->id,
+            'payment_date' => '2026-04-12',
+            'customer_address' => 'Jl Sidoarjo',
+            'amount' => 10000,
+            'amount_in_words' => 'sepuluh ribu rupiah',
+            'customer_signature' => 'Angga Order',
+            'user_signature' => 'Kasir',
+            'notes' => 'Pembayaran piutang',
+            'created_by_user_id' => $user->id,
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-12',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-12042026-0001',
+            'debit' => 100000,
+            'credit' => 0,
+            'balance_after' => 100000,
+            'period_code' => 'S2-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-12',
+            'transaction_type' => 'product',
+            'description' => '[ADMIN EDIT FAKTUR +] Penyesuaian nilai faktur INV-12042026-0001',
+            'debit' => 50000,
+            'credit' => 0,
+            'balance_after' => 150000,
+            'period_code' => 'S2-2526',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-12',
+            'transaction_type' => 'product',
+            'description' => 'Pembayaran KWT-12042026-0001',
+            'debit' => 0,
+            'credit' => 10000,
+            'balance_after' => 140000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertIsString($content);
+        $this->assertNotFalse(strpos($content, 'Admin - Penyesuaian nilai faktur INV-12042026-0001 (+Rp 50.000)'));
+        $this->assertNotFalse(strpos($content, 'KWT-12042026-0001'));
+        $this->assertLessThan(
+            strpos($content, 'KWT-12042026-0001'),
+            strpos($content, 'Admin - Penyesuaian nilai faktur INV-12042026-0001 (+Rp 50.000)')
+        );
     }
 
     public function test_receivable_semester_page_hides_closed_semester_from_dropdown(): void

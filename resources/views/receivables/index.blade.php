@@ -867,6 +867,8 @@
                                         </tr>
                                     @else
                                         @php
+                                            $entryType = (string) ($billRow['entry_type'] ?? '');
+                                            $isAdjustment = $entryType === 'adjustment';
                                             $proofBadge = !empty($billRow['receivable_payment_id'])
                                                 ? 'KWT'
                                                 : (!empty($billRow['sales_return_id']) ? 'RTR' : (!empty($billRow['invoice_id']) ? 'INV' : 'DOC'));
@@ -879,23 +881,25 @@
                                         <tr>
                                             <td>{{ $billRow['date_label'] ?? '' }}</td>
                                             <td>
-                                                <span style="{{ $proofBadgeStyle }}">{{ $proofBadge }}</span>
-                                                @if(!empty($billRow['receivable_payment_id']))
+                                                @unless($isAdjustment)
+                                                    <span style="{{ $proofBadgeStyle }}">{{ $proofBadge }}</span>
+                                                @endunless
+                                                @if(!$isAdjustment && !empty($billRow['receivable_payment_id']))
                                                     <a href="{{ route('receivable-payments.show', (int) $billRow['receivable_payment_id']) }}" target="_blank" rel="noopener noreferrer">
                                                         {{ $billRow['proof_number'] ?? '' }}
                                                     </a>
-                                                @elseif(!empty($billRow['sales_return_id']))
+                                                @elseif(!$isAdjustment && !empty($billRow['sales_return_id']))
                                                     <a href="{{ route('sales-returns.show', (int) $billRow['sales_return_id']) }}" target="_blank" rel="noopener noreferrer">
                                                         {{ $billRow['proof_number'] ?? '' }}
                                                     </a>
-                                                @elseif(!empty($billRow['invoice_id']))
+                                                @elseif(!$isAdjustment && !empty($billRow['invoice_id']))
                                                     <a href="{{ route('sales-invoices.show', (int) $billRow['invoice_id']) }}" target="_blank" rel="noopener noreferrer">
                                                         {{ $billRow['proof_number'] ?? '' }}
                                                     </a>
                                                 @else
                                                     {{ $billRow['proof_number'] ?? '' }}
                                                 @endif
-                                                @if((int) ($billRow['adjustment_amount'] ?? 0) !== 0)
+                                                @if(!$isAdjustment && (int) ($billRow['adjustment_amount'] ?? 0) !== 0)
                                                     <span class="muted" style="display:block; font-size:11px;">
                                                         ({{ (int) ($billRow['adjustment_amount'] ?? 0) > 0 ? '+' : '-' }}Rp {{ number_format(abs((int) ($billRow['adjustment_amount'] ?? 0)), 0, ',', '.') }})
                                                     </span>

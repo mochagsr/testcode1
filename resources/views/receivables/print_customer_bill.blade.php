@@ -146,10 +146,6 @@
                     $isOpening = ($row['date_label'] ?? '') === __('receivable.bill_opening_balance');
                     $entryType = (string) ($row['entry_type'] ?? '');
                     $proofNumber = (string) ($row['proof_number'] ?? '');
-                    if ($entryType === 'adjustment') {
-                        $proofNumber = preg_replace('/^\[ADMIN EDIT FAKTUR [+-]\]\s*/i', '', $proofNumber) ?? $proofNumber;
-                        $proofNumber = trim($proofNumber);
-                    }
                 @endphp
                 @if($isOpening)
                     <tr>

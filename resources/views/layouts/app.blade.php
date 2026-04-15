@@ -492,6 +492,14 @@
         form > .btn.secondary {
             margin-right: 6px;
         }
+        .form-submit-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 6;
+        }
         button,
         .btn,
         input[type="submit"],
@@ -619,6 +627,8 @@
             border-radius: 10px;
             scrollbar-gutter: stable;
             background: var(--table-bg);
+            position: relative;
+            z-index: 0;
         }
         .table-mobile-scroll > table {
             min-width: 720px;
@@ -864,6 +874,7 @@
                 inset: 0;
                 background: rgba(15, 23, 42, 0.48);
                 opacity: 0;
+                visibility: hidden;
                 pointer-events: none;
                 transition: opacity 0.2s ease;
                 z-index: 34;
@@ -886,6 +897,7 @@
             }
             body.mobile-sidebar-open .sidebar-backdrop {
                 opacity: 1;
+                visibility: visible;
                 pointer-events: auto;
             }
             .sidebar-header-mobile {
@@ -1450,6 +1462,17 @@
                 closeMobileSidebar();
             }
         });
+
+        document.addEventListener('wheel', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLInputElement)) {
+                return;
+            }
+            if (target.type !== 'number' || document.activeElement !== target) {
+                return;
+            }
+            event.preventDefault();
+        }, { passive: false, capture: true });
 
         closeMobileSidebar();
         window.addEventListener('pageshow', closeMobileSidebar);

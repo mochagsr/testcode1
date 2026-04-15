@@ -1753,7 +1753,9 @@ class ReceivablePageController extends Controller
                 ]);
 
         $groupedRows = [];
+        $sortPosition = 0;
         foreach ($ledgerRows as $ledgerRow) {
+            $sortPosition++;
             $debit = (int) round((float) $ledgerRow->debit);
             $credit = (int) round((float) $ledgerRow->credit);
             $transactionType = $ledgerRow->transaction_type !== null && trim((string) $ledgerRow->transaction_type) !== ''
@@ -1844,6 +1846,7 @@ class ReceivablePageController extends Controller
                 $groupedRows[$groupKey] = [
                     'date_value' => $dateValue,
                     'date_ts' => $this->toTimestamp($dateValue),
+                    'sort_index' => $sortPosition,
                     'invoice_id' => $invoiceId,
                     'receivable_payment_id' => $paymentId > 0 ? $paymentId : null,
                     'sales_return_id' => $salesReturnId > 0 ? $salesReturnId : null,
@@ -1871,7 +1874,7 @@ class ReceivablePageController extends Controller
             $left = (int) ($a['date_ts'] ?? 0);
             $right = (int) ($b['date_ts'] ?? 0);
             if ($left === $right) {
-                return strcmp((string) ($a['proof_number'] ?? ''), (string) ($b['proof_number'] ?? ''));
+                return ((int) ($a['sort_index'] ?? 0)) <=> ((int) ($b['sort_index'] ?? 0));
             }
 
             return $left <=> $right;
@@ -1890,7 +1893,11 @@ class ReceivablePageController extends Controller
                 'invoice_id' => $groupedRow['invoice_id'],
                 'receivable_payment_id' => $groupedRow['receivable_payment_id'] ?? null,
                 'sales_return_id' => $groupedRow['sales_return_id'] ?? null,
-                'proof_number' => $groupedRow['proof_number'],
+                'proof_number' => $this->formatCustomerBillProofNumber(
+                    (string) ($groupedRow['proof_number'] ?? '-'),
+                    (string) ($groupedRow['entry_type'] ?? 'payment'),
+                    (int) ($groupedRow['adjustment_amount'] ?? 0)
+                ),
                 'entry_type' => (string) ($groupedRow['entry_type'] ?? 'payment'),
                 'transaction_type' => $groupedRow['transaction_type'] ?? null,
                 'transaction_type_label' => $this->customerBillEntryTransactionTypeLabel(
@@ -1921,6 +1928,52 @@ class ReceivablePageController extends Controller
             'rows' => $statementRows,
             'totals' => $totals,
         ];
+    }
+
+    private function formatCustomerBillProofNumber(string $proofNumber, string $entryType, int $adjustmentAmount): string
+    {
+        $proofNumber = trim($proofNumber);
+        if ($entryType !== 'adjustment') {
+            return $proofNumber !== '' ? $proofNumber : '-';
+        }
+
+        $formatted = $this->formatCustomerBillAdjustmentDescription($proofNumber);
+        $sign = $adjustmentAmount > 0 ? '+' : ($adjustmentAmount < 0 ? '-' : '');
+        if ($sign !== '') {
+            $formatted .= ' ('.$sign.'Rp '.number_format(abs($adjustmentAmount), 0, ',', '.').')';
+        }
+
+        return $formatted;
+    }
+
+    private function formatCustomerBillAdjustmentDescription(string $description): string
+    {
+        $raw = trim($description);
+        if ($raw === '') {
+            return __('receivable.bill_proof_number');
+        }
+
+        if (preg_match('/^\[(.+?)\s+EDIT\s+FAKTUR\s+[+-]\]\s*(.+)$/i', $raw, $matches) === 1) {
+            $actor = $this->formatCustomerBillAdjustmentActor((string) ($matches[1] ?? ''));
+            $tail = trim((string) ($matches[2] ?? ''));
+
+            return $actor !== '' ? $actor.' - '.$tail : $tail;
+        }
+
+        return preg_replace('/^\[ADMIN EDIT FAKTUR [+-]\]\s*/i', '', $raw) ?? $raw;
+    }
+
+    private function formatCustomerBillAdjustmentActor(string $actor): string
+    {
+        $normalized = trim(preg_replace('/\s+/', ' ', $actor) ?? '');
+        if ($normalized === '') {
+            return '';
+        }
+
+        return collect(explode(' ', strtolower($normalized)))
+            ->filter()
+            ->map(fn (string $part): string => mb_convert_case($part, MB_CASE_TITLE, 'UTF-8'))
+            ->implode(' ');
     }
 
     private function transactionTypeLabel(?string $transactionType): string

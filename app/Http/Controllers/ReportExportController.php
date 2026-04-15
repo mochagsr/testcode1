@@ -1441,7 +1441,9 @@ class ReportExportController extends Controller
         ];
 
         $groupedRows = [];
+        $sortPosition = 0;
         foreach ($ledgerRows as $ledgerRow) {
+            $sortPosition++;
             $debit = (int) round((float) $ledgerRow->debit);
             $credit = (int) round((float) $ledgerRow->credit);
             $description = strtolower((string) ($ledgerRow->description ?? ''));
@@ -1491,6 +1493,7 @@ class ReportExportController extends Controller
                 $groupedRows[$groupKey] = [
                     'date_value' => $dateValue,
                     'date_ts' => $this->toReportTimestamp($dateValue),
+                    'sort_index' => $sortPosition,
                     'proof_number' => $proofNumber,
                     'entry_type' => $entryType,
                     'adjustment_amount' => 0,
@@ -1513,7 +1516,7 @@ class ReportExportController extends Controller
             $leftTs = (int) ($left['date_ts'] ?? 0);
             $rightTs = (int) ($right['date_ts'] ?? 0);
             if ($leftTs === $rightTs) {
-                return strcmp((string) ($left['proof_number'] ?? ''), (string) ($right['proof_number'] ?? ''));
+                return ((int) ($left['sort_index'] ?? 0)) <=> ((int) ($right['sort_index'] ?? 0));
             }
 
             return $leftTs <=> $rightTs;
@@ -1529,7 +1532,11 @@ class ReportExportController extends Controller
 
             $statementRows[] = [
                 'date_label' => $this->formatReportDate($groupedRow['date_value']),
-                'proof_number' => (string) ($groupedRow['proof_number'] ?? '-'),
+                'proof_number' => $this->formatCustomerBillProofNumber(
+                    (string) ($groupedRow['proof_number'] ?? '-'),
+                    (string) ($groupedRow['entry_type'] ?? 'payment'),
+                    (int) ($groupedRow['adjustment_amount'] ?? 0)
+                ),
                 'credit_sales' => (int) $groupedRow['credit_sales'],
                 'installment_payment' => (int) $groupedRow['installment_payment'],
                 'sales_return' => (int) $groupedRow['sales_return'],
@@ -1561,6 +1568,52 @@ class ReportExportController extends Controller
                 ? __('receivable.customer_balance_note')
                 : trim((string) ($settings['company_invoice_notes'] ?? '')),
         ];
+    }
+
+    private function formatCustomerBillProofNumber(string $proofNumber, string $entryType, int $adjustmentAmount): string
+    {
+        $proofNumber = trim($proofNumber);
+        if ($entryType !== 'adjustment') {
+            return $proofNumber !== '' ? $proofNumber : '-';
+        }
+
+        $formatted = $this->formatCustomerBillAdjustmentDescription($proofNumber);
+        $sign = $adjustmentAmount > 0 ? '+' : ($adjustmentAmount < 0 ? '-' : '');
+        if ($sign !== '') {
+            $formatted .= ' ('.$sign.'Rp '.number_format(abs($adjustmentAmount), 0, ',', '.').')';
+        }
+
+        return $formatted;
+    }
+
+    private function formatCustomerBillAdjustmentDescription(string $description): string
+    {
+        $raw = trim($description);
+        if ($raw === '') {
+            return '-';
+        }
+
+        if (preg_match('/^\[(.+?)\s+EDIT\s+FAKTUR\s+[+-]\]\s*(.+)$/i', $raw, $matches) === 1) {
+            $actor = $this->formatCustomerBillAdjustmentActor((string) ($matches[1] ?? ''));
+            $tail = trim((string) ($matches[2] ?? ''));
+
+            return $actor !== '' ? $actor.' - '.$tail : $tail;
+        }
+
+        return preg_replace('/^\[ADMIN EDIT FAKTUR [+-]\]\s*/i', '', $raw) ?? $raw;
+    }
+
+    private function formatCustomerBillAdjustmentActor(string $actor): string
+    {
+        $normalized = trim(preg_replace('/\s+/', ' ', $actor) ?? '');
+        if ($normalized === '') {
+            return '';
+        }
+
+        return collect(explode(' ', strtolower($normalized)))
+            ->filter()
+            ->map(fn (string $part): string => mb_convert_case($part, MB_CASE_TITLE, 'UTF-8'))
+            ->implode(' ');
     }
 
     private function receivablePeriodLabel(?string $selectedSemester): string

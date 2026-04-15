@@ -150,8 +150,10 @@
             </div>
         </div>
 
-        <button class="btn" type="submit">{{ __('txn.save_invoice') }}</button>
-        <a class="btn secondary" href="{{ route('sales-invoices.index') }}">{{ __('txn.cancel') }}</a>
+        <div class="form-submit-actions">
+            <button class="btn" type="submit">{{ __('txn.save_invoice') }}</button>
+            <a class="btn secondary" href="{{ route('sales-invoices.index') }}">{{ __('txn.cancel') }}</a>
+        </div>
     </form>
 
     <script>
