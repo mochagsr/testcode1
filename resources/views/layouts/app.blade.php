@@ -641,6 +641,14 @@
             background: color-mix(in srgb, var(--border) 70%, var(--text) 30%);
             border-radius: 999px;
         }
+        .main {
+            position: relative;
+            isolation: isolate;
+        }
+        .main > :not(script):not(style) {
+            position: relative;
+            z-index: 0;
+        }
         .page-header-actions {
             display: flex;
             align-items: flex-start;
@@ -649,7 +657,8 @@
             flex-wrap: wrap;
             margin-bottom: 12px;
             position: relative;
-            z-index: 4;
+            z-index: 24;
+            isolation: isolate;
         }
         .page-header-actions .page-title {
             margin: 0;
@@ -661,7 +670,13 @@
             flex-wrap: wrap;
             justify-content: flex-end;
             position: relative;
-            z-index: 5;
+            z-index: 25;
+        }
+        .page-header-actions .actions > *,
+        .page-header-actions .actions form,
+        .page-header-actions .actions form > * {
+            position: relative;
+            z-index: 26;
         }
         .page-header-actions .actions .btn:not(.secondary),
         .page-header-actions .actions button:not(.secondary),
@@ -1321,6 +1336,41 @@
 </div>
 <script>
     (function () {
+        function normalizeLegacyPageHeaders() {
+            const pageMain = document.querySelector('.main');
+            if (!pageMain) {
+                return;
+            }
+
+            pageMain.querySelectorAll(':scope > .flex').forEach((container) => {
+                if (!(container instanceof HTMLDivElement) || container.classList.contains('page-header-actions')) {
+                    return;
+                }
+
+                const title = container.querySelector(':scope > .page-title');
+                if (!(title instanceof HTMLElement)) {
+                    return;
+                }
+
+                const directChildren = Array.from(container.children);
+                const actionNodes = directChildren.filter((child) => child !== title);
+                if (actionNodes.length === 0) {
+                    return;
+                }
+
+                const actionsWrapper = document.createElement('div');
+                actionsWrapper.className = 'actions';
+                actionNodes.forEach((node) => actionsWrapper.appendChild(node));
+
+                container.classList.add('page-header-actions');
+                container.style.justifyContent = '';
+                container.style.marginBottom = '';
+                container.appendChild(actionsWrapper);
+            });
+        }
+
+        normalizeLegacyPageHeaders();
+
         const navGroups = Array.from(document.querySelectorAll('[data-nav-group]'));
         const navStorageKey = 'pgpos-open-nav-group';
 
@@ -1463,16 +1513,35 @@
             }
         });
 
-        document.addEventListener('wheel', (event) => {
+        document.addEventListener('focusin', (event) => {
             const target = event.target;
-            if (!(target instanceof HTMLInputElement)) {
+            if (!(target instanceof HTMLInputElement) || target.type !== 'number' || target.dataset.wheelGuard === 'on') {
                 return;
             }
-            if (target.type !== 'number' || document.activeElement !== target) {
+
+            const handleWheel = (wheelEvent) => {
+                wheelEvent.preventDefault();
+                target.blur();
+            };
+
+            target.addEventListener('wheel', handleWheel, { passive: false });
+            target.dataset.wheelGuard = 'on';
+            target._wheelGuardHandler = handleWheel;
+        });
+
+        document.addEventListener('focusout', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLInputElement) || target.type !== 'number') {
                 return;
             }
-            event.preventDefault();
-        }, { passive: false, capture: true });
+
+            if (typeof target._wheelGuardHandler === 'function') {
+                target.removeEventListener('wheel', target._wheelGuardHandler);
+                delete target._wheelGuardHandler;
+            }
+
+            delete target.dataset.wheelGuard;
+        });
 
         closeMobileSidebar();
         window.addEventListener('pageshow', closeMobileSidebar);
