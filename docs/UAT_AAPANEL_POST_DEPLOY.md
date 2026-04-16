@@ -1,6 +1,6 @@
-# UAT aaPanel v8.0.1 Post-Deploy
+# UAT aaPanel v8.0.1 Post-Deploy untuk TESERPOS
 
-Gunakan checklist ini setiap selesai deploy ke environment `tes` sebelum update diteruskan ke `prod`.
+Gunakan checklist ini setiap selesai deploy ke environment `teserpos` sebelum update diteruskan ke `erpos` production.
 
 Menu aaPanel yang paling sering dipakai saat UAT:
 - `Website`

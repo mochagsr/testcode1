@@ -137,6 +137,7 @@ Catatan:
 - `docs/BACKUP_OPS_HEALTH_README.md`
 - `docs/RECOVERY_SOP.md`
 - `docs/DEPLOY_AAPANEL.md`
+- `docs/DEPLOY_AAPANEL_PROD_AWS_MANAGED_DB.md`
 - `docs/DEPLOY_AWS_LIGHTSAIL_CLOUDPANEL.md`
 - `docs/UAT_AAPANEL_POST_DEPLOY.md`
 - `docs/GO_LIVE_RUNBOOK.md`
@@ -159,16 +160,23 @@ Catatan:
   - `Kolom wajib pada file import belum lengkap: Kategori, Harga Umum. Gunakan template import terbaru.`
 
 ## Deploy yang direkomendasikan
-- Untuk panel `aaPanel v8.0.1`, gunakan dokumen ini:
+- Untuk `teserpos` di `aaPanel v8.0.1`, gunakan dokumen ini:
   - `docs/DEPLOY_AAPANEL.md`
   - `docs/UAT_AAPANEL_POST_DEPLOY.md`
+  - `docs/BACKUP_OPS_HEALTH_README.md`
+  - `docs/GO_LIVE_RUNBOOK.md`
+- Untuk `erpos` production di `aaPanel v8.0.1` dengan `AWS Lightsail Managed Database`, gunakan dokumen ini:
+  - `docs/DEPLOY_AAPANEL_PROD_AWS_MANAGED_DB.md`
   - `docs/BACKUP_OPS_HEALTH_README.md`
   - `docs/GO_LIVE_RUNBOOK.md`
 - Untuk `AWS Lightsail + CloudPanel + Cloudflare`, gunakan dokumen ini:
   - `docs/DEPLOY_AWS_LIGHTSAIL_CLOUDPANEL.md`
 
 Catatan aaPanel:
-- dokumentasi deploy sekarang mencakup 2 metode:
+- dokumentasi deploy sekarang dipisah jadi 2 jalur:
+  - `teserpos` di aaPanel dengan DB lokal server
+  - `erpos` production di aaPanel dengan managed DB terpisah
+- dokumentasi deploy `teserpos` mencakup 2 metode:
   - `Terminal + git clone`
   - `Website -> Add site -> Create for Git`
   - dan section khusus `Update program / upgrade aplikasi`
@@ -177,7 +185,7 @@ Catatan aaPanel:
   - bukan `main`
 - dokumentasi juga sudah mencakup setup subdomain untuk skenario:
   - domain di `DomaiNesia`
-  - VPS `aaPanel` di `IDCloudHost`
+  - VPS `aaPanel` di `AWS Lightsail`
   - DNS dikelola langsung di `DomaiNesia` atau lewat `Cloudflare`
 - file env contoh untuk aaPanel:
   - `.env.aapanel.test.example`
