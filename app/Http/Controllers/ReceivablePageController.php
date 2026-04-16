@@ -1584,10 +1584,6 @@ class ReceivablePageController extends Controller
             ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType))
             : '';
 
-        if ($selectedSemester !== null) {
-            return sprintf('Rekap Piutang %s%s', strtoupper($selectedSemester), $typeSuffix);
-        }
-
         return sprintf('Rekap Piutang%s', $typeSuffix);
     }
 

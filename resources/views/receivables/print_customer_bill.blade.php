@@ -8,7 +8,7 @@
         @page { margin: 8mm 8mm 10mm 8mm; }
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
-        .head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .head { display: grid; grid-template-columns: minmax(0, 47%) minmax(210px, 25%) minmax(0, 28%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
         .company-left { display: flex; gap: 6px; min-width: 0; }
         .logo { width: 40px; height: 60px; object-fit: contain; border: none; padding: 0; background: transparent; }
         .logo-fallback {
@@ -26,8 +26,9 @@
         }
         .company-name { font-size: 15px; font-weight: 800; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
         .company-meta { margin-top: 2px; white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
-        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: start; margin-left: -46px; }
+        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; margin-left: -32px; max-width: 250px; }
         .doc-title { font-size: 20px; font-weight: 800; text-transform: uppercase; line-height: 1.1; }
+        .doc-subtitle { margin-top: 2px; line-height: 1.2; }
         .doc-number { margin-top: 2px; }
         .doc-right { font-size: 12px; line-height: 1.3; min-width: 180px; max-width: 270px; justify-self: end; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
@@ -104,9 +105,9 @@
         <div class="doc-center">
             <div class="doc-title">{{ $reportTitle ?? __('receivable.customer_bill_title') }}</div>
             @if($selectedSemester)
-                <div class="doc-number">Semester: {{ $selectedSemester }}</div>
+                <div class="doc-subtitle">{{ $selectedSemester }}</div>
             @elseif(!empty($selectedTransactionType))
-                <div class="doc-number">{{ strtoupper($selectedTransactionType) }}</div>
+                <div class="doc-subtitle">{{ strtoupper($selectedTransactionType) }}</div>
             @endif
             <div class="doc-number">{{ __('txn.no') }}: {{ $customer->code ?: $customer->id }}</div>
         </div>
