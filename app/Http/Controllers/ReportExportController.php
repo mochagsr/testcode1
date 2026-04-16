@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryTrip;
@@ -29,6 +30,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -1441,6 +1443,7 @@ class ReportExportController extends Controller
         ];
 
         $groupedRows = [];
+        $adjustmentActorsByInvoiceId = $this->customerBillAdjustmentActorsByInvoiceId($ledgerRows);
         $sortPosition = 0;
         foreach ($ledgerRows as $ledgerRow) {
             $sortPosition++;
@@ -1494,6 +1497,7 @@ class ReportExportController extends Controller
                     'date_value' => $dateValue,
                     'date_ts' => $this->toReportTimestamp($dateValue),
                     'sort_index' => $sortPosition,
+                    'invoice_id' => $invoiceId,
                     'proof_number' => $proofNumber,
                     'entry_type' => $entryType,
                     'adjustment_amount' => 0,
@@ -1535,7 +1539,9 @@ class ReportExportController extends Controller
                 'proof_number' => $this->formatCustomerBillProofNumber(
                     (string) ($groupedRow['proof_number'] ?? '-'),
                     (string) ($groupedRow['entry_type'] ?? 'payment'),
-                    (int) ($groupedRow['adjustment_amount'] ?? 0)
+                    (int) ($groupedRow['adjustment_amount'] ?? 0),
+                    isset($groupedRow['invoice_id']) ? (int) $groupedRow['invoice_id'] : null,
+                    $adjustmentActorsByInvoiceId
                 ),
                 'credit_sales' => (int) $groupedRow['credit_sales'],
                 'installment_payment' => (int) $groupedRow['installment_payment'],
@@ -1570,14 +1576,23 @@ class ReportExportController extends Controller
         ];
     }
 
-    private function formatCustomerBillProofNumber(string $proofNumber, string $entryType, int $adjustmentAmount): string
+    private function formatCustomerBillProofNumber(
+        string $proofNumber,
+        string $entryType,
+        int $adjustmentAmount,
+        ?int $invoiceId = null,
+        array $adjustmentActorsByInvoiceId = []
+    ): string
     {
         $proofNumber = trim($proofNumber);
         if ($entryType !== 'adjustment') {
             return $proofNumber !== '' ? $proofNumber : '-';
         }
 
-        $formatted = $this->formatCustomerBillAdjustmentDescription($proofNumber);
+        $formatted = $this->formatCustomerBillAdjustmentDescription(
+            $proofNumber,
+            $invoiceId !== null ? ($adjustmentActorsByInvoiceId[$invoiceId] ?? null) : null
+        );
         $sign = $adjustmentAmount > 0 ? '+' : ($adjustmentAmount < 0 ? '-' : '');
         if ($sign !== '') {
             $formatted .= ' ('.$sign.'Rp '.number_format(abs($adjustmentAmount), 0, ',', '.').')';
@@ -1586,7 +1601,7 @@ class ReportExportController extends Controller
         return $formatted;
     }
 
-    private function formatCustomerBillAdjustmentDescription(string $description): string
+    private function formatCustomerBillAdjustmentDescription(string $description, ?string $fallbackActor = null): string
     {
         $raw = trim($description);
         if ($raw === '') {
@@ -1594,7 +1609,7 @@ class ReportExportController extends Controller
         }
 
         if (preg_match('/^\[(.+?)\s+EDIT\s+FAKTUR\s+[+-]\]\s*(.+)$/i', $raw, $matches) === 1) {
-            $actor = $this->formatCustomerBillAdjustmentActor((string) ($matches[1] ?? ''));
+            $actor = $this->formatCustomerBillAdjustmentActor((string) ($matches[1] ?? ''), $fallbackActor);
             $tail = trim((string) ($matches[2] ?? ''));
 
             return $actor !== '' ? $actor.' - '.$tail : $tail;
@@ -1603,9 +1618,12 @@ class ReportExportController extends Controller
         return preg_replace('/^\[ADMIN EDIT FAKTUR [+-]\]\s*/i', '', $raw) ?? $raw;
     }
 
-    private function formatCustomerBillAdjustmentActor(string $actor): string
+    private function formatCustomerBillAdjustmentActor(string $actor, ?string $fallbackActor = null): string
     {
         $normalized = trim(preg_replace('/\s+/', ' ', $actor) ?? '');
+        if ($normalized !== '' && strcasecmp($normalized, 'admin') === 0 && $fallbackActor !== null && trim($fallbackActor) !== '') {
+            $normalized = trim($fallbackActor);
+        }
         if ($normalized === '') {
             return '';
         }
@@ -1614,6 +1632,60 @@ class ReportExportController extends Controller
             ->filter()
             ->map(fn (string $part): string => mb_convert_case($part, MB_CASE_TITLE, 'UTF-8'))
             ->implode(' ');
+    }
+
+    /**
+     * @param  Collection<int, ReceivableLedger>  $ledgerRows
+     * @return array<int, string>
+     */
+    private function customerBillAdjustmentActorsByInvoiceId(Collection $ledgerRows): array
+    {
+        $invoiceIds = $ledgerRows
+            ->filter(function (ReceivableLedger $ledgerRow): bool {
+                $description = mb_strtolower(trim((string) ($ledgerRow->description ?? '')), 'UTF-8');
+
+                return (int) ($ledgerRow->sales_invoice_id ?? 0) > 0
+                    && (str_contains($description, 'admin edit faktur')
+                        || str_contains($description, 'admin invoice edit')
+                        || str_contains($description, 'penyesuaian nilai faktur')
+                        || str_contains($description, 'invoice adjustment'));
+            })
+            ->pluck('sales_invoice_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($invoiceIds->isEmpty()) {
+            return [];
+        }
+
+        return AuditLog::query()
+            ->with('user:id,name,username,role')
+            ->where('subject_type', SalesInvoice::class)
+            ->whereIn('subject_id', $invoiceIds->all())
+            ->where('action', 'sales.invoice.admin_update')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy(fn (AuditLog $log): int => (int) ($log->subject_id ?? 0))
+            ->map(function (Collection $logs): string {
+                $auditLog = $logs->first();
+                if (! $auditLog instanceof AuditLog) {
+                    return '';
+                }
+
+                $label = trim((string) ($auditLog->user?->name ?? ''));
+                if ($label === '') {
+                    $label = trim((string) ($auditLog->user?->username ?? ''));
+                }
+                if ($label === '') {
+                    $label = trim((string) ($auditLog->user?->role ?? ''));
+                }
+
+                return $label;
+            })
+            ->filter(fn (string $label): bool => $label !== '')
+            ->all();
     }
 
     private function receivablePeriodLabel(?string $selectedSemester): string

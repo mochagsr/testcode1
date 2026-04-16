@@ -154,6 +154,7 @@ return [
     'admin_invoice_cancel_ledger_note' => '[ADMIN INVOICE CANCEL] Invoice cancellation :invoice',
     'admin_invoice_edit_ledger_increase' => '[ADMIN INVOICE EDIT +] Invoice amount adjustment :invoice',
     'admin_invoice_edit_ledger_decrease' => '[ADMIN INVOICE EDIT -] Invoice amount adjustment :invoice',
+    'invoice_amount_adjustment' => 'Invoice amount adjustment :invoice',
     'cancel_return_ledger_note' => 'Return cancellation :number',
     'cancel_return_insufficient_stock' => 'Stock for :product is insufficient to cancel this return.',
     'cancel_receivable_payment_invoice_ledger_note' => 'Receivable payment cancellation :payment for :invoice',

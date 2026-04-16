@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerPrintingSubtype;
 use App\Models\DeliveryNote;
@@ -889,6 +890,77 @@ class ReceivableFlowsTest extends TestCase
             ->where('customer_id', $customer->id)
             ->sum(\Illuminate\Support\Facades\DB::raw('debit - credit')));
         $this->assertSame(100000, $ledgerOutstanding);
+    }
+
+    public function test_admin_update_sales_invoice_stores_actual_actor_in_adjustment_ledger(): void
+    {
+        $editor = User::factory()->create([
+            'role' => 'admin',
+            'name' => 'User Operasional',
+            'username' => 'user.ops',
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-INV-ACTOR-001',
+            'name' => 'Customer Actor',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-INV-ACTOR-001',
+            'name' => 'Kategori Actor',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-INV-ACTOR-001',
+            'name' => 'Produk Actor',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 100000,
+            'is_active' => true,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-ACTOR-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 100000,
+            'total' => 100000,
+            'total_paid' => 0,
+            'balance' => 100000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        SalesInvoiceItem::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'quantity' => 1,
+            'unit_price' => 100000,
+            'discount' => 0,
+            'line_total' => 100000,
+        ]);
+
+        $this->actingAs($editor)->put(route('sales-invoices.admin-update', $invoice), [
+            'invoice_date' => '2026-02-28',
+            'due_date' => null,
+            'semester_period' => 'S2-2526',
+            'payment_method' => 'kredit',
+            'notes' => 'ubah nilai faktur',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 2,
+                    'unit_price' => 100000,
+                    'discount' => 0,
+                ],
+            ],
+        ])->assertRedirect(route('sales-invoices.show', $invoice));
+
+        $this->assertDatabaseHas('receivable_ledgers', [
+            'sales_invoice_id' => $invoice->id,
+            'description' => '[User Operasional EDIT FAKTUR +] '.__('txn.invoice_amount_adjustment', ['invoice' => 'INV-ACTOR-001']),
+        ]);
     }
 
     public function test_admin_can_edit_sales_return_items_and_stock_is_rebalanced(): void
@@ -1847,6 +1919,63 @@ class ReceivableFlowsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Admin - Penyesuaian nilai faktur INV-28022026-0001 (+Rp 52.500)');
         $response->assertDontSee('[ADMIN EDIT FAKTUR +]');
+    }
+
+    public function test_customer_bill_print_uses_audit_log_actor_for_legacy_admin_adjustment_rows(): void
+    {
+        $user = User::factory()->create();
+        $editor = User::factory()->create([
+            'role' => 'user',
+            'name' => 'User Gudang',
+            'username' => 'user.gudang',
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-ADJ-LEGACY-001',
+            'name' => 'Angga Legacy Adjustment',
+            'city' => 'Sidoarjo',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-LEGACY-ACTOR-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-02-28',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'subtotal' => 50000,
+            'total' => 50000,
+            'total_paid' => 0,
+            'balance' => 50000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-02-28',
+            'transaction_type' => 'product',
+            'description' => '[ADMIN EDIT FAKTUR +] Penyesuaian nilai faktur INV-LEGACY-ACTOR-001',
+            'debit' => 50000,
+            'credit' => 0,
+            'balance_after' => 50000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        AuditLog::query()->create([
+            'user_id' => $editor->id,
+            'action' => 'sales.invoice.admin_update',
+            'subject_type' => SalesInvoice::class,
+            'subject_id' => $invoice->id,
+            'description' => 'Legacy actor mapping',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('User Gudang - Penyesuaian nilai faktur INV-LEGACY-ACTOR-001 (+Rp 50.000)');
+        $response->assertDontSee('Admin - Penyesuaian nilai faktur INV-LEGACY-ACTOR-001');
     }
 
     public function test_customer_bill_keeps_same_day_adjustment_before_later_payment(): void

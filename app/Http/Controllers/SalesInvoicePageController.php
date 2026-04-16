@@ -946,7 +946,7 @@ class SalesInvoicePageController extends Controller
                     entryDate: Carbon::parse((string) $data['invoice_date']),
                     amount: $balanceDifference,
                     periodCode: $invoice->semester_period,
-                    description: __('txn.admin_invoice_edit_ledger_increase', ['invoice' => $invoice->invoice_number]),
+                    description: $this->adminInvoiceAdjustmentLedgerDescription('+', $invoice),
                     transactionType: (string) $invoice->transaction_type,
                     printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
                     printingSubtypeName: $invoice->printing_subtype_name,
@@ -958,7 +958,7 @@ class SalesInvoicePageController extends Controller
                     entryDate: Carbon::parse((string) $data['invoice_date']),
                     amount: abs($balanceDifference),
                     periodCode: $invoice->semester_period,
-                    description: __('txn.admin_invoice_edit_ledger_decrease', ['invoice' => $invoice->invoice_number]),
+                    description: $this->adminInvoiceAdjustmentLedgerDescription('-', $invoice),
                     transactionType: (string) $invoice->transaction_type,
                     printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
                     printingSubtypeName: $invoice->printing_subtype_name,
@@ -982,6 +982,35 @@ class SalesInvoicePageController extends Controller
         return redirect()
             ->route('sales-invoices.show', $salesInvoice)
             ->with('success', __('txn.admin_update_saved'));
+    }
+
+    private function adminInvoiceAdjustmentLedgerDescription(string $direction, SalesInvoice $invoice): string
+    {
+        $actor = $this->adminInvoiceAdjustmentActorLabel();
+
+        return sprintf(
+            '[%s EDIT FAKTUR %s] %s',
+            $actor,
+            $direction === '-' ? '-' : '+',
+            __('txn.invoice_amount_adjustment', ['invoice' => $invoice->invoice_number])
+        );
+    }
+
+    private function adminInvoiceAdjustmentActorLabel(): string
+    {
+        $user = Auth::user();
+        $label = trim((string) ($user?->name ?? ''));
+        if ($label === '') {
+            $label = trim((string) ($user?->username ?? ''));
+        }
+        if ($label === '') {
+            $label = trim((string) ($user?->role ?? ''));
+        }
+        if ($label === '') {
+            $label = 'Admin';
+        }
+
+        return preg_replace('/\s+/', ' ', $label) ?? $label;
     }
 
     public function cancel(Request $request, SalesInvoice $salesInvoice): RedirectResponse

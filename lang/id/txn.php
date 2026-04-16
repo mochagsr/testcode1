@@ -154,6 +154,7 @@ return [
     'admin_invoice_cancel_ledger_note' => '[ADMIN BATAL FAKTUR] Pembatalan faktur :invoice',
     'admin_invoice_edit_ledger_increase' => '[ADMIN EDIT FAKTUR +] Penyesuaian nilai faktur :invoice',
     'admin_invoice_edit_ledger_decrease' => '[ADMIN EDIT FAKTUR -] Penyesuaian nilai faktur :invoice',
+    'invoice_amount_adjustment' => 'Penyesuaian nilai faktur :invoice',
     'cancel_return_ledger_note' => 'Pembatalan retur :number',
     'cancel_return_insufficient_stock' => 'Stok :product tidak cukup untuk membatalkan retur.',
     'cancel_receivable_payment_invoice_ledger_note' => 'Pembatalan bayar piutang :payment untuk :invoice',
