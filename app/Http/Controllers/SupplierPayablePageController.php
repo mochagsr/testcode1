@@ -17,6 +17,7 @@ use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
 use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
+use App\Support\UploadedImageCompressor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -24,6 +25,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -105,7 +107,7 @@ class SupplierPayablePageController extends Controller
         }
 
         $paymentProofPhotoPath = $request->hasFile('payment_proof_photo')
-            ? $request->file('payment_proof_photo')->store('supplier_payment_proofs', 'public')
+            ? UploadedImageCompressor::storeJpeg($request->file('payment_proof_photo'), 'supplier_payment_proofs')
             : null;
 
         $payment = DB::transaction(function () use ($data, $request, $paymentProofPhotoPath): SupplierPayment {
@@ -386,7 +388,10 @@ class SupplierPayablePageController extends Controller
 
             $proofPhotoPath = $payment->payment_proof_photo_path;
             if ($request->hasFile('payment_proof_photo')) {
-                $proofPhotoPath = $request->file('payment_proof_photo')->store('supplier_payment_proofs', 'public');
+                if ($proofPhotoPath) {
+                    Storage::disk('public')->delete($proofPhotoPath);
+                }
+                $proofPhotoPath = UploadedImageCompressor::storeJpeg($request->file('payment_proof_photo'), 'supplier_payment_proofs');
             }
 
             $payment->update([

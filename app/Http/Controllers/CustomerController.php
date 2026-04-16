@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Support\AppCache;
+use App\Support\UploadedImageCompressor;
 use App\Support\ValidatesSearchTokens;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -74,7 +75,7 @@ class CustomerController extends Controller
         $data['code'] = $this->generateCustomerCode();
 
         if ($request->hasFile('id_card_photo')) {
-            $data['id_card_photo_path'] = $request->file('id_card_photo')->store('ktp', 'public');
+            $data['id_card_photo_path'] = UploadedImageCompressor::storeJpeg($request->file('id_card_photo'), 'ktp');
         }
 
         unset($data['id_card_photo']);
@@ -114,7 +115,7 @@ class CustomerController extends Controller
                 Storage::disk('public')->delete($customer->id_card_photo_path);
             }
 
-            $data['id_card_photo_path'] = $request->file('id_card_photo')->store('ktp', 'public');
+            $data['id_card_photo_path'] = UploadedImageCompressor::storeJpeg($request->file('id_card_photo'), 'ktp');
         }
 
         unset($data['id_card_photo'], $data['remove_id_card_photo']);

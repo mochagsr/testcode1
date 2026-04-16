@@ -21,6 +21,7 @@ use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
 use App\Support\SemesterBookService;
+use App\Support\UploadedImageCompressor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -302,7 +303,7 @@ class OutgoingTransactionPageController extends Controller
         }
 
         $supplierInvoicePhotoPath = $request->hasFile('supplier_invoice_photo')
-            ? $request->file('supplier_invoice_photo')->store('supplier_invoices', 'public')
+            ? UploadedImageCompressor::storeJpeg($request->file('supplier_invoice_photo'), 'supplier_invoices')
             : null;
 
         $transaction = DB::transaction(function () use ($data, $request, $selectedSemester, $supplierInvoicePhotoPath): OutgoingTransaction {
