@@ -471,7 +471,7 @@ Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int
     /** @var DataArchiveService $service */
     $service = app(DataArchiveService::class);
     $requestedDatasets = (array) $this->option('dataset');
-    $summary = $service->scan($year, $requestedDatasets);
+    $summary = $service->scan($year, $requestedDatasets, true);
 
     if ((bool) $this->option('json')) {
         $this->line(json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -514,6 +514,49 @@ Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int
 
     return 0;
 })->purpose('Preview kandidat arsip data berdasarkan tahun');
+
+Artisan::command('app:archive:review {--dataset=*} {--json}', function () {
+    /** @var DataArchiveService $service */
+    $service = app(DataArchiveService::class);
+    $requestedDatasets = (array) $this->option('dataset');
+    $review = $service->review($requestedDatasets);
+
+    if ((bool) $this->option('json')) {
+        $this->line(json_encode($review, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return 0;
+    }
+
+    $this->info('Review Arsip Berkala');
+    $this->line('Dibuat pada: '.Carbon::parse((string) $review['generated_at'])->format('d-m-Y H:i:s'));
+
+    if ($review['reminders'] !== []) {
+        $this->newLine();
+        foreach ($review['reminders'] as $reminder) {
+            $this->warn('- '.$reminder);
+        }
+    }
+
+    $rows = collect($review['datasets'])
+        ->map(static function (array $dataset): array {
+            return [
+                $dataset['label'],
+                $dataset['retention'],
+                $dataset['cutoff_date'],
+                number_format((int) $dataset['candidate_rows'], 0, ',', '.'),
+                $dataset['recommended_scope'] ?? '-',
+                match ((string) ($dataset['purge_mode'] ?? 'locked')) {
+                    'standard' => 'siap',
+                    'financial_guarded' => 'snapshot+rebuild',
+                    default => 'dikunci',
+                },
+            ];
+        })
+        ->all();
+
+    $this->table(['Dataset', 'Retention', 'Cutoff', 'Kandidat', 'Scope', 'Mode'], $rows);
+
+    return 0;
+})->purpose('Review bulanan kandidat arsip berdasarkan retention policy');
 
 Artisan::command('app:archive:export {year} {--dataset=*} {--path=}', function (int $year) {
     /** @var DataArchiveService $service */
@@ -1037,25 +1080,86 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
 })->purpose('Run restore validation test on latest backup');
 
 Artisan::command('app:financial-rebuild {--rebuild-journal}', function () {
+    $invoiceUpdated = 0;
+    SalesInvoice::query()
+        ->select(['id', 'total'])
+        ->orderBy('id')
+        ->chunkById(200, function ($rows) use (&$invoiceUpdated): void {
+            foreach ($rows as $row) {
+                $totalPaid = (int) round((float) DB::table('invoice_payments')
+                    ->where('sales_invoice_id', (int) $row->id)
+                    ->sum('amount'));
+                $total = (int) round((float) $row->total);
+                $balance = max(0, $total - $totalPaid);
+                $paymentStatus = $totalPaid <= 0
+                    ? 'unpaid'
+                    : ($balance <= 0 ? 'paid' : 'partial');
+
+                SalesInvoice::query()->whereKey((int) $row->id)->update([
+                    'total_paid' => $totalPaid,
+                    'balance' => $balance,
+                    'payment_status' => $paymentStatus,
+                ]);
+                $invoiceUpdated++;
+            }
+        });
+
+    $receivableLedgerUpdated = 0;
+    Customer::query()->select(['id'])->orderBy('id')->chunkById(200, function ($rows) use (&$receivableLedgerUpdated): void {
+        foreach ($rows as $row) {
+            $running = 0;
+            ReceivableLedger::query()
+                ->where('customer_id', (int) $row->id)
+                ->orderBy('entry_date')
+                ->orderBy('id')
+                ->get(['id', 'debit', 'credit'])
+                ->each(function (ReceivableLedger $ledger) use (&$running, &$receivableLedgerUpdated): void {
+                    $running = max(0, $running + (int) round((float) $ledger->debit) - (int) round((float) $ledger->credit));
+                    if ((int) round((float) $ledger->balance_after) !== $running) {
+                        ReceivableLedger::query()->whereKey((int) $ledger->id)->update(['balance_after' => $running]);
+                    }
+                    $receivableLedgerUpdated++;
+                });
+        }
+    });
+
     $customerUpdated = 0;
     Customer::query()->select(['id'])->orderBy('id')->chunkById(200, function ($rows) use (&$customerUpdated): void {
         foreach ($rows as $row) {
-            $balance = (int) round((float) SalesInvoice::query()
+            $balance = max(0, (int) round((float) ReceivableLedger::query()
                 ->where('customer_id', (int) $row->id)
-                ->where('is_canceled', false)
-                ->sum('balance'));
-            Customer::query()->whereKey((int) $row->id)->update(['outstanding_receivable' => max(0, $balance)]);
+                ->sum(DB::raw('debit - credit'))));
+            Customer::query()->whereKey((int) $row->id)->update(['outstanding_receivable' => $balance]);
             $customerUpdated++;
+        }
+    });
+
+    $supplierLedgerUpdated = 0;
+    Supplier::query()->select(['id'])->orderBy('id')->chunkById(200, function ($rows) use (&$supplierLedgerUpdated): void {
+        foreach ($rows as $row) {
+            $running = 0;
+            SupplierLedger::query()
+                ->where('supplier_id', (int) $row->id)
+                ->orderBy('entry_date')
+                ->orderBy('id')
+                ->get(['id', 'debit', 'credit'])
+                ->each(function (SupplierLedger $ledger) use (&$running, &$supplierLedgerUpdated): void {
+                    $running = max(0, $running + (int) round((float) $ledger->debit) - (int) round((float) $ledger->credit));
+                    if ((int) round((float) $ledger->balance_after) !== $running) {
+                        SupplierLedger::query()->whereKey((int) $ledger->id)->update(['balance_after' => $running]);
+                    }
+                    $supplierLedgerUpdated++;
+                });
         }
     });
 
     $supplierUpdated = 0;
     Supplier::query()->select(['id'])->orderBy('id')->chunkById(200, function ($rows) use (&$supplierUpdated): void {
         foreach ($rows as $row) {
-            $balance = (int) round((float) SupplierLedger::query()
+            $balance = max(0, (int) round((float) SupplierLedger::query()
                 ->where('supplier_id', (int) $row->id)
-                ->sum(DB::raw('debit - credit')));
-            Supplier::query()->whereKey((int) $row->id)->update(['outstanding_payable' => max(0, $balance)]);
+                ->sum(DB::raw('debit - credit'))));
+            Supplier::query()->whereKey((int) $row->id)->update(['outstanding_payable' => $balance]);
             $supplierUpdated++;
         }
     });
@@ -1085,6 +1189,25 @@ Artisan::command('app:financial-rebuild {--rebuild-journal}', function () {
                     $accounting->postSalesReturn((int) $return->id, Carbon::parse((string) $return->return_date), (int) round((float) $return->total));
                 }
             });
+            ReceivablePayment::query()->orderBy('payment_date')->orderBy('id')->chunkById(200, function ($payments) use ($accounting): void {
+                foreach ($payments as $payment) {
+                    if ((bool) $payment->is_canceled) {
+                        continue;
+                    }
+
+                    $appliedAmount = (int) round((float) DB::table('invoice_payments')
+                        ->where('notes', 'like', '%'.(string) $payment->payment_number.'%')
+                        ->sum('amount'));
+                    $overPayment = max(0, (int) round((float) $payment->amount) - $appliedAmount);
+
+                    $accounting->postReceivablePayment(
+                        paymentId: (int) $payment->id,
+                        date: Carbon::parse((string) $payment->payment_date),
+                        appliedAmount: $appliedAmount,
+                        overPayment: $overPayment
+                    );
+                }
+            });
             OutgoingTransaction::query()->orderBy('transaction_date')->orderBy('id')->chunkById(200, function ($rows) use ($accounting): void {
                 foreach ($rows as $row) {
                     $accounting->postOutgoingTransaction((int) $row->id, Carbon::parse((string) $row->transaction_date), (int) round((float) $row->total));
@@ -1102,9 +1225,9 @@ Artisan::command('app:financial-rebuild {--rebuild-journal}', function () {
         });
     }
 
-    $this->info("Financial rebuild selesai. customers={$customerUpdated}, suppliers={$supplierUpdated}, journals_rebuilt=".($journalRebuilt ? 'yes' : 'no'));
+    $this->info("Financial rebuild selesai. invoices={$invoiceUpdated}, receivable_ledgers={$receivableLedgerUpdated}, customers={$customerUpdated}, supplier_ledgers={$supplierLedgerUpdated}, suppliers={$supplierUpdated}, journals_rebuilt=".($journalRebuilt ? 'yes' : 'no'));
     return 0;
-})->purpose('Rebuild financial aggregates (customer/supplier) and optional journal rebuild');
+})->purpose('Rebuild invoice totals, ledger running balances, customer/supplier aggregates, and optional journals');
 
 Artisan::command('app:load-test-light {--loops=50} {--search=abc}', function () {
     $loops = max(1, (int) $this->option('loops'));
@@ -1219,10 +1342,9 @@ Artisan::command('app:integrity-check', function () {
         ->orderBy('id')
         ->chunkById(200, function ($customers) use (&$customerMismatches): void {
             foreach ($customers as $customer) {
-                $openBalance = (int) round((float) SalesInvoice::query()
+                $openBalance = max(0, (int) round((float) ReceivableLedger::query()
                     ->where('customer_id', (int) $customer->id)
-                    ->where('is_canceled', false)
-                    ->sum('balance'));
+                    ->sum(DB::raw('debit - credit'))));
                 $stored = (int) round((float) $customer->outstanding_receivable);
                 if ($openBalance !== $stored) {
                     $customerMismatches[] = [
@@ -1230,6 +1352,39 @@ Artisan::command('app:integrity-check', function () {
                         'name' => (string) $customer->name,
                         'stored' => $stored,
                         'computed' => $openBalance,
+                    ];
+                }
+            }
+        });
+
+    $invoiceMismatches = [];
+    SalesInvoice::query()
+        ->select(['id', 'invoice_number', 'total', 'total_paid', 'balance', 'payment_status'])
+        ->orderBy('id')
+        ->chunkById(200, function ($invoices) use (&$invoiceMismatches): void {
+            foreach ($invoices as $invoice) {
+                $computedPaid = (int) round((float) DB::table('invoice_payments')
+                    ->where('sales_invoice_id', (int) $invoice->id)
+                    ->sum('amount'));
+                $computedBalance = max(0, (int) round((float) $invoice->total) - $computedPaid);
+                $computedStatus = $computedPaid <= 0
+                    ? 'unpaid'
+                    : ($computedBalance <= 0 ? 'paid' : 'partial');
+
+                $storedPaid = (int) round((float) $invoice->total_paid);
+                $storedBalance = (int) round((float) $invoice->balance);
+                $storedStatus = (string) $invoice->payment_status;
+
+                if ($computedPaid !== $storedPaid || $computedBalance !== $storedBalance || $computedStatus !== $storedStatus) {
+                    $invoiceMismatches[] = [
+                        'id' => (int) $invoice->id,
+                        'number' => (string) $invoice->invoice_number,
+                        'stored_paid' => $storedPaid,
+                        'computed_paid' => $computedPaid,
+                        'stored_balance' => $storedBalance,
+                        'computed_balance' => $computedBalance,
+                        'stored_status' => $storedStatus,
+                        'computed_status' => $computedStatus,
                     ];
                 }
             }
@@ -1266,8 +1421,10 @@ Artisan::command('app:integrity-check', function () {
         ->count();
 
     $customerMismatchCount = count($customerMismatches);
+    $invoiceMismatchCount = count($invoiceMismatches);
     $supplierMismatchCount = count($supplierMismatches);
     $isOk = $customerMismatchCount === 0
+        && $invoiceMismatchCount === 0
         && $supplierMismatchCount === 0
         && $invalidReceivableLinks === 0
         && $invalidSupplierLinks === 0;
@@ -1280,6 +1437,7 @@ Artisan::command('app:integrity-check', function () {
             'invalid_supplier_links' => (int) $invalidSupplierLinks,
             'details' => [
                 'customer_sample' => $customerMismatches[0] ?? null,
+                'invoice_sample' => $invoiceMismatches[0] ?? null,
                 'supplier_sample' => $supplierMismatches[0] ?? null,
             ],
             'is_ok' => $isOk,
@@ -1289,12 +1447,16 @@ Artisan::command('app:integrity-check', function () {
 
     $this->info('Integrity check result');
     $this->line('Customer balance mismatches: '.count($customerMismatches));
+    $this->line('Invoice payment mismatches : '.count($invoiceMismatches));
     $this->line('Supplier payable mismatches: '.count($supplierMismatches));
     $this->line('Invalid receivable customer links: '.$invalidReceivableLinks);
     $this->line('Invalid supplier payment links: '.$invalidSupplierLinks);
 
     if ($customerMismatches !== []) {
         $this->warn('Sample customer mismatch: '.json_encode($customerMismatches[0], JSON_UNESCAPED_UNICODE));
+    }
+    if ($invoiceMismatches !== []) {
+        $this->warn('Sample invoice mismatch: '.json_encode($invoiceMismatches[0], JSON_UNESCAPED_UNICODE));
     }
     if ($supplierMismatches !== []) {
         $this->warn('Sample supplier mismatch: '.json_encode($supplierMismatches[0], JSON_UNESCAPED_UNICODE));
@@ -1840,6 +2002,7 @@ Artisan::command('app:report-exports-fix-stuck {--minutes=30}', function () {
 
 Schedule::command('app:db-backup --gzip')->dailyAt('01:00');
 Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
+Schedule::command('app:archive:review')->monthlyOn(1, '02:30');
 Schedule::command('app:integrity-check')->dailyAt('03:00');
 Schedule::command('app:financial-rebuild')->dailyAt('03:30');
 Schedule::command('app:load-test-light --loops=80 --search=ang')->dailyAt('04:30');

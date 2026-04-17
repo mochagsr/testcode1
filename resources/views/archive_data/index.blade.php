@@ -193,6 +193,7 @@
                 <tr><th>Restore Drill Terakhir</th><td>{{ $latestRestoreDrill?->tested_at ? \Illuminate\Support\Carbon::parse((string) $latestRestoreDrill->tested_at)->format('d-m-Y H:i:s') : '-' }}</td></tr>
                 <tr><th>Status Restore Drill</th><td>{{ $latestRestoreDrill?->status ? strtoupper((string) $latestRestoreDrill->status) : '-' }}</td></tr>
                 <tr><th>Snapshot Finansial Terakhir</th><td>{{ is_array($latestFinancialSnapshot) ? basename((string) ($latestFinancialSnapshot['path'] ?? '-')) : '-' }}</td></tr>
+                <tr><th>Review Arsip Terakhir</th><td>{{ is_array($latestArchiveReview) ? \Illuminate\Support\Carbon::parse((string) ($latestArchiveReview['generated_at'] ?? now()))->format('d-m-Y H:i:s') : '-' }}</td></tr>
                 </tbody>
             </table>
         </div>
@@ -281,6 +282,47 @@
                 @endforeach
             </div>
         </div>
+
+        @if (is_array($latestArchiveReview))
+            <div class="card archive-col-12">
+                <h3 style="margin-top:0;">Review Arsip Terakhir</h3>
+                <table class="archive-kv" style="margin-bottom:12px;">
+                    <tbody>
+                    <tr><th>Dibuat pada</th><td>{{ \Illuminate\Support\Carbon::parse((string) ($latestArchiveReview['generated_at'] ?? now()))->format('d-m-Y H:i:s') }}</td></tr>
+                    <tr><th>File review</th><td><code>{{ $latestArchiveReview['path'] ?? '-' }}</code></td></tr>
+                    </tbody>
+                </table>
+                @if (!empty($latestArchiveReview['reminders']))
+                    <ul class="archive-list" style="margin-bottom:12px;">
+                        @foreach(($latestArchiveReview['reminders'] ?? []) as $reminder)
+                            <li>{{ $reminder }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+                <table class="archive-table">
+                    <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Retention</th>
+                        <th>Cutoff</th>
+                        <th>Kandidat</th>
+                        <th>Scope</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach(($latestArchiveReview['datasets'] ?? []) as $dataset)
+                        <tr>
+                            <td>{{ $dataset['label'] ?? $dataset['key'] ?? '-' }}</td>
+                            <td>{{ $dataset['retention'] ?? '-' }}</td>
+                            <td>{{ $dataset['cutoff_date'] ?? '-' }}</td>
+                            <td>{{ number_format((int) ($dataset['candidate_rows'] ?? 0), 0, ',', '.') }}</td>
+                            <td>{{ $dataset['recommended_scope'] ?? '-' }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
 
         @if (is_array($scanResult))
             <div class="card archive-col-8">
@@ -395,14 +437,53 @@
             </p>
         </div>
 
+        <div class="card archive-col-6">
+            <h3 style="margin-top:0;">Checklist UAT Arsip Nyata</h3>
+            <ol class="archive-list">
+                @foreach($archiveUatChecklist as $item)
+                    <li>{{ $item }}</li>
+                @endforeach
+            </ol>
+        </div>
+
+        <div class="card archive-col-6">
+            <h3 style="margin-top:0;">Histori Eksekusi Arsip</h3>
+            @if (!empty($archiveHistory))
+                <table class="archive-table">
+                    <thead>
+                    <tr>
+                        <th>Waktu</th>
+                        <th>Aksi</th>
+                        <th>Ringkasan</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($archiveHistory as $entry)
+                        <tr>
+                            <td>{{ \Illuminate\Support\Carbon::parse((string) $entry['created_at'])->format('d-m-Y H:i:s') }}</td>
+                            <td>
+                                <strong>{{ $entry['title'] }}</strong><br>
+                                <span class="archive-muted"><code>{{ $entry['path'] }}</code></span>
+                            </td>
+                            <td>{{ $entry['summary'] }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            @else
+                <p class="archive-muted" style="margin:0;">Belum ada histori eksekusi arsip yang tersimpan.</p>
+            @endif
+        </div>
+
         <div class="card archive-col-12">
             <h3 style="margin-top:0;">Catatan Command Arsip</h3>
             <pre class="archive-code">php artisan app:archive:scan 2021 --dataset=sales_invoices
 php artisan app:archive:export 2021 --dataset=sales_invoices
 php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal
+php artisan app:archive:review
 php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Purge biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Purge finansial tahap pertama hanya dibuka untuk dataset yang sudah punya jalur snapshot dan rebuild aman.
+                Purge biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Purge finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten.
             </p>
         </div>
     </div>

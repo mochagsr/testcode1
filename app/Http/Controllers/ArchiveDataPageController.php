@@ -27,12 +27,16 @@ class ArchiveDataPageController extends Controller
         $selectedDatasets = array_values(array_filter((array) ($request->old('datasets', ['audit_logs']) ?: ['audit_logs'])));
         $latestRestoreDrill = $archiveService->latestRestoreDrill();
         $latestFinancialSnapshot = $archiveService->latestFinancialSnapshot();
+        $latestArchiveReview = $archiveService->latestArchiveReview();
+        $archiveHistory = $archiveService->recentExecutionHistory();
 
         return view('archive_data.index', [
             'latestBackup' => $backupFiles->last(),
             'backupFileCount' => $backupFiles->count(),
             'latestRestoreDrill' => $latestRestoreDrill,
             'latestFinancialSnapshot' => $latestFinancialSnapshot,
+            'latestArchiveReview' => $latestArchiveReview,
+            'archiveHistory' => $archiveHistory,
             'dbConnection' => (string) config('database.default'),
             'dbHost' => (string) config('database.connections.'.config('database.default').'.host'),
             'appEnv' => (string) config('app.env'),
@@ -68,6 +72,14 @@ class ArchiveDataPageController extends Controller
                 'Untuk dataset finansial yang didukung, buat snapshot finansial dulu.',
                 'Purge data production hanya setelah verifikasi arsip selesai.',
             ],
+            'archiveUatChecklist' => [
+                'Jalankan backup terbaru dari app server aaPanel ke managed DB aktif.',
+                'Jalankan restore drill dan pastikan status terakhir PASS.',
+                'Preview scan untuk satu dataset kecil dulu, misalnya audit log.',
+                'Buat export SQL dan cocokkan jumlah baris pada manifest.',
+                'Untuk dataset finansial, siapkan snapshot lalu lakukan dry-run purge dulu.',
+                'Setelah purge final, jalankan deploy check dan integrity check.',
+            ],
         ]);
     }
 
@@ -76,7 +88,7 @@ class ArchiveDataPageController extends Controller
         [$year, $datasets] = $this->validatedInput($request);
 
         try {
-            $result = $archiveService->scan($year, $datasets);
+            $result = $archiveService->scan($year, $datasets, true);
         } catch (\Throwable $e) {
             return back()
                 ->withInput($request->all())

@@ -123,13 +123,16 @@ Catatan:
   - `php artisan app:archive:scan 2021 --dataset=sales_invoices`
   - `php artisan app:archive:export 2021 --dataset=sales_invoices`
   - `php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal`
+  - `php artisan app:archive:review`
   - `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
 - Catatan penting:
   - `Sistem > Arsip Data` sekarang sudah punya form aksi untuk `scan`, `export`, `prepare financial snapshot`, dan `purge`
+  - halaman `Sistem > Arsip Data` juga sudah menampilkan histori eksekusi arsip, review arsip terakhir, dan checklist UAT arsip nyata di server
   - `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun
   - `purge` biasa sudah dibuka untuk dataset log/ops aman, termasuk `failed_jobs` dan `job_batches`
-  - `purge` finansial tahap pertama dibuka untuk dataset yang sudah punya guard snapshot + rebuild, yaitu `sales_invoices`, `outgoing_transactions`, dan `supplier_payments`
+  - `purge` finansial tahap lanjut dibuka untuk dataset yang sudah punya guard snapshot + rebuild, yaitu `sales_invoices`, `sales_returns`, `outgoing_transactions`, `receivable_payments`, dan `supplier_payments`
   - dataset finansial lain seperti `receivable_ledgers` dan `supplier_ledgers` tetap dikunci
+  - review arsip bulanan sekarang bisa dijalankan manual dengan `app:archive:review` dan juga sudah dijadwalkan otomatis lewat scheduler Laravel
 - Profiling query plan manual: `php artisan app:query-profile`
 - Performance probe / load test ringan: `php artisan app:load-test-light --loops=50`
 - Sinkronisasi ulang saldo customer/supplier jika integrity check anomali: `php artisan app:financial-rebuild`
