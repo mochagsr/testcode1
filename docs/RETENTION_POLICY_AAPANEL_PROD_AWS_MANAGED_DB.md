@@ -15,6 +15,16 @@ Submenu operasional di aplikasi:
 - `Sistem > Arsip Data`
 - halaman ini dipakai sebagai pengingat operator bahwa untuk `erpos` production, backup tetap dijalankan ke managed DB AWS dan titik kerja arsip transaksi utama dibaca berdasarkan tahun
 
+Command yang tersedia sekarang:
+- `php artisan app:archive:scan 2021 --dataset=sales_invoices`
+- `php artisan app:archive:export 2021 --dataset=sales_invoices`
+- `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
+
+Catatan:
+- `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun
+- `purge` otomatis saat ini baru dibuka untuk dataset log/ops yang aman dibersihkan
+- dataset finansial tetap sengaja dikunci di tahap purge sampai rebuilder histori finansialnya siap
+
 ## Prinsip utama
 - data operasional yang masih aktif tetap online
 - data lama boleh diarsipkan, **bukan langsung dibuang**

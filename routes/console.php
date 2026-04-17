@@ -21,6 +21,7 @@ use App\Models\IntegrityCheckLog;
 use App\Models\PerformanceProbeLog;
 use App\Models\User;
 use App\Support\AppCache;
+use App\Support\DataArchiveService;
 use App\Support\SemesterBookService;
 use App\Services\AccountingService;
 use Carbon\Carbon;
@@ -465,6 +466,127 @@ Artisan::command('app:db-backup {--path=} {--gzip}', function () {
     $this->info('Backup created: ' . $target);
     return 0;
 })->purpose('Create database backup file');
+
+Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int $year) {
+    /** @var DataArchiveService $service */
+    $service = app(DataArchiveService::class);
+    $requestedDatasets = (array) $this->option('dataset');
+    $summary = $service->scan($year, $requestedDatasets);
+
+    if ((bool) $this->option('json')) {
+        $this->line(json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return 0;
+    }
+
+    $this->info('Preview Arsip Data');
+    $this->line('Tahun: '.$summary['year']);
+    $this->line('Total kandidat baris: '.number_format((int) $summary['grand_total'], 0, ',', '.'));
+
+    foreach ($summary['datasets'] as $datasetKey => $dataset) {
+        $basis = $dataset['basis'] === 'year' ? 'berdasarkan tahun' : 'berdasarkan bulan';
+        $this->newLine();
+        $this->line(sprintf(
+            '[%s] %s | total %s row(s) | %s | purge %s',
+            $datasetKey,
+            $dataset['label'],
+            number_format((int) $dataset['total_rows'], 0, ',', '.'),
+            $basis,
+            $dataset['purge_allowed'] ? 'siap' : 'dikunci'
+        ));
+        foreach ($dataset['tables'] as $table) {
+            $this->line('  - '.$table['table'].': '.number_format((int) $table['rows'], 0, ',', '.'));
+        }
+    }
+
+    if ($summary['missing'] !== []) {
+        $this->warn('Dataset tidak dikenal: '.implode(', ', $summary['missing']));
+    }
+
+    $this->newLine();
+    $this->line('Lanjut export: php artisan app:archive:export '.$year.' --dataset=...');
+    $this->line('Lanjut purge: php artisan app:archive:purge '.$year.' --dataset=... --confirm');
+
+    return 0;
+})->purpose('Preview kandidat arsip data berdasarkan tahun');
+
+Artisan::command('app:archive:export {year} {--dataset=*} {--path=}', function (int $year) {
+    /** @var DataArchiveService $service */
+    $service = app(DataArchiveService::class);
+    $requestedDatasets = (array) $this->option('dataset');
+    $path = (string) ($this->option('path') ?: '');
+
+    try {
+        $result = $service->export($year, $requestedDatasets, $path !== '' ? $path : null);
+    } catch (Throwable $e) {
+        $this->error('Export arsip gagal: '.$e->getMessage());
+        return 1;
+    }
+
+    $this->info('Export arsip selesai.');
+    $this->line('SQL file     : '.$result['sql_file']);
+    $this->line('Manifest file: '.$result['manifest_file']);
+    $this->line('Total row    : '.number_format((int) $result['summary']['grand_total'], 0, ',', '.'));
+
+    foreach ($result['summary']['datasets'] as $datasetKey => $dataset) {
+        $this->line(sprintf(
+            '- %s (%s): %s row(s)',
+            $dataset['label'],
+            $datasetKey,
+            number_format((int) $dataset['total_rows'], 0, ',', '.')
+        ));
+    }
+
+    if ($result['summary']['missing'] !== []) {
+        $this->warn('Dataset tidak dikenal: '.implode(', ', $result['summary']['missing']));
+    }
+
+    return 0;
+})->purpose('Export arsip SQL berdasarkan tahun untuk dataset terpilih');
+
+Artisan::command('app:archive:purge {year} {--dataset=*} {--manifest=} {--confirm} {--allow-skipped-restore}', function (int $year) {
+    /** @var DataArchiveService $service */
+    $service = app(DataArchiveService::class);
+    $requestedDatasets = (array) $this->option('dataset');
+    $manifest = (string) ($this->option('manifest') ?: '');
+    $confirm = (bool) $this->option('confirm');
+    $allowSkippedRestore = (bool) $this->option('allow-skipped-restore');
+
+    try {
+        $result = $service->purge(
+            $year,
+            $requestedDatasets,
+            $confirm,
+            $manifest !== '' ? $manifest : null,
+            $allowSkippedRestore
+        );
+    } catch (Throwable $e) {
+        $this->error('Purge arsip ditolak: '.$e->getMessage());
+        return 1;
+    }
+
+    $this->info($confirm ? 'Purge arsip selesai.' : 'Dry run purge arsip.');
+    $this->line('Backup file    : '.$result['backup_file']);
+    $this->line('Manifest file  : '.$result['manifest_file']);
+    $this->line('Restore status : '.strtoupper($result['restore_status']));
+    $this->line('Total kandidat : '.number_format((int) $result['summary']['grand_total'], 0, ',', '.'));
+
+    foreach ($result['summary']['datasets'] as $datasetKey => $dataset) {
+        $deleted = $result['deleted'][$datasetKey] ?? 0;
+        $this->line(sprintf(
+            '- %s (%s): kandidat %s row(s), deleted %s row(s)',
+            $dataset['label'],
+            $datasetKey,
+            number_format((int) $dataset['total_rows'], 0, ',', '.'),
+            number_format((int) $deleted, 0, ',', '.')
+        ));
+    }
+
+    if (! $confirm) {
+        $this->warn('Belum ada data yang dihapus. Tambahkan --confirm kalau kandidat dan guard sudah sesuai.');
+    }
+
+    return 0;
+})->purpose('Purge arsip yang sudah diexport dan lolos guard backup/restore');
 
 Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-db=} {--mysql-host=} {--mysql-port=} {--mysql-user=} {--mysql-password=}', function () {
     $source = (string) ($this->option('source') ?: database_path('database.sqlite'));

@@ -119,6 +119,14 @@ Catatan:
   - restore drill dulu
   - lalu arsip / pembersihan data
 - Default titik kerja arsip transaksi ERP adalah **berdasarkan tahun**, supaya operator lebih mudah memilih periode arsip
+- Command arsip yang tersedia sekarang:
+  - `php artisan app:archive:scan 2021 --dataset=sales_invoices`
+  - `php artisan app:archive:export 2021 --dataset=sales_invoices`
+  - `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
+- Catatan penting:
+  - `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun
+  - `purge` otomatis saat ini baru dibuka untuk dataset log/ops yang aman dibersihkan
+  - dataset finansial tetap dikunci di tahap purge sampai rebuilder histori finansialnya siap
 - Profiling query plan manual: `php artisan app:query-profile`
 - Performance probe / load test ringan: `php artisan app:load-test-light --loops=50`
 - Sinkronisasi ulang saldo customer/supplier jika integrity check anomali: `php artisan app:financial-rebuild`

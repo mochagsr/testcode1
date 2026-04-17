@@ -141,13 +141,13 @@
         <div class="card archive-col-12">
             <h3 style="margin-top:0;">Catatan Command Arsip</h3>
             <p class="archive-muted" style="margin:0 0 8px;">
-                Command arsip berbasis tahun akan mengikuti pola ini agar tidak menghapus data diam-diam:
+                Command arsip berbasis tahun sekarang sudah tersedia dengan pola berikut:
             </p>
-            <pre class="archive-code">php artisan app:archive:scan --year=2021
-php artisan app:archive:export --year=2021
-php artisan app:archive:purge --year=2021</pre>
+            <pre class="archive-code">php artisan app:archive:scan 2021 --dataset=sales_invoices
+php artisan app:archive:export 2021 --dataset=sales_invoices
+php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Placeholder di atas adalah pola yang kita sepakati. Implementasi command arsipnya bisa kita tambah bertahap setelah operator nyaman dengan alur backup dan restore drill.
+                Untuk tahap aman pertama, `purge` otomatis hanya dibuka untuk dataset log/ops yang memang aman dibersihkan. Dataset finansial seperti faktur, ledger piutang, dan hutang supplier tetap bisa di-`scan` dan di-`export`, tetapi purge masih dikunci sampai rebuilder histori finansialnya disiapkan.
             </p>
         </div>
     </div>
