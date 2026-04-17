@@ -103,6 +103,12 @@ Setelah selesai, catat:
 Contoh hasil:
 - `https://APP_SERVER_PUBLIC_IP:21218/...`
 
+Setelah login ke aaPanel, siapkan juga komponen dasar server:
+- PHP `8.3`
+- Composer terbaru yang kompatibel dengan PHP `8.3`
+- Node.js `22.x` atau minimal `20.19+`
+- `default-mysql-client` atau `mariadb-client` untuk import SQL dari terminal ke managed DB
+
 ## 6. Buat Lightsail Managed Database
 
 Di `AWS Lightsail`:
@@ -214,6 +220,19 @@ Bagus juga diaktifkan:
 - `intl`
 - `opcache`
 
+## 11.1 Tool terminal yang disarankan
+
+Di app server, siapkan tool ini juga:
+
+```bash
+apt update
+apt install -y default-mysql-client unzip git curl
+```
+
+Catatan:
+- `default-mysql-client` dipakai untuk command import ke managed DB
+- kalau distro memilih paket lain, `mariadb-client` juga biasanya cukup
+
 ## 12. Clone code production
 
 ```bash
@@ -289,15 +308,22 @@ Catatan penting:
 
 Gunakan Composer yang kompatibel dengan PHP 8.3.
 
+Kalau `composer2` belum ada di server, install dulu Composer versi baru.
+Setelah itu baru jalankan:
+
 ```bash
 cd /www/wwwroot/erpos.mitrasejatiberkah.com
 COMPOSER_ALLOW_SUPERUSER=1 composer2 install --no-dev --optimize-autoloader
 php artisan key:generate --force
 ```
 
+Kalau servermu hanya punya binary `composer` yang sudah versi baru, command bisa disesuaikan.
+
 ## 15. Build asset frontend
 
-Pastikan Node.js sudah cukup baru.
+Pastikan Node.js sudah cukup baru:
+- `22.x`
+- atau minimal `20.19+`
 
 ```bash
 cd /www/wwwroot/erpos.mitrasejatiberkah.com
@@ -332,6 +358,11 @@ mysql -h YOUR_MANAGED_DB_HOST -P 3306 -u YOUR_DB_USER -p YOUR_DB_NAME < /path/to
 cd /www/wwwroot/erpos.mitrasejatiberkah.com
 CACHE_STORE=file php artisan migrate --force
 ```
+
+Catatan:
+- command `mysql ... < backup.sql` dijalankan dari terminal Linux app server
+- kalau kamu tidak nyaman import lewat terminal, alternatifnya bisa pakai client SQL desktop dari komputer lokal
+- untuk file backup besar, terminal biasanya lebih stabil daripada phpMyAdmin
 
 Jangan jalankan di production:
 
@@ -369,13 +400,19 @@ cd /www/wwwroot/erpos.mitrasejatiberkah.com && php artisan schedule:run >> /dev/
 ```
 
 ### Queue worker
-Buat cron / supervisor / service yang sesuai pola operasionalmu. Untuk jalur paling sederhana:
+Buat worker yang berjalan terus-menerus.
+
+Untuk jalur paling sederhana:
 
 ```bash
 cd /www/wwwroot/erpos.mitrasejatiberkah.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
 ```
 
-Kalau queue dipakai serius dan terus-menerus, lebih baik worker dibuat sebagai process manager, bukan sekadar cron.
+Tapi untuk production yang dipakai harian, lebih baik worker dibuat sebagai process manager, bukan sekadar cron sekali jalan.
+
+Prinsipnya:
+- `schedule:run` = cocok di cron
+- `queue:work` = lebih cocok dijaga sebagai proses yang hidup terus
 
 ## 19. SSL server dan Cloudflare
 
@@ -438,6 +475,8 @@ php artisan config:cache
 php artisan view:cache
 php artisan app:deploy-check --skip-ops
 ```
+
+Kalau kamu ingin deploy lebih deterministik dan `package-lock.json` selalu sinkron, `npm ci` lebih baik daripada `npm install`.
 
 ## 23. Rollback singkat kalau update gagal
 
