@@ -32,7 +32,8 @@
         .total-box td { border: 1px solid #111; }
         .total-box td:first-child { background: #f7f7f7; }
         .summary-spacer { min-height: 1px; }
-        .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-box { line-height: 1.35; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-content { white-space: pre-line; }
         .signature-table { margin-top: 24px; }
         .signature-table th, .signature-table td { text-align: center; }
         .signature-space { height: 64px; border-top: none !important; border-bottom: none !important; }
@@ -143,13 +144,9 @@
         <div class="notes-box">
             <div><strong>{{ __('txn.notes') }}:</strong></div>
             @if($printNotes !== '')
-                @foreach(preg_split('/\r\n|\r|\n/', $printNotes) ?: [] as $line)
-                    @if(trim($line) !== '')
-                        <div>{{ $line }}</div>
-                    @endif
-                @endforeach
+                <div class="notes-content">{{ $printNotes }}</div>
             @else
-                <div>-</div>
+                <div class="notes-content">-</div>
             @endif
         </div>
         <table class="qty-box">
