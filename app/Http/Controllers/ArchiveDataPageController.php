@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Support\DataArchiveRegistry;
 use App\Support\DataArchiveService;
+use App\Support\SemesterBookService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\File;
 
 class ArchiveDataPageController extends Controller
 {
-    public function index(Request $request, DataArchiveService $archiveService): View
+    public function index(Request $request, DataArchiveService $archiveService, SemesterBookService $semesterBookService): View
     {
         $backupFiles = collect(array_merge(
             File::glob(storage_path('app/backups').DIRECTORY_SEPARATOR.'*') ?: [],
@@ -23,7 +24,13 @@ class ArchiveDataPageController extends Controller
             ->values();
 
         $definitions = DataArchiveRegistry::definitions();
+        $selectedScopeType = (string) ($request->old('archive_scope_type', 'year') ?: 'year');
         $selectedYear = (int) ($request->old('archive_year', now()->year - 1) ?: now()->year - 1);
+        $semesterOptions = $semesterBookService
+            ->buildSemesterOptionCollection([], false, true)
+            ->values()
+            ->all();
+        $selectedSemester = (string) ($request->old('archive_semester', $semesterOptions[0] ?? $semesterBookService->currentSemester()) ?: ($semesterOptions[0] ?? $semesterBookService->currentSemester()));
         $selectedDatasets = array_values(array_filter((array) ($request->old('datasets', ['audit_logs']) ?: ['audit_logs'])));
         $latestRestoreDrill = $archiveService->latestRestoreDrill();
         $latestFinancialSnapshot = $archiveService->latestFinancialSnapshot();
@@ -41,7 +48,10 @@ class ArchiveDataPageController extends Controller
             'dbHost' => (string) config('database.connections.'.config('database.default').'.host'),
             'appEnv' => (string) config('app.env'),
             'datasets' => $definitions,
+            'selectedScopeType' => $selectedScopeType,
             'selectedYear' => $selectedYear,
+            'selectedSemester' => $selectedSemester,
+            'semesterOptions' => $semesterOptions,
             'selectedDatasets' => $selectedDatasets,
             'retentionWindows' => [
                 [
@@ -54,7 +64,7 @@ class ArchiveDataPageController extends Controller
                     'label' => 'Transaksi ERP',
                     'period' => '60 bulan',
                     'basis' => 'tahun',
-                    'note' => 'Untuk tabel finansial utama, titik aman paling mudah dibaca operator adalah berdasarkan tahun.',
+                    'note' => 'Untuk tabel finansial utama, operator bisa mulai dari tahun atau semester, tergantung periode mana yang memang sudah selesai dan aman diarsipkan.',
                 ],
             ],
             'archiveCommands' => [
@@ -62,18 +72,21 @@ class ArchiveDataPageController extends Controller
                 'php artisan app:db-restore-test',
                 'php artisan app:integrity-check',
                 'php artisan app:archive:scan 2025 --dataset=audit_logs',
+                'php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices',
                 'php artisan app:archive:prepare-financial 2024 --dataset=sales_invoices',
             ],
             'plannedArchiveFlow' => [
-                'Preview kandidat arsip per tahun.',
+                'Preview kandidat arsip per tahun atau semester.',
                 'Backup penuh ke managed DB AWS lewat command aplikasi.',
+                'Download file backup dari server dan simpan juga di komputer lokal / storage pribadi.',
                 'Restore drill untuk memastikan backup valid.',
-                'Export arsip per tahun sebelum pembersihan.',
+                'Export arsip per tahun atau semester sebelum pembersihan.',
                 'Untuk dataset finansial yang didukung, buat snapshot finansial dulu.',
                 'Purge data production hanya setelah verifikasi arsip selesai.',
             ],
             'archiveUatChecklist' => [
                 'Jalankan backup terbaru dari app server aaPanel ke managed DB aktif.',
+                'Download hasil backup ke komputer lokal sebagai copy arsip operator.',
                 'Jalankan restore drill dan pastikan status terakhir PASS.',
                 'Preview scan untuk satu dataset kecil dulu, misalnya audit log.',
                 'Buat export SQL dan cocokkan jumlah baris pada manifest.',
@@ -85,10 +98,10 @@ class ArchiveDataPageController extends Controller
 
     public function scan(Request $request, DataArchiveService $archiveService): RedirectResponse
     {
-        [$year, $datasets] = $this->validatedInput($request);
+        [$scope, $datasets] = $this->validatedInput($request, $archiveService);
 
         try {
-            $result = $archiveService->scan($year, $datasets, true);
+            $result = $archiveService->scanByScope($scope, $datasets, true);
         } catch (\Throwable $e) {
             return back()
                 ->withInput($request->all())
@@ -103,10 +116,10 @@ class ArchiveDataPageController extends Controller
 
     public function export(Request $request, DataArchiveService $archiveService): RedirectResponse
     {
-        [$year, $datasets] = $this->validatedInput($request);
+        [$scope, $datasets] = $this->validatedInput($request, $archiveService);
 
         try {
-            $result = $archiveService->export($year, $datasets);
+            $result = $archiveService->exportByScope($scope, $datasets);
         } catch (\Throwable $e) {
             return back()
                 ->withInput($request->all())
@@ -121,11 +134,11 @@ class ArchiveDataPageController extends Controller
 
     public function prepareFinancial(Request $request, DataArchiveService $archiveService): RedirectResponse
     {
-        [$year, $datasets] = $this->validatedInput($request);
+        [$scope, $datasets] = $this->validatedInput($request, $archiveService);
 
         try {
-            $result = $archiveService->prepareFinancialSnapshot(
-                $year,
+            $result = $archiveService->prepareFinancialSnapshotByScope(
+                $scope,
                 $datasets,
                 null,
                 (bool) $request->boolean('rebuild_journal')
@@ -144,11 +157,11 @@ class ArchiveDataPageController extends Controller
 
     public function purge(Request $request, DataArchiveService $archiveService): RedirectResponse
     {
-        [$year, $datasets] = $this->validatedInput($request);
+        [$scope, $datasets] = $this->validatedInput($request, $archiveService);
 
         try {
-            $result = $archiveService->purge(
-                $year,
+            $result = $archiveService->purgeByScope(
+                $scope,
                 $datasets,
                 (bool) $request->boolean('confirm_purge'),
                 null,
@@ -169,18 +182,35 @@ class ArchiveDataPageController extends Controller
     }
 
     /**
-     * @return array{0:int,1:list<string>}
+     * @return array{0:array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string},1:list<string>}
      */
-    private function validatedInput(Request $request): array
+    private function validatedInput(Request $request, DataArchiveService $archiveService): array
     {
         $validated = $request->validate([
-            'archive_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'archive_scope_type' => ['required', 'string', 'in:year,semester'],
+            'archive_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'archive_semester' => ['nullable', 'string', 'max:30'],
             'datasets' => ['required', 'array', 'min:1'],
             'datasets.*' => ['required', 'string'],
         ]);
 
+        $scopeType = (string) ($validated['archive_scope_type'] ?? 'year');
+        if ($scopeType === 'semester') {
+            $semester = trim((string) ($validated['archive_semester'] ?? ''));
+            if ($semester === '') {
+                abort(422, 'Semester wajib dipilih.');
+            }
+            $scope = $archiveService->resolveScope('semester', null, $semester);
+        } else {
+            $year = (int) ($validated['archive_year'] ?? 0);
+            if ($year <= 0) {
+                abort(422, 'Tahun wajib diisi.');
+            }
+            $scope = $archiveService->resolveScope('year', $year, null);
+        }
+
         return [
-            (int) $validated['archive_year'],
+            $scope,
             array_values(array_unique(array_map(static fn (mixed $value): string => strtolower(trim((string) $value)), (array) $validated['datasets']))),
         ];
     }

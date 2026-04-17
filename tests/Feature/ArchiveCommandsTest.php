@@ -51,7 +51,7 @@ class ArchiveCommandsTest extends TestCase
         ]);
 
         Artisan::call('app:archive:scan', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['audit_logs'],
             '--json' => true,
         ]);
@@ -64,7 +64,7 @@ class ArchiveCommandsTest extends TestCase
 
         $exportPath = storage_path('app/archives-test');
         $exportExit = Artisan::call('app:archive:export', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['audit_logs'],
             '--path' => $exportPath,
         ]);
@@ -123,7 +123,7 @@ class ArchiveCommandsTest extends TestCase
 
         $exportPath = storage_path('app/archives-test');
         Artisan::call('app:archive:export', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['audit_logs'],
             '--path' => $exportPath,
         ]);
@@ -131,7 +131,7 @@ class ArchiveCommandsTest extends TestCase
         $manifest = File::glob($exportPath.DIRECTORY_SEPARATOR.'manifests'.DIRECTORY_SEPARATOR.'*.json')[0];
 
         $dryRunExit = Artisan::call('app:archive:purge', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['audit_logs'],
             '--manifest' => $manifest,
         ]);
@@ -140,13 +140,13 @@ class ArchiveCommandsTest extends TestCase
         $this->assertDatabaseCount('audit_logs', 2);
 
         $purgeExit = Artisan::call('app:archive:purge', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['audit_logs'],
             '--manifest' => $manifest,
             '--confirm' => true,
         ]);
 
-        $this->assertSame(0, $purgeExit);
+        $this->assertSame(0, $purgeExit, Artisan::output());
         $this->assertDatabaseCount('audit_logs', 1);
         $this->assertDatabaseHas('audit_logs', [
             'description' => 'Audit 2025',
@@ -159,7 +159,7 @@ class ArchiveCommandsTest extends TestCase
     public function test_archive_purge_rejects_financial_dataset(): void
     {
         $exit = Artisan::call('app:archive:purge', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['receivable_ledgers'],
             '--confirm' => true,
         ]);
@@ -213,7 +213,7 @@ class ArchiveCommandsTest extends TestCase
         ]);
 
         Artisan::call('app:archive:scan', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['failed_jobs', 'job_batches'],
             '--json' => true,
         ]);
@@ -322,7 +322,7 @@ class ArchiveCommandsTest extends TestCase
 
         $exportPath = storage_path('app/archives-test');
         Artisan::call('app:archive:export', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['sales_invoices'],
             '--path' => $exportPath,
         ]);
@@ -330,7 +330,7 @@ class ArchiveCommandsTest extends TestCase
         $manifest = File::glob($exportPath.DIRECTORY_SEPARATOR.'manifests'.DIRECTORY_SEPARATOR.'*.json')[0];
 
         $prepareExit = Artisan::call('app:archive:prepare-financial', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['sales_invoices'],
             '--manifest' => $manifest,
         ]);
@@ -339,13 +339,13 @@ class ArchiveCommandsTest extends TestCase
         $this->assertNotEmpty(File::glob(storage_path('app/archives/financial-snapshots').DIRECTORY_SEPARATOR.'*.json'));
 
         $purgeExit = Artisan::call('app:archive:purge', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['sales_invoices'],
             '--manifest' => $manifest,
             '--confirm' => true,
         ]);
 
-        $this->assertSame(0, $purgeExit);
+        $this->assertSame(0, $purgeExit, Artisan::output());
         $this->assertDatabaseMissing('sales_invoices', ['id' => $invoiceId]);
         $this->assertDatabaseHas('customers', [
             'id' => $customerId,
@@ -361,6 +361,7 @@ class ArchiveCommandsTest extends TestCase
         ]);
 
         $response = $this->actingAs($admin)->post(route('archive-data.scan'), [
+            'archive_scope_type' => 'year',
             'archive_year' => 2024,
             'datasets' => ['audit_logs'],
         ]);
@@ -368,6 +369,96 @@ class ArchiveCommandsTest extends TestCase
         $response
             ->assertRedirect()
             ->assertSessionHas('archive_scan_result')
+            ->assertSessionHas('archive_success');
+    }
+
+    public function test_archive_scan_and_export_cover_semester_filtered_sales_invoices(): void
+    {
+        $customerId = $this->createArchiveCustomer('CUS-SEM', 'Customer Semester', 25000);
+        $productId = $this->createArchiveProduct('BRG-SEM', 'Barang Semester', 10, 12000);
+        $invoiceS1 = $this->createArchiveInvoice($customerId, 'INV-S1-2526', 12000, 0, 12000, 'unpaid', '2025-05-10', 'S1-2526');
+        $invoiceS2 = $this->createArchiveInvoice($customerId, 'INV-S2-2526', 13000, 0, 13000, 'unpaid', '2025-11-10', 'S2-2526');
+
+        DB::table('sales_invoice_items')->insert([
+            [
+                'sales_invoice_id' => $invoiceS1,
+                'product_id' => $productId,
+                'product_code' => 'SEM-1',
+                'product_name' => 'Barang Semester 1',
+                'quantity' => 1,
+                'unit_price' => 12000,
+                'discount' => 0,
+                'line_total' => 12000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'sales_invoice_id' => $invoiceS2,
+                'product_id' => $productId,
+                'product_code' => 'SEM-2',
+                'product_name' => 'Barang Semester 2',
+                'quantity' => 1,
+                'unit_price' => 13000,
+                'discount' => 0,
+                'line_total' => 13000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        Artisan::call('app:archive:scan', [
+            '--semester' => 'S1-2526',
+            '--dataset' => ['sales_invoices'],
+            '--json' => true,
+        ]);
+
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertIsArray($payload);
+        $this->assertSame('semester', $payload['period_type']);
+        $this->assertSame('S1-2526', $payload['period_value']);
+        $this->assertSame(2, $payload['grand_total']);
+        $this->assertSame(2, $payload['datasets']['sales_invoices']['total_rows']);
+
+        $exportPath = storage_path('app/archives-test');
+        $exportExit = Artisan::call('app:archive:export', [
+            '--semester' => 'S1-2526',
+            '--dataset' => ['sales_invoices'],
+            '--path' => $exportPath,
+        ]);
+
+        $this->assertSame(0, $exportExit);
+        $manifestFile = File::glob($exportPath.DIRECTORY_SEPARATOR.'manifests'.DIRECTORY_SEPARATOR.'*.json')[0];
+        $manifest = json_decode((string) File::get($manifestFile), true);
+
+        $this->assertSame('semester', $manifest['period_type']);
+        $this->assertSame('S1-2526', $manifest['period_value']);
+
+        $sqlFile = File::glob($exportPath.DIRECTORY_SEPARATOR.'sql'.DIRECTORY_SEPARATOR.'*.sql')[0];
+        $sql = File::get($sqlFile);
+        $this->assertStringContainsString('INV-S1-2526', $sql);
+        $this->assertStringNotContainsString('INV-S2-2526', $sql);
+    }
+
+    public function test_archive_page_scan_action_accepts_semester_scope(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('archive-data.scan'), [
+            'archive_scope_type' => 'semester',
+            'archive_semester' => 'S1-2526',
+            'datasets' => ['audit_logs'],
+        ]);
+
+        $response
+            ->assertRedirect()
+            ->assertSessionHas('archive_scan_result', function (array $result): bool {
+                return ($result['period_type'] ?? null) === 'semester'
+                    && ($result['period_value'] ?? null) === 'S1-2526';
+            })
             ->assertSessionHas('archive_success');
     }
 
@@ -507,7 +598,7 @@ class ArchiveCommandsTest extends TestCase
         $manifest = $this->exportArchiveManifest(2024, ['sales_returns']);
 
         $prepareExit = Artisan::call('app:archive:prepare-financial', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['sales_returns'],
             '--manifest' => $manifest,
             '--rebuild-journal' => true,
@@ -516,13 +607,13 @@ class ArchiveCommandsTest extends TestCase
         $this->assertSame(0, $prepareExit);
 
         $purgeExit = Artisan::call('app:archive:purge', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['sales_returns'],
             '--manifest' => $manifest,
             '--confirm' => true,
         ]);
 
-        $this->assertSame(0, $purgeExit);
+        $this->assertSame(0, $purgeExit, Artisan::output());
         $this->assertDatabaseMissing('sales_returns', ['id' => $returnId]);
         $this->assertDatabaseMissing('sales_return_items', ['sales_return_id' => $returnId]);
         $this->assertDatabaseMissing('stock_mutations', ['reference_type' => \App\Models\SalesReturn::class, 'reference_id' => $returnId]);
@@ -629,7 +720,7 @@ class ArchiveCommandsTest extends TestCase
         $manifest = $this->exportArchiveManifest(2024, ['receivable_payments']);
 
         $prepareExit = Artisan::call('app:archive:prepare-financial', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['receivable_payments'],
             '--manifest' => $manifest,
             '--rebuild-journal' => true,
@@ -638,7 +729,7 @@ class ArchiveCommandsTest extends TestCase
         $this->assertSame(0, $prepareExit);
 
         $purgeExit = Artisan::call('app:archive:purge', [
-            'year' => 2024,
+            'period' => 2024,
             '--dataset' => ['receivable_payments'],
             '--manifest' => $manifest,
             '--confirm' => true,
@@ -684,7 +775,7 @@ class ArchiveCommandsTest extends TestCase
     {
         $exportPath = storage_path('app/archives-test');
         Artisan::call('app:archive:export', [
-            'year' => $year,
+            'period' => $year,
             '--dataset' => $datasets,
             '--path' => $exportPath,
         ]);
@@ -736,14 +827,23 @@ class ArchiveCommandsTest extends TestCase
         ]);
     }
 
-    private function createArchiveInvoice(int $customerId, string $number, int $total, int $totalPaid, int $balance, string $status): int
+    private function createArchiveInvoice(
+        int $customerId,
+        string $number,
+        int $total,
+        int $totalPaid,
+        int $balance,
+        string $status,
+        string $invoiceDate = '2024-01-01',
+        string $semesterPeriod = 'S2-2425'
+    ): int
     {
         return (int) DB::table('sales_invoices')->insertGetId([
             'invoice_number' => $number,
             'customer_id' => $customerId,
-            'invoice_date' => '2024-01-01',
+            'invoice_date' => $invoiceDate,
             'due_date' => '2024-01-31',
-            'semester_period' => 'S2-2425',
+            'semester_period' => $semesterPeriod,
             'subtotal' => $total,
             'total' => $total,
             'total_paid' => $totalPaid,

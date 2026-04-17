@@ -15,13 +15,22 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 
 class DataArchiveService
 {
+    public function __construct(
+        private readonly SemesterBookService $semesterBookService
+    ) {
+    }
+
     /**
      * @param  list<string>  $requestedDatasets
      * @return array{
+     *   period_type:string,
+     *   period_value:string,
      *   year:int,
+     *   semester:?string,
      *   datasets:array<string, array{
      *     label:string,
      *     basis:string,
@@ -36,6 +45,32 @@ class DataArchiveService
      * }
      */
     public function scan(int $year, array $requestedDatasets, bool $persistHistory = false): array
+    {
+        return $this->scanByScope($this->yearScope($year), $requestedDatasets, $persistHistory);
+    }
+
+    /**
+     * @param  list<string>  $requestedDatasets
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     * @return array{
+     *   period_type:string,
+     *   period_value:string,
+     *   year:int,
+     *   semester:?string,
+     *   datasets:array<string, array{
+     *     label:string,
+     *     basis:string,
+     *     purge_allowed:bool,
+     *     purge_mode:string,
+     *     financial:bool,
+     *     total_rows:int,
+     *     tables:array<int, array{table:string, rows:int}>
+     *   }>,
+     *   missing:list<string>,
+     *   grand_total:int
+     * }
+     */
+    public function scanByScope(array $scope, array $requestedDatasets, bool $persistHistory = false): array
     {
         $definitions = DataArchiveRegistry::resolve($requestedDatasets);
         $missing = DataArchiveRegistry::missing($definitions, $requestedDatasets);
@@ -55,7 +90,7 @@ class DataArchiveService
                     continue;
                 }
 
-                $rows = $this->tableQuery($definition, $tableDefinition, $year)->count();
+                $rows = $this->tableQuery($definition, $tableDefinition, $scope)->count();
                 $datasetTotal += (int) $rows;
                 $tableSummaries[] = [
                     'table' => $tableDefinition['table'],
@@ -76,7 +111,10 @@ class DataArchiveService
         }
 
         $payload = [
-            'year' => $year,
+            'period_type' => $scope['type'],
+            'period_value' => $scope['value'],
+            'year' => (int) ($scope['year'] ?? 0),
+            'semester' => $scope['semester'],
             'datasets' => $datasets,
             'missing' => $missing,
             'grand_total' => $grandTotal,
@@ -85,6 +123,7 @@ class DataArchiveService
         if ($persistHistory) {
             $this->writeArchiveRecord('scans', 'scan', [
                 'generated_at' => now('Asia/Jakarta')->toIso8601String(),
+                'scope' => $scope,
                 'summary' => $payload,
                 'datasets' => array_keys($datasets),
                 'grand_total' => $grandTotal,
@@ -100,7 +139,10 @@ class DataArchiveService
      *   sql_file:string,
      *   manifest_file:string,
      *   summary:array{
+     *     period_type:string,
+     *     period_value:string,
      *     year:int,
+     *     semester:?string,
      *     datasets:array<string, array{
      *       label:string,
      *       basis:string,
@@ -117,7 +159,37 @@ class DataArchiveService
      */
     public function export(int $year, array $requestedDatasets, ?string $directory = null): array
     {
-        $summary = $this->scan($year, $requestedDatasets);
+        return $this->exportByScope($this->yearScope($year), $requestedDatasets, $directory);
+    }
+
+    /**
+     * @param  list<string>  $requestedDatasets
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     * @return array{
+     *   sql_file:string,
+     *   manifest_file:string,
+     *   summary:array{
+     *     period_type:string,
+     *     period_value:string,
+     *     year:int,
+     *     semester:?string,
+     *     datasets:array<string, array{
+     *       label:string,
+     *       basis:string,
+     *       purge_allowed:bool,
+     *       purge_mode:string,
+     *       financial:bool,
+     *       total_rows:int,
+     *       tables:array<int, array{table:string, rows:int}>
+     *     }>,
+     *     missing:list<string>,
+     *     grand_total:int
+     *   }
+     * }
+     */
+    public function exportByScope(array $scope, array $requestedDatasets, ?string $directory = null): array
+    {
+        $summary = $this->scanByScope($scope, $requestedDatasets);
         $datasetKeys = array_keys($summary['datasets']);
         $slug = $datasetKeys === [] ? 'empty' : implode('-', array_slice($datasetKeys, 0, 3));
         if (count($datasetKeys) > 3) {
@@ -131,8 +203,9 @@ class DataArchiveService
         File::ensureDirectoryExists($sqlDir);
         File::ensureDirectoryExists($manifestDir);
 
-        $sqlFile = $sqlDir . DIRECTORY_SEPARATOR . sprintf('archive-%d-%s-%s.sql', $year, $slug, $timestamp);
-        $manifestFile = $manifestDir . DIRECTORY_SEPARATOR . sprintf('archive-%d-%s-%s.json', $year, $slug, $timestamp);
+        $scopeSlug = $this->scopeSlug($scope);
+        $sqlFile = $sqlDir . DIRECTORY_SEPARATOR . sprintf('archive-%s-%s-%s.sql', $scopeSlug, $slug, $timestamp);
+        $manifestFile = $manifestDir . DIRECTORY_SEPARATOR . sprintf('archive-%s-%s-%s.json', $scopeSlug, $slug, $timestamp);
 
         $handle = fopen($sqlFile, 'wb');
         if ($handle === false) {
@@ -141,7 +214,7 @@ class DataArchiveService
 
         fwrite($handle, "-- PgPOS ERP archive export\n");
         fwrite($handle, '-- Generated at: '.now('Asia/Jakarta')->toDateTimeString()."\n");
-        fwrite($handle, '-- Year filter: '.$year."\n");
+        fwrite($handle, '-- Scope filter: '.$this->scopeLabel($scope)."\n");
         fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n\n");
 
         foreach ($datasetKeys as $datasetKey) {
@@ -153,13 +226,13 @@ class DataArchiveService
                     continue;
                 }
 
-                $count = $this->tableQuery($definition, $tableDefinition, $year)->count();
+                $count = $this->tableQuery($definition, $tableDefinition, $scope)->count();
                 if ((int) $count === 0) {
                     continue;
                 }
 
                 fwrite($handle, sprintf("-- Table: %s | rows: %d\n", $tableDefinition['table'], $count));
-                $this->writeTableInsertStatements($handle, $definition, $tableDefinition, $year);
+                $this->writeTableInsertStatements($handle, $definition, $tableDefinition, $scope);
                 fwrite($handle, "\n");
             }
         }
@@ -169,7 +242,11 @@ class DataArchiveService
 
         $manifest = [
             'generated_at' => now('Asia/Jakarta')->toIso8601String(),
-            'year' => $year,
+            'scope' => $scope,
+            'period_type' => $scope['type'],
+            'period_value' => $scope['value'],
+            'year' => (int) ($scope['year'] ?? 0),
+            'semester' => $scope['semester'],
             'datasets' => $datasetKeys,
             'sql_file' => $sqlFile,
             'summary' => $summary,
@@ -187,7 +264,10 @@ class DataArchiveService
      * @param  list<string>  $requestedDatasets
      * @return array{
      *   summary:array{
+     *     period_type:string,
+     *     period_value:string,
      *     year:int,
+     *     semester:?string,
      *     datasets:array<string, array{
      *       label:string,
      *       basis:string,
@@ -215,7 +295,52 @@ class DataArchiveService
         ?string $manifestFile = null,
         bool $allowSkippedRestore = false
     ): array {
-        $summary = $this->scan($year, $requestedDatasets);
+        return $this->purgeByScope(
+            $this->yearScope($year),
+            $requestedDatasets,
+            $confirm,
+            $manifestFile,
+            $allowSkippedRestore
+        );
+    }
+
+    /**
+     * @param  list<string>  $requestedDatasets
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     * @return array{
+     *   summary:array{
+     *     period_type:string,
+     *     period_value:string,
+     *     year:int,
+     *     semester:?string,
+     *     datasets:array<string, array{
+     *       label:string,
+     *       basis:string,
+     *       purge_allowed:bool,
+     *       purge_mode:string,
+     *       financial:bool,
+     *       total_rows:int,
+     *       tables:array<int, array{table:string, rows:int}>
+     *     }>,
+     *     missing:list<string>,
+     *     grand_total:int
+     *   },
+     *   manifest_file:string,
+     *   backup_file:string,
+     *   restore_status:string,
+     *   deleted:array<string, int>,
+     *   snapshot_file:?string,
+     *   post_check?:array<string, mixed>|null
+     * }
+     */
+    public function purgeByScope(
+        array $scope,
+        array $requestedDatasets,
+        bool $confirm,
+        ?string $manifestFile = null,
+        bool $allowSkippedRestore = false
+    ): array {
+        $summary = $this->scanByScope($scope, $requestedDatasets);
         $datasetKeys = array_keys($summary['datasets']);
         $definitions = DataArchiveRegistry::definitions();
 
@@ -263,21 +388,21 @@ class DataArchiveService
             throw new \RuntimeException('Restore drill terakhir belum aman untuk purge. Status: '.strtoupper($restoreStatus));
         }
 
-        $manifest = $this->resolveManifest($year, $datasetKeys, $manifestFile);
+        $manifest = $this->resolveManifest($scope, $datasetKeys, $manifestFile);
         if ($manifest === null) {
-            throw new \RuntimeException('Manifest arsip tidak ditemukan. Jalankan app:archive:export dulu untuk periode yang sama.');
+            throw new RuntimeException('Manifest arsip tidak ditemukan. Jalankan app:archive:export dulu untuk periode yang sama.');
         }
 
         $snapshotFile = null;
         if ($financialGuarded !== []) {
             $unsupported = array_values(array_diff($financialGuarded, $this->supportedFinancialPurgeDatasets()));
             if ($unsupported !== []) {
-                throw new \RuntimeException('Dataset finansial ini belum siap dipurge otomatis: '.implode(', ', $unsupported).'. Tahap aman saat ini baru dibuka untuk sales_invoices, outgoing_transactions, dan supplier_payments.');
+                throw new RuntimeException('Dataset finansial ini belum siap dipurge otomatis: '.implode(', ', $unsupported).'. Tahap aman saat ini baru dibuka untuk sales_invoices, sales_returns, outgoing_transactions, receivable_payments, dan supplier_payments.');
             }
 
-            $snapshotFile = $this->resolveFinancialSnapshot($year, $financialGuarded, $manifest);
+            $snapshotFile = $this->resolveFinancialSnapshot($scope, $financialGuarded, $manifest);
             if ($snapshotFile === null) {
-                throw new \RuntimeException('Snapshot finansial belum ditemukan. Jalankan app:archive:prepare-financial dulu untuk periode dan dataset yang sama.');
+                throw new RuntimeException('Snapshot finansial belum ditemukan. Jalankan app:archive:prepare-financial dulu untuk periode dan dataset yang sama.');
             }
         }
 
@@ -297,10 +422,10 @@ class DataArchiveService
             ];
         }
 
-        DB::transaction(function () use ($datasetKeys, $definitions, $year, &$deleted): void {
+        DB::transaction(function () use ($datasetKeys, $definitions, $scope, &$deleted): void {
             foreach ($datasetKeys as $datasetKey) {
                 $definition = $definitions[$datasetKey];
-                $deleted[$datasetKey] = $this->purgeDataset($datasetKey, $definition, $year);
+                $deleted[$datasetKey] = $this->purgeDataset($datasetKey, $definition, $scope);
             }
         });
 
@@ -311,10 +436,14 @@ class DataArchiveService
 
         $purgeDir = storage_path('app/archives/purges');
         File::ensureDirectoryExists($purgeDir);
-        $purgeFile = $purgeDir.DIRECTORY_SEPARATOR.'purge-'.$year.'-'.now('Asia/Jakarta')->format('Ymd-His').'.json';
+        $purgeFile = $purgeDir.DIRECTORY_SEPARATOR.'purge-'.$this->scopeSlug($scope).'-'.now('Asia/Jakarta')->format('Ymd-His').'.json';
         File::put($purgeFile, json_encode([
             'purged_at' => now('Asia/Jakarta')->toIso8601String(),
-            'year' => $year,
+            'scope' => $scope,
+            'period_type' => $scope['type'],
+            'period_value' => $scope['value'],
+            'year' => (int) ($scope['year'] ?? 0),
+            'semester' => $scope['semester'],
             'datasets' => $datasetKeys,
             'manifest_file' => $manifest,
             'backup_file' => $backupFile,
@@ -339,6 +468,9 @@ class DataArchiveService
      * @param  list<string>  $requestedDatasets
      * @return array{
      *   year:int,
+     *   period_type:string,
+     *   period_value:string,
+     *   semester:?string,
      *   manifest_file:string,
      *   backup_file:string,
      *   restore_status:string,
@@ -367,7 +499,54 @@ class DataArchiveService
         ?string $manifestFile = null,
         bool $rebuildJournal = false
     ): array {
-        $summary = $this->scan($year, $requestedDatasets);
+        return $this->prepareFinancialSnapshotByScope(
+            $this->yearScope($year),
+            $requestedDatasets,
+            $manifestFile,
+            $rebuildJournal
+        );
+    }
+
+    /**
+     * @param  list<string>  $requestedDatasets
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     * @return array{
+     *   year:int,
+     *   period_type:string,
+     *   period_value:string,
+     *   semester:?string,
+     *   manifest_file:string,
+     *   backup_file:string,
+     *   restore_status:string,
+     *   summary:array{
+     *     period_type:string,
+     *     period_value:string,
+     *     year:int,
+     *     semester:?string,
+     *     datasets:array<string, array{
+     *       label:string,
+     *       basis:string,
+     *       purge_allowed:bool,
+     *       purge_mode:string,
+     *       financial:bool,
+     *       total_rows:int,
+     *       tables:array<int, array{table:string, rows:int}>
+     *     }>,
+     *     missing:list<string>,
+     *     grand_total:int
+     *   },
+     *   snapshot_file:string,
+     *   customer_snapshots:list<array<string, mixed>>,
+     *   supplier_snapshots:list<array<string, mixed>>
+     * }
+     */
+    public function prepareFinancialSnapshotByScope(
+        array $scope,
+        array $requestedDatasets,
+        ?string $manifestFile = null,
+        bool $rebuildJournal = false
+    ): array {
+        $summary = $this->scanByScope($scope, $requestedDatasets);
         $datasetKeys = array_keys($summary['datasets']);
         $definitions = DataArchiveRegistry::definitions();
 
@@ -401,17 +580,17 @@ class DataArchiveService
             throw new \RuntimeException('Restore drill terakhir belum aman untuk snapshot finansial. Status: '.strtoupper($restoreStatus));
         }
 
-        $manifest = $this->resolveManifest($year, $datasetKeys, $manifestFile);
+        $manifest = $this->resolveManifest($scope, $datasetKeys, $manifestFile);
         if ($manifest === null) {
-            throw new \RuntimeException('Manifest arsip tidak ditemukan. Jalankan app:archive:export dulu untuk periode yang sama.');
+            throw new RuntimeException('Manifest arsip tidak ditemukan. Jalankan app:archive:export dulu untuk periode yang sama.');
         }
 
         $customerIds = collect();
         $supplierIds = collect();
 
         foreach ($datasetKeys as $datasetKey) {
-            $customerIds = $customerIds->merge($this->datasetCustomerIds($datasetKey, $year));
-            $supplierIds = $supplierIds->merge($this->datasetSupplierIds($datasetKey, $year));
+            $customerIds = $customerIds->merge($this->datasetCustomerIds($datasetKey, $scope));
+            $supplierIds = $supplierIds->merge($this->datasetSupplierIds($datasetKey, $scope));
         }
 
         $customerSnapshots = Customer::query()
@@ -453,11 +632,15 @@ class DataArchiveService
         $snapshotDir = storage_path('app/archives/financial-snapshots');
         File::ensureDirectoryExists($snapshotDir);
         $slug = implode('-', $datasetKeys);
-        $snapshotFile = $snapshotDir.DIRECTORY_SEPARATOR.'financial-snapshot-'.$year.'-'.$slug.'-'.now('Asia/Jakarta')->format('Ymd-His').'.json';
+        $snapshotFile = $snapshotDir.DIRECTORY_SEPARATOR.'financial-snapshot-'.$this->scopeSlug($scope).'-'.$slug.'-'.now('Asia/Jakarta')->format('Ymd-His').'.json';
 
         File::put($snapshotFile, json_encode([
             'prepared_at' => now('Asia/Jakarta')->toIso8601String(),
-            'year' => $year,
+            'scope' => $scope,
+            'period_type' => $scope['type'],
+            'period_value' => $scope['value'],
+            'year' => (int) ($scope['year'] ?? 0),
+            'semester' => $scope['semester'],
             'datasets' => $datasetKeys,
             'manifest_file' => $manifest,
             'backup_file' => $backupFile,
@@ -469,7 +652,10 @@ class DataArchiveService
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return [
-            'year' => $year,
+            'year' => (int) ($scope['year'] ?? 0),
+            'period_type' => $scope['type'],
+            'period_value' => $scope['value'],
+            'semester' => $scope['semester'],
             'manifest_file' => $manifest,
             'backup_file' => $backupFile,
             'restore_status' => $restoreStatus,
@@ -552,42 +738,135 @@ class DataArchiveService
     }
 
     /**
+     * @return array{type:string,value:string,year:int,semester:?string,start:?string,end:?string}
+     */
+    public function yearScope(int $year): array
+    {
+        if ($year < 2000 || $year > 2100) {
+            throw new RuntimeException('Tahun arsip tidak valid.');
+        }
+
+        return [
+            'type' => 'year',
+            'value' => (string) $year,
+            'year' => $year,
+            'semester' => null,
+            'start' => null,
+            'end' => null,
+        ];
+    }
+
+    /**
+     * @return array{type:string,value:string,year:?int,semester:string,start:string,end:string}
+     */
+    public function semesterScope(string $semester): array
+    {
+        $normalized = $this->semesterBookService->normalizeSemester($semester);
+        if ($normalized === null) {
+            throw new RuntimeException('Kode semester tidak valid.');
+        }
+
+        $range = $this->semesterBookService->semesterDateRange($normalized);
+        if ($range === null) {
+            throw new RuntimeException('Range tanggal semester tidak ditemukan.');
+        }
+
+        return [
+            'type' => 'semester',
+            'value' => $normalized,
+            'year' => null,
+            'semester' => $normalized,
+            'start' => $range['start'],
+            'end' => $range['end'],
+        ];
+    }
+
+    /**
+     * @return array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}
+     */
+    public function resolveScope(string $scopeType, ?int $year = null, ?string $semester = null): array
+    {
+        return $scopeType === 'semester'
+            ? $this->semesterScope((string) $semester)
+            : $this->yearScope((int) $year);
+    }
+
+    /**
      * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}>}  $definition
      * @param  array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}  $tableDefinition
      */
-    public function tableQuery(array $definition, array $tableDefinition, int $year): Builder
+    /**
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}|int  $scope
+     */
+    public function tableQuery(array $definition, array $tableDefinition, array|int $scope): Builder
     {
+        $scope = is_int($scope) ? $this->yearScope($scope) : $scope;
         if (isset($tableDefinition['date_column'])) {
             $query = DB::table($tableDefinition['table']);
-            if (($tableDefinition['date_kind'] ?? 'calendar') === 'unix') {
-                return $query->whereBetween(
-                    $tableDefinition['date_column'],
-                    [strtotime($year.'-01-01 00:00:00'), strtotime($year.'-12-31 23:59:59')]
-                );
-            }
-
-            return $query->whereYear($tableDefinition['date_column'], $year);
+            return $this->applyScopeToDateQuery($query, $tableDefinition, $scope);
         }
 
         $root = $definition['tables'][0];
         $rootTable = $root['table'];
-        $rootDateColumn = $root['date_column'] ?? 'created_at';
 
-        return DB::table($tableDefinition['table'])->whereIn($tableDefinition['foreign_key'], function ($query) use ($rootTable, $rootDateColumn, $year): void {
-            $query->from($rootTable)
-                ->select('id')
-                ->whereYear($rootDateColumn, $year);
-        });
+        return DB::table($tableDefinition['table'])->whereIn(
+            $tableDefinition['foreign_key'],
+            $this->rootIdQuery($definition, $scope)->select($rootTable.'.id')
+        );
     }
 
-    private function writeTableInsertStatements($handle, array $definition, array $tableDefinition, int $year): void
+    /**
+     * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string,semester_column?:string}>}  $definition
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     */
+    private function rootIdQuery(array $definition, array $scope): Builder
+    {
+        $root = $definition['tables'][0];
+        $query = DB::table($root['table']);
+
+        return $this->applyScopeToDateQuery($query, $root, $scope);
+    }
+
+    /**
+     * @param  array{table:string,date_column?:string,date_kind?:string,foreign_key?:string,semester_column?:string}  $tableDefinition
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     */
+    private function applyScopeToDateQuery(Builder $query, array $tableDefinition, array $scope): Builder
+    {
+        if ($scope['type'] === 'semester' && isset($tableDefinition['semester_column'])) {
+            return $query->where($tableDefinition['semester_column'], $scope['semester']);
+        }
+
+        $dateColumn = $tableDefinition['date_column'] ?? 'created_at';
+        if (($tableDefinition['date_kind'] ?? 'calendar') === 'unix') {
+            if ($scope['type'] === 'semester') {
+                return $query->whereBetween(
+                    $dateColumn,
+                    [strtotime((string) $scope['start'].' 00:00:00'), strtotime((string) $scope['end'].' 23:59:59')]
+                );
+            }
+
+            return $query->whereBetween(
+                $dateColumn,
+                [strtotime((string) $scope['year'].'-01-01 00:00:00'), strtotime((string) $scope['year'].'-12-31 23:59:59')]
+            );
+        }
+
+        if ($scope['type'] === 'semester') {
+            return $query->whereBetween($dateColumn, [$scope['start'], $scope['end']]);
+        }
+
+        return $query->whereYear($dateColumn, (int) $scope['year']);
+    }
+
+    private function writeTableInsertStatements($handle, array $definition, array $tableDefinition, array $scope): void
     {
         $columns = Schema::getColumnListing($tableDefinition['table']);
         if ($columns === []) {
             return;
         }
 
-        $query = $this->tableQuery($definition, $tableDefinition, $year)->select($columns);
+        $query = $this->tableQuery($definition, $tableDefinition, $scope)->select($columns);
         if (in_array('id', $columns, true)) {
             $query->orderBy('id');
         }
@@ -686,7 +965,7 @@ class DataArchiveService
     /**
      * @param  list<string>  $datasetKeys
      */
-    public function latestFinancialSnapshot(?int $year = null, array $datasetKeys = []): ?array
+    public function latestFinancialSnapshot(?int $year = null, array $datasetKeys = [], ?array $scope = null): ?array
     {
         $snapshotDir = storage_path('app/archives/financial-snapshots');
         if (! File::isDirectory($snapshotDir)) {
@@ -697,13 +976,17 @@ class DataArchiveService
 
         $path = collect(File::glob($snapshotDir.DIRECTORY_SEPARATOR.'*.json'))
             ->sortDesc()
-            ->first(function (string $file) use ($year, $normalizedDatasets): bool {
+            ->first(function (string $file) use ($year, $normalizedDatasets, $scope): bool {
                 $payload = json_decode((string) File::get($file), true);
                 if (! is_array($payload)) {
                     return false;
                 }
 
-                if ($year !== null && (int) ($payload['year'] ?? 0) !== $year) {
+                if ($scope !== null && ! $this->matchesStoredScope($payload, $scope)) {
+                    return false;
+                }
+
+                if ($scope === null && $year !== null && (int) ($payload['year'] ?? 0) !== $year) {
                     return false;
                 }
 
@@ -803,12 +1086,13 @@ class DataArchiveService
     /**
      * @param  list<string>  $datasetKeys
      */
-    public function resolveManifest(int $year, array $datasetKeys, ?string $manifestFile = null): ?string
+    public function resolveManifest(int|array $scope, array $datasetKeys, ?string $manifestFile = null): ?string
     {
         if (is_string($manifestFile) && $manifestFile !== '' && File::exists($manifestFile)) {
             return $manifestFile;
         }
 
+        $scope = is_int($scope) ? $this->yearScope($scope) : $scope;
         $manifestDir = storage_path('app/archives/manifests');
         if (! File::isDirectory($manifestDir)) {
             return null;
@@ -818,16 +1102,15 @@ class DataArchiveService
 
         return collect(File::glob($manifestDir.DIRECTORY_SEPARATOR.'*.json'))
             ->sortDesc()
-            ->first(function (string $path) use ($year, $normalizedDatasets): bool {
+            ->first(function (string $path) use ($scope, $normalizedDatasets): bool {
                 $payload = json_decode((string) File::get($path), true);
                 if (! is_array($payload)) {
                     return false;
                 }
 
-                $payloadYear = (int) ($payload['year'] ?? 0);
                 $payloadDatasets = collect((array) ($payload['datasets'] ?? []))->map(static fn ($value): string => strtolower((string) $value))->sort()->values()->all();
 
-                return $payloadYear === $year && $payloadDatasets === $normalizedDatasets;
+                return $payloadDatasets === $normalizedDatasets && $this->matchesStoredScope($payload, $scope);
             });
     }
 
@@ -848,17 +1131,14 @@ class DataArchiveService
     /**
      * @return \Illuminate\Support\Collection<int, int>
      */
-    private function datasetCustomerIds(string $datasetKey, int $year)
+    private function datasetCustomerIds(string $datasetKey, array $scope)
     {
         return match ($datasetKey) {
-            'sales_invoices' => DB::table('sales_invoices')
-                ->whereYear('invoice_date', $year)
+            'sales_invoices' => $this->rootIdQuery(DataArchiveRegistry::definitions()['sales_invoices'], $scope)
                 ->pluck('customer_id'),
-            'sales_returns' => DB::table('sales_returns')
-                ->whereYear('return_date', $year)
+            'sales_returns' => $this->rootIdQuery(DataArchiveRegistry::definitions()['sales_returns'], $scope)
                 ->pluck('customer_id'),
-            'receivable_payments' => DB::table('receivable_payments')
-                ->whereYear('payment_date', $year)
+            'receivable_payments' => $this->rootIdQuery(DataArchiveRegistry::definitions()['receivable_payments'], $scope)
                 ->pluck('customer_id'),
             default => collect(),
         };
@@ -867,14 +1147,12 @@ class DataArchiveService
     /**
      * @return \Illuminate\Support\Collection<int, int>
      */
-    private function datasetSupplierIds(string $datasetKey, int $year)
+    private function datasetSupplierIds(string $datasetKey, array $scope)
     {
         return match ($datasetKey) {
-            'outgoing_transactions' => DB::table('outgoing_transactions')
-                ->whereYear('transaction_date', $year)
+            'outgoing_transactions' => $this->rootIdQuery(DataArchiveRegistry::definitions()['outgoing_transactions'], $scope)
                 ->pluck('supplier_id'),
-            'supplier_payments' => DB::table('supplier_payments')
-                ->whereYear('payment_date', $year)
+            'supplier_payments' => $this->rootIdQuery(DataArchiveRegistry::definitions()['supplier_payments'], $scope)
                 ->pluck('supplier_id'),
             default => collect(),
         };
@@ -883,9 +1161,9 @@ class DataArchiveService
     /**
      * @param  list<string>  $datasetKeys
      */
-    private function resolveFinancialSnapshot(int $year, array $datasetKeys, string $manifestFile): ?string
+    private function resolveFinancialSnapshot(array $scope, array $datasetKeys, string $manifestFile): ?string
     {
-        $snapshot = $this->latestFinancialSnapshot($year, $datasetKeys);
+        $snapshot = $this->latestFinancialSnapshot(null, $datasetKeys, $scope);
         if ($snapshot === null) {
             return null;
         }
@@ -932,19 +1210,19 @@ class DataArchiveService
     /**
      * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}>}  $definition
      */
-    private function purgeDataset(string $datasetKey, array $definition, int $year): int
+    private function purgeDataset(string $datasetKey, array $definition, array $scope): int
     {
         return match ($datasetKey) {
-            'sales_returns' => $this->purgeSalesReturns($definition, $year),
-            'receivable_payments' => $this->purgeReceivablePayments($definition, $year),
-            default => $this->purgeGenericDataset($definition, $year),
+            'sales_returns' => $this->purgeSalesReturns($definition, $scope),
+            'receivable_payments' => $this->purgeReceivablePayments($definition, $scope),
+            default => $this->purgeGenericDataset($definition, $scope),
         };
     }
 
     /**
      * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}>}  $definition
      */
-    private function purgeGenericDataset(array $definition, int $year): int
+    private function purgeGenericDataset(array $definition, array $scope): int
     {
         $tables = array_reverse($definition['tables']);
         $datasetDeleted = 0;
@@ -953,7 +1231,7 @@ class DataArchiveService
             if (! Schema::hasTable($tableDefinition['table'])) {
                 continue;
             }
-            $datasetDeleted += $this->tableQuery($definition, $tableDefinition, $year)->delete();
+            $datasetDeleted += $this->tableQuery($definition, $tableDefinition, $scope)->delete();
         }
 
         return $datasetDeleted;
@@ -962,11 +1240,10 @@ class DataArchiveService
     /**
      * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}>}  $definition
      */
-    private function purgeSalesReturns(array $definition, int $year): int
+    private function purgeSalesReturns(array $definition, array $scope): int
     {
-        $returns = DB::table('sales_returns')
+        $returns = $this->rootIdQuery($definition, $scope)
             ->select(['id', 'return_number'])
-            ->whereYear('return_date', $year)
             ->get();
 
         if ($returns->isEmpty()) {
@@ -989,17 +1266,16 @@ class DataArchiveService
             $deleted += $this->deleteRowsMatchingNumbers('receivable_ledgers', 'description', $returnNumbers);
         }
 
-        return $deleted + $this->purgeGenericDataset($definition, $year);
+        return $deleted + $this->purgeGenericDataset($definition, $scope);
     }
 
     /**
      * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}>}  $definition
      */
-    private function purgeReceivablePayments(array $definition, int $year): int
+    private function purgeReceivablePayments(array $definition, array $scope): int
     {
-        $payments = DB::table('receivable_payments')
+        $payments = $this->rootIdQuery($definition, $scope)
             ->select(['id', 'payment_number'])
-            ->whereYear('payment_date', $year)
             ->get();
 
         if ($payments->isEmpty()) {
@@ -1019,7 +1295,7 @@ class DataArchiveService
             $deleted += $this->deleteRowsMatchingNumbers('receivable_ledgers', 'description', $paymentNumbers);
         }
 
-        return $deleted + $this->purgeGenericDataset($definition, $year);
+        return $deleted + $this->purgeGenericDataset($definition, $scope);
     }
 
     /**
@@ -1145,6 +1421,40 @@ class DataArchiveService
     }
 
     /**
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     */
+    private function scopeSlug(array $scope): string
+    {
+        return strtolower(str_replace([' ', '/'], ['-', '-'], $scope['value']));
+    }
+
+    /**
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     */
+    private function scopeLabel(array $scope): string
+    {
+        return $scope['type'] === 'semester'
+            ? 'Semester '.$scope['value']
+            : 'Tahun '.$scope['value'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     */
+    private function matchesStoredScope(array $payload, array $scope): bool
+    {
+        $payloadType = (string) ($payload['period_type'] ?? $payload['scope']['type'] ?? 'year');
+        $payloadValue = (string) ($payload['period_value']
+            ?? $payload['scope']['value']
+            ?? (($payloadType === 'semester')
+                ? ($payload['semester'] ?? '')
+                : (string) ($payload['year'] ?? '')));
+
+        return $payloadType === $scope['type'] && $payloadValue === $scope['value'];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     private function writeArchiveRecord(string $directoryName, string $prefix, array $payload): string
@@ -1206,6 +1516,18 @@ class DataArchiveService
                 number_format((int) ($payload['grand_total'] ?? $payload['summary']['grand_total'] ?? 0), 0, ',', '.')
             ),
         };
+
+        $scopeType = (string) ($payload['period_type'] ?? $payload['scope']['type'] ?? '');
+        $scopeValue = (string) ($payload['period_value']
+            ?? $payload['scope']['value']
+            ?? (($scopeType === 'semester')
+                ? ($payload['semester'] ?? '')
+                : ($payload['year'] ?? '')));
+
+        if ($scopeValue !== '') {
+            $scopeText = $scopeType === 'semester' ? 'semester '.$scopeValue : 'tahun '.$scopeValue;
+            $summary = $scopeText.' | '.$summary;
+        }
 
         return [
             'type' => $type,

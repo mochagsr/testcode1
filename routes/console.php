@@ -467,11 +467,15 @@ Artisan::command('app:db-backup {--path=} {--gzip}', function () {
     return 0;
 })->purpose('Create database backup file');
 
-Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int $year) {
+Artisan::command('app:archive:scan {period?} {--semester=} {--dataset=*} {--json}', function (?string $period = null) {
     /** @var DataArchiveService $service */
     $service = app(DataArchiveService::class);
     $requestedDatasets = (array) $this->option('dataset');
-    $summary = $service->scan($year, $requestedDatasets, true);
+    $semester = trim((string) ($this->option('semester') ?: ''));
+    $scope = $semester !== ''
+        ? $service->resolveScope('semester', null, $semester)
+        : $service->resolveScope('year', (int) $period, null);
+    $summary = $service->scanByScope($scope, $requestedDatasets, true);
 
     if ((bool) $this->option('json')) {
         $this->line(json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -479,7 +483,7 @@ Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int
     }
 
     $this->info('Preview Arsip Data');
-    $this->line('Tahun: '.$summary['year']);
+    $this->line(($summary['period_type'] === 'semester' ? 'Semester: ' : 'Tahun: ').$summary['period_value']);
     $this->line('Total kandidat baris: '.number_format((int) $summary['grand_total'], 0, ',', '.'));
 
     foreach ($summary['datasets'] as $datasetKey => $dataset) {
@@ -508,12 +512,13 @@ Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int
     }
 
     $this->newLine();
-    $this->line('Lanjut export: php artisan app:archive:export '.$year.' --dataset=...');
-    $this->line('Siapkan finansial: php artisan app:archive:prepare-financial '.$year.' --dataset=...');
-    $this->line('Lanjut purge: php artisan app:archive:purge '.$year.' --dataset=... --confirm');
+    $periodArgument = $scope['type'] === 'semester' ? '--semester='.$scope['value'] : $scope['value'];
+    $this->line('Lanjut export: php artisan app:archive:export '.$periodArgument.' --dataset=...');
+    $this->line('Siapkan finansial: php artisan app:archive:prepare-financial '.$periodArgument.' --dataset=...');
+    $this->line('Lanjut purge: php artisan app:archive:purge '.$periodArgument.' --dataset=... --confirm');
 
     return 0;
-})->purpose('Preview kandidat arsip data berdasarkan tahun');
+})->purpose('Preview kandidat arsip data berdasarkan tahun atau semester');
 
 Artisan::command('app:archive:review {--dataset=*} {--json}', function () {
     /** @var DataArchiveService $service */
@@ -558,20 +563,25 @@ Artisan::command('app:archive:review {--dataset=*} {--json}', function () {
     return 0;
 })->purpose('Review bulanan kandidat arsip berdasarkan retention policy');
 
-Artisan::command('app:archive:export {year} {--dataset=*} {--path=}', function (int $year) {
+Artisan::command('app:archive:export {period?} {--semester=} {--dataset=*} {--path=}', function (?string $period = null) {
     /** @var DataArchiveService $service */
     $service = app(DataArchiveService::class);
     $requestedDatasets = (array) $this->option('dataset');
     $path = (string) ($this->option('path') ?: '');
+    $semester = trim((string) ($this->option('semester') ?: ''));
+    $scope = $semester !== ''
+        ? $service->resolveScope('semester', null, $semester)
+        : $service->resolveScope('year', (int) $period, null);
 
     try {
-        $result = $service->export($year, $requestedDatasets, $path !== '' ? $path : null);
+        $result = $service->exportByScope($scope, $requestedDatasets, $path !== '' ? $path : null);
     } catch (Throwable $e) {
         $this->error('Export arsip gagal: '.$e->getMessage());
         return 1;
     }
 
     $this->info('Export arsip selesai.');
+    $this->line('Scope        : '.(($scope['type'] === 'semester' ? 'Semester ' : 'Tahun ').$scope['value']));
     $this->line('SQL file     : '.$result['sql_file']);
     $this->line('Manifest file: '.$result['manifest_file']);
     $this->line('Total row    : '.number_format((int) $result['summary']['grand_total'], 0, ',', '.'));
@@ -590,17 +600,21 @@ Artisan::command('app:archive:export {year} {--dataset=*} {--path=}', function (
     }
 
     return 0;
-})->purpose('Export arsip SQL berdasarkan tahun untuk dataset terpilih');
+})->purpose('Export arsip SQL berdasarkan tahun atau semester untuk dataset terpilih');
 
-Artisan::command('app:archive:prepare-financial {year} {--dataset=*} {--manifest=} {--rebuild-journal}', function (int $year) {
+Artisan::command('app:archive:prepare-financial {period?} {--semester=} {--dataset=*} {--manifest=} {--rebuild-journal}', function (?string $period = null) {
     /** @var DataArchiveService $service */
     $service = app(DataArchiveService::class);
     $requestedDatasets = (array) $this->option('dataset');
     $manifest = (string) ($this->option('manifest') ?: '');
+    $semester = trim((string) ($this->option('semester') ?: ''));
+    $scope = $semester !== ''
+        ? $service->resolveScope('semester', null, $semester)
+        : $service->resolveScope('year', (int) $period, null);
 
     try {
-        $result = $service->prepareFinancialSnapshot(
-            $year,
+        $result = $service->prepareFinancialSnapshotByScope(
+            $scope,
             $requestedDatasets,
             $manifest !== '' ? $manifest : null,
             (bool) $this->option('rebuild-journal')
@@ -611,6 +625,7 @@ Artisan::command('app:archive:prepare-financial {year} {--dataset=*} {--manifest
     }
 
     $this->info('Snapshot finansial siap.');
+    $this->line('Scope         : '.(($scope['type'] === 'semester' ? 'Semester ' : 'Tahun ').$scope['value']));
     $this->line('Snapshot file : '.$result['snapshot_file']);
     $this->line('Manifest file : '.$result['manifest_file']);
     $this->line('Backup file   : '.$result['backup_file']);
@@ -619,19 +634,23 @@ Artisan::command('app:archive:prepare-financial {year} {--dataset=*} {--manifest
     $this->line('Supplier kena : '.number_format(count($result['supplier_snapshots']), 0, ',', '.'));
 
     return 0;
-})->purpose('Prepare snapshot finansial sebelum purge dataset finansial yang sudah didukung');
+})->purpose('Prepare snapshot finansial sebelum purge dataset finansial yang sudah didukung per tahun atau semester');
 
-Artisan::command('app:archive:purge {year} {--dataset=*} {--manifest=} {--confirm} {--allow-skipped-restore}', function (int $year) {
+Artisan::command('app:archive:purge {period?} {--semester=} {--dataset=*} {--manifest=} {--confirm} {--allow-skipped-restore}', function (?string $period = null) {
     /** @var DataArchiveService $service */
     $service = app(DataArchiveService::class);
     $requestedDatasets = (array) $this->option('dataset');
     $manifest = (string) ($this->option('manifest') ?: '');
     $confirm = (bool) $this->option('confirm');
     $allowSkippedRestore = (bool) $this->option('allow-skipped-restore');
+    $semester = trim((string) ($this->option('semester') ?: ''));
+    $scope = $semester !== ''
+        ? $service->resolveScope('semester', null, $semester)
+        : $service->resolveScope('year', (int) $period, null);
 
     try {
-        $result = $service->purge(
-            $year,
+        $result = $service->purgeByScope(
+            $scope,
             $requestedDatasets,
             $confirm,
             $manifest !== '' ? $manifest : null,
@@ -643,6 +662,7 @@ Artisan::command('app:archive:purge {year} {--dataset=*} {--manifest=} {--confir
     }
 
     $this->info($confirm ? 'Purge arsip selesai.' : 'Dry run purge arsip.');
+    $this->line('Scope          : '.(($scope['type'] === 'semester' ? 'Semester ' : 'Tahun ').$scope['value']));
     $this->line('Backup file    : '.$result['backup_file']);
     $this->line('Manifest file  : '.$result['manifest_file']);
     $this->line('Restore status : '.strtoupper($result['restore_status']));

@@ -13,19 +13,24 @@ Fokus dokumen ini:
 
 Submenu operasional di aplikasi:
 - `Sistem > Arsip Data`
-- halaman ini dipakai sebagai pengingat operator bahwa untuk `erpos` production, backup tetap dijalankan ke managed DB AWS dan titik kerja arsip transaksi utama dibaca berdasarkan tahun
+- halaman ini dipakai sebagai pengingat operator bahwa untuk `erpos` production, backup tetap dijalankan ke managed DB AWS, file backup perlu disimpan juga di lokal operator, dan arsip transaksi utama bisa dipilih berdasarkan tahun atau semester
 
 Command yang tersedia sekarang:
 - `php artisan app:archive:scan 2021 --dataset=sales_invoices`
+- `php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices`
 - `php artisan app:archive:export 2021 --dataset=sales_invoices`
+- `php artisan app:archive:export --semester=S1-2526 --dataset=sales_returns`
 - `php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal`
+- `php artisan app:archive:prepare-financial --semester=S1-2526 --dataset=receivable_payments --rebuild-journal`
 - `php artisan app:archive:review`
 - `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
+- `php artisan app:archive:purge --semester=S1-2526 --dataset=sales_returns --confirm`
 
 Catatan:
 - halaman `Sistem > Arsip Data` sekarang sudah punya tombol aksi untuk `scan`, `export`, `prepare financial snapshot`, dan `purge`
+- halaman `Sistem > Arsip Data` sekarang juga punya filter basis arsip `Tahun` atau `Semester`
 - halaman `Sistem > Arsip Data` juga sudah menampilkan histori eksekusi arsip, review arsip terakhir, dan checklist UAT arsip nyata di server
-- `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun
+- `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun maupun semester
 - `purge` biasa saat ini dibuka untuk dataset log/ops aman, termasuk `failed_jobs` dan `job_batches`
 - `purge` finansial tahap lanjut dibuka untuk dataset yang sudah punya guard snapshot + rebuild:
   - `sales_invoices`
@@ -40,9 +45,10 @@ Catatan:
 - data operasional yang masih aktif tetap online
 - data lama boleh diarsipkan, **bukan langsung dibuang**
 - sebelum arsip/hapus, selalu:
-  - backup penuh
-  - restore test
-  - verifikasi jumlah data
+- backup penuh
+- restore test
+- verifikasi jumlah data
+- unduh/copy backup dari server ke komputer lokal operator
 - untuk tabel finansial, arsip/hapus hanya dilakukan per periode yang jelas dan setelah dicek tidak mengganggu saldo aktif
 
 ## Rekomendasi awal untuk kasus ini
@@ -184,8 +190,8 @@ Contoh:
 - atau arsip semua data lebih tua dari `60 bulan`
 
 Catatan:
-- untuk transaksi ERP, basis kerja operator yang paling aman adalah **berdasarkan tahun**
-- untuk audit log, basis kerja yang lebih enak tetap per bulan atau per kuartal
+- untuk transaksi ERP, operator sekarang bisa memilih **berdasarkan tahun** atau **berdasarkan semester**
+- untuk audit log, basis kerja review tetap lebih enak per bulan atau per kuartal, walaupun tooling arsip bisa tetap dijalankan per tahun atau mengikuti semester jika memang dibutuhkan
 
 ### 2. Backup penuh dulu
 Jalankan dari **folder app di server aaPanel**.
@@ -199,6 +205,11 @@ Catatan:
 cd /www/wwwroot/erpos.mitrasejatiberkah.com
 php artisan app:db-backup --gzip
 ```
+
+Setelah file backup jadi:
+- download / copy file backup dari server
+- simpan di komputer lokal operator
+- kalau bisa, simpan juga salinan kedua di external drive atau cloud storage pribadi
 
 ### 3. Jalankan restore test
 
@@ -221,7 +232,9 @@ Export data lama ke:
 
 Contoh pendekatan paling aman:
 - buat backup SQL tahunan
+- atau backup SQL semesteran kalau periode yang mau dibersihkan memang per semester
 - simpan file hasil backup di storage backup
+- simpan salinan file hasil backup di komputer lokal operator
 - kalau perlu buka histori lama, restore ke database arsip / staging
 
 Catatan:

@@ -114,21 +114,27 @@ Catatan:
 - Uji restore: `php artisan app:db-restore-test`
 - Integrity check: `php artisan app:integrity-check`
 - Untuk `erpos` dengan `AWS Lightsail Managed MySQL`, command backup/restore tetap dijalankan dari folder project Laravel di app server aaPanel, tetapi target database-nya tetap koneksi managed DB yang aktif di `.env`
+- Untuk alur arsip production, backup dibuat dulu di server lalu **diunduh/salin juga ke komputer lokal operator** sebagai arsip tambahan
 - Untuk arsip data production, pola yang disepakati adalah **semi-manual**:
   - backup dulu
   - restore drill dulu
   - lalu arsip / pembersihan data
-- Default titik kerja arsip transaksi ERP adalah **berdasarkan tahun**, supaya operator lebih mudah memilih periode arsip
+- Arsip transaksi ERP sekarang bisa dipilih **berdasarkan tahun atau semester**
 - Command arsip yang tersedia sekarang:
   - `php artisan app:archive:scan 2021 --dataset=sales_invoices`
+  - `php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices`
   - `php artisan app:archive:export 2021 --dataset=sales_invoices`
+  - `php artisan app:archive:export --semester=S1-2526 --dataset=sales_returns`
   - `php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal`
+  - `php artisan app:archive:prepare-financial --semester=S1-2526 --dataset=receivable_payments --rebuild-journal`
   - `php artisan app:archive:review`
   - `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
+  - `php artisan app:archive:purge --semester=S1-2526 --dataset=sales_returns --confirm`
 - Catatan penting:
   - `Sistem > Arsip Data` sekarang sudah punya form aksi untuk `scan`, `export`, `prepare financial snapshot`, dan `purge`
+  - `Sistem > Arsip Data` sekarang juga bisa pilih basis arsip `Tahun` atau `Semester`
   - halaman `Sistem > Arsip Data` juga sudah menampilkan histori eksekusi arsip, review arsip terakhir, dan checklist UAT arsip nyata di server
-  - `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun
+  - `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun maupun semester
   - `purge` biasa sudah dibuka untuk dataset log/ops aman, termasuk `failed_jobs` dan `job_batches`
   - `purge` finansial tahap lanjut dibuka untuk dataset yang sudah punya guard snapshot + rebuild, yaitu `sales_invoices`, `sales_returns`, `outgoing_transactions`, `receivable_payments`, dan `supplier_payments`
   - dataset finansial lain seperti `receivable_ledgers` dan `supplier_ledgers` tetap dikunci

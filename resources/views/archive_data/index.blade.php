@@ -9,6 +9,7 @@
         $financialResult = session('archive_financial_result');
         $purgeResult = session('archive_purge_result');
         $selected = collect(old('datasets', $selectedDatasets ?? []))->map(fn ($value) => strtolower((string) $value))->all();
+        $scopeType = old('archive_scope_type', $selectedScopeType ?? 'year');
     @endphp
 
     <style>
@@ -201,7 +202,7 @@
         <div class="card archive-col-6">
             <h3 style="margin-top:0;">Prinsip Aman</h3>
             <ol class="archive-list">
-                <li>Arsip transaksi utama default dibaca berdasarkan tahun, supaya operator lebih mudah meninjau periode yang akan dipindah.</li>
+                <li>Arsip transaksi utama sekarang bisa dibaca berdasarkan tahun atau semester, sesuai kebutuhan periode bersih-bersih data.</li>
                 <li>Backup penuh wajib dibuat dulu sebelum ekspor atau pembersihan data production.</li>
                 <li>Restore drill wajib lulus dulu, terutama karena database berada di AWS Lightsail Managed MySQL.</li>
                 <li>Dataset finansial yang sudah dibuka tetap harus melalui snapshot finansial dan rebuild setelah purge.</li>
@@ -214,10 +215,28 @@
                 @csrf
                 <div class="archive-form-grid">
                     <div>
-                        <label for="archive_year" class="archive-muted" style="display:block;margin-bottom:6px;">Tahun target</label>
-                        <input type="number" id="archive_year" name="archive_year" value="{{ old('archive_year', $selectedYear) }}" min="2000" max="2100">
+                        <label for="archive_scope_type" class="archive-muted" style="display:block;margin-bottom:6px;">Basis arsip</label>
+                        <select id="archive_scope_type" name="archive_scope_type" onchange="window.toggleArchiveScope && window.toggleArchiveScope(this.value)">
+                            <option value="year" {{ $scopeType === 'year' ? 'selected' : '' }}>Tahun</option>
+                            <option value="semester" {{ $scopeType === 'semester' ? 'selected' : '' }}>Semester</option>
+                        </select>
+
+                        <div id="archive-year-field" style="{{ $scopeType === 'semester' ? 'display:none;' : '' }} margin-top:12px;">
+                            <label for="archive_year" class="archive-muted" style="display:block;margin-bottom:6px;">Tahun target</label>
+                            <input type="number" id="archive_year" name="archive_year" value="{{ old('archive_year', $selectedYear) }}" min="2000" max="2100">
+                        </div>
+
+                        <div id="archive-semester-field" style="{{ $scopeType === 'semester' ? '' : 'display:none;' }} margin-top:12px;">
+                            <label for="archive_semester" class="archive-muted" style="display:block;margin-bottom:6px;">Semester target</label>
+                            <select id="archive_semester" name="archive_semester">
+                                @foreach(($semesterOptions ?? []) as $semesterOption)
+                                    <option value="{{ $semesterOption }}" {{ old('archive_semester', $selectedSemester) === $semesterOption ? 'selected' : '' }}>{{ $semesterOption }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
                         <div class="archive-muted" style="margin-top:8px;">
-                            Untuk audit/ops log tetap dihitung per tahun saat scan/export. Retention bulan tetap dipakai saat keputusan operasional.
+                            Untuk managed DB AWS, backup tetap dibuat di server dulu. Setelah itu file backup sebaiknya diunduh dan disimpan juga di komputer lokal.
                         </div>
 
                         <label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;">
@@ -252,6 +271,7 @@
                                     <strong>{{ $dataset['label'] }}</strong>
                                     <div class="archive-mode-pill {{ $mode }}">{{ $modeLabel }}</div>
                                     <div class="archive-muted">Basis: {{ $dataset['basis'] === 'year' ? 'Tahun' : 'Bulan' }}</div>
+                                    <div class="archive-muted">Scope UI: {{ implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $dataset['scope_modes'] ?? ['year'])) }}</div>
                                     <div class="archive-muted">Key: <code>{{ $key }}</code></div>
                                 </label>
                             @endforeach
@@ -359,6 +379,8 @@
                 <table class="archive-kv">
                     <tbody>
                     <tr><th>Tahun</th><td>{{ $scanResult['year'] ?? '-' }}</td></tr>
+                    <tr><th>Semester</th><td>{{ $scanResult['semester'] ?? '-' }}</td></tr>
+                    <tr><th>Scope</th><td>{{ ($scanResult['period_type'] ?? 'year') === 'semester' ? 'Semester' : 'Tahun' }} {{ $scanResult['period_value'] ?? ($scanResult['year'] ?? '-') }}</td></tr>
                     <tr><th>Total kandidat</th><td>{{ number_format((int) ($scanResult['grand_total'] ?? 0), 0, ',', '.') }}</td></tr>
                     <tr><th>Dataset tidak dikenal</th><td>{{ empty($scanResult['missing']) ? '-' : implode(', ', $scanResult['missing']) }}</td></tr>
                     </tbody>
@@ -373,6 +395,7 @@
                     <tbody>
                     <tr><th>SQL file</th><td><code>{{ $exportResult['sql_file'] ?? '-' }}</code></td></tr>
                     <tr><th>Manifest file</th><td><code>{{ $exportResult['manifest_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Scope</th><td>{{ (($exportResult['summary']['period_type'] ?? 'year') === 'semester') ? 'Semester' : 'Tahun' }} {{ $exportResult['summary']['period_value'] ?? (($exportResult['summary']['year'] ?? '-')) }}</td></tr>
                     <tr><th>Total row</th><td>{{ number_format((int) (($exportResult['summary']['grand_total'] ?? 0)), 0, ',', '.') }}</td></tr>
                     </tbody>
                 </table>
@@ -386,6 +409,7 @@
                     <tbody>
                     <tr><th>Snapshot file</th><td><code>{{ $financialResult['snapshot_file'] ?? '-' }}</code></td></tr>
                     <tr><th>Manifest file</th><td><code>{{ $financialResult['manifest_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Scope</th><td>{{ (($financialResult['period_type'] ?? 'year') === 'semester') ? 'Semester' : 'Tahun' }} {{ $financialResult['period_value'] ?? (($financialResult['year'] ?? '-')) }}</td></tr>
                     <tr><th>Customer terdampak</th><td>{{ number_format(count($financialResult['customer_snapshots'] ?? []), 0, ',', '.') }}</td></tr>
                     <tr><th>Supplier terdampak</th><td>{{ number_format(count($financialResult['supplier_snapshots'] ?? []), 0, ',', '.') }}</td></tr>
                     </tbody>
@@ -433,7 +457,7 @@
                 @endforeach
             </ol>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Untuk transaksi ERP, titik kerja operator tetap berdasarkan tahun. Audit/ops log tetap bisa disapu rutin, tetapi keputusan final pembersihan tetap ada di tangan admin.
+                Untuk transaksi ERP, operator sekarang bisa memilih scope yang paling masuk akal: `tahun` untuk sapuan besar atau `semester` untuk periode yang sudah benar-benar selesai.
             </p>
         </div>
 
@@ -478,13 +502,28 @@
         <div class="card archive-col-12">
             <h3 style="margin-top:0;">Catatan Command Arsip</h3>
             <pre class="archive-code">php artisan app:archive:scan 2021 --dataset=sales_invoices
+php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices
 php artisan app:archive:export 2021 --dataset=sales_invoices
+php artisan app:archive:export --semester=S1-2526 --dataset=sales_returns
 php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal
 php artisan app:archive:review
 php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Purge biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Purge finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten.
+                Purge biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Purge finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
             </p>
         </div>
     </div>
+
+    <script>
+        window.toggleArchiveScope = function (value) {
+            const yearField = document.getElementById('archive-year-field');
+            const semesterField = document.getElementById('archive-semester-field');
+            if (!yearField || !semesterField) {
+                return;
+            }
+            const isSemester = value === 'semester';
+            yearField.style.display = isSemester ? 'none' : '';
+            semesterField.style.display = isSemester ? '' : 'none';
+        };
+    </script>
 @endsection

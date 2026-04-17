@@ -10,6 +10,7 @@ final class DataArchiveRegistry
      * @return array<string, array{
      *     label:string,
      *     basis:string,
+     *     scope_modes?:list<string>,
      *     purge_allowed:bool,
      *     purge_mode:string,
      *     financial:bool,
@@ -17,7 +18,8 @@ final class DataArchiveRegistry
      *         table:string,
      *         date_column?:string,
      *         date_kind?:string,
-     *         foreign_key?:string
+     *         foreign_key?:string,
+     *         semester_column?:string
      *     }>
      * }>
      */
@@ -27,6 +29,7 @@ final class DataArchiveRegistry
             'audit_logs' => [
                 'label' => 'Audit Log',
                 'basis' => 'month',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'standard',
                 'financial' => false,
@@ -37,6 +40,7 @@ final class DataArchiveRegistry
             'report_export_tasks' => [
                 'label' => 'Task Export Laporan',
                 'basis' => 'month',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'standard',
                 'financial' => false,
@@ -47,6 +51,7 @@ final class DataArchiveRegistry
             'integrity_check_logs' => [
                 'label' => 'Integrity Check Logs',
                 'basis' => 'month',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'standard',
                 'financial' => false,
@@ -57,6 +62,7 @@ final class DataArchiveRegistry
             'performance_probe_logs' => [
                 'label' => 'Performance Probe Logs',
                 'basis' => 'month',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'standard',
                 'financial' => false,
@@ -67,6 +73,7 @@ final class DataArchiveRegistry
             'restore_drill_logs' => [
                 'label' => 'Restore Drill Logs',
                 'basis' => 'month',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'standard',
                 'financial' => false,
@@ -77,6 +84,7 @@ final class DataArchiveRegistry
             'failed_jobs' => [
                 'label' => 'Failed Jobs',
                 'basis' => 'month',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'standard',
                 'financial' => false,
@@ -87,6 +95,7 @@ final class DataArchiveRegistry
             'job_batches' => [
                 'label' => 'Job Batches',
                 'basis' => 'month',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'standard',
                 'financial' => false,
@@ -97,11 +106,12 @@ final class DataArchiveRegistry
             'sales_invoices' => [
                 'label' => 'Faktur Penjualan',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
-                    ['table' => 'sales_invoices', 'date_column' => 'invoice_date'],
+                    ['table' => 'sales_invoices', 'date_column' => 'invoice_date', 'semester_column' => 'semester_period'],
                     ['table' => 'sales_invoice_items', 'foreign_key' => 'sales_invoice_id'],
                     ['table' => 'invoice_payments', 'foreign_key' => 'sales_invoice_id'],
                     ['table' => 'receivable_ledgers', 'foreign_key' => 'sales_invoice_id'],
@@ -110,17 +120,19 @@ final class DataArchiveRegistry
             'sales_returns' => [
                 'label' => 'Retur Penjualan',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
-                    ['table' => 'sales_returns', 'date_column' => 'return_date'],
+                    ['table' => 'sales_returns', 'date_column' => 'return_date', 'semester_column' => 'semester_period'],
                     ['table' => 'sales_return_items', 'foreign_key' => 'sales_return_id'],
                 ],
             ],
             'delivery_notes' => [
                 'label' => 'Surat Jalan',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
@@ -132,6 +144,7 @@ final class DataArchiveRegistry
             'order_notes' => [
                 'label' => 'Surat Pesanan',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
@@ -143,11 +156,12 @@ final class DataArchiveRegistry
             'outgoing_transactions' => [
                 'label' => 'Tanda Terima Barang',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
-                    ['table' => 'outgoing_transactions', 'date_column' => 'transaction_date'],
+                    ['table' => 'outgoing_transactions', 'date_column' => 'transaction_date', 'semester_column' => 'semester_period'],
                     ['table' => 'outgoing_transaction_items', 'foreign_key' => 'outgoing_transaction_id'],
                     ['table' => 'supplier_ledgers', 'foreign_key' => 'outgoing_transaction_id'],
                 ],
@@ -155,16 +169,18 @@ final class DataArchiveRegistry
             'receivable_ledgers' => [
                 'label' => 'Ledger Piutang',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => false,
                 'purge_mode' => 'locked',
                 'financial' => true,
                 'tables' => [
-                    ['table' => 'receivable_ledgers', 'date_column' => 'entry_date'],
+                    ['table' => 'receivable_ledgers', 'date_column' => 'entry_date', 'semester_column' => 'period_code'],
                 ],
             ],
             'receivable_payments' => [
                 'label' => 'Pembayaran Piutang',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
@@ -175,16 +191,18 @@ final class DataArchiveRegistry
             'supplier_ledgers' => [
                 'label' => 'Ledger Hutang Supplier',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => false,
                 'purge_mode' => 'locked',
                 'financial' => true,
                 'tables' => [
-                    ['table' => 'supplier_ledgers', 'date_column' => 'entry_date'],
+                    ['table' => 'supplier_ledgers', 'date_column' => 'entry_date', 'semester_column' => 'period_code'],
                 ],
             ],
             'supplier_payments' => [
                 'label' => 'Pembayaran Hutang Supplier',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
@@ -196,6 +214,7 @@ final class DataArchiveRegistry
             'school_bulk_transactions' => [
                 'label' => 'Transaksi Sebar Sekolah',
                 'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
                 'purge_allowed' => true,
                 'purge_mode' => 'financial_guarded',
                 'financial' => true,
