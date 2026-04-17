@@ -138,6 +138,7 @@ Catatan:
 - `docs/RECOVERY_SOP.md`
 - `docs/DEPLOY_AAPANEL.md`
 - `docs/DEPLOY_AAPANEL_PROD_AWS_MANAGED_DB.md`
+- `docs/RETENTION_POLICY_AAPANEL_PROD_AWS_MANAGED_DB.md`
 - `docs/DEPLOY_AWS_LIGHTSAIL_CLOUDPANEL.md`
 - `docs/UAT_AAPANEL_POST_DEPLOY.md`
 - `docs/GO_LIVE_RUNBOOK.md`
@@ -167,6 +168,7 @@ Catatan:
   - `docs/GO_LIVE_RUNBOOK.md`
 - Untuk `erpos` production di `aaPanel v8.0.1` dengan `AWS Lightsail Managed Database`, gunakan dokumen ini:
   - `docs/DEPLOY_AAPANEL_PROD_AWS_MANAGED_DB.md`
+  - `docs/RETENTION_POLICY_AAPANEL_PROD_AWS_MANAGED_DB.md`
   - `docs/BACKUP_OPS_HEALTH_README.md`
   - `docs/GO_LIVE_RUNBOOK.md`
 - Untuk `AWS Lightsail + CloudPanel + Cloudflare`, gunakan dokumen ini:
