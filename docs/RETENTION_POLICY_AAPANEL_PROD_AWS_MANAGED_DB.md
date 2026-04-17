@@ -148,7 +148,12 @@ Contoh:
 - atau arsip semua data lebih tua dari `60 bulan`
 
 ### 2. Backup penuh dulu
-Jalankan dari folder app:
+Jalankan dari **folder app di server aaPanel**.
+
+Catatan:
+- command ini tetap dijalankan dari app server
+- tetapi target database-nya tetap **managed DB AWS** yang aktif di `.env`
+- jadi `cd /www/wwwroot/...` hanya menunjukkan lokasi project Laravel, bukan lokasi database
 
 ```bash
 cd /www/wwwroot/erpos.mitrasejatiberkah.com
@@ -164,6 +169,10 @@ php artisan app:db-restore-test
 Kalau restore drill gagal karena user DB tidak punya hak `CREATE DATABASE`, lihat:
 - `docs/BACKUP_OPS_HEALTH_README.md`
 - `docs/RECOVERY_SOP.md`
+
+Catatan:
+- karena memakai managed DB, restore drill tetap mencoba membuat database sementara di server DB terpisah
+- jadi hak akses user MySQL tetap harus mendukung skenario restore test, atau gunakan user khusus restore drill
 
 ### 4. Export arsip
 Export data lama ke:
