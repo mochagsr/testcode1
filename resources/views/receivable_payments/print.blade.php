@@ -53,7 +53,7 @@
         $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
-        $printNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($payment->notes ?? '')), 4);
+        $printNotes = \App\Support\PrintTextFormatter::normalizeMultiline((string) ($payment->notes ?? ''));
         $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($payment->customer_address ?: ''), 4);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
             ->filter(fn (string $value): bool => $value !== '')

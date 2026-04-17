@@ -23,7 +23,8 @@
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
         @include('partials.print.table_styles')
         .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 140px; align-items: flex-start; gap: 16px; margin-top: 12px; }
-        .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-box { line-height: 1.35; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-content { white-space: pre-line; }
         .qty-box { width: 100%; table-layout: fixed; }
         .qty-box table { margin-top: 0; }
         .qty-box td:first-child { font-weight: 700; background: #f7f7f7; width: 68%; }
@@ -49,7 +50,7 @@
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $companyInvoiceNotes = trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
-        $printNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($note->notes ?: $companyInvoiceNotes)), 4);
+        $printNotes = \App\Support\PrintTextFormatter::normalizeMultiline((string) ($note->notes ?: $companyInvoiceNotes));
         $recipientAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($note->address ?: ''), 4);
         $totalQty = (int) round((float) $note->items->sum('quantity'), 0);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
@@ -123,7 +124,8 @@
 
     <div class="table-summary">
         <div class="notes-box">
-            <strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}
+            <div><strong>{{ __('txn.notes') }}:</strong></div>
+            <div class="notes-content">{{ $printNotes !== '' ? $printNotes : '-' }}</div>
         </div>
         <div class="qty-box">
             <table>

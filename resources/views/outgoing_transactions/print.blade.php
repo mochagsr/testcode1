@@ -22,7 +22,8 @@
         .doc-number { text-align: center; margin-bottom: 4px; }
         @include('partials.print.table_styles')
         .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 130px 220px; align-items: flex-start; gap: 12px; margin-top: 10px; }
-        .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-box { line-height: 1.35; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-content { white-space: pre-line; }
         .qty-box { width: auto; justify-self: end; }
         .qty-box table { width: auto; table-layout: fixed; margin-top: 0; }
         .qty-box table,
@@ -53,7 +54,7 @@
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $companyInvoiceNotes = trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
-        $printNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($transaction->notes ?: $companyInvoiceNotes)), 4);
+        $printNotes = \App\Support\PrintTextFormatter::normalizeMultiline((string) ($transaction->notes ?: $companyInvoiceNotes));
         $totalQty = (int) round((float) $transaction->items->sum('quantity'), 0);
         $totalWeight = (float) $transaction->items->sum(fn($item) => (float) ($item->weight ?? 0));
         $totalBeforeVat = (int) round((float) ($transaction->subtotal_before_tax ?? $transaction->total), 0);
@@ -147,7 +148,8 @@
 
     <div class="table-summary">
         <div class="notes-box">
-            <strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}
+            <div><strong>{{ __('txn.notes') }}:</strong></div>
+            <div class="notes-content">{{ $printNotes !== '' ? $printNotes : '-' }}</div>
         </div>
         <div class="qty-box">
             <table>

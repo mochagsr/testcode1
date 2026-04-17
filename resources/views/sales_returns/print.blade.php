@@ -23,7 +23,8 @@
         .canceled-banner { margin: 8px 0 2px; padding: 4px 8px; border: 1px solid #111; text-align: center; font-weight: 700; letter-spacing: 0.6px; }
         @include('partials.print.table_styles')
         .table-summary { display: grid; grid-template-columns: minmax(0, 1fr) 140px 200px; align-items: flex-start; gap: 16px; margin-top: 12px; }
-        .notes-box { line-height: 1.35; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-box { line-height: 1.35; word-break: break-word; overflow-wrap: anywhere; }
+        .notes-content { white-space: pre-line; }
         .qty-box { width: 100%; table-layout: fixed; }
         .qty-box table,
         .total-box { margin-top: 0; }
@@ -53,7 +54,7 @@
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $companyInvoiceNotes = trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
-        $printNotes = \App\Support\PrintTextFormatter::wrapWords($companyInvoiceNotes, 4);
+        $printNotes = \App\Support\PrintTextFormatter::normalizeMultiline($companyInvoiceNotes);
         $totalQty = (int) round((float) $salesReturn->items->sum('quantity'), 0);
         $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($salesReturn->customer?->address ?: ''), 4);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
@@ -125,9 +126,10 @@
 
     <div class="table-summary">
         <div class="notes-box">
-            <strong>{{ __('txn.reason') }}:</strong> {{ $salesReturn->reason ?: '-' }}
+            <div><strong>{{ __('txn.reason') }}:</strong> {{ $salesReturn->reason ?: '-' }}</div>
             @if($printNotes !== '')
-                <br><strong>{{ __('txn.notes') }}:</strong> {{ $printNotes }}
+                <div style="margin-top: 4px;"><strong>{{ __('txn.notes') }}:</strong></div>
+                <div class="notes-content">{{ $printNotes }}</div>
             @endif
         </div>
         <div class="qty-box">

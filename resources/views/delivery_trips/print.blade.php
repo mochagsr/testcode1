@@ -78,7 +78,7 @@
     $companyPhone = trim((string) \App\Models\AppSetting::getValue('company_phone', ''));
     $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
     $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
-    $tripNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) $trip->notes), 4);
+    $tripNotes = \App\Support\PrintTextFormatter::normalizeMultiline((string) $trip->notes);
 
     $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
         ->filter(fn ($line) => trim((string) $line) !== '');
