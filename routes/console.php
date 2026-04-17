@@ -1725,6 +1725,7 @@ Artisan::command('app:http-smoke-test', function () {
         'Approval' => route('approvals.index'),
         'Semester Transaksi' => route('semester-transactions.index'),
         'Ops Health' => route('ops-health.index'),
+        'Arsip Data' => route('archive-data.index'),
         'Pengaturan' => route('settings.edit'),
     ];
 
@@ -1867,6 +1868,28 @@ Artisan::command('app:http-smoke-test', function () {
     } else {
         $pushRow('Action Routes', 'Preview koreksi', 'WARN', 'Belum ada data invoice untuk preview POST aman.');
     }
+
+    $archiveActionRoutes = [
+        'Preview Arsip Tahun' => [
+            'method' => 'POST',
+            'url' => route('archive-data.scan'),
+            'payload' => [
+                'archive_scope_type' => 'year',
+                'archive_year' => 2025,
+                'datasets' => ['audit_logs'],
+            ],
+        ],
+        'Preview Arsip Semester' => [
+            'method' => 'POST',
+            'url' => route('archive-data.scan'),
+            'payload' => [
+                'archive_scope_type' => 'semester',
+                'archive_semester' => 'S2-2526',
+                'datasets' => ['sales_invoices'],
+            ],
+        ],
+    ];
+    $runRouteSet('Archive Actions', $archiveActionRoutes, $admin);
 
     $this->table(['Group', 'Route', 'Status', 'Detail'], $rows);
     $this->newLine();

@@ -132,6 +132,26 @@ class ActionSmokeTest extends TestCase
 
         $failedTask->refresh();
         $this->assertSame('queued', $failedTask->status);
+
+        $this->actingAs($admin)
+            ->post(route('archive-data.scan'), [
+                'archive_scope_type' => 'year',
+                'archive_year' => 2025,
+                'datasets' => ['audit_logs'],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('archive_scan_result')
+            ->assertSessionHas('archive_success');
+
+        $this->actingAs($admin)
+            ->post(route('archive-data.scan'), [
+                'archive_scope_type' => 'semester',
+                'archive_semester' => 'S2-2526',
+                'datasets' => ['sales_invoices'],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('archive_scan_result')
+            ->assertSessionHas('archive_success');
     }
 
     public function test_bulk_invoice_generation_action_does_not_500(): void
