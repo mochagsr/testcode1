@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\Customer;
+use App\Models\SalesInvoice;
+use App\Models\Supplier;
+use App\Models\SupplierLedger;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -19,6 +24,7 @@ class DataArchiveService
      *     label:string,
      *     basis:string,
      *     purge_allowed:bool,
+     *     purge_mode:string,
      *     financial:bool,
      *     total_rows:int,
      *     tables:array<int, array{table:string, rows:int}>
@@ -60,6 +66,7 @@ class DataArchiveService
                 'label' => $definition['label'],
                 'basis' => $definition['basis'],
                 'purge_allowed' => $definition['purge_allowed'],
+                'purge_mode' => (string) ($definition['purge_mode'] ?? 'locked'),
                 'financial' => $definition['financial'],
                 'total_rows' => $datasetTotal,
                 'tables' => $tableSummaries,
@@ -85,6 +92,7 @@ class DataArchiveService
      *       label:string,
      *       basis:string,
      *       purge_allowed:bool,
+     *       purge_mode:string,
      *       financial:bool,
      *       total_rows:int,
      *       tables:array<int, array{table:string, rows:int}>
@@ -171,6 +179,7 @@ class DataArchiveService
      *       label:string,
      *       basis:string,
      *       purge_allowed:bool,
+     *       purge_mode:string,
      *       financial:bool,
      *       total_rows:int,
      *       tables:array<int, array{table:string, rows:int}>
@@ -181,7 +190,9 @@ class DataArchiveService
      *   manifest_file:string,
      *   backup_file:string,
      *   restore_status:string,
-     *   deleted:array<string, int>
+     *   deleted:array<string, int>,
+     *   snapshot_file:?string,
+     *   post_check?:array<string, mixed>|null
      * }
      */
     public function purge(
@@ -195,17 +206,30 @@ class DataArchiveService
         $datasetKeys = array_keys($summary['datasets']);
         $definitions = DataArchiveRegistry::definitions();
 
-        $blocked = [];
+        $locked = [];
+        $standard = [];
+        $financialGuarded = [];
         foreach ($datasetKeys as $datasetKey) {
-            if (($definitions[$datasetKey]['purge_allowed'] ?? false) === false) {
-                $blocked[] = $datasetKey;
+            $mode = (string) ($definitions[$datasetKey]['purge_mode'] ?? 'locked');
+            if ($mode === 'locked') {
+                $locked[] = $datasetKey;
+                continue;
             }
+            if ($mode === 'financial_guarded') {
+                $financialGuarded[] = $datasetKey;
+                continue;
+            }
+            $standard[] = $datasetKey;
         }
-        if ($blocked !== []) {
+
+        if ($locked !== []) {
             throw new \RuntimeException(
-                'Purge untuk dataset finansial belum dibuka. Dataset terkunci: '.implode(', ', $blocked)
-                .'. Gunakan scan/export dulu. Purge otomatis hanya aman untuk audit/ops logs saat ini.'
+                'Purge untuk dataset ini masih dikunci. Dataset terkunci: '.implode(', ', $locked)
+                .'. Gunakan scan/export dulu atau siapkan rebuilder yang sesuai.'
             );
+        }
+        if ($standard !== [] && $financialGuarded !== []) {
+            throw new \RuntimeException('Jangan campur purge dataset log/ops dengan dataset finansial dalam satu eksekusi. Jalankan terpisah agar verifikasi lebih jelas.');
         }
 
         $backupFile = $this->latestBackupFile();
@@ -231,6 +255,19 @@ class DataArchiveService
             throw new \RuntimeException('Manifest arsip tidak ditemukan. Jalankan app:archive:export dulu untuk periode yang sama.');
         }
 
+        $snapshotFile = null;
+        if ($financialGuarded !== []) {
+            $unsupported = array_values(array_diff($financialGuarded, $this->supportedFinancialPurgeDatasets()));
+            if ($unsupported !== []) {
+                throw new \RuntimeException('Dataset finansial ini belum siap dipurge otomatis: '.implode(', ', $unsupported).'. Tahap aman saat ini baru dibuka untuk sales_invoices, outgoing_transactions, dan supplier_payments.');
+            }
+
+            $snapshotFile = $this->resolveFinancialSnapshot($year, $financialGuarded, $manifest);
+            if ($snapshotFile === null) {
+                throw new \RuntimeException('Snapshot finansial belum ditemukan. Jalankan app:archive:prepare-financial dulu untuk periode dan dataset yang sama.');
+            }
+        }
+
         $deleted = [];
         foreach ($datasetKeys as $datasetKey) {
             $deleted[$datasetKey] = 0;
@@ -243,6 +280,7 @@ class DataArchiveService
                 'backup_file' => $backupFile,
                 'restore_status' => $restoreStatus,
                 'deleted' => $deleted,
+                'snapshot_file' => $snapshotFile,
             ];
         }
 
@@ -261,6 +299,11 @@ class DataArchiveService
             }
         });
 
+        $postCheck = null;
+        if ($financialGuarded !== []) {
+            $postCheck = $this->runFinancialRebuildAndChecks($snapshotFile, true);
+        }
+
         $purgeDir = storage_path('app/archives/purges');
         File::ensureDirectoryExists($purgeDir);
         $purgeFile = $purgeDir.DIRECTORY_SEPARATOR.'purge-'.$year.'-'.now('Asia/Jakarta')->format('Ymd-His').'.json';
@@ -272,6 +315,8 @@ class DataArchiveService
             'backup_file' => $backupFile,
             'restore_status' => $restoreStatus,
             'deleted' => $deleted,
+            'snapshot_file' => $snapshotFile,
+            'post_check' => $postCheck,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return [
@@ -280,17 +325,172 @@ class DataArchiveService
             'backup_file' => $backupFile,
             'restore_status' => $restoreStatus,
             'deleted' => $deleted,
+            'snapshot_file' => $snapshotFile,
+            'post_check' => $postCheck,
         ];
     }
 
     /**
-     * @param  array{label:string,basis:string,purge_allowed:bool,financial:bool,tables:array<int, array{table:string,date_column?:string,foreign_key?:string}>}  $definition
-     * @param  array{table:string,date_column?:string,foreign_key?:string}  $tableDefinition
+     * @param  list<string>  $requestedDatasets
+     * @return array{
+     *   year:int,
+     *   manifest_file:string,
+     *   backup_file:string,
+     *   restore_status:string,
+     *   summary:array{
+     *     year:int,
+     *     datasets:array<string, array{
+     *       label:string,
+     *       basis:string,
+     *       purge_allowed:bool,
+     *       purge_mode:string,
+     *       financial:bool,
+     *       total_rows:int,
+     *       tables:array<int, array{table:string, rows:int}>
+     *     }>,
+     *     missing:list<string>,
+     *     grand_total:int
+     *   },
+     *   snapshot_file:string,
+     *   customer_snapshots:list<array<string, mixed>>,
+     *   supplier_snapshots:list<array<string, mixed>>
+     * }
+     */
+    public function prepareFinancialSnapshot(
+        int $year,
+        array $requestedDatasets,
+        ?string $manifestFile = null,
+        bool $rebuildJournal = false
+    ): array {
+        $summary = $this->scan($year, $requestedDatasets);
+        $datasetKeys = array_keys($summary['datasets']);
+        $definitions = DataArchiveRegistry::definitions();
+
+        if ($datasetKeys === []) {
+            throw new \RuntimeException('Tidak ada dataset yang dipilih untuk snapshot finansial.');
+        }
+
+        $unsupported = [];
+        foreach ($datasetKeys as $datasetKey) {
+            $mode = (string) ($definitions[$datasetKey]['purge_mode'] ?? 'locked');
+            if ($mode !== 'financial_guarded' || ! in_array($datasetKey, $this->supportedFinancialPurgeDatasets(), true)) {
+                $unsupported[] = $datasetKey;
+            }
+        }
+        if ($unsupported !== []) {
+            throw new \RuntimeException('Snapshot finansial saat ini baru dibuka untuk dataset: '.implode(', ', $this->supportedFinancialPurgeDatasets()).'. Dataset tidak didukung: '.implode(', ', $unsupported));
+        }
+
+        $backupFile = $this->latestBackupFile();
+        if ($backupFile === null) {
+            throw new \RuntimeException('Tidak ada file backup terbaru. Jalankan app:db-backup --gzip dulu.');
+        }
+
+        $restore = $this->latestRestoreDrill();
+        if ($restore === null) {
+            throw new \RuntimeException('Belum ada restore drill log. Jalankan app:db-restore-test dulu.');
+        }
+
+        $restoreStatus = strtolower((string) ($restore->status ?? ''));
+        if (! in_array($restoreStatus, ['passed', 'skipped'], true)) {
+            throw new \RuntimeException('Restore drill terakhir belum aman untuk snapshot finansial. Status: '.strtoupper($restoreStatus));
+        }
+
+        $manifest = $this->resolveManifest($year, $datasetKeys, $manifestFile);
+        if ($manifest === null) {
+            throw new \RuntimeException('Manifest arsip tidak ditemukan. Jalankan app:archive:export dulu untuk periode yang sama.');
+        }
+
+        $customerIds = collect();
+        $supplierIds = collect();
+
+        foreach ($datasetKeys as $datasetKey) {
+            $customerIds = $customerIds->merge($this->datasetCustomerIds($datasetKey, $year));
+            $supplierIds = $supplierIds->merge($this->datasetSupplierIds($datasetKey, $year));
+        }
+
+        $customerSnapshots = Customer::query()
+            ->whereIn('id', $customerIds->unique()->filter()->values()->all())
+            ->orderBy('id')
+            ->get(['id', 'name', 'outstanding_receivable'])
+            ->map(function (Customer $customer): array {
+                return [
+                    'id' => (int) $customer->id,
+                    'name' => (string) $customer->name,
+                    'outstanding_receivable' => (int) $customer->outstanding_receivable,
+                    'invoice_balance_sum' => (int) round((float) SalesInvoice::query()
+                        ->where('customer_id', (int) $customer->id)
+                        ->where('is_canceled', false)
+                        ->sum('balance')),
+                    'ledger_net_sum' => (int) round((float) DB::table('receivable_ledgers')
+                        ->where('customer_id', (int) $customer->id)
+                        ->sum(DB::raw('debit - credit'))),
+                ];
+            })
+            ->all();
+
+        $supplierSnapshots = Supplier::query()
+            ->whereIn('id', $supplierIds->unique()->filter()->values()->all())
+            ->orderBy('id')
+            ->get(['id', 'name', 'outstanding_payable'])
+            ->map(function (Supplier $supplier): array {
+                return [
+                    'id' => (int) $supplier->id,
+                    'name' => (string) $supplier->name,
+                    'outstanding_payable' => (int) $supplier->outstanding_payable,
+                    'ledger_net_sum' => (int) round((float) SupplierLedger::query()
+                        ->where('supplier_id', (int) $supplier->id)
+                        ->sum(DB::raw('debit - credit'))),
+                ];
+            })
+            ->all();
+
+        $snapshotDir = storage_path('app/archives/financial-snapshots');
+        File::ensureDirectoryExists($snapshotDir);
+        $slug = implode('-', $datasetKeys);
+        $snapshotFile = $snapshotDir.DIRECTORY_SEPARATOR.'financial-snapshot-'.$year.'-'.$slug.'-'.now('Asia/Jakarta')->format('Ymd-His').'.json';
+
+        File::put($snapshotFile, json_encode([
+            'prepared_at' => now('Asia/Jakarta')->toIso8601String(),
+            'year' => $year,
+            'datasets' => $datasetKeys,
+            'manifest_file' => $manifest,
+            'backup_file' => $backupFile,
+            'restore_status' => $restoreStatus,
+            'rebuild_journal' => $rebuildJournal,
+            'summary' => $summary,
+            'customer_snapshots' => $customerSnapshots,
+            'supplier_snapshots' => $supplierSnapshots,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return [
+            'year' => $year,
+            'manifest_file' => $manifest,
+            'backup_file' => $backupFile,
+            'restore_status' => $restoreStatus,
+            'summary' => $summary,
+            'snapshot_file' => $snapshotFile,
+            'customer_snapshots' => $customerSnapshots,
+            'supplier_snapshots' => $supplierSnapshots,
+        ];
+    }
+
+    /**
+     * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}>}  $definition
+     * @param  array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}  $tableDefinition
      */
     public function tableQuery(array $definition, array $tableDefinition, int $year): Builder
     {
         if (isset($tableDefinition['date_column'])) {
-            return DB::table($tableDefinition['table'])->whereYear($tableDefinition['date_column'], $year);
+            $query = DB::table($tableDefinition['table']);
+            if (($tableDefinition['date_kind'] ?? 'calendar') === 'unix') {
+                return $query->whereBetween(
+                    $tableDefinition['date_column'],
+                    [strtotime($year.'-01-01 00:00:00'), strtotime($year.'-12-31 23:59:59')]
+                );
+            }
+
+            return $query->whereYear($tableDefinition['date_column'], $year);
         }
 
         $root = $definition['tables'][0];
@@ -380,7 +580,7 @@ class DataArchiveService
         return $pdo->quote((string) $value);
     }
 
-    private function latestBackupFile(): ?string
+    public function latestBackupFile(): ?string
     {
         $files = collect(array_merge(
             File::glob(storage_path('app/backups').DIRECTORY_SEPARATOR.'*') ?: [],
@@ -398,7 +598,7 @@ class DataArchiveService
         return $file;
     }
 
-    private function latestRestoreDrill(): ?object
+    public function latestRestoreDrill(): ?object
     {
         if (! Schema::hasTable('restore_drill_logs')) {
             return null;
@@ -410,7 +610,60 @@ class DataArchiveService
     /**
      * @param  list<string>  $datasetKeys
      */
-    private function resolveManifest(int $year, array $datasetKeys, ?string $manifestFile = null): ?string
+    public function latestFinancialSnapshot(?int $year = null, array $datasetKeys = []): ?array
+    {
+        $snapshotDir = storage_path('app/archives/financial-snapshots');
+        if (! File::isDirectory($snapshotDir)) {
+            return null;
+        }
+
+        $normalizedDatasets = collect($datasetKeys)->map(static fn (mixed $key): string => strtolower((string) $key))->sort()->values()->all();
+
+        $path = collect(File::glob($snapshotDir.DIRECTORY_SEPARATOR.'*.json'))
+            ->sortDesc()
+            ->first(function (string $file) use ($year, $normalizedDatasets): bool {
+                $payload = json_decode((string) File::get($file), true);
+                if (! is_array($payload)) {
+                    return false;
+                }
+
+                if ($year !== null && (int) ($payload['year'] ?? 0) !== $year) {
+                    return false;
+                }
+
+                if ($normalizedDatasets !== []) {
+                    $payloadDatasets = collect((array) ($payload['datasets'] ?? []))
+                        ->map(static fn (mixed $value): string => strtolower((string) $value))
+                        ->sort()
+                        ->values()
+                        ->all();
+
+                    if ($payloadDatasets !== $normalizedDatasets) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $payload = json_decode((string) File::get($path), true);
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $payload['path'] = $path;
+
+        return $payload;
+    }
+
+    /**
+     * @param  list<string>  $datasetKeys
+     */
+    public function resolveManifest(int $year, array $datasetKeys, ?string $manifestFile = null): ?string
     {
         if (is_string($manifestFile) && $manifestFile !== '' && File::exists($manifestFile)) {
             return $manifestFile;
@@ -436,5 +689,95 @@ class DataArchiveService
 
                 return $payloadYear === $year && $payloadDatasets === $normalizedDatasets;
             });
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function supportedFinancialPurgeDatasets(): array
+    {
+        return [
+            'sales_invoices',
+            'outgoing_transactions',
+            'supplier_payments',
+        ];
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function datasetCustomerIds(string $datasetKey, int $year)
+    {
+        return match ($datasetKey) {
+            'sales_invoices' => DB::table('sales_invoices')
+                ->whereYear('invoice_date', $year)
+                ->pluck('customer_id'),
+            default => collect(),
+        };
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function datasetSupplierIds(string $datasetKey, int $year)
+    {
+        return match ($datasetKey) {
+            'outgoing_transactions' => DB::table('outgoing_transactions')
+                ->whereYear('transaction_date', $year)
+                ->pluck('supplier_id'),
+            'supplier_payments' => DB::table('supplier_payments')
+                ->whereYear('payment_date', $year)
+                ->pluck('supplier_id'),
+            default => collect(),
+        };
+    }
+
+    /**
+     * @param  list<string>  $datasetKeys
+     */
+    private function resolveFinancialSnapshot(int $year, array $datasetKeys, string $manifestFile): ?string
+    {
+        $snapshot = $this->latestFinancialSnapshot($year, $datasetKeys);
+        if ($snapshot === null) {
+            return null;
+        }
+
+        if (($snapshot['manifest_file'] ?? null) !== $manifestFile) {
+            return null;
+        }
+
+        return (string) ($snapshot['path'] ?? '');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function runFinancialRebuildAndChecks(?string $snapshotFile, bool $defaultRebuildJournal = true): array
+    {
+        $snapshotPayload = null;
+        if (is_string($snapshotFile) && $snapshotFile !== '' && File::exists($snapshotFile)) {
+            $snapshotPayload = json_decode((string) File::get($snapshotFile), true);
+        }
+
+        $rebuildJournal = (bool) ($snapshotPayload['rebuild_journal'] ?? $defaultRebuildJournal);
+        $rebuildExit = Artisan::call('app:financial-rebuild', array_filter([
+            '--rebuild-journal' => $rebuildJournal ? true : null,
+        ], static fn (mixed $value): bool => $value !== null));
+        $rebuildOutput = trim(Artisan::output());
+
+        $integrityExit = Artisan::call('app:integrity-check');
+        $integrityOutput = trim(Artisan::output());
+        $latestIntegrity = Schema::hasTable('integrity_check_logs')
+            ? DB::table('integrity_check_logs')->latest('checked_at')->latest('id')->first()
+            : null;
+
+        return [
+            'rebuild_exit' => $rebuildExit,
+            'rebuild_output' => $rebuildOutput,
+            'integrity_exit' => $integrityExit,
+            'integrity_output' => $integrityOutput,
+            'latest_integrity_status' => is_object($latestIntegrity) ? (bool) ($latestIntegrity->is_ok ?? false) : null,
+            'latest_integrity_checked_at' => is_object($latestIntegrity) ? (string) ($latestIntegrity->checked_at ?? '') : null,
+        ];
     }
 }

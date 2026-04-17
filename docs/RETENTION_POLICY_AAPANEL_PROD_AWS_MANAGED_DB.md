@@ -18,12 +18,18 @@ Submenu operasional di aplikasi:
 Command yang tersedia sekarang:
 - `php artisan app:archive:scan 2021 --dataset=sales_invoices`
 - `php artisan app:archive:export 2021 --dataset=sales_invoices`
+- `php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal`
 - `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
 
 Catatan:
+- halaman `Sistem > Arsip Data` sekarang sudah punya tombol aksi untuk `scan`, `export`, `prepare financial snapshot`, dan `purge`
 - `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun
-- `purge` otomatis saat ini baru dibuka untuk dataset log/ops yang aman dibersihkan
-- dataset finansial tetap sengaja dikunci di tahap purge sampai rebuilder histori finansialnya siap
+- `purge` biasa saat ini dibuka untuk dataset log/ops aman, termasuk `failed_jobs` dan `job_batches`
+- `purge` finansial tahap pertama dibuka untuk dataset yang sudah punya guard snapshot + rebuild:
+  - `sales_invoices`
+  - `outgoing_transactions`
+  - `supplier_payments`
+- dataset finansial lain seperti `receivable_ledgers`, `receivable_payments`, `sales_returns`, dan `supplier_ledgers` tetap dikunci sampai jalur rebuild-nya siap
 
 ## Prinsip utama
 - data operasional yang masih aktif tetap online
@@ -220,6 +226,7 @@ Catatan:
 - pola command yang disiapkan nanti tetap mengikuti urutan:
   - `scan`
   - `export`
+  - `prepare-financial` untuk dataset finansial yang sudah didukung
   - `purge`
 
 ### 5. Verifikasi arsip

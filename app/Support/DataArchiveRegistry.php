@@ -11,10 +11,12 @@ final class DataArchiveRegistry
      *     label:string,
      *     basis:string,
      *     purge_allowed:bool,
+     *     purge_mode:string,
      *     financial:bool,
      *     tables:array<int, array{
      *         table:string,
      *         date_column?:string,
+     *         date_kind?:string,
      *         foreign_key?:string
      *     }>
      * }>
@@ -26,6 +28,7 @@ final class DataArchiveRegistry
                 'label' => 'Audit Log',
                 'basis' => 'month',
                 'purge_allowed' => true,
+                'purge_mode' => 'standard',
                 'financial' => false,
                 'tables' => [
                     ['table' => 'audit_logs', 'date_column' => 'created_at'],
@@ -35,6 +38,7 @@ final class DataArchiveRegistry
                 'label' => 'Task Export Laporan',
                 'basis' => 'month',
                 'purge_allowed' => true,
+                'purge_mode' => 'standard',
                 'financial' => false,
                 'tables' => [
                     ['table' => 'report_export_tasks', 'date_column' => 'created_at'],
@@ -44,6 +48,7 @@ final class DataArchiveRegistry
                 'label' => 'Integrity Check Logs',
                 'basis' => 'month',
                 'purge_allowed' => true,
+                'purge_mode' => 'standard',
                 'financial' => false,
                 'tables' => [
                     ['table' => 'integrity_check_logs', 'date_column' => 'checked_at'],
@@ -53,6 +58,7 @@ final class DataArchiveRegistry
                 'label' => 'Performance Probe Logs',
                 'basis' => 'month',
                 'purge_allowed' => true,
+                'purge_mode' => 'standard',
                 'financial' => false,
                 'tables' => [
                     ['table' => 'performance_probe_logs', 'date_column' => 'probed_at'],
@@ -62,15 +68,37 @@ final class DataArchiveRegistry
                 'label' => 'Restore Drill Logs',
                 'basis' => 'month',
                 'purge_allowed' => true,
+                'purge_mode' => 'standard',
                 'financial' => false,
                 'tables' => [
                     ['table' => 'restore_drill_logs', 'date_column' => 'tested_at'],
                 ],
             ],
+            'failed_jobs' => [
+                'label' => 'Failed Jobs',
+                'basis' => 'month',
+                'purge_allowed' => true,
+                'purge_mode' => 'standard',
+                'financial' => false,
+                'tables' => [
+                    ['table' => 'failed_jobs', 'date_column' => 'failed_at'],
+                ],
+            ],
+            'job_batches' => [
+                'label' => 'Job Batches',
+                'basis' => 'month',
+                'purge_allowed' => true,
+                'purge_mode' => 'standard',
+                'financial' => false,
+                'tables' => [
+                    ['table' => 'job_batches', 'date_column' => 'created_at', 'date_kind' => 'unix'],
+                ],
+            ],
             'sales_invoices' => [
                 'label' => 'Faktur Penjualan',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'sales_invoices', 'date_column' => 'invoice_date'],
@@ -82,7 +110,8 @@ final class DataArchiveRegistry
             'sales_returns' => [
                 'label' => 'Retur Penjualan',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'sales_returns', 'date_column' => 'return_date'],
@@ -92,7 +121,8 @@ final class DataArchiveRegistry
             'delivery_notes' => [
                 'label' => 'Surat Jalan',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'delivery_notes', 'date_column' => 'note_date'],
@@ -102,7 +132,8 @@ final class DataArchiveRegistry
             'order_notes' => [
                 'label' => 'Surat Pesanan',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'order_notes', 'date_column' => 'note_date'],
@@ -112,7 +143,8 @@ final class DataArchiveRegistry
             'outgoing_transactions' => [
                 'label' => 'Tanda Terima Barang',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'outgoing_transactions', 'date_column' => 'transaction_date'],
@@ -124,6 +156,7 @@ final class DataArchiveRegistry
                 'label' => 'Ledger Piutang',
                 'basis' => 'year',
                 'purge_allowed' => false,
+                'purge_mode' => 'locked',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'receivable_ledgers', 'date_column' => 'entry_date'],
@@ -132,7 +165,8 @@ final class DataArchiveRegistry
             'receivable_payments' => [
                 'label' => 'Pembayaran Piutang',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'receivable_payments', 'date_column' => 'payment_date'],
@@ -142,6 +176,7 @@ final class DataArchiveRegistry
                 'label' => 'Ledger Hutang Supplier',
                 'basis' => 'year',
                 'purge_allowed' => false,
+                'purge_mode' => 'locked',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'supplier_ledgers', 'date_column' => 'entry_date'],
@@ -150,7 +185,8 @@ final class DataArchiveRegistry
             'supplier_payments' => [
                 'label' => 'Pembayaran Hutang Supplier',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'supplier_payments', 'date_column' => 'payment_date'],
@@ -160,7 +196,8 @@ final class DataArchiveRegistry
             'school_bulk_transactions' => [
                 'label' => 'Transaksi Sebar Sekolah',
                 'basis' => 'year',
-                'purge_allowed' => false,
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'school_bulk_transactions', 'date_column' => 'transaction_date'],
@@ -201,7 +238,7 @@ final class DataArchiveRegistry
     }
 
     /**
-     * @param  array<string, array{label:string, basis:string, purge_allowed:bool, financial:bool, tables:array<int, array{table:string, date_column?:string, foreign_key?:string}>}>  $datasets
+     * @param  array<string, array{label:string, basis:string, purge_allowed:bool, purge_mode:string, financial:bool, tables:array<int, array{table:string, date_column?:string, date_kind?:string, foreign_key?:string}>}>  $datasets
      * @return list<string>
      */
     public static function missing(array $datasets, array $requested): array

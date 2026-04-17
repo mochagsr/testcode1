@@ -3,6 +3,14 @@
 @section('title', 'Arsip Data - PgPOS ERP')
 
 @section('content')
+    @php
+        $scanResult = session('archive_scan_result');
+        $exportResult = session('archive_export_result');
+        $financialResult = session('archive_financial_result');
+        $purgeResult = session('archive_purge_result');
+        $selected = collect(old('datasets', $selectedDatasets ?? []))->map(fn ($value) => strtolower((string) $value))->all();
+    @endphp
+
     <style>
         .archive-grid {
             display: grid;
@@ -10,44 +18,64 @@
             gap: 12px;
         }
         .archive-col-12 { grid-column: span 12; }
+        .archive-col-8 { grid-column: span 8; }
         .archive-col-6 { grid-column: span 6; }
-        @media (max-width: 1024px) {
-            .archive-col-6 { grid-column: span 12; }
+        .archive-col-4 { grid-column: span 4; }
+        @media (max-width: 1100px) {
+            .archive-col-8,
+            .archive-col-6,
+            .archive-col-4 { grid-column: span 12; }
         }
         .archive-kv th { width: 240px; }
         .archive-list {
             margin: 0;
             padding-left: 18px;
         }
-        .archive-list li + li {
-            margin-top: 6px;
-        }
-        .archive-window-grid {
+        .archive-list li + li { margin-top: 6px; }
+        .archive-window-grid,
+        .archive-dataset-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 10px;
         }
-        .archive-window-card {
+        .archive-window-card,
+        .archive-dataset-card {
             border: 1px solid var(--border);
             border-radius: 10px;
             padding: 12px;
             background: color-mix(in srgb, var(--card) 96%, var(--bg));
         }
-        .archive-window-card h3 {
+        .archive-window-card h3,
+        .archive-dataset-card h3 {
             margin: 0 0 6px;
             font-size: 15px;
         }
-        .archive-window-pill {
+        .archive-window-pill,
+        .archive-mode-pill {
             display: inline-flex;
             align-items: center;
             gap: 6px;
             border-radius: 999px;
             padding: 4px 10px;
-            background: color-mix(in srgb, var(--badge-neutral-bg) 92%, var(--card));
-            color: var(--badge-neutral-text);
             font-size: 12px;
             font-weight: 700;
             margin-bottom: 8px;
+        }
+        .archive-window-pill {
+            background: color-mix(in srgb, var(--badge-neutral-bg) 92%, var(--card));
+            color: var(--badge-neutral-text);
+        }
+        .archive-mode-pill.standard {
+            background: color-mix(in srgb, #d4f8df 82%, var(--card));
+            color: #0d7a31;
+        }
+        .archive-mode-pill.financial_guarded {
+            background: color-mix(in srgb, #fff1c9 85%, var(--card));
+            color: #8a5a00;
+        }
+        .archive-mode-pill.locked {
+            background: color-mix(in srgb, #ffd6d6 85%, var(--card));
+            color: #a12727;
         }
         .archive-code {
             margin: 0;
@@ -64,6 +92,70 @@
             font-size: 13px;
             line-height: 1.5;
         }
+        .archive-form-grid {
+            display: grid;
+            grid-template-columns: minmax(160px, 220px) 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .archive-form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .archive-action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .archive-checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 10px;
+        }
+        .archive-checkbox {
+            display: block;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: color-mix(in srgb, var(--card) 96%, var(--bg));
+        }
+        .archive-checkbox strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        .archive-flash {
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px;
+        }
+        .archive-flash.success {
+            background: color-mix(in srgb, #d8f4df 86%, var(--card));
+            color: #0f6b2f;
+            border: 1px solid color-mix(in srgb, #9ad0aa 86%, var(--card));
+        }
+        .archive-flash.error {
+            background: color-mix(in srgb, #ffdcdc 86%, var(--card));
+            color: #8e1d1d;
+            border: 1px solid color-mix(in srgb, #f0a2a2 86%, var(--card));
+        }
+        .archive-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .archive-table th,
+        .archive-table td {
+            border-bottom: 1px solid var(--border);
+            padding: 8px 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .archive-table th {
+            font-size: 12px;
+            color: var(--muted);
+        }
     </style>
 
     <div class="archive-grid">
@@ -74,6 +166,20 @@
                 backup tetap dijalankan dari app server Laravel, tetapi target database-nya tetap koneksi managed MySQL yang aktif di `.env`.
             </p>
         </div>
+
+        @if (session('archive_success'))
+            <div class="archive-col-12 archive-flash success">{{ session('archive_success') }}</div>
+        @endif
+
+        @if (session('archive_error'))
+            <div class="archive-col-12 archive-flash error">{{ session('archive_error') }}</div>
+        @endif
+
+        @if ($errors->any())
+            <div class="archive-col-12 archive-flash error">
+                {{ $errors->first() }}
+            </div>
+        @endif
 
         <div class="card archive-col-6">
             <h3 style="margin-top:0;">Konteks Server Saat Ini</h3>
@@ -86,6 +192,7 @@
                 <tr><th>Total File Backup</th><td>{{ number_format((int) $backupFileCount, 0, ',', '.') }}</td></tr>
                 <tr><th>Restore Drill Terakhir</th><td>{{ $latestRestoreDrill?->tested_at ? \Illuminate\Support\Carbon::parse((string) $latestRestoreDrill->tested_at)->format('d-m-Y H:i:s') : '-' }}</td></tr>
                 <tr><th>Status Restore Drill</th><td>{{ $latestRestoreDrill?->status ? strtoupper((string) $latestRestoreDrill->status) : '-' }}</td></tr>
+                <tr><th>Snapshot Finansial Terakhir</th><td>{{ is_array($latestFinancialSnapshot) ? basename((string) ($latestFinancialSnapshot['path'] ?? '-')) : '-' }}</td></tr>
                 </tbody>
             </table>
         </div>
@@ -96,8 +203,69 @@
                 <li>Arsip transaksi utama default dibaca berdasarkan tahun, supaya operator lebih mudah meninjau periode yang akan dipindah.</li>
                 <li>Backup penuh wajib dibuat dulu sebelum ekspor atau pembersihan data production.</li>
                 <li>Restore drill wajib lulus dulu, terutama karena database berada di AWS Lightsail Managed MySQL.</li>
-                <li>Hapus data production hanya setelah arsip diverifikasi dan periode yang dipilih benar.</li>
+                <li>Dataset finansial yang sudah dibuka tetap harus melalui snapshot finansial dan rebuild setelah purge.</li>
             </ol>
+        </div>
+
+        <div class="card archive-col-12">
+            <h3 style="margin-top:0;">Aksi Arsip</h3>
+            <form id="archive-action-form" method="post">
+                @csrf
+                <div class="archive-form-grid">
+                    <div>
+                        <label for="archive_year" class="archive-muted" style="display:block;margin-bottom:6px;">Tahun target</label>
+                        <input type="number" id="archive_year" name="archive_year" value="{{ old('archive_year', $selectedYear) }}" min="2000" max="2100">
+                        <div class="archive-muted" style="margin-top:8px;">
+                            Untuk audit/ops log tetap dihitung per tahun saat scan/export. Retention bulan tetap dipakai saat keputusan operasional.
+                        </div>
+
+                        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;">
+                            <input type="checkbox" name="rebuild_journal" value="1" {{ old('rebuild_journal') ? 'checked' : '' }}>
+                            <span class="archive-muted">Saat snapshot finansial, siapkan rebuild journal juga.</span>
+                        </label>
+
+                        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
+                            <input type="checkbox" name="allow_skipped_restore" value="1" {{ old('allow_skipped_restore') ? 'checked' : '' }}>
+                            <span class="archive-muted">Izinkan restore drill terakhir berstatus `SKIPPED` bila alasannya memang dipahami.</span>
+                        </label>
+
+                        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
+                            <input type="checkbox" name="confirm_purge" value="1" {{ old('confirm_purge') ? 'checked' : '' }}>
+                            <span class="archive-muted">Centang hanya saat benar-benar siap menghapus data production.</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <div class="archive-checkbox-grid">
+                            @foreach($datasets as $key => $dataset)
+                                @php
+                                    $mode = (string) ($dataset['purge_mode'] ?? 'locked');
+                                    $modeLabel = match ($mode) {
+                                        'standard' => 'Purge biasa',
+                                        'financial_guarded' => 'Butuh snapshot + rebuild',
+                                        default => 'Masih dikunci',
+                                    };
+                                @endphp
+                                <label class="archive-checkbox">
+                                    <input type="checkbox" name="datasets[]" value="{{ $key }}" {{ in_array($key, $selected, true) ? 'checked' : '' }}>
+                                    <strong>{{ $dataset['label'] }}</strong>
+                                    <div class="archive-mode-pill {{ $mode }}">{{ $modeLabel }}</div>
+                                    <div class="archive-muted">Basis: {{ $dataset['basis'] === 'year' ? 'Tahun' : 'Bulan' }}</div>
+                                    <div class="archive-muted">Key: <code>{{ $key }}</code></div>
+                                </label>
+                            @endforeach
+                        </div>
+
+                        <div class="archive-action-row">
+                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.scan') }}">Preview Scan</button>
+                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.export') }}">Buat Export SQL</button>
+                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.prepare-financial') }}">Siapkan Snapshot Finansial</button>
+                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=false;">Dry Run Purge</button>
+                            <button type="submit" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=true;">Purge Final</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
 
         <div class="card archive-col-12">
@@ -114,6 +282,95 @@
             </div>
         </div>
 
+        @if (is_array($scanResult))
+            <div class="card archive-col-8">
+                <h3 style="margin-top:0;">Hasil Preview Scan</h3>
+                <table class="archive-table">
+                    <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Mode Purge</th>
+                        <th>Total Row</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach(($scanResult['datasets'] ?? []) as $datasetKey => $dataset)
+                        <tr>
+                            <td>
+                                <strong>{{ $dataset['label'] }}</strong><br>
+                                <span class="archive-muted"><code>{{ $datasetKey }}</code></span>
+                            </td>
+                            <td>{{ match ((string) ($dataset['purge_mode'] ?? 'locked')) {
+                                'standard' => 'Purge biasa',
+                                'financial_guarded' => 'Snapshot + rebuild',
+                                default => 'Dikunci',
+                            } }}</td>
+                            <td>{{ number_format((int) $dataset['total_rows'], 0, ',', '.') }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card archive-col-4">
+                <h3 style="margin-top:0;">Ringkasan Scan</h3>
+                <table class="archive-kv">
+                    <tbody>
+                    <tr><th>Tahun</th><td>{{ $scanResult['year'] ?? '-' }}</td></tr>
+                    <tr><th>Total kandidat</th><td>{{ number_format((int) ($scanResult['grand_total'] ?? 0), 0, ',', '.') }}</td></tr>
+                    <tr><th>Dataset tidak dikenal</th><td>{{ empty($scanResult['missing']) ? '-' : implode(', ', $scanResult['missing']) }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
+        @if (is_array($exportResult))
+            <div class="card archive-col-12">
+                <h3 style="margin-top:0;">Hasil Export</h3>
+                <table class="archive-kv">
+                    <tbody>
+                    <tr><th>SQL file</th><td><code>{{ $exportResult['sql_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Manifest file</th><td><code>{{ $exportResult['manifest_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Total row</th><td>{{ number_format((int) (($exportResult['summary']['grand_total'] ?? 0)), 0, ',', '.') }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
+        @if (is_array($financialResult))
+            <div class="card archive-col-12">
+                <h3 style="margin-top:0;">Snapshot Finansial</h3>
+                <table class="archive-kv">
+                    <tbody>
+                    <tr><th>Snapshot file</th><td><code>{{ $financialResult['snapshot_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Manifest file</th><td><code>{{ $financialResult['manifest_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Customer terdampak</th><td>{{ number_format(count($financialResult['customer_snapshots'] ?? []), 0, ',', '.') }}</td></tr>
+                    <tr><th>Supplier terdampak</th><td>{{ number_format(count($financialResult['supplier_snapshots'] ?? []), 0, ',', '.') }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
+        @if (is_array($purgeResult))
+            <div class="card archive-col-12">
+                <h3 style="margin-top:0;">Hasil Purge</h3>
+                <table class="archive-kv">
+                    <tbody>
+                    <tr><th>Backup file</th><td><code>{{ $purgeResult['backup_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Manifest file</th><td><code>{{ $purgeResult['manifest_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Snapshot file</th><td><code>{{ $purgeResult['snapshot_file'] ?? '-' }}</code></td></tr>
+                    <tr><th>Restore status</th><td>{{ strtoupper((string) ($purgeResult['restore_status'] ?? '-')) }}</td></tr>
+                    <tr><th>Total kandidat</th><td>{{ number_format((int) (($purgeResult['summary']['grand_total'] ?? 0)), 0, ',', '.') }}</td></tr>
+                    @if (!empty($purgeResult['post_check']) && is_array($purgeResult['post_check']))
+                        <tr><th>Financial rebuild exit</th><td>{{ $purgeResult['post_check']['rebuild_exit'] ?? '-' }}</td></tr>
+                        <tr><th>Integrity exit</th><td>{{ $purgeResult['post_check']['integrity_exit'] ?? '-' }}</td></tr>
+                        <tr><th>Integrity latest ok</th><td>{{ var_export($purgeResult['post_check']['latest_integrity_status'] ?? null, true) }}</td></tr>
+                    @endif
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
         <div class="card archive-col-6">
             <h3 style="margin-top:0;">Command yang Dipakai Sekarang</h3>
             <ul class="archive-list">
@@ -122,7 +379,7 @@
                 @endforeach
             </ul>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Tiga command ini dijalankan dari folder project Laravel di aaPanel, tetapi tetap bekerja ke managed DB AWS lewat koneksi `.env` yang aktif.
+                Tiga command ini tetap berjalan dari folder project Laravel di aaPanel, tetapi target database-nya tetap managed DB AWS lewat `.env`.
             </p>
         </div>
 
@@ -134,20 +391,18 @@
                 @endforeach
             </ol>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Jadi untuk transaksi ERP, ya, titik kerja yang paling aman memang berdasarkan tahun. Operator tinggal menentukan tahun target, lalu ikuti alur backup, verifikasi, dan pembersihan.
+                Untuk transaksi ERP, titik kerja operator tetap berdasarkan tahun. Audit/ops log tetap bisa disapu rutin, tetapi keputusan final pembersihan tetap ada di tangan admin.
             </p>
         </div>
 
         <div class="card archive-col-12">
             <h3 style="margin-top:0;">Catatan Command Arsip</h3>
-            <p class="archive-muted" style="margin:0 0 8px;">
-                Command arsip berbasis tahun sekarang sudah tersedia dengan pola berikut:
-            </p>
             <pre class="archive-code">php artisan app:archive:scan 2021 --dataset=sales_invoices
 php artisan app:archive:export 2021 --dataset=sales_invoices
+php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal
 php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Untuk tahap aman pertama, `purge` otomatis hanya dibuka untuk dataset log/ops yang memang aman dibersihkan. Dataset finansial seperti faktur, ledger piutang, dan hutang supplier tetap bisa di-`scan` dan di-`export`, tetapi purge masih dikunci sampai rebuilder histori finansialnya disiapkan.
+                Purge biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Purge finansial tahap pertama hanya dibuka untuk dataset yang sudah punya jalur snapshot dan rebuild aman.
             </p>
         </div>
     </div>

@@ -484,6 +484,11 @@ Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int
 
     foreach ($summary['datasets'] as $datasetKey => $dataset) {
         $basis = $dataset['basis'] === 'year' ? 'berdasarkan tahun' : 'berdasarkan bulan';
+        $purgeStatus = match ((string) ($dataset['purge_mode'] ?? 'locked')) {
+            'standard' => 'siap',
+            'financial_guarded' => 'butuh snapshot+rebuild',
+            default => 'dikunci',
+        };
         $this->newLine();
         $this->line(sprintf(
             '[%s] %s | total %s row(s) | %s | purge %s',
@@ -491,7 +496,7 @@ Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int
             $dataset['label'],
             number_format((int) $dataset['total_rows'], 0, ',', '.'),
             $basis,
-            $dataset['purge_allowed'] ? 'siap' : 'dikunci'
+            $purgeStatus
         ));
         foreach ($dataset['tables'] as $table) {
             $this->line('  - '.$table['table'].': '.number_format((int) $table['rows'], 0, ',', '.'));
@@ -504,6 +509,7 @@ Artisan::command('app:archive:scan {year} {--dataset=*} {--json}', function (int
 
     $this->newLine();
     $this->line('Lanjut export: php artisan app:archive:export '.$year.' --dataset=...');
+    $this->line('Siapkan finansial: php artisan app:archive:prepare-financial '.$year.' --dataset=...');
     $this->line('Lanjut purge: php artisan app:archive:purge '.$year.' --dataset=... --confirm');
 
     return 0;
@@ -543,6 +549,35 @@ Artisan::command('app:archive:export {year} {--dataset=*} {--path=}', function (
     return 0;
 })->purpose('Export arsip SQL berdasarkan tahun untuk dataset terpilih');
 
+Artisan::command('app:archive:prepare-financial {year} {--dataset=*} {--manifest=} {--rebuild-journal}', function (int $year) {
+    /** @var DataArchiveService $service */
+    $service = app(DataArchiveService::class);
+    $requestedDatasets = (array) $this->option('dataset');
+    $manifest = (string) ($this->option('manifest') ?: '');
+
+    try {
+        $result = $service->prepareFinancialSnapshot(
+            $year,
+            $requestedDatasets,
+            $manifest !== '' ? $manifest : null,
+            (bool) $this->option('rebuild-journal')
+        );
+    } catch (Throwable $e) {
+        $this->error('Snapshot finansial gagal: '.$e->getMessage());
+        return 1;
+    }
+
+    $this->info('Snapshot finansial siap.');
+    $this->line('Snapshot file : '.$result['snapshot_file']);
+    $this->line('Manifest file : '.$result['manifest_file']);
+    $this->line('Backup file   : '.$result['backup_file']);
+    $this->line('Restore status: '.strtoupper($result['restore_status']));
+    $this->line('Customer kena : '.number_format(count($result['customer_snapshots']), 0, ',', '.'));
+    $this->line('Supplier kena : '.number_format(count($result['supplier_snapshots']), 0, ',', '.'));
+
+    return 0;
+})->purpose('Prepare snapshot finansial sebelum purge dataset finansial yang sudah didukung');
+
 Artisan::command('app:archive:purge {year} {--dataset=*} {--manifest=} {--confirm} {--allow-skipped-restore}', function (int $year) {
     /** @var DataArchiveService $service */
     $service = app(DataArchiveService::class);
@@ -568,6 +603,9 @@ Artisan::command('app:archive:purge {year} {--dataset=*} {--manifest=} {--confir
     $this->line('Backup file    : '.$result['backup_file']);
     $this->line('Manifest file  : '.$result['manifest_file']);
     $this->line('Restore status : '.strtoupper($result['restore_status']));
+    if (! empty($result['snapshot_file'])) {
+        $this->line('Snapshot file  : '.$result['snapshot_file']);
+    }
     $this->line('Total kandidat : '.number_format((int) $result['summary']['grand_total'], 0, ',', '.'));
 
     foreach ($result['summary']['datasets'] as $datasetKey => $dataset) {
@@ -583,6 +621,14 @@ Artisan::command('app:archive:purge {year} {--dataset=*} {--manifest=} {--confir
 
     if (! $confirm) {
         $this->warn('Belum ada data yang dihapus. Tambahkan --confirm kalau kandidat dan guard sudah sesuai.');
+    }
+
+    if (! empty($result['post_check']) && is_array($result['post_check'])) {
+        $this->newLine();
+        $this->line('Post purge check:');
+        $this->line('- financial rebuild exit: '.(string) ($result['post_check']['rebuild_exit'] ?? '-'));
+        $this->line('- integrity exit        : '.(string) ($result['post_check']['integrity_exit'] ?? '-'));
+        $this->line('- integrity latest ok   : '.var_export($result['post_check']['latest_integrity_status'] ?? null, true));
     }
 
     return 0;

@@ -342,5 +342,9 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         Route::post('/approvals/{approvalRequest}/re-execute', [ApprovalRequestController::class, 'reExecute'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.re-execute');
         Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
         Route::get('/archive-data', [ArchiveDataPageController::class, 'index'])->middleware('perm:settings.admin')->name('archive-data.index');
+        Route::post('/archive-data/scan', [ArchiveDataPageController::class, 'scan'])->middleware('perm:settings.admin')->name('archive-data.scan');
+        Route::post('/archive-data/export', [ArchiveDataPageController::class, 'export'])->middleware('perm:settings.admin')->name('archive-data.export');
+        Route::post('/archive-data/prepare-financial', [ArchiveDataPageController::class, 'prepareFinancial'])->middleware('perm:settings.admin')->name('archive-data.prepare-financial');
+        Route::post('/archive-data/purge', [ArchiveDataPageController::class, 'purge'])->middleware('perm:settings.admin')->name('archive-data.purge');
     });
 });
