@@ -17,6 +17,7 @@ use App\Http\Controllers\ItemCategoryPageController;
 use App\Http\Controllers\MassImportController;
 use App\Http\Controllers\OrderNotePageController;
 use App\Http\Controllers\OpsHealthController;
+use App\Http\Controllers\ArchiveDataPageController;
 use App\Http\Controllers\OutgoingTransactionPageController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPageController;
@@ -340,5 +341,6 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.reject');
         Route::post('/approvals/{approvalRequest}/re-execute', [ApprovalRequestController::class, 'reExecute'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.re-execute');
         Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
+        Route::get('/archive-data', [ArchiveDataPageController::class, 'index'])->middleware('perm:settings.admin')->name('archive-data.index');
     });
 });

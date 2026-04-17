@@ -26,6 +26,7 @@ return [
     'school_bulk_transactions' => 'Transaksi Sebar Sekolah',
     'reports' => 'Laporan',
     'users' => 'Pengguna',
+    'archive_data' => 'Arsip Data',
     'semester_transactions' => 'Transaksi Per Semester',
     'settings' => 'Pengaturan',
     'logout' => 'Logout',

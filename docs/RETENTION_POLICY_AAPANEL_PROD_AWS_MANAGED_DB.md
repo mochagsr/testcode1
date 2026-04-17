@@ -11,6 +11,10 @@ Fokus dokumen ini:
 - menjaga histori penting tetap aman
 - memakai pola **semi-manual**, bukan hapus otomatis penuh
 
+Submenu operasional di aplikasi:
+- `Sistem > Arsip Data`
+- halaman ini dipakai sebagai pengingat operator bahwa untuk `erpos` production, backup tetap dijalankan ke managed DB AWS dan titik kerja arsip transaksi utama dibaca berdasarkan tahun
+
 ## Prinsip utama
 - data operasional yang masih aktif tetap online
 - data lama boleh diarsipkan, **bukan langsung dibuang**
@@ -155,8 +159,12 @@ Kalau storage mendekati `30 GB`, arsip atau upgrade sebaiknya jangan ditunda.
 
 ### 1. Tentukan periode arsip
 Contoh:
-- arsip semua data sebelum `2022-01-01`
+- arsip semua data tahun `2020`
 - atau arsip semua data lebih tua dari `60 bulan`
+
+Catatan:
+- untuk transaksi ERP, basis kerja operator yang paling aman adalah **berdasarkan tahun**
+- untuk audit log, basis kerja yang lebih enak tetap per bulan atau per kuartal
 
 ### 2. Backup penuh dulu
 Jalankan dari **folder app di server aaPanel**.
@@ -199,6 +207,10 @@ Catatan:
 - pada tahap ini operator masih bisa memakai proses manual yang terkontrol
 - misalnya export backup SQL penuh dulu, lalu simpan sebagai arsip tahunan
 - kalau nanti dibutuhkan, baru kita bisa tambah SOP atau tool arsip yang lebih otomatis
+- pola command yang disiapkan nanti tetap mengikuti urutan:
+  - `scan`
+  - `export`
+  - `purge`
 
 ### 5. Verifikasi arsip
 Minimal cek:

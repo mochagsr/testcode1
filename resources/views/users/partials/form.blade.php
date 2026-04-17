@@ -95,7 +95,7 @@
         ],
         'settings.admin' => [
             'title' => 'Pengaturan admin',
-            'note' => 'Menu Sistem > Pengaturan, Semester Transaksi, dan Ops Health untuk pengaturan tingkat admin.',
+            'note' => 'Menu Sistem > Pengaturan, Semester Transaksi, Ops Health, dan Arsip Data untuk pengaturan tingkat admin.',
         ],
         'masters.products.view' => [
             'title' => 'Lihat menu Barang',

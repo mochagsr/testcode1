@@ -97,6 +97,7 @@ class PageLoadSmokeTest extends TestCase
             route('approvals.index'),
             route('semester-transactions.index'),
             route('ops-health.index'),
+            route('archive-data.index'),
             route('settings.edit'),
         ];
     }

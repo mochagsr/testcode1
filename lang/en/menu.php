@@ -26,6 +26,7 @@ return [
     'school_bulk_transactions' => 'School Bulk Transactions',
     'reports' => 'Reports',
     'users' => 'Users',
+    'archive_data' => 'Data Archive',
     'semester_transactions' => 'Semester Transactions',
     'settings' => 'Settings',
     'logout' => 'Logout',

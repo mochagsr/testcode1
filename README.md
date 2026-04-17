@@ -113,6 +113,12 @@ Catatan:
 - Backup DB: `php artisan app:db-backup --gzip`
 - Uji restore: `php artisan app:db-restore-test`
 - Integrity check: `php artisan app:integrity-check`
+- Untuk `erpos` dengan `AWS Lightsail Managed MySQL`, command backup/restore tetap dijalankan dari folder project Laravel di app server aaPanel, tetapi target database-nya tetap koneksi managed DB yang aktif di `.env`
+- Untuk arsip data production, pola yang disepakati adalah **semi-manual**:
+  - backup dulu
+  - restore drill dulu
+  - lalu arsip / pembersihan data
+- Default titik kerja arsip transaksi ERP adalah **berdasarkan tahun**, supaya operator lebih mudah memilih periode arsip
 - Profiling query plan manual: `php artisan app:query-profile`
 - Performance probe / load test ringan: `php artisan app:load-test-light --loops=50`
 - Sinkronisasi ulang saldo customer/supplier jika integrity check anomali: `php artisan app:financial-rebuild`
@@ -171,6 +177,9 @@ Catatan:
   - `docs/RETENTION_POLICY_AAPANEL_PROD_AWS_MANAGED_DB.md`
   - `docs/BACKUP_OPS_HEALTH_README.md`
   - `docs/GO_LIVE_RUNBOOK.md`
+- Di aplikasi, submenu operasionalnya ada di:
+  - `Sistem > Arsip Data`
+  - halaman ini merangkum prinsip arsip berbasis tahun dan command backup/restore yang relevan untuk managed DB AWS
 - Untuk `AWS Lightsail + CloudPanel + Cloudflare`, gunakan dokumen ini:
   - `docs/DEPLOY_AWS_LIGHTSAIL_CLOUDPANEL.md`
 
