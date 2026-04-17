@@ -6,6 +6,20 @@ namespace App\Support;
 
 final class PrintTextFormatter
 {
+    public static function normalizeMultiline(?string $text): string
+    {
+        $value = trim((string) $text);
+
+        if ($value === '') {
+            return '';
+        }
+
+        $value = str_replace(["\r\n", "\r"], "\n", $value);
+        $lines = array_map(static fn (string $line): string => rtrim($line), explode("\n", $value));
+
+        return implode("\n", $lines);
+    }
+
     public static function wrapWords(?string $text, int $wordsPerLine = 4): string
     {
         $value = trim((string) $text);

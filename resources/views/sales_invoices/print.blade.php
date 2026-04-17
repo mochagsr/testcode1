@@ -61,7 +61,7 @@
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
         $companyInvoiceNotes = trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', ''));
         $reportHeaderText = trim((string) \App\Models\AppSetting::getValue('report_header_text', ''));
-        $printNotes = \App\Support\PrintTextFormatter::wrapWords(trim((string) ($invoice->notes ?: $companyInvoiceNotes)), 4);
+        $printNotes = \App\Support\PrintTextFormatter::normalizeMultiline((string) ($invoice->notes ?: $companyInvoiceNotes));
         $totalQty = (int) round((float) $invoice->items->sum('quantity'), 0);
         $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($invoice->customer?->address ?: ''), 4);
         $companyDetailLines = collect([$companyAddress, $companyPhone, $companyEmail, $companyNotes])
@@ -141,7 +141,16 @@
 
     <div class="summary-row">
         <div class="notes-box">
-            <strong>{{ __('txn.notes') }}:</strong> {{ $printNotes !== '' ? $printNotes : '-' }}
+            <div><strong>{{ __('txn.notes') }}:</strong></div>
+            @if($printNotes !== '')
+                @foreach(preg_split('/\r\n|\r|\n/', $printNotes) ?: [] as $line)
+                    @if(trim($line) !== '')
+                        <div>{{ $line }}</div>
+                    @endif
+                @endforeach
+            @else
+                <div>-</div>
+            @endif
         </div>
         <table class="qty-box">
             <tr>

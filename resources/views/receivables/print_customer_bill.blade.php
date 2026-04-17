@@ -69,7 +69,7 @@
         if ($notesText === '') {
             $notesText = trim((string) ($companyNotes ?? ''));
         }
-        $notesText = \App\Support\PrintTextFormatter::wrapWords($notesText, 4);
+        $notesText = \App\Support\PrintTextFormatter::normalizeMultiline($notesText);
         $transferText = trim((string) ($companyTransferAccounts ?? ''));
         $maxBlankRows = 3;
         $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($customer->address ?? ''), 4);

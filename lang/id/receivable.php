@@ -167,7 +167,7 @@ return [
     'school_balance_total' => 'Sisa Piutang',
     'unknown_school' => 'Tanpa Sekolah',
     'invoice_label' => 'Invoice',
-    'note_label' => 'Note',
+    'note_label' => 'Catatan',
     'default_billing_note' => "Untuk pesanan dan komplain bisa langsung hubungi nomor perusahaan.\nRetur maksimal 10% dari total pengambilan.",
     'default_transfer_accounts' => "BCA : 0110989806 a/n Marimin\nBRI : 124701000187568 a/n Marimin\nMANDIRI : 144.00.1327809.5 a/n Sumarni",
 ];

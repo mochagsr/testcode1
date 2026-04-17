@@ -460,7 +460,7 @@ class ReceivablePageController extends Controller
                 $companyPhone = trim((string) ($data['companyPhone'] ?? ''));
                 $companyEmail = trim((string) ($data['companyEmail'] ?? ''));
                 $customerAddress = PrintTextFormatter::wrapWords(trim((string) ($selectedCustomer->address ?? '')), 4);
-                $notesText = PrintTextFormatter::wrapWords(trim((string) ($data['companyInvoiceNotes'] ?? '')), 4);
+                $notesText = PrintTextFormatter::normalizeMultiline((string) ($data['companyInvoiceNotes'] ?? ''));
                 $transferText = trim((string) ($data['companyTransferAccounts'] ?? ''));
                 $invoiceRows = collect($data['customerInvoiceRows'] ?? []);
                 $invoiceTotal = (int) ($data['customerInvoiceTotal'] ?? 0);
@@ -1057,7 +1057,7 @@ class ReceivablePageController extends Controller
             $companyPhone = trim((string) ($data['companyPhone'] ?? ''));
             $companyEmail = trim((string) ($data['companyEmail'] ?? ''));
             $customerAddress = PrintTextFormatter::wrapWords(trim((string) ($data['customer']->address ?? '')), 5);
-            $notesText = PrintTextFormatter::wrapWords(trim((string) ($data['companyInvoiceNotes'] ?? '')), 4);
+            $notesText = PrintTextFormatter::normalizeMultiline((string) ($data['companyInvoiceNotes'] ?? ''));
 
             $sheet->mergeCells('A1:G1');
             $sheet->setCellValue('A1', (string) ($data['reportTitle'] ?? __('receivable.customer_bill_title')));
