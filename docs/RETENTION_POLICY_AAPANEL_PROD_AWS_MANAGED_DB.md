@@ -114,6 +114,17 @@ Alur semi-manual:
 6. verifikasi arsip
 7. baru hapus dari production jika memang disetujui
 
+## Apa yang masih manual saat ini
+Untuk repo saat ini, pola semi-manual berarti:
+- backup dan restore test sudah dibantu oleh command aplikasi
+- tetapi keputusan arsip/hapus periode lama masih dilakukan operator
+- export arsip periodik masih perlu dijalankan dengan prosedur ops yang disepakati
+
+Artinya:
+- aplikasi **belum** punya tombol atau command bawaan yang otomatis memindahkan transaksi lama ke database arsip
+- aplikasi **belum** menghapus data lama sendiri secara diam-diam
+- ini memang sengaja, supaya data finansial tidak berpindah/hilang tanpa verifikasi
+
 ## Kapan review retention dilakukan
 
 ### Review bulanan
@@ -184,6 +195,11 @@ Contoh pendekatan paling aman:
 - simpan file hasil backup di storage backup
 - kalau perlu buka histori lama, restore ke database arsip / staging
 
+Catatan:
+- pada tahap ini operator masih bisa memakai proses manual yang terkontrol
+- misalnya export backup SQL penuh dulu, lalu simpan sebagai arsip tahunan
+- kalau nanti dibutuhkan, baru kita bisa tambah SOP atau tool arsip yang lebih otomatis
+
 ### 5. Verifikasi arsip
 Minimal cek:
 - tabel utama ada
@@ -195,6 +211,11 @@ Jangan hapus data lama sebelum:
 - backup penuh valid
 - restore test lulus
 - arsip sudah dicek
+
+Kalau penghapusan periode lama memang jadi kebijakan resmi:
+- lakukan saat maintenance window
+- catat periode yang dihapus
+- catat nama file backup / snapshot yang menjadi arsip rujukan
 
 ## Peringatan penting untuk data finansial
 Untuk tabel seperti:
