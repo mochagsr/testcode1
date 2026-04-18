@@ -75,7 +75,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('sales-invoices.admin-update');
     Route::post('/sales-invoices/{salesInvoice}/cancel', [SalesInvoicePageController::class, 'cancel'])
-        ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:transactions.cancel', 'semester.open'])
         ->name('sales-invoices.cancel');
 
     Route::get('/sales-returns', [SalesReturnPageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-returns.index');
@@ -89,7 +89,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('sales-returns.admin-update');
     Route::post('/sales-returns/{salesReturn}/cancel', [SalesReturnPageController::class, 'cancel'])
-        ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:transactions.cancel', 'semester.open'])
         ->name('sales-returns.cancel');
 
     Route::get('/delivery-notes', [DeliveryNotePageController::class, 'index'])->middleware('perm:transactions.view')->name('delivery-notes.index');
@@ -103,7 +103,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('delivery-notes.admin-update');
     Route::post('/delivery-notes/{deliveryNote}/cancel', [DeliveryNotePageController::class, 'cancel'])
-        ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:transactions.cancel', 'semester.open'])
         ->name('delivery-notes.cancel');
 
     Route::get('/order-notes', [OrderNotePageController::class, 'index'])->middleware('perm:transactions.view')->name('order-notes.index');
@@ -117,7 +117,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('order-notes.admin-update');
     Route::post('/order-notes/{orderNote}/cancel', [OrderNotePageController::class, 'cancel'])
-        ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:transactions.cancel', 'semester.open'])
         ->name('order-notes.cancel');
 
     Route::get('/delivery-trips', [DeliveryTripPageController::class, 'index'])->middleware('perm:transactions.view')->name('delivery-trips.index');
@@ -168,10 +168,10 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware('perm:receivables.view')
         ->name('receivables.export-customer-bill-excel');
     Route::post('/receivables/customer-writeoff/{customer}', [ReceivablePageController::class, 'customerWriteoff'])
-        ->middleware(['finance.unlocked', 'admin', 'semester.open'])
+        ->middleware(['finance.unlocked', 'perm:receivables.adjust', 'semester.open'])
         ->name('receivables.customer-writeoff');
     Route::post('/receivables/customer-discount/{customer}', [ReceivablePageController::class, 'customerDiscount'])
-        ->middleware(['finance.unlocked', 'admin', 'semester.open'])
+        ->middleware(['finance.unlocked', 'perm:receivables.adjust', 'semester.open'])
         ->name('receivables.customer-discount');
     Route::post('/receivables/customer/{customer}/semester-close', [ReceivablePageController::class, 'closeCustomerSemester'])
         ->middleware('perm:receivables.lock')
@@ -192,7 +192,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('receivable-payments.admin-update');
     Route::post('/receivable-payments/{receivablePayment}/cancel', [ReceivablePaymentPageController::class, 'cancel'])
-        ->middleware(['admin', 'perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:transactions.cancel', 'semester.open'])
         ->name('receivable-payments.cancel');
     Route::get('/transaction-corrections/create', [TransactionCorrectionWizardController::class, 'create'])
         ->middleware('perm:transactions.correction.request')
@@ -268,10 +268,10 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('perm:settings.profile')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('perm:settings.profile')->name('settings.update');
     Route::post('/settings/semester-close', [SettingsController::class, 'closeSemester'])
-        ->middleware(['admin', 'perm:settings.admin'])
+        ->middleware('perm:settings.admin')
         ->name('settings.semester.close');
     Route::post('/settings/semester-open', [SettingsController::class, 'openSemester'])
-        ->middleware(['admin', 'perm:settings.admin'])
+        ->middleware('perm:settings.admin')
         ->name('settings.semester.open');
 
     Route::get('/suppliers', [SupplierPageController::class, 'index'])->middleware('perm:masters.suppliers.view')->name('suppliers.index');
@@ -307,10 +307,10 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
         ->name('supplier-payables.store');
     Route::post('/supplier-payables/year-close', [SupplierPayablePageController::class, 'closeYear'])
-        ->middleware(['admin', 'perm:supplier_payables.adjust'])
+        ->middleware('perm:supplier_payables.adjust')
         ->name('supplier-payables.year-close');
     Route::post('/supplier-payables/year-open', [SupplierPayablePageController::class, 'openYear'])
-        ->middleware(['admin', 'perm:supplier_payables.adjust'])
+        ->middleware('perm:supplier_payables.adjust')
         ->name('supplier-payables.year-open');
     Route::get('/supplier-payables/payment/{supplierPayment}', [SupplierPayablePageController::class, 'showPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.show-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/print', [SupplierPayablePageController::class, 'printPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print-payment');
@@ -320,31 +320,29 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('supplier-payables.admin-update');
 
-    Route::middleware('admin')->group(function (): void {
-        Route::get('/sales-invoices/import/template', [MassImportController::class, 'templateSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import.template');
-        Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
-        Route::get('/customer-ship-locations/import/template', [MassImportController::class, 'templateCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import.template');
-        Route::post('/customer-ship-locations/import', [MassImportController::class, 'importCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import');
+    Route::get('/sales-invoices/import/template', [MassImportController::class, 'templateSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import.template');
+    Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
+    Route::get('/customer-ship-locations/import/template', [MassImportController::class, 'templateCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import.template');
+    Route::post('/customer-ship-locations/import', [MassImportController::class, 'importCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import');
 
-        Route::get('/users', [UserManagementController::class, 'index'])->middleware('perm:users.manage')->name('users.index');
-        Route::get('/users/create', [UserManagementController::class, 'create'])->middleware('perm:users.manage')->name('users.create');
-        Route::post('/users', [UserManagementController::class, 'store'])->middleware('perm:users.manage')->name('users.store');
-        Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])->middleware('perm:users.manage')->name('users.edit');
-        Route::put('/users/{user}', [UserManagementController::class, 'update'])->middleware('perm:users.manage')->name('users.update');
-        Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->middleware('perm:users.manage')->name('users.destroy');
-        Route::get('/audit-logs', [AuditLogPageController::class, 'index'])->middleware('perm:audit_logs.view')->name('audit-logs.index');
-        Route::get('/audit-logs/export.csv', [AuditLogPageController::class, 'exportCsv'])->middleware('perm:audit_logs.view')->name('audit-logs.export.csv');
-        Route::get('/semester-transactions', [SemesterTransactionPageController::class, 'index'])->middleware('perm:settings.admin')->name('semester-transactions.index');
-        Route::post('/semester-transactions/bulk-action', [SemesterTransactionPageController::class, 'bulkAction'])->middleware('perm:semester.bulk')->name('semester-transactions.bulk-action');
-        Route::get('/approvals', [ApprovalRequestController::class, 'index'])->middleware('perm:transactions.correction.approve')->name('approvals.index');
-        Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.approve');
-        Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.reject');
-        Route::post('/approvals/{approvalRequest}/re-execute', [ApprovalRequestController::class, 'reExecute'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.re-execute');
-        Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
-        Route::get('/archive-data', [ArchiveDataPageController::class, 'index'])->middleware('perm:settings.admin')->name('archive-data.index');
-        Route::post('/archive-data/scan', [ArchiveDataPageController::class, 'scan'])->middleware('perm:settings.admin')->name('archive-data.scan');
-        Route::post('/archive-data/export', [ArchiveDataPageController::class, 'export'])->middleware('perm:settings.admin')->name('archive-data.export');
-        Route::post('/archive-data/prepare-financial', [ArchiveDataPageController::class, 'prepareFinancial'])->middleware('perm:settings.admin')->name('archive-data.prepare-financial');
-        Route::post('/archive-data/purge', [ArchiveDataPageController::class, 'purge'])->middleware('perm:settings.admin')->name('archive-data.purge');
-    });
+    Route::get('/users', [UserManagementController::class, 'index'])->middleware('perm:users.manage')->name('users.index');
+    Route::get('/users/create', [UserManagementController::class, 'create'])->middleware('perm:users.manage')->name('users.create');
+    Route::post('/users', [UserManagementController::class, 'store'])->middleware('perm:users.manage')->name('users.store');
+    Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])->middleware('perm:users.manage')->name('users.edit');
+    Route::put('/users/{user}', [UserManagementController::class, 'update'])->middleware('perm:users.manage')->name('users.update');
+    Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->middleware('perm:users.manage')->name('users.destroy');
+    Route::get('/audit-logs', [AuditLogPageController::class, 'index'])->middleware('perm:audit_logs.view')->name('audit-logs.index');
+    Route::get('/audit-logs/export.csv', [AuditLogPageController::class, 'exportCsv'])->middleware('perm:audit_logs.view')->name('audit-logs.export.csv');
+    Route::get('/semester-transactions', [SemesterTransactionPageController::class, 'index'])->middleware('perm:settings.admin')->name('semester-transactions.index');
+    Route::post('/semester-transactions/bulk-action', [SemesterTransactionPageController::class, 'bulkAction'])->middleware('perm:semester.bulk')->name('semester-transactions.bulk-action');
+    Route::get('/approvals', [ApprovalRequestController::class, 'index'])->middleware('perm:transactions.correction.approve')->name('approvals.index');
+    Route::post('/approvals/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.approve');
+    Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.reject');
+    Route::post('/approvals/{approvalRequest}/re-execute', [ApprovalRequestController::class, 'reExecute'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.re-execute');
+    Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
+    Route::get('/archive-data', [ArchiveDataPageController::class, 'index'])->middleware('perm:settings.admin')->name('archive-data.index');
+    Route::post('/archive-data/scan', [ArchiveDataPageController::class, 'scan'])->middleware('perm:settings.admin')->name('archive-data.scan');
+    Route::post('/archive-data/export', [ArchiveDataPageController::class, 'export'])->middleware('perm:settings.admin')->name('archive-data.export');
+    Route::post('/archive-data/prepare-financial', [ArchiveDataPageController::class, 'prepareFinancial'])->middleware('perm:settings.admin')->name('archive-data.prepare-financial');
+    Route::post('/archive-data/purge', [ArchiveDataPageController::class, 'purge'])->middleware('perm:settings.admin')->name('archive-data.purge');
 });

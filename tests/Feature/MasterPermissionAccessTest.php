@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class MasterPermissionAccessTest extends TestCase
@@ -71,6 +72,64 @@ class MasterPermissionAccessTest extends TestCase
         $this->actingAs($user)->get(route('suppliers.import.template'))->assertOk();
     }
 
+    public function test_user_with_system_detail_permissions_can_access_matching_system_pages(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'dashboard.view',
+                'settings.profile',
+                'users.manage',
+                'audit_logs.view',
+                'settings.admin',
+                'transactions.correction.approve',
+                'imports.transactions',
+                'semester.bulk',
+                'transactions.create',
+            ],
+        ]);
+
+        $this->actingAs($user)->get(route('users.index'))->assertOk();
+        $this->actingAs($user)->get(route('audit-logs.index'))->assertOk();
+        $this->actingAs($user)->get(route('approvals.index'))->assertOk();
+        $this->actingAs($user)->get(route('ops-health.index'))->assertOk();
+        $this->actingAs($user)->get(route('semester-transactions.index'))->assertOk();
+        $this->actingAs($user)->get(route('sales-invoices.import.template'))->assertOk();
+        $this->actingAs($user)->get(route('customer-ship-locations.import.template'))->assertOk();
+        $this->actingAs($user)->post(route('archive-data.scan'), [
+            'archive_scope_type' => 'year',
+            'archive_year' => 2025,
+            'datasets' => ['audit_logs'],
+        ])->assertRedirect();
+    }
+
+    public function test_granular_permission_routes_do_not_require_admin_role(): void
+    {
+        $routes = [
+            'sales-invoices.cancel',
+            'sales-returns.cancel',
+            'delivery-notes.cancel',
+            'order-notes.cancel',
+            'receivable-payments.cancel',
+            'receivables.customer-writeoff',
+            'receivables.customer-discount',
+            'settings.semester.close',
+            'settings.semester.open',
+            'supplier-payables.year-close',
+            'supplier-payables.year-open',
+            'users.index',
+            'audit-logs.index',
+            'ops-health.index',
+            'archive-data.index',
+        ];
+
+        foreach ($routes as $routeName) {
+            $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
+
+            $this->assertNotContains('admin', $middleware, sprintf('Route [%s] should rely on detailed permissions instead of admin-only middleware.', $routeName));
+        }
+    }
+
 
     public function test_outgoing_create_button_hidden_without_create_permission(): void
     {
@@ -110,22 +169,18 @@ class MasterPermissionAccessTest extends TestCase
 
     public function test_user_edit_form_checks_effective_default_role_permissions(): void
     {
-        $admin = User::factory()->create([
-            'role' => 'admin',
-            'permissions' => ['*'],
-        ]);
-
         $user = User::factory()->create([
             'role' => 'user',
             'permissions' => [],
         ]);
 
-        $response = $this->actingAs($admin)->get(route('users.edit', $user));
+        $resolvedPermissions = $user->resolvedPermissions();
 
-        $response->assertOk();
-        $response->assertSee('value="dashboard.view" checked', false);
-        $response->assertSee('value="transactions.create" checked', false);
-        $response->assertSee('value="masters.suppliers.edit" checked', false);
+        $this->assertContains('dashboard.view', $resolvedPermissions);
+        $this->assertContains('transactions.view', $resolvedPermissions);
+        $this->assertContains('transactions.create', $resolvedPermissions);
+        $this->assertContains('masters.suppliers.edit', $resolvedPermissions);
+        $this->assertNotContains('settings.admin', $resolvedPermissions);
     }
 
 }

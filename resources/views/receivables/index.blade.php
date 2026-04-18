@@ -1035,7 +1035,7 @@
                         </div>
                     </div>
                     </div>
-                    @if((auth()->user()?->role ?? '') === 'admin' && (float) ($customerOutstandingTotal ?? 0) > 0)
+                    @if(auth()->user()?->canAccess('receivables.adjust') && (float) ($customerOutstandingTotal ?? 0) > 0)
                         <div id="receivable-adjustment-modal-overlay" class="receivable-adjustment-modal-overlay"></div>
                         <div
                             id="receivable-adjustment-modal"
