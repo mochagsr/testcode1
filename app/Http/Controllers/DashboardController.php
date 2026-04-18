@@ -292,6 +292,33 @@ class DashboardController extends Controller
         $candidateRows = (int) $candidateDatasets->sum(static fn (array $dataset): int => (int) ($dataset['candidate_rows'] ?? 0));
         $reminderCount = count((array) ($latestReview['reminders'] ?? []));
         $latestAction = $archiveHistory[0] ?? null;
+        $capacityProfile = $this->archiveCapacityProfile();
+        $candidateHighlights = $candidateDatasets
+            ->sortBy([
+                ['oldest_entry', 'asc'],
+                ['candidate_rows', 'desc'],
+            ])
+            ->take(5)
+            ->map(function (array $dataset): array {
+                $scopeLabel = '-';
+                if (! empty($dataset['recommended_semester_scope'])) {
+                    $scopeLabel = 'Semester '.$dataset['recommended_semester_scope'];
+                } elseif (! empty($dataset['recommended_year_scope'])) {
+                    $scopeLabel = 'Tahun '.$dataset['recommended_year_scope'];
+                } elseif (! empty($dataset['recommended_scope'])) {
+                    $scopeLabel = (string) $dataset['recommended_scope'];
+                }
+
+                return [
+                    'label' => (string) ($dataset['label'] ?? '-'),
+                    'rows' => (int) ($dataset['candidate_rows'] ?? 0),
+                    'oldest' => (string) ($dataset['oldest_entry'] ?? '-'),
+                    'newest' => (string) ($dataset['newest_entry'] ?? '-'),
+                    'scope' => $scopeLabel,
+                ];
+            })
+            ->values()
+            ->all();
 
         $statusKey = 'not_ready';
         $statusNote = __('ui.dashboard_archive_health_note_not_ready');
@@ -307,9 +334,17 @@ class DashboardController extends Controller
                     'datasets' => number_format($candidateDatasets->count(), 0, ',', '.'),
                     'rows' => number_format($candidateRows, 0, ',', '.'),
                 ]);
-            } elseif ($databaseSize >= 2147483648 || $backupSize >= 2147483648 || $archiveSize >= 2147483648) {
+            } elseif (
+                $databaseSize >= $capacityProfile['database_growth_threshold']
+                || $backupSize >= $capacityProfile['backup_growth_threshold']
+                || $archiveSize >= $capacityProfile['archive_growth_threshold']
+            ) {
                 $statusKey = 'growing';
-                $statusNote = __('ui.dashboard_archive_health_note_growing');
+                $statusNote = __('ui.dashboard_archive_health_note_growing', [
+                    'database_threshold' => $this->formatBytes($capacityProfile['database_growth_threshold']),
+                    'backup_threshold' => $this->formatBytes($capacityProfile['backup_growth_threshold']),
+                    'archive_threshold' => $this->formatBytes($capacityProfile['archive_growth_threshold']),
+                ]);
             } else {
                 $statusKey = 'safe';
                 $statusNote = __('ui.dashboard_archive_health_note_safe');
@@ -323,12 +358,14 @@ class DashboardController extends Controller
             'latestArchiveReviewAt' => isset($latestReview['generated_at'])
                 ? (string) Carbon::parse((string) $latestReview['generated_at'])->timezone('Asia/Jakarta')->format('d-m-Y H:i')
                 : '-',
+            'capacityProfileLabel' => $capacityProfile['label'],
             'archiveHealthStatusKey' => $statusKey,
             'archiveHealthStatus' => __('ui.dashboard_archive_health_'.$statusKey),
             'archiveHealthNote' => $statusNote,
             'candidateDatasetCount' => (int) $candidateDatasets->count(),
             'candidateRows' => $candidateRows,
             'reminderCount' => $reminderCount,
+            'candidateHighlights' => $candidateHighlights,
             'latestActionTitle' => (string) ($latestAction['title'] ?? '-'),
             'latestActionSummary' => (string) ($latestAction['summary'] ?? '-'),
             'latestActionAt' => isset($latestAction['created_at'])
@@ -394,15 +431,48 @@ class DashboardController extends Controller
             'backupSize' => $this->formatBytes(0),
             'archiveSize' => $this->formatBytes(0),
             'latestArchiveReviewAt' => '-',
+            'capacityProfileLabel' => $this->archiveCapacityProfile()['label'],
             'archiveHealthStatusKey' => 'not_ready',
             'archiveHealthStatus' => __('ui.dashboard_archive_health_not_ready'),
             'archiveHealthNote' => __('ui.dashboard_archive_health_note_not_ready'),
             'candidateDatasetCount' => 0,
             'candidateRows' => 0,
             'reminderCount' => 0,
+            'candidateHighlights' => [],
             'latestActionTitle' => '-',
             'latestActionSummary' => '-',
             'latestActionAt' => '-',
+        ];
+    }
+
+    /**
+     * @return array{
+     *   label:string,
+     *   database_growth_threshold:int,
+     *   backup_growth_threshold:int,
+     *   archive_growth_threshold:int
+     * }
+     */
+    private function archiveCapacityProfile(): array
+    {
+        $defaultConnection = (string) config('database.default');
+        $databaseHost = (string) config('database.connections.'.$defaultConnection.'.host');
+        $isManagedRemote = $databaseHost !== '' && ! in_array(strtolower($databaseHost), ['127.0.0.1', 'localhost'], true);
+
+        if ($isManagedRemote) {
+            return [
+                'label' => __('ui.dashboard_archive_capacity_managed_small'),
+                'database_growth_threshold' => 768 * 1024 * 1024,
+                'backup_growth_threshold' => 2 * 1024 * 1024 * 1024,
+                'archive_growth_threshold' => 5 * 1024 * 1024 * 1024,
+            ];
+        }
+
+        return [
+            'label' => __('ui.dashboard_archive_capacity_local'),
+            'database_growth_threshold' => 2 * 1024 * 1024 * 1024,
+            'backup_growth_threshold' => 4 * 1024 * 1024 * 1024,
+            'archive_growth_threshold' => 8 * 1024 * 1024 * 1024,
         ];
     }
 

@@ -200,7 +200,10 @@
                         </tr>
                         <tr>
                             <th>{{ __('ui.dashboard_latest_archive_review') }}</th>
-                            <td>{{ $archiveSnapshot['latestArchiveReviewAt'] ?? '-' }}</td>
+                            <td>
+                                {{ $archiveSnapshot['latestArchiveReviewAt'] ?? '-' }}
+                                <div class="muted" style="margin-top:6px;">{{ $archiveSnapshot['capacityProfileLabel'] ?? '-' }}</div>
+                            </td>
                         </tr>
                         <tr>
                             <th>{{ __('ui.dashboard_archive_review_candidates') }}</th>
@@ -227,6 +230,37 @@
                     <div style="margin-top: 12px;">
                         <a href="{{ route('archive-data.index') }}" class="btn">{{ __('ui.dashboard_archive_open') }}</a>
                     </div>
+                    <hr style="margin: 14px 0; border-color: var(--border);">
+                    <h4 style="margin:0 0 10px;">{{ __('ui.dashboard_archive_candidates_title') }}</h4>
+                    @if(!empty($archiveSnapshot['candidateHighlights']))
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>{{ __('ui.name') }}</th>
+                                <th>{{ __('ui.dashboard_archive_candidate_scope') }}</th>
+                                <th>{{ __('ui.dashboard_archive_candidate_rows') }}</th>
+                                <th>{{ __('ui.dashboard_archive_candidate_oldest') }}</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($archiveSnapshot['candidateHighlights'] as $candidate)
+                                <tr>
+                                    <td>{{ $candidate['label'] }}</td>
+                                    <td>{{ $candidate['scope'] }}</td>
+                                    <td>{{ number_format((int) ($candidate['rows'] ?? 0), 0, ',', '.') }}</td>
+                                    <td>
+                                        {{ $candidate['oldest'] ?: '-' }}
+                                        @if(!empty($candidate['newest']))
+                                            <div class="muted">{{ __('ui.dashboard_archive_candidate_newest') }}: {{ $candidate['newest'] }}</div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    @else
+                        <div class="muted">{{ __('ui.dashboard_archive_candidates_empty') }}</div>
+                    @endif
                 </div>
             </div>
             <div class="col-6">

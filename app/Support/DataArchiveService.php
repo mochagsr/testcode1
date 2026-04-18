@@ -675,13 +675,16 @@ class DataArchiveService
      *     key:string,
      *     label:string,
      *     basis:string,
+     *     scope_modes:list<string>,
      *     retention:string,
      *     purge_mode:string,
      *     cutoff_date:string,
      *     candidate_rows:int,
      *     oldest_entry:?string,
      *     newest_entry:?string,
-     *     recommended_scope:?string
+     *     recommended_scope:?string,
+     *     recommended_year_scope:?string,
+     *     recommended_semester_scope:?string
      *   }>
      * }
      */
@@ -697,17 +700,21 @@ class DataArchiveService
             }
 
             [$candidateRows, $oldestEntry, $newestEntry] = $this->reviewDatasetWindow($definition, $retention['cutoff']);
+            $recommendedScopes = $this->recommendedReviewScopes($definition, $oldestEntry);
             $datasets[] = [
                 'key' => $key,
                 'label' => $definition['label'],
                 'basis' => $definition['basis'],
+                'scope_modes' => array_values((array) ($definition['scope_modes'] ?? ['year'])),
                 'retention' => $retention['label'],
                 'purge_mode' => (string) ($definition['purge_mode'] ?? 'locked'),
                 'cutoff_date' => $retention['cutoff']->toDateString(),
                 'candidate_rows' => $candidateRows,
                 'oldest_entry' => $oldestEntry,
                 'newest_entry' => $newestEntry,
-                'recommended_scope' => $this->recommendedReviewScope($definition, $retention['cutoff']),
+                'recommended_scope' => $recommendedScopes['default'],
+                'recommended_year_scope' => $recommendedScopes['year'],
+                'recommended_semester_scope' => $recommendedScopes['semester'],
             ];
         }
 
@@ -1412,12 +1419,51 @@ class DataArchiveService
     /**
      * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string}>}  $definition
      */
-    private function recommendedReviewScope(array $definition, \Illuminate\Support\Carbon $cutoff): ?string
+    private function recommendedReviewScopes(array $definition, ?string $oldestEntry): array
     {
-        return match ((string) ($definition['basis'] ?? 'year')) {
-            'month' => $cutoff->copy()->subMonth()->format('Y-m'),
-            default => (string) $cutoff->copy()->subYear()->year,
-        };
+        if ($oldestEntry === null || trim($oldestEntry) === '') {
+            return [
+                'default' => null,
+                'year' => null,
+                'semester' => null,
+            ];
+        }
+
+        $reference = $this->normalizeReviewDate($oldestEntry);
+        if ($reference === null) {
+            return [
+                'default' => null,
+                'year' => null,
+                'semester' => null,
+            ];
+        }
+
+        $yearScope = (string) $reference->year;
+        $semesterScope = null;
+        $scopeModes = array_values((array) ($definition['scope_modes'] ?? ['year']));
+
+        if (in_array('semester', $scopeModes, true)) {
+            $semesterScope = $this->semesterBookService->semesterFromDate($reference->toDateString());
+        }
+
+        $default = in_array('semester', $scopeModes, true) && $semesterScope !== null
+            ? $semesterScope
+            : $yearScope;
+
+        return [
+            'default' => $default,
+            'year' => $yearScope,
+            'semester' => $semesterScope,
+        ];
+    }
+
+    private function normalizeReviewDate(string $value): ?\Illuminate\Support\Carbon
+    {
+        try {
+            return \Illuminate\Support\Carbon::parse($value, 'Asia/Jakarta');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
