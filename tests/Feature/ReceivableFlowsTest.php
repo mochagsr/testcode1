@@ -170,7 +170,8 @@ class ReceivableFlowsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Buku Cerita');
-        $response->assertSee(__('receivable.printing_subtype'));
+        $response->assertSee(__('receivable.transaction_subtype'));
+        $response->assertSee(__('receivable.transaction_subtype_printing_named', ['name' => 'Buku Cerita']));
     }
 
     public function test_receivable_report_print_respects_semester_and_customer_filters(): void
