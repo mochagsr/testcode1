@@ -15,19 +15,23 @@ use App\Models\ReportExportTask;
 use App\Models\SalesInvoice;
 use App\Models\Supplier;
 use App\Support\AppCache;
+use App\Support\DataArchiveService;
 use App\Support\SemesterBookService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
 {
     public function __construct(
-        private readonly SemesterBookService $semesterBookService
+        private readonly SemesterBookService $semesterBookService,
+        private readonly DataArchiveService $dataArchiveService,
     ) {}
 
     public function index(): View
@@ -61,8 +65,14 @@ class DashboardController extends Controller
                 'locked_customer_semesters' => 0,
                 'locked_supplier_years' => 0,
                 'backup_files' => 0,
+                'database_size_bytes' => 0,
+                'backup_total_bytes' => 0,
+                'archive_total_bytes' => 0,
             ],
                 'opsSnapshot' => $this->defaultOpsSnapshot(),
+                'archiveSnapshot' => $this->defaultArchiveSnapshot(),
+                'archiveHistory' => [],
+                'archiveUatChecklist' => $this->defaultArchiveUatChecklist(),
                 'uncollectedCustomers' => $this->emptyPaginator($uncollectedPerPage, $currentPath, $currentQuery, $uncollectedPageName),
                 'pendingOrderNotes' => $this->emptyPaginator($pendingOrderNotesPerPage, $currentPath, $currentQuery, $pendingOrderNotesPageName),
                 'supplierExpenseRecap' => $this->emptyPaginator($supplierExpensePerPage, $currentPath, $currentQuery, $supplierExpensePageName),
@@ -82,6 +92,7 @@ class DashboardController extends Controller
         $summary = Cache::remember($summaryCacheKey, $now->copy()->addSeconds(60), function () use ($hasOutgoingTable, $now): array {
             $backupFiles = collect(Storage::disk('local')->files('backups'))
                 ->merge(Storage::disk('local')->files('backups/db'));
+            $archiveFiles = collect(Storage::disk('local')->allFiles('archives'));
 
             return [
                 'total_products' => Product::count(),
@@ -107,9 +118,15 @@ class DashboardController extends Controller
                 'locked_customer_semesters' => count($this->semesterBookService->closedCustomerSemesters()),
                 'locked_supplier_years' => count($this->semesterBookService->closedSupplierYears()),
                 'backup_files' => $backupFiles->count(),
+                'database_size_bytes' => $this->databaseSizeBytes(),
+                'backup_total_bytes' => $this->storageFilesBytes($backupFiles->all()),
+                'archive_total_bytes' => $this->storageFilesBytes($archiveFiles->all()),
             ];
         });
         $opsSnapshot = $this->opsSnapshot();
+        $archiveHistory = $this->dataArchiveService->recentExecutionHistory(5);
+        $archiveSnapshot = $this->archiveSnapshot($summary, $archiveHistory);
+        $archiveUatChecklist = $this->archiveUatChecklist($archiveHistory);
         $quickLinks = collect([
             [
                 'allowed' => $user?->canAccess('receivables.view') ?? false,
@@ -199,6 +216,9 @@ class DashboardController extends Controller
             'supplierExpenseRecap' => $supplierExpenseRecap,
             'lowStockProducts' => $lowStockProducts,
             'opsSnapshot' => $opsSnapshot,
+            'archiveSnapshot' => $archiveSnapshot,
+            'archiveHistory' => $archiveHistory,
+            'archiveUatChecklist' => $archiveUatChecklist,
             'quickLinks' => $quickLinks,
             'readyToCloseSemesters' => $readyToCloseSemesters,
         ]);
@@ -256,6 +276,193 @@ class DashboardController extends Controller
             'latestIntegrityAt' => '-',
             'latestProbeAt' => '-',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     * @param  list<array{type:string,path:string,created_at:string,title:string,summary:string}>  $archiveHistory
+     * @return array<string, mixed>
+     */
+    private function archiveSnapshot(array $summary, array $archiveHistory): array
+    {
+        $latestReview = $this->dataArchiveService->latestArchiveReview();
+        $candidateDatasets = collect((array) ($latestReview['datasets'] ?? []))
+            ->filter(static fn (array $dataset): bool => (int) ($dataset['candidate_rows'] ?? 0) > 0)
+            ->values();
+        $candidateRows = (int) $candidateDatasets->sum(static fn (array $dataset): int => (int) ($dataset['candidate_rows'] ?? 0));
+        $reminderCount = count((array) ($latestReview['reminders'] ?? []));
+        $latestAction = $archiveHistory[0] ?? null;
+
+        $statusKey = 'not_ready';
+        $statusNote = __('ui.dashboard_archive_health_note_not_ready');
+
+        if ($latestReview !== null) {
+            $databaseSize = (int) ($summary['database_size_bytes'] ?? 0);
+            $backupSize = (int) ($summary['backup_total_bytes'] ?? 0);
+            $archiveSize = (int) ($summary['archive_total_bytes'] ?? 0);
+
+            if ($candidateRows > 0 || $reminderCount > 0) {
+                $statusKey = 'needs_review';
+                $statusNote = __('ui.dashboard_archive_health_note_needs_review', [
+                    'datasets' => number_format($candidateDatasets->count(), 0, ',', '.'),
+                    'rows' => number_format($candidateRows, 0, ',', '.'),
+                ]);
+            } elseif ($databaseSize >= 2147483648 || $backupSize >= 2147483648 || $archiveSize >= 2147483648) {
+                $statusKey = 'growing';
+                $statusNote = __('ui.dashboard_archive_health_note_growing');
+            } else {
+                $statusKey = 'safe';
+                $statusNote = __('ui.dashboard_archive_health_note_safe');
+            }
+        }
+
+        return [
+            'databaseSize' => $this->formatBytes((int) ($summary['database_size_bytes'] ?? 0)),
+            'backupSize' => $this->formatBytes((int) ($summary['backup_total_bytes'] ?? 0)),
+            'archiveSize' => $this->formatBytes((int) ($summary['archive_total_bytes'] ?? 0)),
+            'latestArchiveReviewAt' => isset($latestReview['generated_at'])
+                ? (string) Carbon::parse((string) $latestReview['generated_at'])->timezone('Asia/Jakarta')->format('d-m-Y H:i')
+                : '-',
+            'archiveHealthStatusKey' => $statusKey,
+            'archiveHealthStatus' => __('ui.dashboard_archive_health_'.$statusKey),
+            'archiveHealthNote' => $statusNote,
+            'candidateDatasetCount' => (int) $candidateDatasets->count(),
+            'candidateRows' => $candidateRows,
+            'reminderCount' => $reminderCount,
+            'latestActionTitle' => (string) ($latestAction['title'] ?? '-'),
+            'latestActionSummary' => (string) ($latestAction['summary'] ?? '-'),
+            'latestActionAt' => isset($latestAction['created_at'])
+                ? (string) Carbon::parse((string) $latestAction['created_at'])->timezone('Asia/Jakarta')->format('d-m-Y H:i')
+                : '-',
+        ];
+    }
+
+    /**
+     * @param  list<array{type:string,path:string,created_at:string,title:string,summary:string}>  $archiveHistory
+     * @return list<array{label:string,done:bool}>
+     */
+    private function archiveUatChecklist(array $archiveHistory): array
+    {
+        $types = collect($archiveHistory)->pluck('type');
+        $restoreStatus = strtolower((string) ($this->dataArchiveService->latestRestoreDrill()?->status ?? ''));
+
+        return [
+            [
+                'label' => __('ui.dashboard_archive_uat_backup'),
+                'done' => $this->dataArchiveService->latestBackupFile() !== null,
+            ],
+            [
+                'label' => __('ui.dashboard_archive_uat_restore'),
+                'done' => in_array($restoreStatus, ['passed', 'skipped'], true),
+            ],
+            [
+                'label' => __('ui.dashboard_archive_uat_review'),
+                'done' => $this->dataArchiveService->latestArchiveReview() !== null,
+            ],
+            [
+                'label' => __('ui.dashboard_archive_uat_export'),
+                'done' => $types->contains('export'),
+            ],
+            [
+                'label' => __('ui.dashboard_archive_uat_purge'),
+                'done' => $types->contains('purge'),
+            ],
+        ];
+    }
+
+    /**
+     * @return list<array{label:string,done:bool}>
+     */
+    private function defaultArchiveUatChecklist(): array
+    {
+        return [
+            ['label' => __('ui.dashboard_archive_uat_backup'), 'done' => false],
+            ['label' => __('ui.dashboard_archive_uat_restore'), 'done' => false],
+            ['label' => __('ui.dashboard_archive_uat_review'), 'done' => false],
+            ['label' => __('ui.dashboard_archive_uat_export'), 'done' => false],
+            ['label' => __('ui.dashboard_archive_uat_purge'), 'done' => false],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function defaultArchiveSnapshot(): array
+    {
+        return [
+            'databaseSize' => $this->formatBytes(0),
+            'backupSize' => $this->formatBytes(0),
+            'archiveSize' => $this->formatBytes(0),
+            'latestArchiveReviewAt' => '-',
+            'archiveHealthStatusKey' => 'not_ready',
+            'archiveHealthStatus' => __('ui.dashboard_archive_health_not_ready'),
+            'archiveHealthNote' => __('ui.dashboard_archive_health_note_not_ready'),
+            'candidateDatasetCount' => 0,
+            'candidateRows' => 0,
+            'reminderCount' => 0,
+            'latestActionTitle' => '-',
+            'latestActionSummary' => '-',
+            'latestActionAt' => '-',
+        ];
+    }
+
+    /**
+     * @param  list<string>  $files
+     */
+    private function storageFilesBytes(array $files): int
+    {
+        return (int) collect($files)
+            ->filter(static fn (mixed $path): bool => is_string($path) && $path !== '')
+            ->sum(function (string $path): int {
+                try {
+                    return (int) Storage::disk('local')->size($path);
+                } catch (\Throwable) {
+                    return 0;
+                }
+            });
+    }
+
+    private function databaseSizeBytes(): int
+    {
+        $connection = DB::connection();
+        $driver = $connection->getDriverName();
+
+        try {
+            return match ($driver) {
+                'mysql' => (int) (($mysqlSize = DB::selectOne(
+                    'select coalesce(sum(data_length + index_length), 0) as size_bytes from information_schema.tables where table_schema = ?',
+                    [(string) $connection->getDatabaseName()]
+                ))?->size_bytes ?? 0),
+                'pgsql' => (int) (($pgsqlSize = DB::selectOne('select pg_database_size(current_database()) as size_bytes'))?->size_bytes ?? 0),
+                'sqlite' => $this->sqliteDatabaseSizeBytes(),
+                default => 0,
+            };
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    private function sqliteDatabaseSizeBytes(): int
+    {
+        $database = (string) config('database.connections.sqlite.database');
+        if ($database === '' || $database === ':memory:' || ! File::exists($database)) {
+            return 0;
+        }
+
+        return (int) File::size($database);
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes <= 0) {
+            return '0 B';
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $power = min((int) floor(log($bytes, 1024)), count($units) - 1);
+        $value = $bytes / (1024 ** $power);
+
+        return number_format($value, $power === 0 ? 0 : 2, ',', '.').' '.$units[$power];
     }
 
     private function pendingOrderNotesPaginator(int $perPage, string $pageName): LengthAwarePaginator

@@ -21,6 +21,9 @@ class DashboardOpsTest extends TestCase
         $response->assertSee(__('ui.dashboard_pending_approvals'));
         $response->assertSee(__('ui.dashboard_pending_report_tasks'));
         $response->assertSee(__('ui.dashboard_ops_snapshot'));
+        $response->assertSee(__('ui.dashboard_database_size'));
+        $response->assertSee(__('ui.dashboard_archive_status_title'));
+        $response->assertSee(__('ui.dashboard_archive_uat_title'));
         $response->assertSee(__('ui.dashboard_quick_actions'));
     }
 

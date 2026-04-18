@@ -29,6 +29,46 @@
         .dashboard-quick-link small {
             color: var(--muted);
         }
+        .dashboard-status-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .02em;
+        }
+        .dashboard-status-pill.safe {
+            background: rgba(34, 197, 94, 0.18);
+            color: #86efac;
+        }
+        .dashboard-status-pill.needs_review,
+        .dashboard-status-pill.not_ready {
+            background: rgba(250, 204, 21, 0.18);
+            color: #fde68a;
+        }
+        .dashboard-status-pill.growing {
+            background: rgba(249, 115, 22, 0.18);
+            color: #fdba74;
+        }
+        .dashboard-checklist {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .dashboard-checklist li + li {
+            margin-top: 8px;
+        }
+        .dashboard-check {
+            color: #86efac;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+        .dashboard-cross {
+            color: #fca5a5;
+            font-weight: 700;
+            margin-right: 8px;
+        }
     </style>
     <h1 class="page-title">{{ __('ui.dashboard_title') }}</h1>
 
@@ -82,6 +122,18 @@
                 <div class="stat-label">{{ __('ui.dashboard_backup_files') }}</div>
                 <div class="stat-value">{{ number_format((int) ($summary['backup_files'] ?? 0), 0, ',', '.') }}</div>
             </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_database_size') }}</div>
+                <div class="stat-value">{{ $archiveSnapshot['databaseSize'] ?? '0 B' }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_backup_size') }}</div>
+                <div class="stat-value">{{ $archiveSnapshot['backupSize'] ?? '0 B' }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_archive_size') }}</div>
+                <div class="stat-value">{{ $archiveSnapshot['archiveSize'] ?? '0 B' }}</div>
+            </div>
         @endif
     </div>
 
@@ -131,6 +183,89 @@
     </div>
 
     @if($showAdminDashboard)
+        <div class="row" style="margin-top: 8px;">
+            <div class="col-6">
+                <div class="card">
+                    <h3>{{ __('ui.dashboard_archive_status_title') }}</h3>
+                    <table>
+                        <tbody>
+                        <tr>
+                            <th>{{ __('ui.dashboard_archive_health') }}</th>
+                            <td>
+                                <span class="dashboard-status-pill {{ $archiveSnapshot['archiveHealthStatusKey'] ?? 'not_ready' }}">
+                                    {{ $archiveSnapshot['archiveHealthStatus'] ?? '-' }}
+                                </span>
+                                <div class="muted" style="margin-top:6px;">{{ $archiveSnapshot['archiveHealthNote'] ?? '-' }}</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>{{ __('ui.dashboard_latest_archive_review') }}</th>
+                            <td>{{ $archiveSnapshot['latestArchiveReviewAt'] ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>{{ __('ui.dashboard_archive_review_candidates') }}</th>
+                            <td>{{ number_format((int) ($archiveSnapshot['candidateDatasetCount'] ?? 0), 0, ',', '.') }} dataset / {{ number_format((int) ($archiveSnapshot['candidateRows'] ?? 0), 0, ',', '.') }} row</td>
+                        </tr>
+                        <tr>
+                            <th>{{ __('ui.dashboard_archive_review_reminders') }}</th>
+                            <td>{{ number_format((int) ($archiveSnapshot['reminderCount'] ?? 0), 0, ',', '.') }}</td>
+                        </tr>
+                        <tr>
+                            <th>{{ __('ui.dashboard_latest_archive_action') }}</th>
+                            <td>
+                                {{ $archiveSnapshot['latestActionTitle'] ?? '-' }}
+                                @if(($archiveSnapshot['latestActionAt'] ?? '-') !== '-')
+                                    <span class="muted">({{ $archiveSnapshot['latestActionAt'] }})</span>
+                                @endif
+                                @if(($archiveSnapshot['latestActionSummary'] ?? '-') !== '-')
+                                    <div class="muted" style="margin-top:6px;">{{ $archiveSnapshot['latestActionSummary'] }}</div>
+                                @endif
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 12px;">
+                        <a href="{{ route('archive-data.index') }}" class="btn">{{ __('ui.dashboard_archive_open') }}</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card">
+                    <h3>{{ __('ui.dashboard_archive_uat_title') }}</h3>
+                    <ul class="dashboard-checklist">
+                        @foreach($archiveUatChecklist as $item)
+                            <li>
+                                <span class="{{ $item['done'] ? 'dashboard-check' : 'dashboard-cross' }}">{{ $item['done'] ? 'OK' : 'TODO' }}</span>
+                                {{ $item['label'] }}
+                            </li>
+                        @endforeach
+                    </ul>
+                    <div class="muted" style="margin-top:10px;">
+                        {{ __('ui.dashboard_archive_uat_note') }}
+                    </div>
+                    <hr style="margin: 14px 0; border-color: var(--border);">
+                    <h4 style="margin:0 0 10px;">{{ __('ui.dashboard_archive_history_title') }}</h4>
+                    @if(!empty($archiveHistory))
+                        <table>
+                            <tbody>
+                            @foreach($archiveHistory as $entry)
+                                <tr>
+                                    <th style="width:140px;">{{ \Illuminate\Support\Carbon::parse((string) $entry['created_at'])->format('d-m-Y H:i') }}</th>
+                                    <td>
+                                        <strong>{{ $entry['title'] }}</strong>
+                                        <div class="muted">{{ $entry['summary'] }}</div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    @else
+                        <div class="muted">{{ __('ui.dashboard_archive_history_empty') }}</div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
         <div class="card" style="margin-top: 8px;">
             <h3 style="margin-top:0;">{{ __('ui.dashboard_post_deploy_check_title') }}</h3>
             <div class="muted" style="margin-bottom:8px;">{{ __('ui.dashboard_post_deploy_check_note') }}</div>
