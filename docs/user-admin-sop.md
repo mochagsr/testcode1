@@ -4,6 +4,10 @@ Dokumen ringkas ini menjadi penghubung ke panduan yang lebih detail.
 
 ## Panduan yang dipakai
 
+- User operasional versi ringkas siap print:
+  - `docs/USER_PRINT_README.md`
+- Admin / supervisor versi ringkas siap print:
+  - `docs/ADMIN_PRINT_README.md`
 - User operasional:
   - `docs/USER_TRANSACTION_GUIDE.md`
 - Admin / supervisor:

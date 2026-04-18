@@ -231,6 +231,9 @@ Catatan aaPanel:
 - `Create for Git` aman dipakai juga, tapi tetap harus dilanjutkan dengan setup Laravel lengkap
 
 ## Panduan user/admin siap cetak
+- Ringkas siap print:
+  - `docs/USER_PRINT_README.md`
+  - `docs/ADMIN_PRINT_README.md`
 - Markdown:
   - `docs/USER_TRANSACTION_GUIDE.md`
   - `docs/ADMIN_TRANSACTION_GUIDE.md`
