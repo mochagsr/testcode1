@@ -5,7 +5,7 @@
 @section('content')
     @php
         $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
-        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
     @endphp
     <style>
         #admin-order-items-table input[type=number].qty-input::-webkit-outer-spin-button,
@@ -184,7 +184,7 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }} {{ $note->note_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.back') }}</a>
-            @if($canEditTransactions || ($isAdminUser && !$note->is_canceled))
+            @if($canEditTransactions || ($canCancelTransactions && !$note->is_canceled))
                 <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
@@ -312,7 +312,7 @@
         </div>
     </div>
 
-    @if($canEditTransactions || ($isAdminUser && !$note->is_canceled))
+    @if($canEditTransactions || ($canCancelTransactions && !$note->is_canceled))
     <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
         <div id="admin-edit-transaction" class="card txn-modal-card">
             <div class="form-section">
@@ -404,7 +404,7 @@
                         </div>
                     </form>
                 @endif
-                @if($isAdminUser && !$note->is_canceled)
+                @if($canCancelTransactions && !$note->is_canceled)
                     <form method="post" action="{{ route('order-notes.cancel', $note) }}" class="row">
                         @csrf
                         <div class="col-12">

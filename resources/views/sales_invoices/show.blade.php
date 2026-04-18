@@ -25,8 +25,8 @@
         $isPaidTransactionLocked = $hasCashOnCreate || $invoice->payment_status === 'paid';
         $isCreditSemesterLocked = $isCreditReceivableTransaction && $isCustomerSemesterLocked;
         $requiresAdminToEdit = $isPaidTransactionLocked || $isCreditSemesterLocked;
-        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
         $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
+        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
         $adminProducts = $products->map(function ($product): array {
             return [
                 'id' => (int) $product->id,
@@ -332,7 +332,7 @@
                             <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                         </div>
                     </form>
-                    @if(!$invoice->is_canceled)
+                    @if($canCancelTransactions && !$invoice->is_canceled)
                         <form method="post" action="{{ route('sales-invoices.cancel', $invoice) }}" class="row">
                             @csrf
                             <div class="col-12">

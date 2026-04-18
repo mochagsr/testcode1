@@ -7,7 +7,6 @@
         $resolvedPermissions = auth()->user()?->resolvedPermissions() ?? [];
         $canRequestCorrection = in_array('*', $resolvedPermissions, true)
             || in_array('transactions.correction.request', $resolvedPermissions, true);
-        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
         $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between;">

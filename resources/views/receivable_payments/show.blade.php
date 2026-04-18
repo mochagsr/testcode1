@@ -5,7 +5,7 @@
 @section('content')
     @php
         $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
-        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('receivable.payment_menu') }} {{ $payment->payment_number }}</h1>
@@ -73,7 +73,7 @@
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if($isAdminUser && !$payment->is_canceled)
+                @if($canCancelTransactions && !$payment->is_canceled)
                     <form method="post" action="{{ route('receivable-payments.cancel', $payment) }}" class="row">
                         @csrf
                         <div class="col-12">
@@ -89,6 +89,5 @@
         </div>
     @endif
 @endsection
-
 
 

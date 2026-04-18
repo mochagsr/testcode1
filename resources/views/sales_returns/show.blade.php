@@ -5,7 +5,7 @@
 @section('content')
     @php
         $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
-        $isAdminUser = (auth()->user()?->role ?? '') === 'admin';
+        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
     @endphp
     <style>
         .txn-modal {
@@ -204,7 +204,7 @@
                         <button class="btn" type="submit">{{ __('txn.save_changes') }}</button>
                     </div>
                 </form>
-                @if($isAdminUser && !$salesReturn->is_canceled)
+                @if($canCancelTransactions && !$salesReturn->is_canceled)
                     <form method="post" action="{{ route('sales-returns.cancel', $salesReturn) }}" class="row">
                         @csrf
                         <div class="col-12">

@@ -156,7 +156,7 @@
         </form>
     </div>
 
-    @if(auth()->user()->role === 'admin')
+    @if(auth()->user()?->canAccess('supplier_payables.adjust'))
         <div class="card">
             <div class="form-section">
                 <h3 class="form-section-title">{{ __('supplier_payable.month_book_title') }}</h3>

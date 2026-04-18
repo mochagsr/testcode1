@@ -17,7 +17,7 @@
     <div class="page-header-actions">
         <h1 class="page-title">{{ __('txn.sales_invoices_title') }}</h1>
         <div class="actions">
-            @if((auth()->user()?->role ?? '') === 'admin')
+            @if(auth()->user()?->canAccess('imports.transactions'))
                 <a class="btn info-btn" href="{{ route('sales-invoices.import.template') }}">Template Import</a>
                 <form method="post" action="{{ route('sales-invoices.import') }}" enctype="multipart/form-data" class="flex">
                     @csrf
