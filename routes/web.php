@@ -143,10 +143,10 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['perm:transactions.edit', 'semester.open'])
         ->name('outgoing-transactions.admin-update');
     Route::post('/outgoing-transactions/supplier/{supplier}/semester-close', [OutgoingTransactionPageController::class, 'closeSupplierSemester'])
-        ->middleware('admin')
+        ->middleware('perm:supplier_payables.adjust')
         ->name('outgoing-transactions.supplier-semester.close');
     Route::post('/outgoing-transactions/supplier/{supplier}/semester-open', [OutgoingTransactionPageController::class, 'openSupplierSemester'])
-        ->middleware('admin')
+        ->middleware('perm:supplier_payables.adjust')
         ->name('outgoing-transactions.supplier-semester.open');
 
     Route::get('/receivables', [ReceivablePageController::class, 'index'])->middleware('perm:receivables.view')->name('receivables.index');

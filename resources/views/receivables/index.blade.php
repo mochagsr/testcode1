@@ -398,7 +398,7 @@
             </div>
         @endif
 
-        @if((auth()->user()?->role ?? '') === 'admin' && $selectedSemester && isset($semesterClosingState) && is_array($semesterClosingState))
+        @if((auth()->user()?->canAccess('settings.admin') ?? false) && $selectedSemester && isset($semesterClosingState) && is_array($semesterClosingState))
             <div style="margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-color, #d0d7de); border-radius: 8px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
                 <div>
                     <strong>{{ __('receivable.semester_lock_readiness_title') }}</strong><br>
@@ -957,7 +957,7 @@
                     <div class="receivable-subcard" style="margin-top: 10px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                         <h4 style="margin: 0;">{{ __('receivable.outstanding_invoice_details') }}</h4>
-                        @if((auth()->user()?->role ?? '') === 'admin' && (float) ($customerOutstandingTotal ?? 0) > 0)
+                        @if((auth()->user()?->canAccess('receivables.adjust') ?? false) && (float) ($customerOutstandingTotal ?? 0) > 0)
                             <div class="flex" style="gap:8px;">
                                 <button
                                     type="button"

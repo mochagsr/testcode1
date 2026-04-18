@@ -113,6 +113,8 @@ class MasterPermissionAccessTest extends TestCase
             'receivable-payments.cancel',
             'receivables.customer-writeoff',
             'receivables.customer-discount',
+            'outgoing-transactions.supplier-semester.close',
+            'outgoing-transactions.supplier-semester.open',
             'settings.semester.close',
             'settings.semester.open',
             'supplier-payables.year-close',
