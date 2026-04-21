@@ -212,7 +212,7 @@ class DataArchiveService
             throw new \RuntimeException('Failed creating archive SQL file: '.$sqlFile);
         }
 
-        fwrite($handle, "-- PgPOS ERP archive export\n");
+        fwrite($handle, '-- '.config('app.name', 'Laravel')." archive export\n");
         fwrite($handle, '-- Generated at: '.now('Asia/Jakarta')->toDateTimeString()."\n");
         fwrite($handle, '-- Scope filter: '.$this->scopeLabel($scope)."\n");
         fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n\n");
