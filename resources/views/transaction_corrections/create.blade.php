@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Wizard Koreksi Transaksi - PgPOS ERP')
+@section('title', 'Wizard Koreksi Transaksi - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">Wizard Koreksi Transaksi</h1>
@@ -130,3 +130,4 @@
         </script>
     @endif
 @endsection
+

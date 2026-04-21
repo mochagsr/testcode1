@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Ops Health - PgPOS ERP')
+@section('title', 'Ops Health - '.config('app.name', 'Laravel'))
 
 @section('content')
     <style>
@@ -172,3 +172,4 @@
     </div>
     </div>
 @endsection
+

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.add_supplier').' - PgPOS ERP')
+@section('title', __('ui.add_supplier').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('ui.add_supplier') }}</h1>
@@ -16,3 +16,4 @@
         </form>
     </div>
 @endsection
+

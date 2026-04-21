@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('receivable.payment_menu').' - PgPOS ERP')
+@section('title', __('receivable.payment_menu').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -103,3 +103,4 @@
         })();
     </script>
 @endsection
+

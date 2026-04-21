@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.edit_customer_level').' - PgPOS ERP')
+@section('title', __('ui.edit_customer_level').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('ui.edit_customer_level') }}</h1>
@@ -10,3 +10,4 @@
         @include('customer_levels.partials.form', ['level' => $level])
     </form>
 @endsection
+

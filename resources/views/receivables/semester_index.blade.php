@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('receivable.semester_page_title').' - PgPOS ERP')
+@section('title', __('receivable.semester_page_title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <style>
@@ -164,4 +164,5 @@
         @endif
     </div>
 @endsection
+
 

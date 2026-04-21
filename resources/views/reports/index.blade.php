@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('menu.reports').' - PgPOS ERP')
+@section('title', __('menu.reports').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('report.export_title') }}</h1>
@@ -217,3 +217,4 @@
         })();
     </script>
 @endsection
+

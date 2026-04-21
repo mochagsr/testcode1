@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Approval Request - PgPOS ERP')
+@section('title', 'Approval Request - '.config('app.name', 'Laravel'))
 
 @section('content')
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
@@ -89,3 +89,4 @@
         {{ $requests->links() }}
     </div>
 @endsection
+

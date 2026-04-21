@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.add_customer').' - PgPOS ERP')
+@section('title', __('ui.add_customer').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('ui.add_customer') }}</h1>
@@ -9,3 +9,4 @@
         @include('customers.partials.form', ['customer' => null])
     </form>
 @endsection
+

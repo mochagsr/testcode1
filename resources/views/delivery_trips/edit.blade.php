@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('delivery_trip.edit').' - PgPOS ERP')
+@section('title', __('delivery_trip.edit').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('delivery_trip.edit') }}: {{ $trip->trip_number }}</h1>
@@ -13,3 +13,4 @@
         ])
     </form>
 @endsection
+

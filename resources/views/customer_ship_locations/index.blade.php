@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('school_bulk.ship_location_master_title').' - PgPOS ERP')
+@section('title', __('school_bulk.ship_location_master_title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -82,3 +82,4 @@
         </div>
     </div>
 @endsection
+

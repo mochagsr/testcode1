@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('txn.invoice').' '.__('txn.detail').' - PgPOS ERP')
+@section('title', __('txn.invoice').' '.__('txn.detail').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     @php
@@ -672,3 +672,4 @@
         @include('partials.printing_subtype_script')
     @endif
 @endsection
+

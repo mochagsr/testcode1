@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('receivable.create_payment').' - PgPOS ERP')
+@section('title', __('receivable.create_payment').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('receivable.create_payment') }}</h1>
@@ -467,3 +467,4 @@
         validatePaymentAmount();
     </script>
 @endsection
+

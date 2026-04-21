@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('school_bulk.create_bulk_transaction').' - PgPOS ERP')
+@section('title', __('school_bulk.create_bulk_transaction').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('school_bulk.create_bulk_transaction') }}</h1>
@@ -1030,3 +1030,4 @@
         })();
     </script>
 @endsection
+

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('supplier_payable.title').' - PgPOS ERP')
+@section('title', __('supplier_payable.title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <style>
@@ -368,4 +368,5 @@
         })();
     </script>
 @endsection
+
 

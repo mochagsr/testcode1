@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('txn.create_outgoing_transaction_title').' - PgPOS ERP')
+@section('title', __('txn.create_outgoing_transaction_title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('txn.create_outgoing_transaction_title') }}</h1>
@@ -1179,3 +1179,4 @@
         @endforeach
     </datalist>
 @endsection
+

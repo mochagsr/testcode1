@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.edit_category').' - PgPOS ERP')
+@section('title', __('ui.edit_category').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('ui.edit_category') }}</h1>
@@ -10,3 +10,4 @@
         @include('item_categories.partials.form', ['category' => $category])
     </form>
 @endsection
+

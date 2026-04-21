@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', $trip->trip_number.' - PgPOS ERP')
+@section('title', $trip->trip_number.' - '.config('app.name', 'Laravel'))
 
 @section('content')
     @php
@@ -37,4 +37,5 @@
         </div>
     </div>
 @endsection
+
 

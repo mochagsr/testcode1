@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', $payment->payment_number.' - PgPOS ERP')
+@section('title', $payment->payment_number.' - '.config('app.name', 'Laravel'))
 
 @section('content')
     @php
@@ -119,4 +119,5 @@
         })();
     </script>
 @endsection
+
 

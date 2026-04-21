@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Arsip Data - PgPOS ERP')
+@section('title', 'Arsip Data - '.config('app.name', 'Laravel'))
 
 @section('content')
     @php
@@ -736,3 +736,4 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
         };
     </script>
 @endsection
+

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.users_title').' - PgPOS ERP')
+@section('title', __('ui.users_title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <div class="page-header-actions">
@@ -94,3 +94,4 @@
         })();
     </script>
 @endsection
+

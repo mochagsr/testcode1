@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('txn.create_sales_return_title').' - PgPOS ERP')
+@section('title', __('txn.create_sales_return_title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('txn.create_sales_return_title') }}</h1>
@@ -643,3 +643,4 @@
     </datalist>
     @include('partials.printing_subtype_script')
 @endsection
+

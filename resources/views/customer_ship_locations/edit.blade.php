@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('school_bulk.edit_ship_location').' - PgPOS ERP')
+@section('title', __('school_bulk.edit_ship_location').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('school_bulk.edit_ship_location') }}</h1>
@@ -10,4 +10,5 @@
         @include('customer_ship_locations.partials.form', ['location' => $location])
     </form>
 @endsection
+
 

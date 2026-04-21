@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.audit_logs_title').' - PgPOS ERP')
+@section('title', __('ui.audit_logs_title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
     <h1 class="page-title">{{ __('ui.audit_logs_title') }}</h1>
@@ -236,3 +236,4 @@
         })();
     </script>
 @endsection
+
