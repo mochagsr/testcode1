@@ -345,5 +345,6 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::post('/archive-data/scan', [ArchiveDataPageController::class, 'scan'])->middleware('perm:settings.admin')->name('archive-data.scan');
     Route::post('/archive-data/export', [ArchiveDataPageController::class, 'export'])->middleware('perm:settings.admin')->name('archive-data.export');
     Route::post('/archive-data/prepare-financial', [ArchiveDataPageController::class, 'prepareFinancial'])->middleware('perm:settings.admin')->name('archive-data.prepare-financial');
+    Route::post('/archive-data/check-financial', [ArchiveDataPageController::class, 'checkFinancial'])->middleware('perm:settings.admin')->name('archive-data.check-financial');
     Route::post('/archive-data/purge', [ArchiveDataPageController::class, 'purge'])->middleware('perm:settings.admin')->name('archive-data.purge');
 });

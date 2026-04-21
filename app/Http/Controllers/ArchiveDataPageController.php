@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\IntegrityCheckLog;
 use App\Support\DataArchiveRegistry;
 use App\Support\DataArchiveService;
 use App\Support\SemesterBookService;
@@ -11,6 +12,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 
 class ArchiveDataPageController extends Controller
@@ -58,6 +60,10 @@ class ArchiveDataPageController extends Controller
         $latestFinancialSnapshot = $archiveService->latestFinancialSnapshot();
         $latestArchiveReview = $archiveService->latestArchiveReview();
         $archiveHistory = $archiveService->recentExecutionHistory();
+        $latestIntegrityLog = IntegrityCheckLog::query()
+            ->latest('checked_at')
+            ->latest('id')
+            ->first();
 
         return view('archive_data.index', [
             'latestBackup' => $backupFiles->last(),
@@ -66,6 +72,7 @@ class ArchiveDataPageController extends Controller
             'latestFinancialSnapshot' => $latestFinancialSnapshot,
             'latestArchiveReview' => $latestArchiveReview,
             'archiveHistory' => $archiveHistory,
+            'latestIntegrityLog' => $latestIntegrityLog,
             'dbConnection' => (string) config('database.default'),
             'dbHost' => (string) config('database.connections.'.config('database.default').'.host'),
             'appEnv' => (string) config('app.env'),
@@ -197,6 +204,40 @@ class ArchiveDataPageController extends Controller
             ->withInput($request->all())
             ->with('archive_financial_result', $result)
             ->with('archive_success', 'Snapshot finansial berhasil dibuat.');
+    }
+
+    public function checkFinancial(Request $request): RedirectResponse
+    {
+        try {
+            $exitCode = Artisan::call('app:integrity-check');
+            $latest = IntegrityCheckLog::query()
+                ->latest('checked_at')
+                ->latest('id')
+                ->first();
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput($request->all())
+                ->with('archive_error', $e->getMessage());
+        }
+
+        if (! $latest instanceof IntegrityCheckLog) {
+            return back()
+                ->withInput($request->all())
+                ->with('archive_error', 'Hasil cek finansial belum ditemukan setelah command dijalankan.');
+        }
+
+        return back()
+            ->withInput($request->all())
+            ->with('archive_integrity_result', [
+                'is_ok' => (bool) $latest->is_ok,
+                'checked_at' => optional($latest->checked_at)?->format('d-m-Y H:i:s'),
+                'customer_mismatch_count' => (int) $latest->customer_mismatch_count,
+                'supplier_mismatch_count' => (int) $latest->supplier_mismatch_count,
+                'invalid_receivable_links' => (int) $latest->invalid_receivable_links,
+                'invalid_supplier_links' => (int) $latest->invalid_supplier_links,
+                'command_exit_code' => $exitCode,
+            ])
+            ->with('archive_success', 'Cek finansial selesai dijalankan.');
     }
 
     public function purge(Request $request, DataArchiveService $archiveService): RedirectResponse

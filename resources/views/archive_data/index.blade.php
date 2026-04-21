@@ -7,6 +7,7 @@
         $scanResult = session('archive_scan_result');
         $exportResult = session('archive_export_result');
         $financialResult = session('archive_financial_result');
+        $integrityResult = session('archive_integrity_result');
         $purgeResult = session('archive_purge_result');
         $selected = collect(old('datasets', $selectedDatasets ?? []))->map(fn ($value) => strtolower((string) $value))->all();
         $scopeType = old('archive_scope_type', $selectedScopeType ?? 'year');
@@ -378,19 +379,52 @@
                                         @endif
                                     </ol>
                                 </div>
+                                <div class="archive-muted" style="margin-top:10px;">
+                                    Kalau kamu pilih <strong>Faktur Penjualan</strong> lalu export per tahun atau semester, file SQL yang dibuat berisi tabel utama dan tabel terkait untuk periode itu. File itu bisa diunduh lalu diimport ke MySQL lokal di komputer kamu sebagai arsip periode tersebut.
+                                </div>
                             </div>
                         </div>
 
                         <div class="archive-action-row">
                             <button type="submit" class="btn secondary" formaction="{{ route('archive-data.scan') }}">1. Cek Dulu</button>
                             <button type="submit" class="btn secondary" formaction="{{ route('archive-data.export') }}">2. Buat File Arsip</button>
-                            <button type="submit" id="archive-financial-button" class="btn secondary" formaction="{{ route('archive-data.prepare-financial') }}" {{ $selectedDatasetMode !== 'financial_guarded' ? 'disabled' : '' }}>3. Snapshot Finansial</button>
-                            <button type="submit" id="archive-dry-run-button" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='0';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>4. Coba Simulasi Hapus</button>
-                            <button type="submit" id="archive-purge-button" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='1';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>5. Hapus Data</button>
+                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.check-financial') }}">3. Cek Finansial</button>
+                            <button type="submit" id="archive-financial-button" class="btn secondary" formaction="{{ route('archive-data.prepare-financial') }}" {{ $selectedDatasetMode !== 'financial_guarded' ? 'disabled' : '' }}>4. Snapshot Finansial</button>
+                            <button type="submit" id="archive-dry-run-button" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='0';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>5. Coba Simulasi Hapus</button>
+                            <button type="submit" id="archive-purge-button" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='1';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>6. Hapus Data</button>
                         </div>
                     </div>
                 </div>
             </form>
+        </div>
+
+        <div class="card archive-col-12">
+            <h3 style="margin-top:0;">Cek Finansial</h3>
+            @php
+                $financialStatus = is_array($integrityResult)
+                    ? (bool) ($integrityResult['is_ok'] ?? false)
+                    : ((bool) ($latestIntegrityLog?->is_ok ?? false));
+            @endphp
+            <table class="archive-kv">
+                <tbody>
+                <tr>
+                    <th>Status Terakhir</th>
+                    <td>
+                        <span class="archive-mode-pill {{ $financialStatus ? 'standard' : 'locked' }}">
+                            {{ $financialStatus ? 'Aman' : 'Perlu Dicek' }}
+                        </span>
+                    </td>
+                </tr>
+                <tr><th>Waktu Cek</th><td>{{ $integrityResult['checked_at'] ?? (optional($latestIntegrityLog?->checked_at)->format('d-m-Y H:i:s') ?: '-') }}</td></tr>
+                <tr><th>Mismatch Piutang Customer</th><td>{{ number_format((int) ($integrityResult['customer_mismatch_count'] ?? $latestIntegrityLog?->customer_mismatch_count ?? 0), 0, ',', '.') }}</td></tr>
+                <tr><th>Mismatch Hutang Supplier</th><td>{{ number_format((int) ($integrityResult['supplier_mismatch_count'] ?? $latestIntegrityLog?->supplier_mismatch_count ?? 0), 0, ',', '.') }}</td></tr>
+                <tr><th>Invalid Link Piutang</th><td>{{ number_format((int) ($integrityResult['invalid_receivable_links'] ?? $latestIntegrityLog?->invalid_receivable_links ?? 0), 0, ',', '.') }}</td></tr>
+                <tr><th>Invalid Link Hutang</th><td>{{ number_format((int) ($integrityResult['invalid_supplier_links'] ?? $latestIntegrityLog?->invalid_supplier_links ?? 0), 0, ',', '.') }}</td></tr>
+                </tbody>
+            </table>
+            <p class="archive-muted" style="margin:10px 0 0;">
+                Tombol <strong>Cek Finansial</strong> ini aman dijalankan. Fungsinya hanya memeriksa apakah saldo piutang, hutang supplier, dan relasi penting masih konsisten sebelum atau sesudah arsip data.
+            </p>
         </div>
 
         <div class="card archive-col-12">

@@ -152,6 +152,12 @@ class ActionSmokeTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('archive_scan_result')
             ->assertSessionHas('archive_success');
+
+        $this->actingAs($admin)
+            ->post(route('archive-data.check-financial'))
+            ->assertRedirect()
+            ->assertSessionHas('archive_integrity_result')
+            ->assertSessionHas('archive_success');
     }
 
     public function test_bulk_invoice_generation_action_does_not_500(): void
