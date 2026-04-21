@@ -90,7 +90,7 @@ class ArchiveDataPageController extends Controller
                 'Restore drill untuk memastikan backup valid.',
                 'Export arsip per tahun atau semester sebelum pembersihan.',
                 'Untuk dataset finansial yang didukung, buat snapshot finansial dulu.',
-                'Purge data production hanya setelah verifikasi arsip selesai.',
+                'Bersihkan data production hanya setelah verifikasi arsip selesai.',
             ],
             'archiveUatChecklist' => [
                 'Jalankan backup terbaru dari app server aaPanel ke managed DB aktif.',
@@ -98,8 +98,8 @@ class ArchiveDataPageController extends Controller
                 'Jalankan restore drill dan pastikan status terakhir PASS.',
                 'Preview scan untuk satu dataset kecil dulu, misalnya audit log.',
                 'Buat export SQL dan cocokkan jumlah baris pada manifest.',
-                'Untuk dataset finansial, siapkan snapshot lalu lakukan dry-run purge dulu.',
-                'Setelah purge final, jalankan deploy check dan integrity check.',
+                'Untuk dataset finansial, siapkan snapshot lalu lakukan simulasi hapus dulu.',
+                'Setelah hapus data final, jalankan deploy check dan integrity check.',
             ],
         ]);
     }
@@ -203,8 +203,8 @@ class ArchiveDataPageController extends Controller
             ->withInput($request->all())
             ->with('archive_purge_result', $result)
             ->with('archive_success', $request->boolean('confirm_purge')
-                ? 'Purge arsip selesai dijalankan.'
-                : 'Dry-run purge selesai. Belum ada data yang dihapus.');
+                ? 'Bersihkan data arsip selesai dijalankan.'
+                : 'Simulasi hapus selesai. Belum ada data yang dihapus.');
     }
 
     /**

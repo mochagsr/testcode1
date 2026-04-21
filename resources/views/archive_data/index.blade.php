@@ -245,7 +245,7 @@
                 <li>Arsip transaksi utama sekarang bisa dibaca berdasarkan tahun atau semester, sesuai kebutuhan periode bersih-bersih data.</li>
                 <li>Backup penuh wajib dibuat dulu sebelum ekspor atau pembersihan data production.</li>
                 <li>Restore drill wajib lulus dulu, terutama karena database berada di AWS Lightsail Managed MySQL.</li>
-                <li>Dataset finansial yang sudah dibuka tetap harus melalui snapshot finansial dan rebuild setelah purge.</li>
+                <li>Dataset finansial yang sudah dibuka tetap harus melalui snapshot finansial dan rebuild setelah pembersihan data.</li>
             </ol>
         </div>
 
@@ -311,7 +311,7 @@
                                 <h4 id="archive-selected-label">{{ $selectedDatasetLabel }}</h4>
                                 <div id="archive-selected-mode" class="archive-mode-pill {{ $selectedDatasetMode }}">
                                     @if($selectedDatasetMode === 'standard')
-                                        Langsung bisa export lalu purge
+                                        Langsung bisa export lalu bersihkan data
                                     @elseif($selectedDatasetMode === 'financial_guarded')
                                         Butuh snapshot finansial dulu
                                     @else
@@ -320,11 +320,11 @@
                                 </div>
                                 <div id="archive-selected-note" class="archive-muted">
                                     @if($selectedDatasetMode === 'standard')
-                                        Untuk data log/ops seperti ini, langkahnya cukup: `Preview Scan` -> `Buat Export SQL` -> `Dry Run Purge` -> `Purge Final`.
+                                        Untuk data log/ops seperti ini, langkahnya cukup: `Cek Dulu` -> `Buat File Arsip` -> `Coba Simulasi Hapus` -> `Hapus Data`.
                                     @elseif($selectedDatasetMode === 'financial_guarded')
-                                        Untuk data finansial seperti ini, langkahnya: `Preview Scan` -> `Buat Export SQL` -> `Siapkan Snapshot Finansial` -> `Dry Run Purge` -> `Purge Final`.
+                                        Untuk data finansial seperti ini, langkahnya: `Cek Dulu` -> `Buat File Arsip` -> `Snapshot Finansial` -> `Coba Simulasi Hapus` -> `Hapus Data`.
                                     @else
-                                        Untuk data ini, purge masih dikunci. Saat ini pakai dulu: `Preview Scan` dan `Buat Export SQL`.
+                                        Untuk data ini, pembersihan data masih dikunci. Saat ini pakai dulu: `Cek Dulu` dan `Buat File Arsip`.
                                     @endif
                                 </div>
                                 <div class="archive-muted" style="margin-top:8px;">
@@ -408,7 +408,7 @@
                     <thead>
                     <tr>
                         <th>Dataset</th>
-                        <th>Mode Purge</th>
+                        <th>Mode Bersihkan Data</th>
                         <th>Total Row</th>
                     </tr>
                     </thead>
@@ -420,7 +420,7 @@
                                 <span class="archive-muted"><code>{{ $datasetKey }}</code></span>
                             </td>
                             <td>{{ match ((string) ($dataset['purge_mode'] ?? 'locked')) {
-                                'standard' => 'Purge biasa',
+                                'standard' => 'Bersihkan data biasa',
                                 'financial_guarded' => 'Snapshot + rebuild',
                                 default => 'Dikunci',
                             } }}</td>
@@ -493,7 +493,7 @@
 
         @if (is_array($purgeResult))
             <div class="card archive-col-12">
-                <h3 style="margin-top:0;">Hasil Purge</h3>
+                <h3 style="margin-top:0;">Hasil Bersihkan Data</h3>
                 <table class="archive-kv">
                     <tbody>
                     <tr><th>Backup file</th><td><code>{{ $purgeResult['backup_file'] ?? '-' }}</code></td></tr>
@@ -583,7 +583,7 @@ php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuil
 php artisan app:archive:review
 php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Purge biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Purge finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
+                Bersihkan data biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Bersihkan data finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
             </p>
         </div>
     </div>
@@ -629,7 +629,7 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             if (mode) {
                 mode.className = 'archive-mode-pill ' + meta.mode;
                 mode.textContent = meta.mode === 'standard'
-                    ? 'Langsung bisa export lalu purge'
+                    ? 'Langsung bisa export lalu bersihkan data'
                     : (meta.mode === 'financial_guarded'
                         ? 'Butuh snapshot finansial dulu'
                         : 'Baru bisa scan dan export');
@@ -637,10 +637,10 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
 
             if (note) {
                 note.textContent = meta.mode === 'standard'
-                    ? 'Untuk data log/ops seperti ini, langkahnya cukup: Preview Scan -> Buat Export SQL -> Dry Run Purge -> Purge Final.'
+                    ? 'Untuk data log/ops seperti ini, langkahnya cukup: Cek Dulu -> Buat File Arsip -> Coba Simulasi Hapus -> Hapus Data.'
                     : (meta.mode === 'financial_guarded'
-                        ? 'Untuk data finansial seperti ini, langkahnya: Preview Scan -> Buat Export SQL -> Siapkan Snapshot Finansial -> Dry Run Purge -> Purge Final.'
-                        : 'Untuk data ini, purge masih dikunci. Saat ini pakai dulu: Preview Scan dan Buat Export SQL.');
+                        ? 'Untuk data finansial seperti ini, langkahnya: Cek Dulu -> Buat File Arsip -> Snapshot Finansial -> Coba Simulasi Hapus -> Hapus Data.'
+                        : 'Untuk data ini, pembersihan data masih dikunci. Saat ini pakai dulu: Cek Dulu dan Buat File Arsip.');
             }
 
             if (financialButton) financialButton.disabled = meta.mode !== 'financial_guarded';
