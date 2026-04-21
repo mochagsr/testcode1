@@ -1,4 +1,4 @@
-# PgPOS ERP
+# ERPOS
 
 ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
 - Master data: barang, customer, supplier

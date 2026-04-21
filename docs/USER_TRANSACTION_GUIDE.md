@@ -792,7 +792,7 @@ Gunanya:
 - nama ini juga bisa muncul di beberapa tampilan akun di aplikasi
 
 Contoh:
-- sebelumnya nama user tercatat `User PgPOS`
+- sebelumnya nama user tercatat `User lama`
 - lalu diganti menjadi `Kasir Toko Depan`
 - sesudah disimpan, nama yang tampil di nota akan mengikuti perubahan itu
 

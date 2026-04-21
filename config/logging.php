@@ -94,7 +94,7 @@ return [
         'alert_slack' => [
             'driver' => 'slack',
             'url' => env('LOG_ALERT_SLACK_WEBHOOK_URL'),
-            'username' => env('LOG_ALERT_SLACK_USERNAME', 'PgPOS Alert'),
+            'username' => env('LOG_ALERT_SLACK_USERNAME', 'ERPOS Alert'),
             'emoji' => env('LOG_ALERT_SLACK_EMOJI', ':warning:'),
             'level' => env('LOG_ALERT_LEVEL', 'error'),
             'replace_placeholders' => true,

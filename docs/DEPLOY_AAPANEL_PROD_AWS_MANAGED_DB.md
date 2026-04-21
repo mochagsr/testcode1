@@ -256,7 +256,7 @@ Isi dengan nilai production final.
 Contoh `.env` final production dengan managed DB:
 
 ```env
-APP_NAME=PgPOS-ERP
+APP_NAME=ERPOS
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://erpos.mitrasejatiberkah.com
@@ -294,7 +294,7 @@ MAIL_USERNAME=noreply@mitrasejatiberkah.com
 MAIL_PASSWORD=replace_me
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=noreply@mitrasejatiberkah.com
-MAIL_FROM_NAME="PgPOS ERP"
+MAIL_FROM_NAME="ERPOS"
 
 VITE_APP_NAME="${APP_NAME}"
 ```

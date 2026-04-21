@@ -806,7 +806,7 @@ Admin bisa mengubah preferensi akun sendiri:
 - tema tampilan
 
 Contoh:
-- nama user admin sebelumnya `Admin PgPOS`
+- nama user admin sebelumnya `Admin lama`
 - lalu diubah menjadi `Supervisor Cetak`
 - sesudah disimpan, nama yang tampil di nota akan ikut berubah
 - admin operasional A memakai bahasa `Indonesia`

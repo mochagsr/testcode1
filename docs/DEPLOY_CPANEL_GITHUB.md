@@ -1,4 +1,4 @@
-# Deploy PgPOS ERP ke cPanel via GitHub
+# Deploy ERPOS ke cPanel via GitHub
 
 Dokumen ini untuk uji deploy pertama di hosting cPanel dengan:
 
@@ -80,7 +80,7 @@ Gunakan contoh:
 Salin menjadi `.env`, lalu isi:
 
 ```env
-APP_NAME=PgPOS-ERP
+APP_NAME=ERPOS
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://your-domain.com

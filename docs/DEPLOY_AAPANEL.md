@@ -1,4 +1,4 @@
-# Deploy PgPOS ERP di aaPanel v8.0.1 untuk TESERPOS
+# Deploy ERPOS di aaPanel v8.0.1 untuk TESERPOS
 
 Dokumen ini khusus untuk environment `teserpos.mitrasejatiberkah.com`.
 
@@ -91,7 +91,7 @@ cp .env.aapanel.test.example .env
 Lalu isi nilai final seperti:
 
 ```env
-APP_NAME=PgPOS-ERP-TES
+APP_NAME=TESERPOS
 APP_ENV=staging
 APP_DEBUG=false
 APP_URL=https://teserpos.mitrasejatiberkah.com

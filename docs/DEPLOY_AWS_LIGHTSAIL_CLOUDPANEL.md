@@ -1,4 +1,4 @@
-# Deploy PgPOS ERP di AWS Lightsail + CloudPanel
+# Deploy ERPOS di AWS Lightsail + CloudPanel
 
 Dokumen ini disiapkan untuk deploy aplikasi ke server Linux yang memakai:
 - `AWS Lightsail`
@@ -494,7 +494,7 @@ Lalu edit `.env`.
 Contoh `tes`:
 
 ```env
-APP_NAME=PgPOS-ERP-TES
+APP_NAME=TESERPOS
 APP_ENV=staging
 APP_DEBUG=false
 APP_URL=https://teserpos.mitrasejatiberkah.com
@@ -510,7 +510,7 @@ DB_PASSWORD=replace_me
 Contoh `prod`:
 
 ```env
-APP_NAME=PgPOS-ERP
+APP_NAME=ERPOS
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://erpos.mitrasejatiberkah.com

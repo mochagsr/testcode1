@@ -1,4 +1,4 @@
-# PgPOS ERP Roadmap
+# ERPOS Roadmap
 
 ## Scope Source
 - Requirements extracted from `tesai.docx` (book-store POS + ERP flow).

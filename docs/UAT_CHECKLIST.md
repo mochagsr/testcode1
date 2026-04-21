@@ -1,4 +1,4 @@
-# UAT Checklist (ERP PgPOS)
+# UAT Checklist (ERPOS)
 
 ## Scope
 - Sales invoice, sales return, delivery note, order note.

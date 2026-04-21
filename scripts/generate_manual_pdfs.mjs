@@ -463,7 +463,7 @@ async function renderPdf(browser, markdownFile, pdfFile, title) {
   const markdown = await fs.readFile(path.join(docsDir, markdownFile), 'utf8');
   const cover = `
     <div class="cover">
-      <div class="cover-kicker">Panduan Internal PgPOS ERP</div>
+      <div class="cover-kicker">Panduan Internal ERPOS</div>
       <h1>${title}</h1>
       <div class="meta">Dibuat otomatis dari dokumentasi aplikasi pada ${new Date().toLocaleString('id-ID')}</div>
       <div class="note">
@@ -473,7 +473,7 @@ async function renderPdf(browser, markdownFile, pdfFile, title) {
   `;
   const toc = buildToc(markdown);
   const body = await enhanceHtml(marked.parse(markdown));
-  const html = wrapHtml(title, `${cover}${toc}${body}<div class="footer-note">PgPOS ERP Manual</div>`);
+  const html = wrapHtml(title, `${cover}${toc}${body}<div class="footer-note">ERPOS Manual</div>`);
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'load' });
   await page.waitForLoadState('networkidle').catch(() => {});
