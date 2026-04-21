@@ -120,10 +120,14 @@
             font-size: 20px;
             font-weight: 700;
             margin-bottom: 24px;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .nav {
             position: relative;
             z-index: 1;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .nav > a,
         .nav-sub a {
@@ -162,6 +166,8 @@
             letter-spacing: 0.8px;
             color: var(--sidebar-muted);
             font-weight: 700;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .nav-group-title {
             display: flex;
@@ -179,6 +185,8 @@
             text-align: left;
             cursor: pointer;
             font: inherit;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .nav-group-title::after {
             content: '+';
@@ -271,6 +279,8 @@
         .page-title {
             margin: 0 0 16px;
             font-size: 24px;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .card {
             background: var(--card);
