@@ -490,12 +490,54 @@ class ArchiveCommandsTest extends TestCase
 
         AppSetting::setValue('closed_semester_periods', 'S2-2425,S1-2526,S2-2526');
 
-        $response = $this->actingAs($admin)->get(route('archive-data.index'));
+        $response = $this->withSession([
+            '_old_input' => [
+                'dataset_key' => 'sales_invoices',
+                'archive_scope_type' => 'year',
+            ],
+        ])->actingAs($admin)->get(route('archive-data.index'));
 
         $response->assertOk();
         $response->assertSee('value="2526"', false);
         $response->assertSee('value="2425"', false);
-        $response->assertDontSee('Kosong / belum ada');
+    }
+
+    public function test_archive_page_products_use_product_years_without_waiting_for_closed_semester(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+
+        DB::table('item_categories')->insert([
+            'code' => 'CAT-ARSIP',
+            'name' => 'Kategori Arsip',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('products')->insert([
+            'item_category_id' => DB::table('item_categories')->value('id'),
+            'code' => 'BRG-ARSIP',
+            'name' => 'Barang Arsip',
+            'unit' => 'pcs',
+            'stock' => 5,
+            'price_general' => 10000,
+            'is_active' => true,
+            'created_at' => '2024-06-15 08:00:00',
+            'updated_at' => '2024-06-15 08:00:00',
+        ]);
+
+        $response = $this->withSession([
+            '_old_input' => [
+                'dataset_key' => 'products',
+                'archive_scope_type' => 'year',
+            ],
+        ])->actingAs($admin)->get(route('archive-data.index'));
+
+        $response->assertOk();
+        $response->assertSee('value="2024"', false);
+        $response->assertSee('Daftar Barang memakai tahun dari data barang yang sudah ada');
     }
 
     public function test_archive_scan_and_export_cover_semester_filtered_sales_invoices(): void

@@ -20,6 +20,7 @@
         $encodedExportManifestFile = !empty($exportResult['manifest_file']) ? rtrim(strtr(base64_encode((string) $exportResult['manifest_file']), '+/', '-_'), '=') : null;
         $encodedFinancialSnapshotFile = !empty($financialResult['snapshot_file']) ? rtrim(strtr(base64_encode((string) $financialResult['snapshot_file']), '+/', '-_'), '=') : null;
         $encodedFinancialManifestFile = !empty($financialResult['manifest_file']) ? rtrim(strtr(base64_encode((string) $financialResult['manifest_file']), '+/', '-_'), '=') : null;
+        $selectedYearNote = $datasetMeta[$selectedDatasetKey]['year_note'] ?? 'Tahun target hanya diambil dari tahun ajaran yang semester-nya sudah ditutup di menu Pengaturan.';
     @endphp
 
     <style>
@@ -296,7 +297,7 @@
                                     @endforeach
                                 @endif
                             </select>
-                            <div class="archive-muted" style="margin-top:8px;">Tahun target hanya diambil dari tahun ajaran yang semester-nya sudah ditutup di menu Pengaturan.</div>
+                            <div id="archive-year-note" class="archive-muted" style="margin-top:8px;">{{ $selectedYearNote }}</div>
                         </div>
 
                         <div id="archive-semester-field" style="{{ $scopeType === 'semester' ? '' : 'display:none;' }} margin-top:12px;">
@@ -725,6 +726,8 @@ php artisan app:archive:purge 2526 --dataset=sales_returns --confirm</pre>
             const note = document.getElementById('archive-selected-note');
             const basis = document.getElementById('archive-selected-basis');
             const scope = document.getElementById('archive-selected-scope');
+            const yearSelect = document.getElementById('archive_year');
+            const yearNote = document.getElementById('archive-year-note');
             const financialButton = document.getElementById('archive-financial-button');
             const dryRunButton = document.getElementById('archive-dry-run-button');
             const purgeButton = document.getElementById('archive-purge-button');
@@ -733,6 +736,34 @@ php artisan app:archive:purge 2526 --dataset=sales_returns --confirm</pre>
             if (label) label.textContent = meta.label;
             if (basis) basis.textContent = meta.basis === 'year' ? 'Tahun ajaran' : 'Bulan';
             if (scope) scope.textContent = meta.scope;
+            if (yearNote) yearNote.textContent = meta.year_note || 'Tahun target disesuaikan dengan data yang tersedia.';
+
+            if (yearSelect) {
+                const options = Array.isArray(meta.year_options) ? meta.year_options : [];
+                const currentValue = yearSelect.value;
+                yearSelect.innerHTML = '';
+                if (options.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'Kosong / belum ada';
+                    yearSelect.appendChild(option);
+                    yearSelect.disabled = true;
+                } else {
+                    options.forEach(function (item) {
+                        const option = document.createElement('option');
+                        option.value = item;
+                        option.textContent = item;
+                        if (item === currentValue) {
+                            option.selected = true;
+                        }
+                        yearSelect.appendChild(option);
+                    });
+                    if (!options.includes(currentValue)) {
+                        yearSelect.selectedIndex = 0;
+                    }
+                    yearSelect.disabled = false;
+                }
+            }
 
             if (mode) {
                 mode.className = 'archive-mode-pill ' + meta.mode;

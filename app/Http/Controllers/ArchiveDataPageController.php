@@ -13,6 +13,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 class ArchiveDataPageController extends Controller
@@ -28,8 +29,6 @@ class ArchiveDataPageController extends Controller
 
         $definitions = DataArchiveRegistry::businessDefinitions();
         $selectedScopeType = (string) ($request->old('archive_scope_type', 'year') ?: 'year');
-        $yearOptions = $semesterBookService->closedArchiveYearOptions();
-        $selectedYear = trim((string) ($request->old('archive_year', $yearOptions[0] ?? '') ?: ($yearOptions[0] ?? '')));
         $semesterOptions = $semesterBookService
             ->buildSemesterOptionCollection([], false, true)
             ->values()
@@ -42,14 +41,21 @@ class ArchiveDataPageController extends Controller
             $selectedDatasetKey = $defaultDatasetKey;
         }
         $selectedDataset = $definitions[$selectedDatasetKey] ?? null;
-        $datasetMeta = collect($definitions)->map(fn (array $dataset): array => [
-            'label' => (string) ($dataset['label'] ?? ''),
-            'mode' => (string) ($dataset['purge_mode'] ?? 'locked'),
-            'basis' => (($dataset['basis'] ?? 'year') === 'year') ? 'Tahun' : 'Bulan',
-            'scope' => implode(' / ', array_map(
-                static fn (string $item): string => $item === 'semester' ? 'semester' : 'tahun',
-                (array) ($dataset['scope_modes'] ?? ['year'])
-            )),
+        $datasetYearOptions = $this->datasetYearOptions($definitions, $semesterBookService);
+        $yearOptions = $datasetYearOptions[$selectedDatasetKey] ?? [];
+        $selectedYear = trim((string) ($request->old('archive_year', $yearOptions[0] ?? '') ?: ($yearOptions[0] ?? '')));
+        $datasetMeta = collect($definitions)->mapWithKeys(fn (array $dataset, string $datasetKey): array => [
+            $datasetKey => [
+                'label' => (string) ($dataset['label'] ?? ''),
+                'mode' => (string) ($dataset['purge_mode'] ?? 'locked'),
+                'basis' => (($dataset['basis'] ?? 'year') === 'year') ? 'Tahun' : 'Bulan',
+                'scope' => implode(' / ', array_map(
+                    static fn (string $item): string => $item === 'semester' ? 'semester' : 'tahun',
+                    (array) ($dataset['scope_modes'] ?? ['year'])
+                )),
+                'year_options' => $datasetYearOptions[$datasetKey] ?? [],
+                'year_note' => $this->datasetYearNote($datasetKey),
+            ],
         ])->all();
         $latestRestoreDrill = $archiveService->latestRestoreDrill();
         $latestFinancialSnapshot = $archiveService->latestFinancialSnapshot();
@@ -77,6 +83,7 @@ class ArchiveDataPageController extends Controller
             'selectedScopeType' => $selectedScopeType,
             'selectedYear' => $selectedYear,
             'yearOptions' => $yearOptions,
+            'datasetYearOptions' => $datasetYearOptions,
             'selectedSemester' => $selectedSemester,
             'semesterOptions' => $semesterOptions,
             'selectedDatasets' => $selectedDatasets,
@@ -140,6 +147,53 @@ class ArchiveDataPageController extends Controller
         $decoded = json_decode((string) File::get($latest), true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $definitions
+     * @return array<string, array<int, string>>
+     */
+    private function datasetYearOptions(array $definitions, SemesterBookService $semesterBookService): array
+    {
+        $closedSemesterYears = $semesterBookService->closedArchiveYearOptions();
+        $options = [];
+
+        foreach (array_keys($definitions) as $datasetKey) {
+            $options[$datasetKey] = $datasetKey === 'products'
+                ? $this->productYearOptions()
+                : $closedSemesterYears;
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function productYearOptions(): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('products')) {
+            return [];
+        }
+
+        return DB::table('products')
+            ->whereNotNull('created_at')
+            ->orderByDesc('created_at')
+            ->pluck('created_at')
+            ->map(static function ($createdAt): string {
+                return trim((string) optional(\Illuminate\Support\Carbon::parse((string) $createdAt))->format('Y'));
+            })
+            ->filter(static fn (string $year): bool => preg_match('/^\d{4}$/', $year) === 1)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function datasetYearNote(string $datasetKey): string
+    {
+        return $datasetKey === 'products'
+            ? 'Daftar Barang memakai tahun dari data barang yang sudah ada, jadi tidak perlu menunggu tutup semester.'
+            : 'Tahun target hanya diambil dari tahun ajaran yang semester-nya sudah ditutup di menu Pengaturan.';
     }
 
     public function download(Request $request): BinaryFileResponse
