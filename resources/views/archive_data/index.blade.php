@@ -197,6 +197,28 @@
             gap: 8px;
             margin-top: 10px;
         }
+        .archive-scroll-box {
+            max-height: 360px;
+            overflow: auto;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+        .archive-scroll-box .archive-table th {
+            position: sticky;
+            top: 0;
+            background: color-mix(in srgb, var(--card) 96%, var(--bg));
+            z-index: 1;
+        }
+        .archive-help-box {
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: color-mix(in srgb, var(--surface) 94%, var(--card));
+        }
+        .archive-help-box h4 {
+            margin: 0 0 8px;
+            font-size: 15px;
+        }
     </style>
 
     <div class="archive-grid">
@@ -223,13 +245,13 @@
         @endif
 
         <div class="card archive-col-6">
-            <h3 style="margin-top:0;">Konteks Server Saat Ini</h3>
+            <h3 style="margin-top:0;">Status Backup dan Pemeriksaan</h3>
+            <p class="archive-muted" style="margin:0 0 12px;">
+                Bagian ini dipakai untuk memastikan backup dan pemeriksaan dasar sudah pernah jalan sebelum data dibersihkan.
+            </p>
             <table class="archive-kv">
                 <tbody>
-                <tr><th>Environment</th><td>{{ $appEnv }}</td></tr>
-                <tr><th>DB Connection</th><td>{{ $dbConnection }}</td></tr>
-                <tr><th>DB Host</th><td>{{ $dbHost !== '' ? $dbHost : '-' }}</td></tr>
-                <tr><th>Backup Terakhir</th><td>{{ $latestBackup ?: '-' }}</td></tr>
+                <tr><th>Backup Terakhir</th><td>{{ $latestBackup ? basename((string) $latestBackup) : '-' }}</td></tr>
                 <tr><th>Total File Backup</th><td>{{ number_format((int) $backupFileCount, 0, ',', '.') }}</td></tr>
                 <tr><th>Restore Drill Terakhir</th><td>{{ $latestRestoreDrill?->tested_at ? \Illuminate\Support\Carbon::parse((string) $latestRestoreDrill->tested_at)->format('d-m-Y H:i:s') : '-' }}</td></tr>
                 <tr><th>Status Restore Drill</th><td>{{ $latestRestoreDrill?->status ? strtoupper((string) $latestRestoreDrill->status) : '-' }}</td></tr>
@@ -263,7 +285,11 @@
 
                         <div id="archive-year-field" style="{{ $scopeType === 'semester' ? 'display:none;' : '' }} margin-top:12px;">
                             <label for="archive_year" class="archive-muted" style="display:block;margin-bottom:6px;">Tahun target</label>
-                            <input type="number" id="archive_year" name="archive_year" value="{{ old('archive_year', $selectedYear) }}" min="2000" max="2100">
+                            <select id="archive_year" name="archive_year">
+                                @foreach(($yearOptions ?? []) as $yearOption)
+                                    <option value="{{ $yearOption }}" {{ (int) old('archive_year', $selectedYear) === (int) $yearOption ? 'selected' : '' }}>{{ $yearOption }}</option>
+                                @endforeach
+                            </select>
                         </div>
 
                         <div id="archive-semester-field" style="{{ $scopeType === 'semester' ? '' : 'display:none;' }} margin-top:12px;">
@@ -277,20 +303,20 @@
 
                         <div class="archive-muted" style="margin-top:8px;">Untuk managed DB AWS, file arsip dibuat di server dulu lalu sebaiknya diunduh dan disimpan juga di komputer lokal.</div>
 
-                        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;">
-                            <input type="checkbox" name="rebuild_journal" value="1" {{ old('rebuild_journal') ? 'checked' : '' }}>
-                            <span class="archive-muted">Saat snapshot finansial, siapkan rebuild journal juga.</span>
-                        </label>
+                        <input type="hidden" id="confirm_purge" name="confirm_purge" value="{{ old('confirm_purge') ? '1' : '0' }}">
 
-                        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
-                            <input type="checkbox" name="allow_skipped_restore" value="1" {{ old('allow_skipped_restore') ? 'checked' : '' }}>
-                            <span class="archive-muted">Izinkan restore drill terakhir berstatus `SKIPPED` bila alasannya memang dipahami.</span>
-                        </label>
+                        <details style="margin-top:12px;">
+                            <summary class="archive-muted" style="cursor:pointer;">Pengaturan tambahan</summary>
+                            <label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;">
+                                <input type="checkbox" name="rebuild_journal" value="1" {{ old('rebuild_journal') ? 'checked' : '' }}>
+                                <span class="archive-muted">Saat snapshot finansial, siapkan rebuild journal juga.</span>
+                            </label>
 
-                        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
-                            <input type="checkbox" name="confirm_purge" value="1" {{ old('confirm_purge') ? 'checked' : '' }}>
-                            <span class="archive-muted">Centang hanya saat benar-benar siap menghapus data production.</span>
-                        </label>
+                            <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
+                                <input type="checkbox" name="allow_skipped_restore" value="1" {{ old('allow_skipped_restore') ? 'checked' : '' }}>
+                                <span class="archive-muted">Izinkan restore drill terakhir berstatus `SKIPPED` bila alasannya memang dipahami.</span>
+                            </label>
+                        </details>
                     </div>
 
                     <div>
@@ -331,6 +357,27 @@
                                     Basis data ini: <strong id="archive-selected-basis">{{ ($selectedDataset['basis'] ?? 'year') === 'year' ? 'Tahun' : 'Bulan' }}</strong>.
                                     Scope yang boleh dipakai: <strong id="archive-selected-scope">{{ implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $selectedDataset['scope_modes'] ?? ['year'])) }}</strong>.
                                 </div>
+                                <div class="archive-help-box" style="margin-top:12px;">
+                                    <h4>Urutan klik yang aman</h4>
+                                    <ol id="archive-selected-steps" class="archive-list">
+                                        @if($selectedDatasetMode === 'standard')
+                                            <li>Klik <strong>1. Cek Dulu</strong>.</li>
+                                            <li>Klik <strong>2. Buat File Arsip</strong>.</li>
+                                            <li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li>
+                                            <li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>
+                                        @elseif($selectedDatasetMode === 'financial_guarded')
+                                            <li>Klik <strong>1. Cek Dulu</strong>.</li>
+                                            <li>Klik <strong>2. Buat File Arsip</strong>.</li>
+                                            <li>Klik <strong>3. Snapshot Finansial</strong>.</li>
+                                            <li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li>
+                                            <li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>
+                                        @else
+                                            <li>Klik <strong>1. Cek Dulu</strong>.</li>
+                                            <li>Klik <strong>2. Buat File Arsip</strong>.</li>
+                                            <li>Untuk jenis data ini, pembersihan masih dikunci.</li>
+                                        @endif
+                                    </ol>
+                                </div>
                             </div>
                         </div>
 
@@ -338,8 +385,8 @@
                             <button type="submit" class="btn secondary" formaction="{{ route('archive-data.scan') }}">1. Cek Dulu</button>
                             <button type="submit" class="btn secondary" formaction="{{ route('archive-data.export') }}">2. Buat File Arsip</button>
                             <button type="submit" id="archive-financial-button" class="btn secondary" formaction="{{ route('archive-data.prepare-financial') }}" {{ $selectedDatasetMode !== 'financial_guarded' ? 'disabled' : '' }}>3. Snapshot Finansial</button>
-                            <button type="submit" id="archive-dry-run-button" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=false;" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>4. Coba Simulasi Hapus</button>
-                            <button type="submit" id="archive-purge-button" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=true;" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>5. Hapus Data</button>
+                            <button type="submit" id="archive-dry-run-button" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='0';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>4. Coba Simulasi Hapus</button>
+                            <button type="submit" id="archive-purge-button" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='1';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>5. Hapus Data</button>
                         </div>
                     </div>
                 </div>
@@ -547,27 +594,29 @@
         <div class="card archive-col-6">
             <h3 style="margin-top:0;">Histori Eksekusi Arsip</h3>
             @if (!empty($archiveHistory))
-                <table class="archive-table">
-                    <thead>
-                    <tr>
-                        <th>Waktu</th>
-                        <th>Aksi</th>
-                        <th>Ringkasan</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @foreach($archiveHistory as $entry)
+                <div class="archive-scroll-box">
+                    <table class="archive-table">
+                        <thead>
                         <tr>
-                            <td>{{ \Illuminate\Support\Carbon::parse((string) $entry['created_at'])->format('d-m-Y H:i:s') }}</td>
-                            <td>
-                                <strong>{{ $entry['title'] }}</strong><br>
-                                <span class="archive-muted"><code>{{ $entry['path'] }}</code></span>
-                            </td>
-                            <td>{{ $entry['summary'] }}</td>
+                            <th>Waktu</th>
+                            <th>Aksi</th>
+                            <th>Ringkasan</th>
                         </tr>
-                    @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        @foreach($archiveHistory as $entry)
+                            <tr>
+                                <td>{{ \Illuminate\Support\Carbon::parse((string) $entry['created_at'])->format('d-m-Y H:i:s') }}</td>
+                                <td>
+                                    <strong>{{ $entry['title'] }}</strong><br>
+                                    <span class="archive-muted"><code>{{ $entry['path'] }}</code></span>
+                                </td>
+                                <td>{{ $entry['summary'] }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
             @else
                 <p class="archive-muted" style="margin:0;">Belum ada histori eksekusi arsip yang tersimpan.</p>
             @endif
@@ -616,6 +665,7 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             const financialButton = document.getElementById('archive-financial-button');
             const dryRunButton = document.getElementById('archive-dry-run-button');
             const purgeButton = document.getElementById('archive-purge-button');
+            const steps = document.getElementById('archive-selected-steps');
 
             if (label) label.textContent = meta.label;
             if (basis) basis.textContent = meta.basis;
@@ -636,6 +686,14 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
                     : (meta.mode === 'financial_guarded'
                         ? 'Untuk data finansial seperti ini, langkahnya: Cek Dulu -> Buat File Arsip -> Snapshot Finansial -> Coba Simulasi Hapus -> Hapus Data.'
                         : 'Untuk data ini, pembersihan data masih dikunci. Saat ini pakai dulu: Cek Dulu dan Buat File Arsip.');
+            }
+
+            if (steps) {
+                steps.innerHTML = meta.mode === 'standard'
+                    ? '<li>Klik <strong>1. Cek Dulu</strong>.</li><li>Klik <strong>2. Buat File Arsip</strong>.</li><li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li><li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>'
+                    : (meta.mode === 'financial_guarded'
+                        ? '<li>Klik <strong>1. Cek Dulu</strong>.</li><li>Klik <strong>2. Buat File Arsip</strong>.</li><li>Klik <strong>3. Snapshot Finansial</strong>.</li><li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li><li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>'
+                        : '<li>Klik <strong>1. Cek Dulu</strong>.</li><li>Klik <strong>2. Buat File Arsip</strong>.</li><li>Untuk jenis data ini, pembersihan masih dikunci.</li>');
             }
 
             if (financialButton) financialButton.disabled = meta.mode !== 'financial_guarded';

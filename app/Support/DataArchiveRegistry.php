@@ -103,6 +103,17 @@ final class DataArchiveRegistry
                     ['table' => 'job_batches', 'date_column' => 'created_at', 'date_kind' => 'unix'],
                 ],
             ],
+            'products' => [
+                'label' => 'Daftar Barang',
+                'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
+                'purge_allowed' => false,
+                'purge_mode' => 'locked',
+                'financial' => false,
+                'tables' => [
+                    ['table' => 'products', 'date_column' => 'created_at'],
+                ],
+            ],
             'sales_invoices' => [
                 'label' => 'Faktur Penjualan',
                 'basis' => 'year',

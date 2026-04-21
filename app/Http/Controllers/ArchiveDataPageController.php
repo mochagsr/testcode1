@@ -27,6 +27,13 @@ class ArchiveDataPageController extends Controller
         $definitions = DataArchiveRegistry::definitions();
         $selectedScopeType = (string) ($request->old('archive_scope_type', 'year') ?: 'year');
         $selectedYear = (int) ($request->old('archive_year', now()->year - 1) ?: now()->year - 1);
+        $currentYear = now()->year;
+        $yearFloor = max(2000, $currentYear - 15);
+        $yearOptions = collect(range($currentYear, $yearFloor, -1));
+        if (! $yearOptions->contains($selectedYear)) {
+            $yearOptions->push($selectedYear);
+        }
+        $yearOptions = $yearOptions->unique()->sortDesc()->values()->all();
         $semesterOptions = $semesterBookService
             ->buildSemesterOptionCollection([], false, true)
             ->values()
@@ -65,6 +72,7 @@ class ArchiveDataPageController extends Controller
             'datasets' => $definitions,
             'selectedScopeType' => $selectedScopeType,
             'selectedYear' => $selectedYear,
+            'yearOptions' => $yearOptions,
             'selectedSemester' => $selectedSemester,
             'semesterOptions' => $semesterOptions,
             'selectedDatasets' => $selectedDatasets,
