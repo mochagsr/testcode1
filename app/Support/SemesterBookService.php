@@ -795,6 +795,26 @@ class SemesterBookService
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function closedArchiveYearOptions(): array
+    {
+        return collect($this->closedSemesters())
+            ->map(function (string $semester): ?string {
+                if (preg_match('/^S[12]-(\d{4})$/', $semester, $matches) !== 1) {
+                    return null;
+                }
+
+                return (string) $matches[1];
+            })
+            ->filter(fn (?string $yearCode): bool => $yearCode !== null && $yearCode !== '')
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array<string, array{closed_at?:string|null}>
      */
     public function closedSemesterMetadata(): array
@@ -1012,6 +1032,34 @@ class SemesterBookService
         return [
             'start' => Carbon::create($startYear, 11, 1)->startOfDay()->toDateString(),
             'end' => Carbon::create($endYear, 4, 30)->endOfDay()->toDateString(),
+        ];
+    }
+
+    /**
+     * @return array{start:string,end:string,label:string,start_year:int,end_year:int}|null
+     */
+    public function archiveYearDateRange(?string $yearCode): ?array
+    {
+        $value = trim((string) $yearCode);
+        if (preg_match('/^(\d{2})(\d{2})$/', $value, $matches) !== 1) {
+            return null;
+        }
+
+        $startYear2D = (int) $matches[1];
+        $endYear2D = (int) $matches[2];
+        if ($endYear2D !== (($startYear2D + 1) % 100)) {
+            return null;
+        }
+
+        $startYear = 2000 + $startYear2D;
+        $endYear = 2000 + $endYear2D;
+
+        return [
+            'start' => Carbon::create($startYear, 5, 1)->startOfDay()->toDateString(),
+            'end' => Carbon::create($endYear, 4, 30)->endOfDay()->toDateString(),
+            'label' => $value,
+            'start_year' => $startYear,
+            'end_year' => $endYear,
         ];
     }
 

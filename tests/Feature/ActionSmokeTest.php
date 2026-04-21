@@ -136,7 +136,7 @@ class ActionSmokeTest extends TestCase
         $this->actingAs($admin)
             ->post(route('archive-data.scan'), [
                 'archive_scope_type' => 'year',
-                'archive_year' => 2025,
+                'archive_year' => '2025',
                 'dataset_key' => 'audit_logs',
             ])
             ->assertRedirect()

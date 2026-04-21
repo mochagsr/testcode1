@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AppSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -77,6 +78,71 @@ class ArchiveCommandsTest extends TestCase
         $this->assertStringContainsString('INSERT INTO `audit_logs`', File::get($sqlFile));
         $this->assertStringContainsString('Audit 2024', File::get($sqlFile));
         $this->assertStringNotContainsString('Audit 2025', File::get($sqlFile));
+    }
+
+    public function test_archive_scan_supports_academic_year_scope_from_closed_semesters(): void
+    {
+        $user = User::factory()->create();
+
+        DB::table('audit_logs')->insert([
+            [
+                'user_id' => $user->id,
+                'action' => 'created',
+                'subject_type' => 'sales_invoice',
+                'subject_id' => 1,
+                'description' => 'Audit sebelum 2526',
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit',
+                'created_at' => '2025-04-30 10:00:00',
+                'updated_at' => '2025-04-30 10:00:00',
+            ],
+            [
+                'user_id' => $user->id,
+                'action' => 'created',
+                'subject_type' => 'sales_invoice',
+                'subject_id' => 2,
+                'description' => 'Audit awal 2526',
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit',
+                'created_at' => '2025-05-01 10:00:00',
+                'updated_at' => '2025-05-01 10:00:00',
+            ],
+            [
+                'user_id' => $user->id,
+                'action' => 'created',
+                'subject_type' => 'sales_invoice',
+                'subject_id' => 3,
+                'description' => 'Audit akhir 2526',
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit',
+                'created_at' => '2026-04-30 10:00:00',
+                'updated_at' => '2026-04-30 10:00:00',
+            ],
+            [
+                'user_id' => $user->id,
+                'action' => 'created',
+                'subject_type' => 'sales_invoice',
+                'subject_id' => 4,
+                'description' => 'Audit sesudah 2526',
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit',
+                'created_at' => '2026-05-01 10:00:00',
+                'updated_at' => '2026-05-01 10:00:00',
+            ],
+        ]);
+
+        Artisan::call('app:archive:scan', [
+            'period' => 2526,
+            '--dataset' => ['audit_logs'],
+            '--json' => true,
+        ]);
+
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertIsArray($payload);
+        $this->assertSame('year', $payload['period_type']);
+        $this->assertSame('2526', $payload['period_value']);
+        $this->assertSame(2, $payload['datasets']['audit_logs']['total_rows']);
     }
 
     public function test_archive_download_route_serves_generated_export_file(): void
@@ -403,7 +469,7 @@ class ArchiveCommandsTest extends TestCase
 
         $response = $this->actingAs($admin)->post(route('archive-data.scan'), [
             'archive_scope_type' => 'year',
-            'archive_year' => 2024,
+            'archive_year' => '2024',
             'datasets' => ['audit_logs'],
         ]);
 
@@ -411,6 +477,23 @@ class ArchiveCommandsTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('archive_scan_result')
             ->assertSessionHas('archive_success');
+    }
+
+    public function test_archive_page_year_dropdown_uses_closed_semester_years(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+
+        AppSetting::setValue('closed_semester_periods', 'S2-2425,S1-2526,S2-2526');
+
+        $response = $this->actingAs($admin)->get(route('archive-data.index'));
+
+        $response->assertOk();
+        $response->assertSee('value="2526"', false);
+        $response->assertSee('value="2425"', false);
+        $response->assertDontSee('Kosong / belum ada');
     }
 
     public function test_archive_scan_and_export_cover_semester_filtered_sales_invoices(): void

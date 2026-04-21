@@ -286,11 +286,16 @@
 
                         <div id="archive-year-field" style="{{ $scopeType === 'semester' ? 'display:none;' : '' }} margin-top:12px;">
                             <label for="archive_year" class="archive-muted" style="display:block;margin-bottom:6px;">Tahun target</label>
-                            <select id="archive_year" name="archive_year">
-                                @foreach(($yearOptions ?? []) as $yearOption)
-                                    <option value="{{ $yearOption }}" {{ (int) old('archive_year', $selectedYear) === (int) $yearOption ? 'selected' : '' }}>{{ $yearOption }}</option>
-                                @endforeach
+                            <select id="archive_year" name="archive_year" {{ empty($yearOptions ?? []) ? 'disabled' : '' }}>
+                                @if(empty($yearOptions ?? []))
+                                    <option value="">Kosong / belum ada</option>
+                                @else
+                                    @foreach(($yearOptions ?? []) as $yearOption)
+                                        <option value="{{ $yearOption }}" {{ (string) old('archive_year', $selectedYear) === (string) $yearOption ? 'selected' : '' }}>{{ $yearOption }}</option>
+                                    @endforeach
+                                @endif
                             </select>
+                            <div class="archive-muted" style="margin-top:8px;">Tahun target hanya diambil dari tahun ajaran yang semester-nya sudah ditutup di menu Pengaturan.</div>
                         </div>
 
                         <div id="archive-semester-field" style="{{ $scopeType === 'semester' ? '' : 'display:none;' }} margin-top:12px;">
@@ -355,7 +360,7 @@
                                     @endif
                                 </div>
                                 <div class="archive-muted" style="margin-top:8px;">
-                                    Basis data ini: <strong id="archive-selected-basis">{{ ($selectedDataset['basis'] ?? 'year') === 'year' ? 'Tahun' : 'Bulan' }}</strong>.
+                                    Basis data ini: <strong id="archive-selected-basis">{{ ($selectedDataset['basis'] ?? 'year') === 'year' ? 'Tahun ajaran' : 'Bulan' }}</strong>.
                                     Scope yang boleh dipakai: <strong id="archive-selected-scope">{{ implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $selectedDataset['scope_modes'] ?? ['year'])) }}</strong>.
                                 </div>
                                 <div class="archive-help-box" style="margin-top:12px;">
@@ -658,15 +663,15 @@
 
         <div class="card archive-col-12">
             <h3 style="margin-top:0;">Catatan Command Arsip</h3>
-            <pre class="archive-code">php artisan app:archive:scan 2021 --dataset=sales_invoices
+            <pre class="archive-code">php artisan app:archive:scan 2526 --dataset=sales_invoices
 php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices
-php artisan app:archive:export 2021 --dataset=sales_invoices
+php artisan app:archive:export 2526 --dataset=sales_invoices
 php artisan app:archive:export --semester=S1-2526 --dataset=sales_returns
-php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal
+php artisan app:archive:prepare-financial 2526 --dataset=sales_invoices --rebuild-journal
 php artisan app:archive:review
-php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
+php artisan app:archive:purge 2526 --dataset=audit_logs --confirm</pre>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Bersihkan data biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Bersihkan data finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
+                Bersihkan data biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Bersihkan data finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk tahun ajaran atau semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
             </p>
         </div>
     </div>
@@ -702,7 +707,7 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             const steps = document.getElementById('archive-selected-steps');
 
             if (label) label.textContent = meta.label;
-            if (basis) basis.textContent = meta.basis;
+            if (basis) basis.textContent = meta.basis === 'year' ? 'Tahun ajaran' : 'Bulan';
             if (scope) scope.textContent = meta.scope;
 
             if (mode) {

@@ -28,14 +28,8 @@ class ArchiveDataPageController extends Controller
 
         $definitions = DataArchiveRegistry::definitions();
         $selectedScopeType = (string) ($request->old('archive_scope_type', 'year') ?: 'year');
-        $selectedYear = (int) ($request->old('archive_year', now()->year - 1) ?: now()->year - 1);
-        $currentYear = now()->year;
-        $yearFloor = max(2000, $currentYear - 15);
-        $yearOptions = collect(range($currentYear, $yearFloor, -1));
-        if (! $yearOptions->contains($selectedYear)) {
-            $yearOptions->push($selectedYear);
-        }
-        $yearOptions = $yearOptions->unique()->sortDesc()->values()->all();
+        $yearOptions = $semesterBookService->closedArchiveYearOptions();
+        $selectedYear = trim((string) ($request->old('archive_year', $yearOptions[0] ?? '') ?: ($yearOptions[0] ?? '')));
         $semesterOptions = $semesterBookService
             ->buildSemesterOptionCollection([], false, true)
             ->values()
@@ -97,16 +91,16 @@ class ArchiveDataPageController extends Controller
                     'label' => 'Transaksi ERP',
                     'period' => '60 bulan',
                     'basis' => 'tahun',
-                    'note' => 'Untuk tabel finansial utama, operator bisa mulai dari tahun atau semester, tergantung periode mana yang memang sudah selesai dan aman diarsipkan.',
+                    'note' => 'Untuk tabel finansial utama, operator bisa mulai dari tahun ajaran yang sudah ditutup atau langsung dari semester yang memang sudah selesai dan aman diarsipkan.',
                 ],
             ],
             'archiveCommands' => [
                 'php artisan app:db-backup --gzip',
                 'php artisan app:db-restore-test',
                 'php artisan app:integrity-check',
-                'php artisan app:archive:scan 2025 --dataset=audit_logs',
+                'php artisan app:archive:scan 2526 --dataset=audit_logs',
                 'php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices',
-                'php artisan app:archive:prepare-financial 2024 --dataset=sales_invoices',
+                'php artisan app:archive:prepare-financial 2526 --dataset=sales_invoices',
             ],
             'plannedArchiveFlow' => [
                 'Preview kandidat arsip per tahun atau semester.',
@@ -273,7 +267,7 @@ class ArchiveDataPageController extends Controller
     {
         $validated = $request->validate([
             'archive_scope_type' => ['required', 'string', 'in:year,semester'],
-            'archive_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'archive_year' => ['nullable', 'string', 'regex:/^\d{4}$/'],
             'archive_semester' => ['nullable', 'string', 'max:30'],
             'dataset_key' => ['nullable', 'string'],
             'datasets' => ['nullable', 'array', 'min:1'],
@@ -288,9 +282,9 @@ class ArchiveDataPageController extends Controller
             }
             $scope = $archiveService->resolveScope('semester', null, $semester);
         } else {
-            $year = (int) ($validated['archive_year'] ?? 0);
-            if ($year <= 0) {
-                abort(422, 'Tahun wajib diisi.');
+            $year = trim((string) ($validated['archive_year'] ?? ''));
+            if ($year === '') {
+                abort(422, 'Tahun target belum ada. Tutup periode semester dulu di menu Pengaturan.');
             }
             $scope = $archiveService->resolveScope('year', $year, null);
         }

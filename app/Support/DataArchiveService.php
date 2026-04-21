@@ -747,16 +747,31 @@ class DataArchiveService
     /**
      * @return array{type:string,value:string,year:int,semester:?string,start:?string,end:?string}
      */
-    public function yearScope(int $year): array
+    public function yearScope(int|string $year): array
     {
-        if ($year < 2000 || $year > 2100) {
+        $normalized = trim((string) $year);
+
+        $archiveYearRange = $this->semesterBookService->archiveYearDateRange($normalized);
+        if ($archiveYearRange !== null) {
+            return [
+                'type' => 'year',
+                'value' => $archiveYearRange['label'],
+                'year' => (int) $archiveYearRange['label'],
+                'semester' => null,
+                'start' => $archiveYearRange['start'],
+                'end' => $archiveYearRange['end'],
+            ];
+        }
+
+        $calendarYear = (int) $normalized;
+        if ($calendarYear < 2000 || $calendarYear > 2100) {
             throw new RuntimeException('Tahun arsip tidak valid.');
         }
 
         return [
             'type' => 'year',
-            'value' => (string) $year,
-            'year' => $year,
+            'value' => (string) $calendarYear,
+            'year' => $calendarYear,
             'semester' => null,
             'start' => null,
             'end' => null,
@@ -791,11 +806,11 @@ class DataArchiveService
     /**
      * @return array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}
      */
-    public function resolveScope(string $scopeType, ?int $year = null, ?string $semester = null): array
+    public function resolveScope(string $scopeType, int|string|null $year = null, ?string $semester = null): array
     {
         return $scopeType === 'semester'
             ? $this->semesterScope((string) $semester)
-            : $this->yearScope((int) $year);
+            : $this->yearScope((string) $year);
     }
 
     /**
@@ -846,7 +861,7 @@ class DataArchiveService
 
         $dateColumn = $tableDefinition['date_column'] ?? 'created_at';
         if (($tableDefinition['date_kind'] ?? 'calendar') === 'unix') {
-            if ($scope['type'] === 'semester') {
+            if (! empty($scope['start']) && ! empty($scope['end'])) {
                 return $query->whereBetween(
                     $dateColumn,
                     [strtotime((string) $scope['start'].' 00:00:00'), strtotime((string) $scope['end'].' 23:59:59')]
@@ -859,8 +874,18 @@ class DataArchiveService
             );
         }
 
-        if ($scope['type'] === 'semester') {
-            return $query->whereBetween($dateColumn, [$scope['start'], $scope['end']]);
+        if (! empty($scope['start']) && ! empty($scope['end'])) {
+            $start = (string) $scope['start'];
+            $end = (string) $scope['end'];
+
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) === 1) {
+                $start .= ' 00:00:00';
+            }
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $end) === 1) {
+                $end .= ' 23:59:59';
+            }
+
+            return $query->whereBetween($dateColumn, [$start, $end]);
         }
 
         return $query->whereYear($dateColumn, (int) $scope['year']);
