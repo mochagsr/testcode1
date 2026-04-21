@@ -197,8 +197,8 @@ final class DataArchiveRegistry
                 'label' => 'Ledger Piutang',
                 'basis' => 'year',
                 'scope_modes' => ['year', 'semester'],
-                'purge_allowed' => false,
-                'purge_mode' => 'locked',
+                'purge_allowed' => true,
+                'purge_mode' => 'financial_guarded',
                 'financial' => true,
                 'tables' => [
                     ['table' => 'receivable_ledgers', 'date_column' => 'entry_date', 'semester_column' => 'period_code'],

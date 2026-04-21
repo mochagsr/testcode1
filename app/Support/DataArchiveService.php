@@ -10,6 +10,7 @@ use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -1157,6 +1158,7 @@ class DataArchiveService
             'sales_invoices',
             'sales_returns',
             'outgoing_transactions',
+            'receivable_ledgers',
             'receivable_payments',
             'supplier_payments',
         ];
@@ -1171,6 +1173,8 @@ class DataArchiveService
             'sales_invoices' => $this->rootIdQuery(DataArchiveRegistry::definitions()['sales_invoices'], $scope)
                 ->pluck('customer_id'),
             'sales_returns' => $this->rootIdQuery(DataArchiveRegistry::definitions()['sales_returns'], $scope)
+                ->pluck('customer_id'),
+            'receivable_ledgers' => $this->rootIdQuery(DataArchiveRegistry::definitions()['receivable_ledgers'], $scope)
                 ->pluck('customer_id'),
             'receivable_payments' => $this->rootIdQuery(DataArchiveRegistry::definitions()['receivable_payments'], $scope)
                 ->pluck('customer_id'),
@@ -1248,6 +1252,7 @@ class DataArchiveService
     {
         return match ($datasetKey) {
             'sales_returns' => $this->purgeSalesReturns($definition, $scope),
+            'receivable_ledgers' => $this->purgeReceivableLedgers($definition, $scope),
             'receivable_payments' => $this->purgeReceivablePayments($definition, $scope),
             default => $this->purgeGenericDataset($definition, $scope),
         };
@@ -1333,6 +1338,150 @@ class DataArchiveService
     }
 
     /**
+     * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string,semester_column?:string}>}  $definition
+     */
+    private function purgeReceivableLedgers(array $definition, array $scope): int
+    {
+        $this->assertReceivableLedgerScopeCanBePurged($definition, $scope);
+
+        return $this->purgeGenericDataset($definition, $scope);
+    }
+
+    /**
+     * @param  array{label:string,basis:string,purge_allowed:bool,purge_mode:string,financial:bool,tables:array<int, array{table:string,date_column?:string,date_kind?:string,foreign_key?:string,semester_column?:string}>}  $definition
+     */
+    private function assertReceivableLedgerScopeCanBePurged(array $definition, array $scope): void
+    {
+        $this->assertReceivableLedgerScopeIsClosed($scope);
+        $this->assertReceivableLedgerScopeMeetsRetention($scope);
+
+        $rows = $this->rootIdQuery($definition, $scope)
+            ->select(['id', 'customer_id', 'sales_invoice_id', 'balance_after'])
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        $openBalances = $rows
+            ->groupBy('customer_id')
+            ->map(static fn ($items): int => (int) round((float) optional($items->last())->balance_after))
+            ->filter(static fn (int $balance): bool => $balance !== 0);
+
+        if ($openBalances->isNotEmpty()) {
+            $customerNames = Customer::query()
+                ->whereIn('id', $openBalances->keys()->all())
+                ->orderBy('name')
+                ->pluck('name')
+                ->map(static fn (mixed $name): string => (string) $name)
+                ->all();
+
+            throw new RuntimeException(
+                'Ledger Piutang untuk periode ini belum aman dibersihkan karena saldo akhirnya belum nol. '
+                .'Selesaikan dulu piutang customer berikut: '.implode(', ', $customerNames)
+            );
+        }
+
+        $invoiceIds = $rows
+            ->pluck('sales_invoice_id')
+            ->filter(static fn (mixed $id): bool => $id !== null)
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($invoiceIds === []) {
+            return;
+        }
+
+        $unsettledInvoices = SalesInvoice::query()
+            ->whereIn('id', $invoiceIds)
+            ->where(function ($query): void {
+                $query->where('is_canceled', false)
+                    ->where('balance', '>', 0);
+            })
+            ->orderBy('invoice_number')
+            ->pluck('invoice_number')
+            ->map(static fn (mixed $value): string => (string) $value)
+            ->all();
+
+        if ($unsettledInvoices !== []) {
+            throw new RuntimeException(
+                'Ledger Piutang untuk periode ini belum aman dibersihkan karena masih ada faktur yang belum lunas: '
+                .implode(', ', $unsettledInvoices)
+            );
+        }
+
+        $invoicesThatWouldReopen = SalesInvoice::query()
+            ->whereIn('id', $invoiceIds)
+            ->where('is_canceled', false)
+            ->orderBy('invoice_number')
+            ->get(['id', 'invoice_number', 'total'])
+            ->filter(function (SalesInvoice $invoice): bool {
+                $appliedAmount = (int) round((float) DB::table('invoice_payments')
+                    ->where('sales_invoice_id', (int) $invoice->id)
+                    ->sum('amount'));
+                $expectedBalance = max(0, (int) round((float) $invoice->total) - $appliedAmount);
+
+                return $expectedBalance > 0;
+            })
+            ->pluck('invoice_number')
+            ->map(static fn (mixed $value): string => (string) $value)
+            ->all();
+
+        if ($invoicesThatWouldReopen !== []) {
+            throw new RuntimeException(
+                'Ledger Piutang untuk periode ini belum aman dibersihkan karena beberapa faktur akan terbuka lagi setelah rebuild. '
+                .'Pastikan pelunasannya sudah tercatat di pembayaran faktur untuk: '.implode(', ', $invoicesThatWouldReopen)
+            );
+        }
+    }
+
+    /**
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     */
+    private function assertReceivableLedgerScopeIsClosed(array $scope): void
+    {
+        if ($scope['type'] === 'semester') {
+            if (! $this->semesterBookService->isClosed((string) $scope['semester'])) {
+                throw new RuntimeException('Ledger Piutang hanya bisa dibersihkan untuk semester yang sudah ditutup di Pengaturan.');
+            }
+
+            return;
+        }
+
+        $closedYears = $this->semesterBookService->closedArchiveYearOptions();
+        if (! in_array((string) $scope['value'], $closedYears, true)) {
+            throw new RuntimeException('Ledger Piutang hanya bisa dibersihkan untuk tahun ajaran yang semester-nya sudah ditutup di Pengaturan.');
+        }
+    }
+
+    /**
+     * @param  array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string}  $scope
+     */
+    private function assertReceivableLedgerScopeMeetsRetention(array $scope): void
+    {
+        $retention = $this->retentionRule('receivable_ledgers');
+        if (! is_array($retention) || ! isset($retention['cutoff']) || ! $retention['cutoff'] instanceof Carbon) {
+            return;
+        }
+
+        $scopeEnd = $scope['end'] ?? null;
+        if (! is_string($scopeEnd) || trim($scopeEnd) === '') {
+            throw new RuntimeException('Range tanggal periode Ledger Piutang tidak ditemukan, jadi sistem belum bisa memastikan usia arsipnya.');
+        }
+
+        $scopeEndDate = Carbon::parse($scopeEnd, 'Asia/Jakarta')->endOfDay();
+        /** @var Carbon $cutoff */
+        $cutoff = $retention['cutoff'];
+        if ($scopeEndDate->greaterThanOrEqualTo($cutoff)) {
+            throw new RuntimeException('Ledger Piutang baru bisa dibersihkan jika periode tersebut sudah lewat 60 bulan.');
+        }
+    }
+
+    /**
      * @param  list<int>  $referenceIds
      */
     private function deleteJournalEntriesForReference(string $referenceType, array $referenceIds): int
@@ -1394,7 +1543,7 @@ class DataArchiveService
                 'label' => '3 bulan',
                 'cutoff' => now('Asia/Jakarta')->subMonths(3)->startOfDay(),
             ],
-            'sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'outgoing_transactions', 'receivable_payments', 'supplier_payments', 'school_bulk_transactions' => [
+            'sales_invoices', 'sales_returns', 'delivery_notes', 'order_notes', 'outgoing_transactions', 'receivable_ledgers', 'receivable_payments', 'supplier_payments', 'school_bulk_transactions' => [
                 'label' => '60 bulan',
                 'cutoff' => now('Asia/Jakarta')->subMonths(60)->startOfDay(),
             ],

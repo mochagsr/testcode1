@@ -269,7 +269,7 @@ class ArchiveCommandsTest extends TestCase
     {
         $exit = Artisan::call('app:archive:purge', [
             'period' => 2024,
-            '--dataset' => ['receivable_ledgers'],
+            '--dataset' => ['supplier_ledgers'],
             '--confirm' => true,
         ]);
 
@@ -1014,6 +1014,148 @@ class ArchiveCommandsTest extends TestCase
         ]);
     }
 
+    public function test_financial_snapshot_and_purge_can_run_for_receivable_ledgers_when_period_is_closed_and_settled(): void
+    {
+        AppSetting::setValue('closed_semester_periods', 'S2-1920');
+
+        $customerId = $this->createArchiveCustomer('CUS-AR-LEDGER', 'Customer Ledger', 0);
+        $invoiceId = $this->createArchiveInvoice(
+            $customerId,
+            'INV-05012020-0001',
+            5000,
+            5000,
+            0,
+            'paid',
+            '2020-01-05',
+            'S2-1920'
+        );
+
+        DB::table('receivable_ledgers')->insert([
+            [
+                'customer_id' => $customerId,
+                'sales_invoice_id' => $invoiceId,
+                'entry_date' => '2020-01-05',
+                'period_code' => 'S2-1920',
+                'transaction_type' => 'product',
+                'description' => 'Invoice INV-05012020-0001',
+                'debit' => 5000,
+                'credit' => 0,
+                'balance_after' => 5000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'customer_id' => $customerId,
+                'sales_invoice_id' => $invoiceId,
+                'entry_date' => '2020-01-06',
+                'period_code' => 'S2-1920',
+                'transaction_type' => 'product',
+                'description' => 'Pembayaran INV-05012020-0001',
+                'debit' => 0,
+                'credit' => 5000,
+                'balance_after' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        DB::table('invoice_payments')->insert([
+            'sales_invoice_id' => $invoiceId,
+            'payment_date' => '2020-01-06',
+            'amount' => 5000,
+            'method' => 'cash',
+            'notes' => 'Pembayaran INV-05012020-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->prepareArchiveGuards();
+        $manifest = $this->exportArchiveManifestForSemester('S2-1920', ['receivable_ledgers']);
+
+        $prepareExit = Artisan::call('app:archive:prepare-financial', [
+            '--semester' => 'S2-1920',
+            '--dataset' => ['receivable_ledgers'],
+            '--manifest' => $manifest,
+        ]);
+
+        $this->assertSame(0, $prepareExit, Artisan::output());
+
+        $purgeExit = Artisan::call('app:archive:purge', [
+            '--semester' => 'S2-1920',
+            '--dataset' => ['receivable_ledgers'],
+            '--manifest' => $manifest,
+            '--confirm' => true,
+        ]);
+
+        $this->assertSame(0, $purgeExit, Artisan::output());
+        $this->assertDatabaseMissing('receivable_ledgers', ['customer_id' => $customerId, 'period_code' => 'S2-1920']);
+        $this->assertDatabaseHas('customers', [
+            'id' => $customerId,
+            'outstanding_receivable' => 0,
+        ]);
+        $this->assertDatabaseHas('sales_invoices', [
+            'id' => $invoiceId,
+            'balance' => 0,
+            'payment_status' => 'paid',
+        ]);
+    }
+
+    public function test_receivable_ledgers_purge_is_blocked_when_period_balance_is_not_zero(): void
+    {
+        AppSetting::setValue('closed_semester_periods', 'S2-1920');
+
+        $customerId = $this->createArchiveCustomer('CUS-AR-OPEN', 'Customer Belum Lunas', 5000);
+        $invoiceId = $this->createArchiveInvoice(
+            $customerId,
+            'INV-07012020-0001',
+            5000,
+            0,
+            5000,
+            'unpaid',
+            '2020-01-07',
+            'S2-1920'
+        );
+
+        DB::table('receivable_ledgers')->insert([
+            'customer_id' => $customerId,
+            'sales_invoice_id' => $invoiceId,
+            'entry_date' => '2020-01-07',
+            'period_code' => 'S2-1920',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-07012020-0001',
+            'debit' => 5000,
+            'credit' => 0,
+            'balance_after' => 5000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->prepareArchiveGuards();
+        $manifest = $this->exportArchiveManifestForSemester('S2-1920', ['receivable_ledgers']);
+
+        $prepareExit = Artisan::call('app:archive:prepare-financial', [
+            '--semester' => 'S2-1920',
+            '--dataset' => ['receivable_ledgers'],
+            '--manifest' => $manifest,
+        ]);
+
+        $this->assertSame(0, $prepareExit, Artisan::output());
+
+        $purgeExit = Artisan::call('app:archive:purge', [
+            '--semester' => 'S2-1920',
+            '--dataset' => ['receivable_ledgers'],
+            '--manifest' => $manifest,
+            '--confirm' => true,
+        ]);
+
+        $this->assertSame(1, $purgeExit);
+        $this->assertStringContainsString('saldo akhirnya belum nol', strtolower(Artisan::output()));
+        $this->assertDatabaseHas('receivable_ledgers', [
+            'customer_id' => $customerId,
+            'period_code' => 'S2-1920',
+        ]);
+    }
+
     private function prepareArchiveGuards(): void
     {
         File::ensureDirectoryExists(storage_path('app/backups/db'));
@@ -1038,6 +1180,21 @@ class ArchiveCommandsTest extends TestCase
         $exportPath = storage_path('app/archives-test');
         Artisan::call('app:archive:export', [
             'period' => $year,
+            '--dataset' => $datasets,
+            '--path' => $exportPath,
+        ]);
+
+        return File::glob($exportPath.DIRECTORY_SEPARATOR.'manifests'.DIRECTORY_SEPARATOR.'*.json')[0];
+    }
+
+    /**
+     * @param  list<string>  $datasets
+     */
+    private function exportArchiveManifestForSemester(string $semester, array $datasets): string
+    {
+        $exportPath = storage_path('app/archives-test');
+        Artisan::call('app:archive:export', [
+            '--semester' => $semester,
             '--dataset' => $datasets,
             '--path' => $exportPath,
         ]);
