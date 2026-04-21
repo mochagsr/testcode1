@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Support\DataArchiveRegistry;
 use App\Support\DataArchiveService;
 use App\Support\SemesterBookService;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,11 @@ class ArchiveDataPageController extends Controller
             ->all();
         $selectedSemester = (string) ($request->old('archive_semester', $semesterOptions[0] ?? $semesterBookService->currentSemester()) ?: ($semesterOptions[0] ?? $semesterBookService->currentSemester()));
         $selectedDatasets = array_values(array_filter((array) ($request->old('datasets', ['audit_logs']) ?: ['audit_logs'])));
+        $selectedDatasetKey = (string) ($request->old('dataset_key', $selectedDatasets[0] ?? 'audit_logs') ?: 'audit_logs');
+        if (! isset($definitions[$selectedDatasetKey])) {
+            $selectedDatasetKey = 'audit_logs';
+        }
+        $selectedDataset = $definitions[$selectedDatasetKey] ?? null;
         $latestRestoreDrill = $archiveService->latestRestoreDrill();
         $latestFinancialSnapshot = $archiveService->latestFinancialSnapshot();
         $latestArchiveReview = $archiveService->latestArchiveReview();
@@ -53,6 +59,8 @@ class ArchiveDataPageController extends Controller
             'selectedSemester' => $selectedSemester,
             'semesterOptions' => $semesterOptions,
             'selectedDatasets' => $selectedDatasets,
+            'selectedDatasetKey' => $selectedDatasetKey,
+            'selectedDataset' => $selectedDataset,
             'retentionWindows' => [
                 [
                     'label' => 'Audit Log',
@@ -94,6 +102,24 @@ class ArchiveDataPageController extends Controller
                 'Setelah purge final, jalankan deploy check dan integrity check.',
             ],
         ]);
+    }
+
+    public function download(Request $request): BinaryFileResponse
+    {
+        $encoded = (string) $request->query('file', '');
+        abort_if($encoded === '', 404);
+
+        $decoded = base64_decode(strtr($encoded, '-_', '+/'), true);
+        abort_if(! is_string($decoded) || $decoded === '', 404);
+
+        $realPath = realpath($decoded);
+        $allowedBase = realpath(storage_path('app/archives'));
+
+        abort_if($realPath === false || $allowedBase === false, 404);
+        abort_if(! str_starts_with($realPath, $allowedBase.DIRECTORY_SEPARATOR) && $realPath !== $allowedBase, 403);
+        abort_if(! File::exists($realPath), 404);
+
+        return response()->download($realPath, basename($realPath));
     }
 
     public function scan(Request $request, DataArchiveService $archiveService): RedirectResponse
@@ -190,7 +216,8 @@ class ArchiveDataPageController extends Controller
             'archive_scope_type' => ['required', 'string', 'in:year,semester'],
             'archive_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'archive_semester' => ['nullable', 'string', 'max:30'],
-            'datasets' => ['required', 'array', 'min:1'],
+            'dataset_key' => ['nullable', 'string'],
+            'datasets' => ['nullable', 'array', 'min:1'],
             'datasets.*' => ['required', 'string'],
         ]);
 
@@ -209,9 +236,21 @@ class ArchiveDataPageController extends Controller
             $scope = $archiveService->resolveScope('year', $year, null);
         }
 
+        $datasets = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $value): string => strtolower(trim((string) $value)),
+            array_merge(
+                (array) ($validated['datasets'] ?? []),
+                [trim((string) ($validated['dataset_key'] ?? ''))]
+            )
+        ))));
+
+        if ($datasets === []) {
+            abort(422, 'Jenis data wajib dipilih.');
+        }
+
         return [
             $scope,
-            array_values(array_unique(array_map(static fn (mixed $value): string => strtolower(trim((string) $value)), (array) $validated['datasets']))),
+            $datasets,
         ];
     }
 }

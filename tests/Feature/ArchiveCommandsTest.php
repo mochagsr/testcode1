@@ -79,6 +79,47 @@ class ArchiveCommandsTest extends TestCase
         $this->assertStringNotContainsString('Audit 2025', File::get($sqlFile));
     }
 
+    public function test_archive_download_route_serves_generated_export_file(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+
+        $user = User::factory()->create();
+
+        DB::table('audit_logs')->insert([
+            'user_id' => $user->id,
+            'action' => 'created',
+            'subject_type' => 'sales_invoice',
+            'subject_id' => 1,
+            'description' => 'Audit Download',
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'PHPUnit',
+            'created_at' => '2024-05-01 10:00:00',
+            'updated_at' => '2024-05-01 10:00:00',
+        ]);
+
+        $exportPath = storage_path('app/archives-test');
+        Artisan::call('app:archive:export', [
+            'period' => 2024,
+            '--dataset' => ['audit_logs'],
+            '--path' => $exportPath,
+        ]);
+
+        $sqlFile = File::glob($exportPath.DIRECTORY_SEPARATOR.'sql'.DIRECTORY_SEPARATOR.'*.sql')[0];
+        File::ensureDirectoryExists(storage_path('app/archives/sql'));
+        $copiedSqlFile = storage_path('app/archives/sql'.DIRECTORY_SEPARATOR.basename($sqlFile));
+        File::copy($sqlFile, $copiedSqlFile);
+
+        $encoded = rtrim(strtr(base64_encode($copiedSqlFile), '+/', '-_'), '=');
+
+        $this->actingAs($admin)
+            ->get(route('archive-data.download', ['file' => $encoded]))
+            ->assertOk()
+            ->assertHeader('content-disposition');
+    }
+
     public function test_archive_purge_deletes_audit_logs_after_backup_and_restore_guards(): void
     {
         $user = User::factory()->create();

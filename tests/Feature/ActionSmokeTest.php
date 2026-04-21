@@ -137,7 +137,7 @@ class ActionSmokeTest extends TestCase
             ->post(route('archive-data.scan'), [
                 'archive_scope_type' => 'year',
                 'archive_year' => 2025,
-                'datasets' => ['audit_logs'],
+                'dataset_key' => 'audit_logs',
             ])
             ->assertRedirect()
             ->assertSessionHas('archive_scan_result')

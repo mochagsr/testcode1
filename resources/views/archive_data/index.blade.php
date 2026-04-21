@@ -10,6 +10,15 @@
         $purgeResult = session('archive_purge_result');
         $selected = collect(old('datasets', $selectedDatasets ?? []))->map(fn ($value) => strtolower((string) $value))->all();
         $scopeType = old('archive_scope_type', $selectedScopeType ?? 'year');
+        $selectedDatasetKey = old('dataset_key', $selectedDatasetKey ?? ($selected[0] ?? 'audit_logs'));
+        $selectedDataset = $datasets[$selectedDatasetKey] ?? null;
+        $selectedDatasetMode = (string) ($selectedDataset['purge_mode'] ?? 'locked');
+        $selectedDatasetLabel = (string) ($selectedDataset['label'] ?? $selectedDatasetKey);
+        $selectedDatasetIsFinancial = (bool) ($selectedDataset['financial'] ?? false);
+        $encodedExportSqlFile = !empty($exportResult['sql_file']) ? rtrim(strtr(base64_encode((string) $exportResult['sql_file']), '+/', '-_'), '=') : null;
+        $encodedExportManifestFile = !empty($exportResult['manifest_file']) ? rtrim(strtr(base64_encode((string) $exportResult['manifest_file']), '+/', '-_'), '=') : null;
+        $encodedFinancialSnapshotFile = !empty($financialResult['snapshot_file']) ? rtrim(strtr(base64_encode((string) $financialResult['snapshot_file']), '+/', '-_'), '=') : null;
+        $encodedFinancialManifestFile = !empty($financialResult['manifest_file']) ? rtrim(strtr(base64_encode((string) $financialResult['manifest_file']), '+/', '-_'), '=') : null;
     @endphp
 
     <style>
@@ -115,6 +124,17 @@
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 10px;
         }
+        .archive-simple-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, 300px) 1fr;
+            gap: 14px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .archive-simple-grid {
+                grid-template-columns: 1fr;
+            }
+        }
         .archive-checkbox {
             display: block;
             border: 1px solid var(--border);
@@ -156,6 +176,26 @@
         .archive-table th {
             font-size: 12px;
             color: var(--muted);
+        }
+        .archive-step-box {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: color-mix(in srgb, var(--surface) 95%, var(--card));
+        }
+        .archive-step-box h4 {
+            margin: 0 0 8px;
+            font-size: 15px;
+        }
+        .archive-action-row .btn[disabled] {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .archive-download-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
         }
     </style>
 
@@ -235,9 +275,7 @@
                             </select>
                         </div>
 
-                        <div class="archive-muted" style="margin-top:8px;">
-                            Untuk managed DB AWS, backup tetap dibuat di server dulu. Setelah itu file backup sebaiknya diunduh dan disimpan juga di komputer lokal.
-                        </div>
+                        <div class="archive-muted" style="margin-top:8px;">Untuk managed DB AWS, file arsip dibuat di server dulu lalu sebaiknya diunduh dan disimpan juga di komputer lokal.</div>
 
                         <label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;">
                             <input type="checkbox" name="rebuild_journal" value="1" {{ old('rebuild_journal') ? 'checked' : '' }}>
@@ -256,33 +294,52 @@
                     </div>
 
                     <div>
-                        <div class="archive-checkbox-grid">
-                            @foreach($datasets as $key => $dataset)
-                                @php
-                                    $mode = (string) ($dataset['purge_mode'] ?? 'locked');
-                                    $modeLabel = match ($mode) {
-                                        'standard' => 'Purge biasa',
-                                        'financial_guarded' => 'Butuh snapshot + rebuild',
-                                        default => 'Masih dikunci',
-                                    };
-                                @endphp
-                                <label class="archive-checkbox">
-                                    <input type="checkbox" name="datasets[]" value="{{ $key }}" {{ in_array($key, $selected, true) ? 'checked' : '' }}>
-                                    <strong>{{ $dataset['label'] }}</strong>
-                                    <div class="archive-mode-pill {{ $mode }}">{{ $modeLabel }}</div>
-                                    <div class="archive-muted">Basis: {{ $dataset['basis'] === 'year' ? 'Tahun' : 'Bulan' }}</div>
-                                    <div class="archive-muted">Scope UI: {{ implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $dataset['scope_modes'] ?? ['year'])) }}</div>
-                                    <div class="archive-muted">Key: <code>{{ $key }}</code></div>
-                                </label>
-                            @endforeach
+                        <div class="archive-simple-grid">
+                            <div>
+                                <label for="dataset_key" class="archive-muted" style="display:block;margin-bottom:6px;">Jenis data</label>
+                                <select id="dataset_key" name="dataset_key" onchange="window.updateArchiveDataset && window.updateArchiveDataset(this.value)">
+                                    @foreach($datasets as $key => $dataset)
+                                        <option value="{{ $key }}" {{ $selectedDatasetKey === $key ? 'selected' : '' }}>{{ $dataset['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="archive-muted" style="margin-top:8px;">
+                                    Pilih satu jenis data dulu agar langkahnya lebih mudah dibaca.
+                                </div>
+                            </div>
+
+                            <div class="archive-step-box">
+                                <h4 id="archive-selected-label">{{ $selectedDatasetLabel }}</h4>
+                                <div id="archive-selected-mode" class="archive-mode-pill {{ $selectedDatasetMode }}">
+                                    @if($selectedDatasetMode === 'standard')
+                                        Langsung bisa export lalu purge
+                                    @elseif($selectedDatasetMode === 'financial_guarded')
+                                        Butuh snapshot finansial dulu
+                                    @else
+                                        Baru bisa scan dan export
+                                    @endif
+                                </div>
+                                <div id="archive-selected-note" class="archive-muted">
+                                    @if($selectedDatasetMode === 'standard')
+                                        Untuk data log/ops seperti ini, langkahnya cukup: `Preview Scan` -> `Buat Export SQL` -> `Dry Run Purge` -> `Purge Final`.
+                                    @elseif($selectedDatasetMode === 'financial_guarded')
+                                        Untuk data finansial seperti ini, langkahnya: `Preview Scan` -> `Buat Export SQL` -> `Siapkan Snapshot Finansial` -> `Dry Run Purge` -> `Purge Final`.
+                                    @else
+                                        Untuk data ini, purge masih dikunci. Saat ini pakai dulu: `Preview Scan` dan `Buat Export SQL`.
+                                    @endif
+                                </div>
+                                <div class="archive-muted" style="margin-top:8px;">
+                                    Basis data ini: <strong id="archive-selected-basis">{{ ($selectedDataset['basis'] ?? 'year') === 'year' ? 'Tahun' : 'Bulan' }}</strong>.
+                                    Scope yang boleh dipakai: <strong id="archive-selected-scope">{{ implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $selectedDataset['scope_modes'] ?? ['year'])) }}</strong>.
+                                </div>
+                            </div>
                         </div>
 
                         <div class="archive-action-row">
-                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.scan') }}">Preview Scan</button>
-                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.export') }}">Buat Export SQL</button>
-                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.prepare-financial') }}">Siapkan Snapshot Finansial</button>
-                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=false;">Dry Run Purge</button>
-                            <button type="submit" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=true;">Purge Final</button>
+                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.scan') }}">1. Cek Dulu</button>
+                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.export') }}">2. Buat File Arsip</button>
+                            <button type="submit" id="archive-financial-button" class="btn secondary" formaction="{{ route('archive-data.prepare-financial') }}" {{ $selectedDatasetMode !== 'financial_guarded' ? 'disabled' : '' }}>3. Snapshot Finansial</button>
+                            <button type="submit" id="archive-dry-run-button" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=false;" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>4. Coba Simulasi Hapus</button>
+                            <button type="submit" id="archive-purge-button" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="this.form.confirm_purge.checked=true;" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>5. Hapus Data</button>
                         </div>
                     </div>
                 </div>
@@ -390,7 +447,7 @@
 
         @if (is_array($exportResult))
             <div class="card archive-col-12">
-                <h3 style="margin-top:0;">Hasil Export</h3>
+                <h3 style="margin-top:0;">Hasil File Arsip</h3>
                 <table class="archive-kv">
                     <tbody>
                     <tr><th>SQL file</th><td><code>{{ $exportResult['sql_file'] ?? '-' }}</code></td></tr>
@@ -399,6 +456,15 @@
                     <tr><th>Total row</th><td>{{ number_format((int) (($exportResult['summary']['grand_total'] ?? 0)), 0, ',', '.') }}</td></tr>
                     </tbody>
                 </table>
+                <div class="archive-download-row">
+                    @if($encodedExportSqlFile)
+                        <a href="{{ route('archive-data.download', ['file' => $encodedExportSqlFile]) }}" class="btn secondary">Download SQL</a>
+                    @endif
+                    @if($encodedExportManifestFile)
+                        <a href="{{ route('archive-data.download', ['file' => $encodedExportManifestFile]) }}" class="btn secondary">Download Manifest</a>
+                    @endif
+                </div>
+                <p class="archive-muted" style="margin:10px 0 0;">Kalau mau lanjut hapus data, simpan dulu file ini di komputer lokal.</p>
             </div>
         @endif
 
@@ -414,6 +480,14 @@
                     <tr><th>Supplier terdampak</th><td>{{ number_format(count($financialResult['supplier_snapshots'] ?? []), 0, ',', '.') }}</td></tr>
                     </tbody>
                 </table>
+                <div class="archive-download-row">
+                    @if($encodedFinancialSnapshotFile)
+                        <a href="{{ route('archive-data.download', ['file' => $encodedFinancialSnapshotFile]) }}" class="btn secondary">Download Snapshot</a>
+                    @endif
+                    @if($encodedFinancialManifestFile)
+                        <a href="{{ route('archive-data.download', ['file' => $encodedFinancialManifestFile]) }}" class="btn secondary">Download Manifest</a>
+                    @endif
+                </div>
             </div>
         @endif
 
@@ -515,6 +589,13 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
     </div>
 
     <script>
+        window.archiveDatasetMeta = @json(collect($datasets)->map(fn ($dataset) => [
+            'label' => $dataset['label'],
+            'mode' => $dataset['purge_mode'] ?? 'locked',
+            'basis' => ($dataset['basis'] ?? 'year') === 'year' ? 'Tahun' : 'Bulan',
+            'scope' => implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $dataset['scope_modes'] ?? ['year'])),
+        ])->all());
+
         window.toggleArchiveScope = function (value) {
             const yearField = document.getElementById('archive-year-field');
             const semesterField = document.getElementById('archive-semester-field');
@@ -524,6 +605,47 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
             const isSemester = value === 'semester';
             yearField.style.display = isSemester ? 'none' : '';
             semesterField.style.display = isSemester ? '' : 'none';
+        };
+
+        window.updateArchiveDataset = function (value) {
+            const meta = (window.archiveDatasetMeta || {})[value];
+            if (!meta) {
+                return;
+            }
+
+            const label = document.getElementById('archive-selected-label');
+            const mode = document.getElementById('archive-selected-mode');
+            const note = document.getElementById('archive-selected-note');
+            const basis = document.getElementById('archive-selected-basis');
+            const scope = document.getElementById('archive-selected-scope');
+            const financialButton = document.getElementById('archive-financial-button');
+            const dryRunButton = document.getElementById('archive-dry-run-button');
+            const purgeButton = document.getElementById('archive-purge-button');
+
+            if (label) label.textContent = meta.label;
+            if (basis) basis.textContent = meta.basis;
+            if (scope) scope.textContent = meta.scope;
+
+            if (mode) {
+                mode.className = 'archive-mode-pill ' + meta.mode;
+                mode.textContent = meta.mode === 'standard'
+                    ? 'Langsung bisa export lalu purge'
+                    : (meta.mode === 'financial_guarded'
+                        ? 'Butuh snapshot finansial dulu'
+                        : 'Baru bisa scan dan export');
+            }
+
+            if (note) {
+                note.textContent = meta.mode === 'standard'
+                    ? 'Untuk data log/ops seperti ini, langkahnya cukup: Preview Scan -> Buat Export SQL -> Dry Run Purge -> Purge Final.'
+                    : (meta.mode === 'financial_guarded'
+                        ? 'Untuk data finansial seperti ini, langkahnya: Preview Scan -> Buat Export SQL -> Siapkan Snapshot Finansial -> Dry Run Purge -> Purge Final.'
+                        : 'Untuk data ini, purge masih dikunci. Saat ini pakai dulu: Preview Scan dan Buat Export SQL.');
+            }
+
+            if (financialButton) financialButton.disabled = meta.mode !== 'financial_guarded';
+            if (dryRunButton) dryRunButton.disabled = meta.mode === 'locked';
+            if (purgeButton) purgeButton.disabled = meta.mode === 'locked';
         };
     </script>
 @endsection
