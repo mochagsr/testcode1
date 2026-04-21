@@ -10,6 +10,7 @@ use App\Models\PerformanceProbeLog;
 use App\Models\ReportExportTask;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -51,6 +52,8 @@ class OpsHealthController extends Controller
                 ->first();
         }
 
+        $latestSystemCleanup = $this->latestSystemCleanupSummary();
+
         return view('ops_health.index', [
             'failedJobs' => $failedJobs,
             'pendingReportTasks' => $pendingReportTasks,
@@ -64,6 +67,26 @@ class OpsHealthController extends Controller
             'latestIntegrityLog' => $latestIntegrityLog,
             'integrityIssueRuns7d' => $integrityIssueRuns7d,
             'latestPerformanceProbe' => $latestPerformanceProbe,
+            'latestSystemCleanup' => $latestSystemCleanup,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function latestSystemCleanupSummary(): ?array
+    {
+        $files = collect(File::glob(storage_path('app/system-cleanups').DIRECTORY_SEPARATOR.'*.json') ?: [])
+            ->sortDesc()
+            ->values();
+
+        $latest = $files->first();
+        if (! is_string($latest) || $latest === '' || ! File::exists($latest)) {
+            return null;
+        }
+
+        $decoded = json_decode((string) File::get($latest), true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 }

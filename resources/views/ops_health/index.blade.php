@@ -140,12 +140,47 @@
     </div>
 
     <div class="card ops-col-6">
+        <h3 style="margin-top:0;">Cleanup Log Sistem</h3>
+        @if($latestSystemCleanup)
+            @php
+                $cleanupOk = (($latestSystemCleanup['status'] ?? 'partial') === 'ok');
+                $cleanupDatasets = array_slice((array) ($latestSystemCleanup['datasets'] ?? []), 0, 5);
+            @endphp
+            <table class="ops-kv">
+                <tbody>
+                <tr>
+                    <th>Status Terakhir</th>
+                    <td>
+                        <span class="{{ $cleanupOk ? 'ops-metric-ok' : 'ops-metric-bad' }}">
+                            {{ strtoupper((string) ($latestSystemCleanup['status'] ?? '-')) }}
+                        </span>
+                    </td>
+                </tr>
+                <tr><th>Waktu Cleanup</th><td>{{ \Illuminate\Support\Carbon::parse((string) ($latestSystemCleanup['generated_at'] ?? now()))->format('d-m-Y H:i:s') }}</td></tr>
+                <tr><th>Total Dibersihkan</th><td>{{ number_format((int) ($latestSystemCleanup['total_deleted'] ?? 0), 0, ',', '.') }}</td></tr>
+                <tr><th>Jadwal</th><td>Otomatis harian via <code>schedule:run</code> jam 04:00</td></tr>
+                </tbody>
+            </table>
+            @if(!empty($cleanupDatasets))
+                <div style="margin-top:8px;">
+                    <div class="muted" style="margin-bottom:4px;">Ringkasan dataset log sistem:</div>
+                    <pre class="ops-json">{{ json_encode($cleanupDatasets, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                </div>
+            @endif
+        @else
+            <div class="muted">Belum ada log cleanup sistem. Jalankan <code>php artisan app:system-logs-cleanup</code> atau tunggu scheduler harian.</div>
+        @endif
+    </div>
+
+    <div class="card ops-col-6">
         <h3 style="margin-top:0;">Quick Commands</h3>
         <ul class="ops-list">
             <li><code>php artisan app:db-backup --gzip</code></li>
             <li><code>php artisan app:db-restore-test</code></li>
             <li><code>php artisan app:integrity-check</code></li>
+            <li><code>php artisan app:system-logs-cleanup</code></li>
             <li><code>php artisan app:load-test-light --loops=80 --search=ang</code></li>
+            <li><code>php artisan schedule:list</code></li>
             <li><code>php artisan app:smoke-test</code></li>
         </ul>
     </div>
@@ -154,6 +189,7 @@
         <h3 style="margin-top:0;">Next Actions Setelah Deploy</h3>
         <ul class="ops-list">
             <li>Pastikan <code>schedule:run</code> dan queue worker aktif.</li>
+            <li>Cek <code>php artisan schedule:list</code> dan pastikan <code>app:system-logs-cleanup</code> muncul di daftar.</li>
             <li>Jalankan backup manual pertama lalu cek file backup masuk.</li>
             <li>Uji print/PDF/Excel dari modul transaksi utama.</li>
             <li>Jalankan integrity check sebelum user mulai transaksi banyak.</li>
