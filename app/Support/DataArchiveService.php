@@ -690,7 +690,9 @@ class DataArchiveService
      */
     public function review(array $requestedDatasets = []): array
     {
-        $definitions = DataArchiveRegistry::resolve($requestedDatasets);
+        $definitions = $requestedDatasets === []
+            ? DataArchiveRegistry::businessDefinitions()
+            : DataArchiveRegistry::resolve($requestedDatasets);
         $datasets = [];
 
         foreach ($definitions as $key => $definition) {

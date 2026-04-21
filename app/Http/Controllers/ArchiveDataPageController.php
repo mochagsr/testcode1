@@ -26,7 +26,7 @@ class ArchiveDataPageController extends Controller
             ->sort()
             ->values();
 
-        $definitions = DataArchiveRegistry::definitions();
+        $definitions = DataArchiveRegistry::businessDefinitions();
         $selectedScopeType = (string) ($request->old('archive_scope_type', 'year') ?: 'year');
         $yearOptions = $semesterBookService->closedArchiveYearOptions();
         $selectedYear = trim((string) ($request->old('archive_year', $yearOptions[0] ?? '') ?: ($yearOptions[0] ?? '')));
@@ -35,10 +35,11 @@ class ArchiveDataPageController extends Controller
             ->values()
             ->all();
         $selectedSemester = (string) ($request->old('archive_semester', $semesterOptions[0] ?? $semesterBookService->currentSemester()) ?: ($semesterOptions[0] ?? $semesterBookService->currentSemester()));
-        $selectedDatasets = array_values(array_filter((array) ($request->old('datasets', ['audit_logs']) ?: ['audit_logs'])));
-        $selectedDatasetKey = (string) ($request->old('dataset_key', $selectedDatasets[0] ?? 'audit_logs') ?: 'audit_logs');
+        $defaultDatasetKey = array_key_first($definitions) ?? 'sales_invoices';
+        $selectedDatasets = array_values(array_filter((array) ($request->old('datasets', [$defaultDatasetKey]) ?: [$defaultDatasetKey])));
+        $selectedDatasetKey = (string) ($request->old('dataset_key', $selectedDatasets[0] ?? $defaultDatasetKey) ?: $defaultDatasetKey);
         if (! isset($definitions[$selectedDatasetKey])) {
-            $selectedDatasetKey = 'audit_logs';
+            $selectedDatasetKey = $defaultDatasetKey;
         }
         $selectedDataset = $definitions[$selectedDatasetKey] ?? null;
         $datasetMeta = collect($definitions)->map(fn (array $dataset): array => [
@@ -58,6 +59,8 @@ class ArchiveDataPageController extends Controller
             ->latest('checked_at')
             ->latest('id')
             ->first();
+        $systemCleanupRules = DataArchiveRegistry::automaticCleanupRules();
+        $latestSystemCleanup = $this->latestSystemCleanupSummary();
 
         return view('archive_data.index', [
             'latestBackup' => $backupFiles->last(),
@@ -80,13 +83,9 @@ class ArchiveDataPageController extends Controller
             'selectedDatasetKey' => $selectedDatasetKey,
             'selectedDataset' => $selectedDataset,
             'datasetMeta' => $datasetMeta,
+            'systemCleanupRules' => $systemCleanupRules,
+            'latestSystemCleanup' => $latestSystemCleanup,
             'retentionWindows' => [
-                [
-                    'label' => 'Audit Log',
-                    'period' => '3 bulan',
-                    'basis' => 'bulan',
-                    'note' => 'Cukup untuk jejak operasional harian. Histori lebih lama tetap aman di backup / arsip SQL.',
-                ],
                 [
                     'label' => 'Transaksi ERP',
                     'period' => '60 bulan',
@@ -98,9 +97,10 @@ class ArchiveDataPageController extends Controller
                 'php artisan app:db-backup --gzip',
                 'php artisan app:db-restore-test',
                 'php artisan app:integrity-check',
-                'php artisan app:archive:scan 2526 --dataset=audit_logs',
-                'php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices',
+                'php artisan app:archive:scan 2526 --dataset=sales_invoices',
+                'php artisan app:archive:scan --semester=S1-2526 --dataset=sales_returns',
                 'php artisan app:archive:prepare-financial 2526 --dataset=sales_invoices',
+                'php artisan app:system-logs-cleanup',
             ],
             'plannedArchiveFlow' => [
                 'Preview kandidat arsip per tahun atau semester.',
@@ -115,12 +115,31 @@ class ArchiveDataPageController extends Controller
                 'Jalankan backup terbaru dari app server aaPanel ke managed DB aktif.',
                 'Download hasil backup ke komputer lokal sebagai copy arsip operator.',
                 'Jalankan restore drill dan pastikan status terakhir PASS.',
-                'Preview scan untuk satu dataset kecil dulu, misalnya audit log.',
+                'Preview scan untuk satu dataset bisnis dulu, misalnya faktur penjualan atau retur penjualan.',
                 'Buat export SQL dan cocokkan jumlah baris pada manifest.',
                 'Untuk dataset finansial, siapkan snapshot lalu lakukan simulasi hapus dulu.',
                 'Setelah hapus data final, jalankan deploy check dan integrity check.',
             ],
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function latestSystemCleanupSummary(): ?array
+    {
+        $files = collect(File::glob(storage_path('app/system-cleanups').DIRECTORY_SEPARATOR.'*.json') ?: [])
+            ->sortDesc()
+            ->values();
+
+        $latest = $files->first();
+        if (! is_string($latest) || $latest === '' || ! File::exists($latest)) {
+            return null;
+        }
+
+        $decoded = json_decode((string) File::get($latest), true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     public function download(Request $request): BinaryFileResponse
@@ -299,6 +318,12 @@ class ArchiveDataPageController extends Controller
 
         if ($datasets === []) {
             abort(422, 'Jenis data wajib dipilih.');
+        }
+
+        $allowedDatasets = array_keys(DataArchiveRegistry::businessDefinitions());
+        $invalidDatasets = array_values(array_diff($datasets, $allowedDatasets));
+        if ($invalidDatasets !== []) {
+            abort(422, 'Jenis data ini dibersihkan otomatis oleh sistem atau belum tersedia untuk arsip manual.');
         }
 
         return [

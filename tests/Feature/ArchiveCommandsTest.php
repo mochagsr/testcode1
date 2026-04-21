@@ -18,6 +18,8 @@ class ArchiveCommandsTest extends TestCase
     {
         File::deleteDirectory(storage_path('app/archives-test'));
         File::deleteDirectory(storage_path('app/backups'));
+        File::deleteDirectory(storage_path('app/system-cleanups'));
+        File::deleteDirectory(storage_path('app/report-exports'));
 
         parent::tearDown();
     }
@@ -470,7 +472,7 @@ class ArchiveCommandsTest extends TestCase
         $response = $this->actingAs($admin)->post(route('archive-data.scan'), [
             'archive_scope_type' => 'year',
             'archive_year' => '2024',
-            'datasets' => ['audit_logs'],
+            'datasets' => ['sales_invoices'],
         ]);
 
         $response
@@ -574,7 +576,7 @@ class ArchiveCommandsTest extends TestCase
         $response = $this->actingAs($admin)->post(route('archive-data.scan'), [
             'archive_scope_type' => 'semester',
             'archive_semester' => 'S1-2526',
-            'datasets' => ['audit_logs'],
+            'datasets' => ['sales_invoices'],
         ]);
 
         $response
@@ -584,6 +586,100 @@ class ArchiveCommandsTest extends TestCase
                     && ($result['period_value'] ?? null) === 'S1-2526';
             })
             ->assertSessionHas('archive_success');
+    }
+
+    public function test_archive_page_focuses_on_business_datasets_and_shows_system_cleanup_section(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('archive-data.index'));
+
+        $response->assertOk();
+        $response->assertSee('Arsip Data Bisnis');
+        $response->assertSee('Pembersihan Otomatis Log Sistem');
+        $response->assertSee('Daftar Barang');
+        $response->assertDontSee('value="audit_logs"', false);
+    }
+
+    public function test_system_logs_cleanup_command_prunes_old_system_logs_and_export_files(): void
+    {
+        $user = User::factory()->create();
+
+        DB::table('audit_logs')->insert([
+            [
+                'user_id' => $user->id,
+                'action' => 'created',
+                'subject_type' => 'sales_invoice',
+                'subject_id' => 1,
+                'description' => 'Audit lama',
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit',
+                'created_at' => now()->subDays(120),
+                'updated_at' => now()->subDays(120),
+            ],
+            [
+                'user_id' => $user->id,
+                'action' => 'created',
+                'subject_type' => 'sales_invoice',
+                'subject_id' => 2,
+                'description' => 'Audit baru',
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit',
+                'created_at' => now()->subDays(5),
+                'updated_at' => now()->subDays(5),
+            ],
+        ]);
+
+        File::ensureDirectoryExists(storage_path('app/report-exports'));
+        File::put(storage_path('app/report-exports/old-export.pdf'), 'old');
+        File::put(storage_path('app/report-exports/new-export.pdf'), 'new');
+
+        DB::table('report_export_tasks')->insert([
+            [
+                'user_id' => $user->id,
+                'dataset' => 'sales_invoices',
+                'format' => 'pdf',
+                'status' => 'done',
+                'filters' => json_encode([], JSON_THROW_ON_ERROR),
+                'file_path' => 'report-exports/old-export.pdf',
+                'file_name' => 'old-export.pdf',
+                'generated_at' => now()->subDays(200),
+                'created_at' => now()->subDays(200),
+                'updated_at' => now()->subDays(200),
+            ],
+            [
+                'user_id' => $user->id,
+                'dataset' => 'sales_invoices',
+                'format' => 'pdf',
+                'status' => 'done',
+                'filters' => json_encode([], JSON_THROW_ON_ERROR),
+                'file_path' => 'report-exports/new-export.pdf',
+                'file_name' => 'new-export.pdf',
+                'generated_at' => now()->subDays(2),
+                'created_at' => now()->subDays(2),
+                'updated_at' => now()->subDays(2),
+            ],
+        ]);
+
+        $exit = Artisan::call('app:system-logs-cleanup', [
+            '--json' => true,
+        ]);
+
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame(0, $exit, Artisan::output());
+        $this->assertIsArray($payload);
+        $this->assertSame('ok', $payload['status']);
+        $this->assertGreaterThanOrEqual(2, $payload['total_deleted']);
+        $this->assertDatabaseMissing('audit_logs', ['description' => 'Audit lama']);
+        $this->assertDatabaseHas('audit_logs', ['description' => 'Audit baru']);
+        $this->assertDatabaseCount('report_export_tasks', 1);
+        $this->assertFalse(File::exists(storage_path('app/report-exports/old-export.pdf')));
+        $this->assertTrue(File::exists(storage_path('app/report-exports/new-export.pdf')));
+        $this->assertNotEmpty(File::glob(storage_path('app/system-cleanups').DIRECTORY_SEPARATOR.'*.json'));
     }
 
     public function test_archive_review_writes_report_and_lists_candidates(): void

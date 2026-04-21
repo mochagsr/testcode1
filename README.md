@@ -128,14 +128,15 @@ Catatan:
   - `php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal`
   - `php artisan app:archive:prepare-financial --semester=S1-2526 --dataset=receivable_payments --rebuild-journal`
   - `php artisan app:archive:review`
-  - `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
+  - `php artisan app:system-logs-cleanup`
+  - `php artisan app:archive:purge 2021 --dataset=sales_returns --confirm`
   - `php artisan app:archive:purge --semester=S1-2526 --dataset=sales_returns --confirm`
 - Catatan penting:
-  - `Sistem > Arsip Data` sekarang sudah punya form aksi untuk `scan`, `export`, `prepare financial snapshot`, dan `purge`
+  - `Sistem > Arsip Data` sekarang fokus untuk data bisnis saja: `scan`, `export`, `prepare financial snapshot`, dan `purge`
   - `Sistem > Arsip Data` sekarang juga bisa pilih basis arsip `Tahun` atau `Semester`
   - halaman `Sistem > Arsip Data` juga sudah menampilkan histori eksekusi arsip, review arsip terakhir, dan checklist UAT arsip nyata di server
+  - log sistem seperti `audit_logs`, `report_export_tasks`, `failed_jobs`, `job_batches`, `integrity_check_logs`, `performance_probe_logs`, dan `restore_drill_logs` sekarang dibersihkan otomatis oleh scheduler lewat `app:system-logs-cleanup`
   - `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun maupun semester
-  - `purge` biasa sudah dibuka untuk dataset log/ops aman, termasuk `failed_jobs` dan `job_batches`
   - `purge` finansial tahap lanjut dibuka untuk dataset yang sudah punya guard snapshot + rebuild, yaitu `sales_invoices`, `sales_returns`, `outgoing_transactions`, `receivable_payments`, dan `supplier_payments`
   - dataset finansial lain seperti `receivable_ledgers` dan `supplier_ledgers` tetap dikunci
   - review arsip bulanan sekarang bisa dijalankan manual dengan `app:archive:review` dan juga sudah dijadwalkan otomatis lewat scheduler Laravel
@@ -248,4 +249,3 @@ npm install --no-save playwright marked
 npx playwright install chromium
 node scripts/generate_manual_pdfs.mjs
 ```
-

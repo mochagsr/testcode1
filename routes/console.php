@@ -21,6 +21,7 @@ use App\Models\IntegrityCheckLog;
 use App\Models\PerformanceProbeLog;
 use App\Models\User;
 use App\Support\AppCache;
+use App\Support\DataArchiveRegistry;
 use App\Support\DataArchiveService;
 use App\Support\SemesterBookService;
 use App\Services\AccountingService;
@@ -2028,6 +2029,133 @@ Artisan::command('app:report-exports-prune {--days=14}', function () {
     return 0;
 })->purpose('Prune old queued export files/tasks from storage and database');
 
+Artisan::command('app:system-logs-cleanup {--json}', function () {
+    $rules = DataArchiveRegistry::automaticCleanupRules();
+    $definitions = DataArchiveRegistry::systemDefinitions();
+    $summary = [
+        'generated_at' => now('Asia/Jakarta')->toIso8601String(),
+        'status' => 'ok',
+        'total_deleted' => 0,
+        'datasets' => [],
+    ];
+
+    $deleteByIds = static function (string $table, array $ids): int {
+        if ($ids === []) {
+            return 0;
+        }
+
+        return DB::table($table)->whereIn('id', $ids)->delete();
+    };
+
+    foreach ($rules as $key => $rule) {
+        $definition = $definitions[$key] ?? null;
+        $tableDefinition = $definition['tables'][0] ?? null;
+
+        $datasetSummary = [
+            'key' => $key,
+            'label' => (string) ($rule['label'] ?? $key),
+            'days' => (int) ($rule['days'] ?? 0),
+            'table' => is_array($tableDefinition) ? (string) ($tableDefinition['table'] ?? '') : '',
+            'deleted' => 0,
+            'status' => 'ok',
+            'cutoff' => now('Asia/Jakarta')->subDays((int) ($rule['days'] ?? 0))->toIso8601String(),
+        ];
+
+        try {
+            if (! is_array($tableDefinition) || ! isset($tableDefinition['table'], $tableDefinition['date_column'])) {
+                $datasetSummary['status'] = 'skipped';
+                $datasetSummary['message'] = 'Konfigurasi dataset tidak lengkap.';
+                $summary['datasets'][] = $datasetSummary;
+                continue;
+            }
+
+            $table = (string) $tableDefinition['table'];
+            $dateColumn = (string) $tableDefinition['date_column'];
+            $dateKind = (string) ($tableDefinition['date_kind'] ?? 'calendar');
+            $cutoff = now('Asia/Jakarta')->subDays((int) ($rule['days'] ?? 0));
+
+            if (! Schema::hasTable($table)) {
+                $datasetSummary['status'] = 'skipped';
+                $datasetSummary['message'] = 'Tabel tidak ditemukan.';
+                $summary['datasets'][] = $datasetSummary;
+                continue;
+            }
+
+            if ($key === 'report_export_tasks') {
+                do {
+                    $tasks = ReportExportTask::query()
+                        ->where('created_at', '<', $cutoff)
+                        ->orderBy('id')
+                        ->limit(200)
+                        ->get();
+
+                    foreach ($tasks as $task) {
+                        $path = trim((string) ($task->file_path ?? ''));
+                        if ($path !== '' && File::exists(storage_path('app/'.$path))) {
+                            File::delete(storage_path('app/'.$path));
+                        }
+                        $task->delete();
+                        $datasetSummary['deleted']++;
+                    }
+                } while ($tasks->isNotEmpty());
+            } elseif ($dateKind === 'unix') {
+                do {
+                    $ids = DB::table($table)
+                        ->where($dateColumn, '<', $cutoff->timestamp)
+                        ->orderBy('id')
+                        ->limit(200)
+                        ->pluck('id')
+                        ->all();
+
+                    $datasetSummary['deleted'] += $deleteByIds($table, $ids);
+                } while ($ids !== []);
+            } else {
+                do {
+                    $ids = DB::table($table)
+                        ->where($dateColumn, '<', $cutoff)
+                        ->orderBy('id')
+                        ->limit(200)
+                        ->pluck('id')
+                        ->all();
+
+                    $datasetSummary['deleted'] += $deleteByIds($table, $ids);
+                } while ($ids !== []);
+            }
+        } catch (\Throwable $e) {
+            $datasetSummary['status'] = 'failed';
+            $datasetSummary['message'] = $e->getMessage();
+            $summary['status'] = 'partial';
+        }
+
+        $summary['total_deleted'] += (int) $datasetSummary['deleted'];
+        $summary['datasets'][] = $datasetSummary;
+    }
+
+    $cleanupDir = storage_path('app/system-cleanups');
+    File::ensureDirectoryExists($cleanupDir);
+    $cleanupFile = $cleanupDir.DIRECTORY_SEPARATOR.'system-cleanup-'.now('Asia/Jakarta')->format('Ymd-His').'.json';
+    File::put($cleanupFile, json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+    if ((bool) $this->option('json')) {
+        $this->line(json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    } else {
+        $this->info('Cleanup log sistem selesai dijalankan.');
+        $this->line('Status: '.strtoupper((string) $summary['status']));
+        $this->line('Total baris dibersihkan: '.number_format((int) $summary['total_deleted'], 0, ',', '.'));
+        foreach ($summary['datasets'] as $datasetSummary) {
+            $this->line(sprintf(
+                '- %s: %s (deleted=%d)',
+                (string) ($datasetSummary['label'] ?? $datasetSummary['key'] ?? '-'),
+                strtoupper((string) ($datasetSummary['status'] ?? 'ok')),
+                (int) ($datasetSummary['deleted'] ?? 0)
+            ));
+        }
+        $this->line('Ringkasan file: '.$cleanupFile);
+    }
+
+    return $summary['status'] === 'ok' ? 0 : 1;
+})->purpose('Automatically clean old system logs based on retention rules');
+
 Artisan::command('app:report-exports-fix-stuck {--minutes=30}', function () {
     $minutes = max(1, (int) $this->option('minutes'));
     $threshold = now()->subMinutes($minutes);
@@ -2048,6 +2176,6 @@ Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
 Schedule::command('app:archive:review')->monthlyOn(1, '02:30');
 Schedule::command('app:integrity-check')->dailyAt('03:00');
 Schedule::command('app:financial-rebuild')->dailyAt('03:30');
+Schedule::command('app:system-logs-cleanup')->dailyAt('04:00');
 Schedule::command('app:load-test-light --loops=80 --search=ang')->dailyAt('04:30');
-Schedule::command('app:report-exports-prune --days=14')->dailyAt('04:00');
 Schedule::command('app:report-exports-fix-stuck --minutes=30')->hourly();

@@ -23,15 +23,16 @@ Command yang tersedia sekarang:
 - `php artisan app:archive:prepare-financial 2021 --dataset=sales_invoices --rebuild-journal`
 - `php artisan app:archive:prepare-financial --semester=S1-2526 --dataset=receivable_payments --rebuild-journal`
 - `php artisan app:archive:review`
-- `php artisan app:archive:purge 2021 --dataset=audit_logs --confirm`
+- `php artisan app:system-logs-cleanup`
+- `php artisan app:archive:purge 2021 --dataset=sales_returns --confirm`
 - `php artisan app:archive:purge --semester=S1-2526 --dataset=sales_returns --confirm`
 
 Catatan:
-- halaman `Sistem > Arsip Data` sekarang sudah punya tombol aksi untuk `scan`, `export`, `prepare financial snapshot`, dan `purge`
+- halaman `Sistem > Arsip Data` sekarang fokus ke data bisnis: `scan`, `export`, `prepare financial snapshot`, dan `purge`
 - halaman `Sistem > Arsip Data` sekarang juga punya filter basis arsip `Tahun` atau `Semester`
 - halaman `Sistem > Arsip Data` juga sudah menampilkan histori eksekusi arsip, review arsip terakhir, dan checklist UAT arsip nyata di server
 - `scan` dan `export` sudah bisa dipakai untuk dataset transaksi ERP berbasis tahun maupun semester
-- `purge` biasa saat ini dibuka untuk dataset log/ops aman, termasuk `failed_jobs` dan `job_batches`
+- log sistem seperti `audit_logs`, `report_export_tasks`, `integrity_check_logs`, `performance_probe_logs`, `restore_drill_logs`, `failed_jobs`, dan `job_batches` sekarang dibersihkan otomatis oleh scheduler lewat `app:system-logs-cleanup`
 - `purge` finansial tahap lanjut dibuka untuk dataset yang sudah punya guard snapshot + rebuild:
   - `sales_invoices`
   - `sales_returns`
@@ -135,6 +136,7 @@ Pola semi-manual berarti:
 - sistem tidak menghapus data lama sendiri diam-diam
 - operator tetap memegang keputusan akhir
 - tapi langkah kerja dibuat baku dan ringan
+- pengecualian untuk log sistem: log seperti `failed_jobs`, `job_batches`, `audit_logs`, dan log health check sekarang boleh dibersihkan otomatis oleh scheduler karena bukan data bisnis inti
 
 Alur semi-manual:
 1. cek umur data dan ukuran database

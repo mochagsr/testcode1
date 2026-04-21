@@ -99,7 +99,7 @@ class MasterPermissionAccessTest extends TestCase
         $this->actingAs($user)->post(route('archive-data.scan'), [
             'archive_scope_type' => 'year',
             'archive_year' => '2025',
-            'datasets' => ['audit_logs'],
+            'datasets' => ['sales_invoices'],
         ])->assertRedirect();
     }
 

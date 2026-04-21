@@ -7,6 +7,22 @@ namespace App\Support;
 final class DataArchiveRegistry
 {
     /**
+     * @return list<string>
+     */
+    public static function systemDatasetKeys(): array
+    {
+        return [
+            'audit_logs',
+            'report_export_tasks',
+            'integrity_check_logs',
+            'performance_probe_logs',
+            'restore_drill_logs',
+            'failed_jobs',
+            'job_batches',
+        ];
+    }
+
+    /**
      * @return array<string, array{
      *     label:string,
      *     basis:string,
@@ -234,6 +250,87 @@ final class DataArchiveRegistry
                     ['table' => 'school_bulk_transaction_locations', 'foreign_key' => 'school_bulk_transaction_id'],
                     ['table' => 'school_bulk_transaction_items', 'foreign_key' => 'school_bulk_transaction_id'],
                 ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, array{
+     *     label:string,
+     *     basis:string,
+     *     scope_modes?:list<string>,
+     *     purge_allowed:bool,
+     *     purge_mode:string,
+     *     financial:bool,
+     *     tables:array<int, array{
+     *         table:string,
+     *         date_column?:string,
+     *         date_kind?:string,
+     *         foreign_key?:string,
+     *         semester_column?:string
+     *     }>
+     * }>
+     */
+    public static function businessDefinitions(): array
+    {
+        return array_diff_key(self::definitions(), array_flip(self::systemDatasetKeys()));
+    }
+
+    /**
+     * @return array<string, array{
+     *     label:string,
+     *     basis:string,
+     *     scope_modes?:list<string>,
+     *     purge_allowed:bool,
+     *     purge_mode:string,
+     *     financial:bool,
+     *     tables:array<int, array{
+     *         table:string,
+     *         date_column?:string,
+     *         date_kind?:string,
+     *         foreign_key?:string,
+     *         semester_column?:string
+     *     }>
+     * }>
+     */
+    public static function systemDefinitions(): array
+    {
+        return array_intersect_key(self::definitions(), array_flip(self::systemDatasetKeys()));
+    }
+
+    /**
+     * @return array<string, array{label:string, days:int}>
+     */
+    public static function automaticCleanupRules(): array
+    {
+        return [
+            'audit_logs' => [
+                'label' => 'Audit Log',
+                'days' => 90,
+            ],
+            'report_export_tasks' => [
+                'label' => 'Task Export Laporan',
+                'days' => 180,
+            ],
+            'integrity_check_logs' => [
+                'label' => 'Integrity Check Logs',
+                'days' => 180,
+            ],
+            'performance_probe_logs' => [
+                'label' => 'Performance Probe Logs',
+                'days' => 90,
+            ],
+            'restore_drill_logs' => [
+                'label' => 'Restore Drill Logs',
+                'days' => 180,
+            ],
+            'failed_jobs' => [
+                'label' => 'Failed Jobs',
+                'days' => 30,
+            ],
+            'job_batches' => [
+                'label' => 'Job Batches',
+                'days' => 30,
             ],
         ];
     }

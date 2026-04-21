@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Arsip Data - '.config('app.name', 'Laravel'))
+@section('title', 'Arsip Data Bisnis - '.config('app.name', 'Laravel'))
 
 @section('content')
     @php
@@ -11,7 +11,7 @@
         $purgeResult = session('archive_purge_result');
         $selected = collect(old('datasets', $selectedDatasets ?? []))->map(fn ($value) => strtolower((string) $value))->all();
         $scopeType = old('archive_scope_type', $selectedScopeType ?? 'year');
-        $selectedDatasetKey = old('dataset_key', $selectedDatasetKey ?? ($selected[0] ?? 'audit_logs'));
+        $selectedDatasetKey = old('dataset_key', $selectedDatasetKey ?? ($selected[0] ?? 'sales_invoices'));
         $selectedDataset = $datasets[$selectedDatasetKey] ?? null;
         $selectedDatasetMode = (string) ($selectedDataset['purge_mode'] ?? 'locked');
         $selectedDatasetLabel = (string) ($selectedDataset['label'] ?? $selectedDatasetKey);
@@ -224,9 +224,10 @@
 
     <div class="archive-grid">
         <div class="card archive-col-12">
-            <h1 class="page-title" style="margin:0 0 8px 0;">Arsip Data</h1>
+            <h1 class="page-title" style="margin:0 0 8px 0;">Arsip Data Bisnis</h1>
             <p class="archive-muted" style="margin:0;">
-                Halaman ini dipakai untuk menyiapkan arsip data production secara aman. Untuk `erpos` dengan managed DB AWS,
+                Halaman ini dipakai untuk menyiapkan arsip data bisnis production secara aman. Log sistem seperti audit log, failed jobs,
+                performance probe, restore drill, dan task export sekarang dibersihkan otomatis oleh scheduler. Untuk `erpos` dengan managed DB AWS,
                 backup tetap dijalankan dari app server Laravel, tetapi target database-nya tetap koneksi managed MySQL yang aktif di `.env`.
             </p>
         </div>
@@ -328,14 +329,14 @@
                     <div>
                         <div class="archive-simple-grid">
                             <div>
-                                <label for="dataset_key" class="archive-muted" style="display:block;margin-bottom:6px;">Jenis data</label>
+                                <label for="dataset_key" class="archive-muted" style="display:block;margin-bottom:6px;">Jenis data bisnis</label>
                                 <select id="dataset_key" name="dataset_key" onchange="window.updateArchiveDataset && window.updateArchiveDataset(this.value)">
                                     @foreach($datasets as $key => $dataset)
                                         <option value="{{ $key }}" {{ $selectedDatasetKey === $key ? 'selected' : '' }}>{{ $dataset['label'] }}</option>
                                     @endforeach
                                 </select>
                                 <div class="archive-muted" style="margin-top:8px;">
-                                    Pilih satu jenis data dulu agar langkahnya lebih mudah dibaca.
+                                    Pilih satu jenis data bisnis dulu agar langkahnya lebih mudah dibaca.
                                 </div>
                             </div>
 
@@ -352,7 +353,7 @@
                                 </div>
                                 <div id="archive-selected-note" class="archive-muted">
                                     @if($selectedDatasetMode === 'standard')
-                                        Untuk data log/ops seperti ini, langkahnya cukup: `Cek Dulu` -> `Buat File Arsip` -> `Coba Simulasi Hapus` -> `Hapus Data`.
+                                        Untuk data bisnis seperti ini, langkahnya cukup: `Cek Dulu` -> `Buat File Arsip` -> `Coba Simulasi Hapus` -> `Hapus Data`.
                                     @elseif($selectedDatasetMode === 'financial_guarded')
                                         Untuk data finansial seperti ini, langkahnya: `Cek Dulu` -> `Buat File Arsip` -> `Snapshot Finansial` -> `Coba Simulasi Hapus` -> `Hapus Data`.
                                     @else
@@ -444,6 +445,29 @@
                     </div>
                 @endforeach
             </div>
+        </div>
+
+        <div class="card archive-col-12">
+            <h3 style="margin-top:0;">Pembersihan Otomatis Log Sistem</h3>
+            <p class="archive-muted" style="margin:0 0 12px;">
+                Bagian ini tidak perlu kamu arsipkan manual lagi. Scheduler akan membersihkan log sistem secara otomatis sesuai umur data yang disepakati.
+            </p>
+            <div class="archive-window-grid">
+                @foreach($systemCleanupRules as $cleanupKey => $cleanupRule)
+                    <div class="archive-window-card">
+                        <h3>{{ $cleanupRule['label'] }}</h3>
+                        <div class="archive-window-pill">Auto bersih {{ $cleanupRule['days'] }} hari</div>
+                        <div class="archive-muted">Key: <code>{{ $cleanupKey }}</code></div>
+                    </div>
+                @endforeach
+            </div>
+            <table class="archive-kv" style="margin-top:12px;">
+                <tbody>
+                <tr><th>Cleanup terakhir</th><td>{{ is_array($latestSystemCleanup) ? \Illuminate\Support\Carbon::parse((string) ($latestSystemCleanup['generated_at'] ?? now()))->format('d-m-Y H:i:s') : '-' }}</td></tr>
+                <tr><th>Status</th><td>{{ is_array($latestSystemCleanup) ? strtoupper((string) ($latestSystemCleanup['status'] ?? '-')) : '-' }}</td></tr>
+                <tr><th>Total baris dibersihkan</th><td>{{ is_array($latestSystemCleanup) ? number_format((int) ($latestSystemCleanup['total_deleted'] ?? 0), 0, ',', '.') : '0' }}</td></tr>
+                </tbody>
+            </table>
         </div>
 
         @if (is_array($latestArchiveReview))
@@ -631,7 +655,7 @@
         </div>
 
         <div class="card archive-col-6">
-            <h3 style="margin-top:0;">Histori Eksekusi Arsip</h3>
+            <h3 style="margin-top:0;">Histori Eksekusi Arsip Data Bisnis</h3>
             @if (!empty($archiveHistory))
                 <div class="archive-scroll-box">
                     <table class="archive-table">
@@ -662,16 +686,16 @@
         </div>
 
         <div class="card archive-col-12">
-            <h3 style="margin-top:0;">Catatan Command Arsip</h3>
+            <h3 style="margin-top:0;">Catatan Command Arsip Data Bisnis</h3>
             <pre class="archive-code">php artisan app:archive:scan 2526 --dataset=sales_invoices
 php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices
 php artisan app:archive:export 2526 --dataset=sales_invoices
 php artisan app:archive:export --semester=S1-2526 --dataset=sales_returns
 php artisan app:archive:prepare-financial 2526 --dataset=sales_invoices --rebuild-journal
 php artisan app:archive:review
-php artisan app:archive:purge 2526 --dataset=audit_logs --confirm</pre>
+php artisan app:archive:purge 2526 --dataset=sales_returns --confirm</pre>
             <p class="archive-muted" style="margin:10px 0 0;">
-                Bersihkan data biasa sekarang dibuka juga untuk beberapa dataset ops tambahan seperti `failed_jobs` dan `job_batches`. Bersihkan data finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk tahun ajaran atau semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
+                Arsip manual sekarang difokuskan ke data bisnis. Bersihkan data finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk tahun ajaran atau semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
             </p>
         </div>
     </div>
@@ -721,7 +745,7 @@ php artisan app:archive:purge 2526 --dataset=audit_logs --confirm</pre>
 
             if (note) {
                 note.textContent = meta.mode === 'standard'
-                    ? 'Untuk data log/ops seperti ini, langkahnya cukup: Cek Dulu -> Buat File Arsip -> Coba Simulasi Hapus -> Hapus Data.'
+                    ? 'Untuk data bisnis seperti ini, langkahnya cukup: Cek Dulu -> Buat File Arsip -> Coba Simulasi Hapus -> Hapus Data.'
                     : (meta.mode === 'financial_guarded'
                         ? 'Untuk data finansial seperti ini, langkahnya: Cek Dulu -> Buat File Arsip -> Snapshot Finansial -> Coba Simulasi Hapus -> Hapus Data.'
                         : 'Untuk data ini, pembersihan data masih dikunci. Saat ini pakai dulu: Cek Dulu dan Buat File Arsip.');
