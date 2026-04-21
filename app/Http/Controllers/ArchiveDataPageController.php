@@ -38,6 +38,15 @@ class ArchiveDataPageController extends Controller
             $selectedDatasetKey = 'audit_logs';
         }
         $selectedDataset = $definitions[$selectedDatasetKey] ?? null;
+        $datasetMeta = collect($definitions)->map(fn (array $dataset): array => [
+            'label' => (string) ($dataset['label'] ?? ''),
+            'mode' => (string) ($dataset['purge_mode'] ?? 'locked'),
+            'basis' => (($dataset['basis'] ?? 'year') === 'year') ? 'Tahun' : 'Bulan',
+            'scope' => implode(' / ', array_map(
+                static fn (string $item): string => $item === 'semester' ? 'semester' : 'tahun',
+                (array) ($dataset['scope_modes'] ?? ['year'])
+            )),
+        ])->all();
         $latestRestoreDrill = $archiveService->latestRestoreDrill();
         $latestFinancialSnapshot = $archiveService->latestFinancialSnapshot();
         $latestArchiveReview = $archiveService->latestArchiveReview();
@@ -61,6 +70,7 @@ class ArchiveDataPageController extends Controller
             'selectedDatasets' => $selectedDatasets,
             'selectedDatasetKey' => $selectedDatasetKey,
             'selectedDataset' => $selectedDataset,
+            'datasetMeta' => $datasetMeta,
             'retentionWindows' => [
                 [
                     'label' => 'Audit Log',

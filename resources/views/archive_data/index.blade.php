@@ -589,12 +589,7 @@ php artisan app:archive:purge 2021 --dataset=audit_logs --confirm</pre>
     </div>
 
     <script>
-        window.archiveDatasetMeta = @json(collect($datasets)->map(fn ($dataset) => [
-            'label' => $dataset['label'],
-            'mode' => $dataset['purge_mode'] ?? 'locked',
-            'basis' => ($dataset['basis'] ?? 'year') === 'year' ? 'Tahun' : 'Bulan',
-            'scope' => implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $dataset['scope_modes'] ?? ['year'])),
-        ])->all());
+        window.archiveDatasetMeta = @json($datasetMeta ?? []);
 
         window.toggleArchiveScope = function (value) {
             const yearField = document.getElementById('archive-year-field');
