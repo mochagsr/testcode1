@@ -340,6 +340,8 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::post('/approvals/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.reject');
     Route::post('/approvals/{approvalRequest}/re-execute', [ApprovalRequestController::class, 'reExecute'])->middleware(['perm:transactions.correction.approve', 'idempotent'])->name('approvals.re-execute');
     Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
+    Route::post('/ops-health/integrity-check', [OpsHealthController::class, 'runIntegrityCheck'])->middleware('perm:settings.admin')->name('ops-health.integrity-check');
+    Route::post('/ops-health/check-financial', [OpsHealthController::class, 'runFinancialCheck'])->middleware('perm:settings.admin')->name('ops-health.check-financial');
     Route::get('/archive-data', [ArchiveDataPageController::class, 'index'])->middleware('perm:settings.admin')->name('archive-data.index');
     Route::get('/archive-data/download', [ArchiveDataPageController::class, 'download'])->middleware('perm:settings.admin')->name('archive-data.download');
     Route::post('/archive-data/scan', [ArchiveDataPageController::class, 'scan'])->middleware('perm:settings.admin')->name('archive-data.scan');

@@ -38,6 +38,12 @@
     <div class="ops-grid">
     <div class="card ops-col-12">
         <h1 class="page-title" style="margin:0 0 8px 0;">Ops Health</h1>
+        @if (session('ops_success'))
+            <div class="alert alert-success" style="margin:12px 0 0;">{{ session('ops_success') }}</div>
+        @endif
+        @if (session('ops_error'))
+            <div class="alert alert-error" style="margin:12px 0 0;">{{ session('ops_error') }}</div>
+        @endif
         <div class="table-mobile-scroll">
         <table class="ops-kv">
             <tbody>
@@ -79,6 +85,16 @@
 
     <div class="card ops-col-6">
         <h3 style="margin-top:0;">Integrity Guardrail</h3>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            <form method="post" action="{{ route('ops-health.integrity-check') }}">
+                @csrf
+                <button type="submit" class="btn secondary">Cek Integrity</button>
+            </form>
+            <form method="post" action="{{ route('ops-health.check-financial') }}">
+                @csrf
+                <button type="submit" class="btn secondary">Cek Finansial</button>
+            </form>
+        </div>
         @if($latestIntegrityLog)
             @php
                 $isOk = (bool) $latestIntegrityLog->is_ok;

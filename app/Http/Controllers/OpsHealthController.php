@@ -9,6 +9,8 @@ use App\Models\IntegrityCheckLog;
 use App\Models\PerformanceProbeLog;
 use App\Models\ReportExportTask;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
@@ -71,6 +73,16 @@ class OpsHealthController extends Controller
         ]);
     }
 
+    public function runIntegrityCheck(): RedirectResponse
+    {
+        return $this->runIntegrityCommand('Cek integrity selesai.');
+    }
+
+    public function runFinancialCheck(): RedirectResponse
+    {
+        return $this->runIntegrityCommand('Cek finansial selesai.');
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -88,5 +100,17 @@ class OpsHealthController extends Controller
         $decoded = json_decode((string) File::get($latest), true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private function runIntegrityCommand(string $successMessage): RedirectResponse
+    {
+        $exitCode = Artisan::call('app:integrity-check');
+        $output = trim(Artisan::output());
+
+        if ($exitCode !== 0) {
+            return back()->with('ops_error', $output !== '' ? $output : 'Pemeriksaan gagal dijalankan.');
+        }
+
+        return back()->with('ops_success', $successMessage);
     }
 }
