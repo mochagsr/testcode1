@@ -2177,5 +2177,7 @@ Schedule::command('app:archive:review')->monthlyOn(1, '02:30');
 Schedule::command('app:integrity-check')->dailyAt('03:00');
 Schedule::command('app:financial-rebuild')->dailyAt('03:30');
 Schedule::command('app:system-logs-cleanup')->dailyAt('04:00');
-Schedule::command('app:load-test-light --loops=80 --search=ang')->dailyAt('04:30');
+Schedule::command('app:load-test-light --loops=80 --search=ang')
+    ->dailyAt('04:30')
+    ->environments(['local', 'testing', 'staging']);
 Schedule::command('app:report-exports-fix-stuck --minutes=30')->hourly();
