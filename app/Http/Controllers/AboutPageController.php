@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 use Throwable;
@@ -35,7 +34,11 @@ class AboutPageController extends Controller
             return $updates;
         }
 
-        return $this->readCommitsFromGitHeadLog();
+        try {
+            return $this->readCommitsFromGitHeadLog();
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /**
@@ -97,11 +100,16 @@ class AboutPageController extends Controller
     {
         $headLogPath = base_path('.git/logs/HEAD');
 
-        if (! File::isReadable($headLogPath)) {
+        if (! is_readable($headLogPath)) {
             return [];
         }
 
-        $lines = preg_split('/\r\n|\r|\n/', trim((string) File::get($headLogPath))) ?: [];
+        $contents = file_get_contents($headLogPath);
+        if ($contents === false) {
+            return [];
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($contents)) ?: [];
 
         return collect($lines)
             ->reverse()
@@ -119,7 +127,7 @@ class AboutPageController extends Controller
                     'hash' => $hash,
                     'short_hash' => substr($hash, 0, 7),
                     'message' => $message,
-                    'committed_at' => CarbonImmutable::createFromTimestamp($timestamp, $timezone)->toIso8601String(),
+                    'committed_at' => $this->formatGitTimestamp($timestamp, $timezone),
                 ];
             })
             ->filter()
@@ -127,6 +135,20 @@ class AboutPageController extends Controller
             ->take(120)
             ->values()
             ->all();
+    }
+
+    private function formatGitTimestamp(int $timestamp, string $timezone): string
+    {
+        try {
+            $date = new \DateTimeImmutable('@'.$timestamp);
+            $hours = substr($timezone, 0, 3);
+            $minutes = substr($timezone, 3, 2);
+            $offset = $hours.':'.$minutes;
+
+            return $date->setTimezone(new \DateTimeZone($offset))->format(DATE_ATOM);
+        } catch (Throwable) {
+            return date(DATE_ATOM, $timestamp);
+        }
     }
 
     private function canStartProcess(): bool
