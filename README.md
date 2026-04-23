@@ -113,6 +113,7 @@ Catatan:
 - Backup DB: `php artisan app:db-backup --gzip`
 - Uji restore: `php artisan app:db-restore-test`
 - Integrity check: `php artisan app:integrity-check`
+- Refresh list update `Sistem > About`: `php artisan app:about-updates-refresh`
 - Untuk `erpos` dengan `AWS Lightsail Managed MySQL`, command backup/restore tetap dijalankan dari folder project Laravel di app server aaPanel, tetapi target database-nya tetap koneksi managed DB yang aktif di `.env`
 - Untuk alur arsip production, backup dibuat dulu di server lalu **diunduh/salin juga ke komputer lokal operator** sebagai arsip tambahan
 - Untuk arsip data production, pola yang disepakati adalah **semi-manual**:

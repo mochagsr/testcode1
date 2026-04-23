@@ -119,6 +119,7 @@ npm run build
 php artisan migrate --force
 php artisan optimize:clear
 php artisan config:cache
+php artisan app:about-updates-refresh
 php artisan view:cache
 ```
 
@@ -157,6 +158,20 @@ php artisan app:deploy-check
 2. jalankan smoke test
 3. lakukan UAT user
 4. baru lanjut ke production `erpos`
+
+Command update singkat:
+
+```bash
+cd /www/wwwroot/teserpos.mitrasejatiberkah.com
+git pull origin master
+php artisan optimize:clear
+php artisan app:about-updates-refresh
+php artisan view:cache
+```
+
+Catatan:
+- `app:about-updates-refresh` memperbarui daftar commit di `Sistem > About`
+- jalankan command ini setiap selesai `git pull`
 
 ## 9. Catatan penting
 

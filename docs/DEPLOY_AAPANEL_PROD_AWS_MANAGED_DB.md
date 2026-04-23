@@ -472,11 +472,16 @@ npm run build
 CACHE_STORE=file php artisan migrate --force
 php artisan optimize:clear
 php artisan config:cache
+php artisan app:about-updates-refresh
 php artisan view:cache
 php artisan app:deploy-check --skip-ops
 ```
 
 Kalau kamu ingin deploy lebih deterministik dan `package-lock.json` selalu sinkron, `npm ci` lebih baik daripada `npm install`.
+
+Catatan:
+- `app:about-updates-refresh` memperbarui daftar commit di `Sistem > About`
+- jalankan command ini setiap selesai `git pull` agar halaman About menampilkan update terbaru, bukan data lama
 
 ## 23. Rollback singkat kalau update gagal
 
