@@ -4,8 +4,7 @@
 
 @section('content')
     @php
-        $showAdminDashboard = (auth()->user()?->canAccess('settings.admin') ?? false)
-            || ((string) (auth()->user()?->role ?? '') === 'admin');
+        $showAdminDashboard = ((string) (auth()->user()?->role ?? '') === 'admin');
     @endphp
     <style>
         .dashboard-quick-links {
