@@ -32,7 +32,10 @@
                 <th>{{ __('supplier_payable.payment_proof_photo') }}</th>
                 <td>
                     @if($payment->payment_proof_photo_path)
-                        <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$payment->payment_proof_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                        <div class="flex">
+                            <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$payment->payment_proof_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                            <a class="btn info-btn" href="{{ route('supplier-payables.proof-photo.print', $payment) }}" target="_blank">{{ __('txn.print') }}</a>
+                        </div>
                     @else
                         -
                     @endif

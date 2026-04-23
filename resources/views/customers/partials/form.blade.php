@@ -58,6 +58,7 @@
                             <label>{{ __('ui.current_id_card_photo') }}</label>
                             <div class="flex">
                                 <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$customer->id_card_photo_path) }}">{{ __('ui.view') }}</a>
+                                <a class="btn info-btn" href="{{ route('customers-web.id-card-photo.print', $customer) }}" target="_blank">{{ __('txn.print') }}</a>
                             </div>
                             <label style="margin-top:8px; display:block;">
                                 <input type="checkbox" name="remove_id_card_photo" value="1" style="width:auto;"> {{ __('ui.remove_id_card_photo') }}

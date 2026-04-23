@@ -19,6 +19,7 @@ use App\Http\Controllers\OrderNotePageController;
 use App\Http\Controllers\OpsHealthController;
 use App\Http\Controllers\ArchiveDataPageController;
 use App\Http\Controllers\OutgoingTransactionPageController;
+use App\Http\Controllers\PhotoPrintController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductPageController;
 use App\Http\Controllers\ProductUnitPageController;
@@ -136,6 +137,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
         ->name('outgoing-transactions.store');
     Route::get('/outgoing-transactions/{outgoingTransaction}', [OutgoingTransactionPageController::class, 'show'])->middleware('perm:transactions.view')->name('outgoing-transactions.show');
+    Route::get('/outgoing-transactions/{outgoingTransaction}/supplier-invoice-photo/print', [PhotoPrintController::class, 'supplierInvoice'])->middleware('perm:transactions.view')->name('outgoing-transactions.supplier-invoice-photo.print');
     Route::get('/outgoing-transactions/{outgoingTransaction}/print', [OutgoingTransactionPageController::class, 'print'])->middleware('perm:transactions.export')->name('outgoing-transactions.print');
     Route::get('/outgoing-transactions/{outgoingTransaction}/pdf', [OutgoingTransactionPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.pdf');
     Route::get('/outgoing-transactions/{outgoingTransaction}/excel', [OutgoingTransactionPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.excel');
@@ -291,6 +293,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->middleware('perm:masters.customers.manage')->name('customers-web.create');
     Route::post('/customers-web', [CustomerPageController::class, 'store'])->middleware('perm:masters.customers.manage')->name('customers-web.store');
     Route::get('/customers-web/{customer}/edit', [CustomerPageController::class, 'edit'])->middleware('perm:masters.customers.manage')->name('customers-web.edit');
+    Route::get('/customers-web/{customer}/id-card-photo/print', [PhotoPrintController::class, 'customerIdCard'])->middleware('perm:masters.customers.view')->name('customers-web.id-card-photo.print');
     Route::put('/customers-web/{customer}', [CustomerPageController::class, 'update'])->middleware('perm:masters.customers.manage')->name('customers-web.update');
     Route::delete('/customers-web/{customer}', [CustomerPageController::class, 'destroy'])->middleware('perm:masters.customers.manage')->name('customers-web.destroy');
     Route::get('/supplier-payables', [SupplierPayablePageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-payables.index');
@@ -313,6 +316,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->middleware('perm:supplier_payables.adjust')
         ->name('supplier-payables.year-open');
     Route::get('/supplier-payables/payment/{supplierPayment}', [SupplierPayablePageController::class, 'showPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.show-payment');
+    Route::get('/supplier-payables/payment/{supplierPayment}/proof-photo/print', [PhotoPrintController::class, 'supplierPaymentProof'])->middleware('perm:supplier_payables.view')->name('supplier-payables.proof-photo.print');
     Route::get('/supplier-payables/payment/{supplierPayment}/print', [SupplierPayablePageController::class, 'printPayment'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print-payment');
     Route::get('/supplier-payables/payment/{supplierPayment}/pdf', [SupplierPayablePageController::class, 'exportPaymentPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-pdf');
     Route::get('/supplier-payables/payment/{supplierPayment}/excel', [SupplierPayablePageController::class, 'exportPaymentExcel'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-excel');

@@ -122,7 +122,10 @@
                     <strong>{{ __('supplier_payable.supplier_invoice_photo') }}</strong>
                     <div>
                         @if($transaction->supplier_invoice_photo_path)
-                            <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$transaction->supplier_invoice_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                            <div class="flex">
+                                <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$transaction->supplier_invoice_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                                <a class="btn info-btn" href="{{ route('outgoing-transactions.supplier-invoice-photo.print', $transaction) }}" target="_blank">{{ __('txn.print') }}</a>
+                            </div>
                         @else
                             -
                         @endif
