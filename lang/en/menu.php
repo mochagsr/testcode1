@@ -27,6 +27,7 @@ return [
     'reports' => 'Reports',
     'users' => 'Users',
     'archive_data' => 'Data Archive',
+    'about' => 'About',
     'semester_transactions' => 'Semester Transactions',
     'settings' => 'Settings',
     'logout' => 'Logout',

@@ -27,6 +27,7 @@ return [
     'reports' => 'Laporan',
     'users' => 'Pengguna',
     'archive_data' => 'Arsip Data',
+    'about' => 'About',
     'semester_transactions' => 'Transaksi Per Semester',
     'settings' => 'Pengaturan',
     'logout' => 'Logout',

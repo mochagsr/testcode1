@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AboutPageController;
 use App\Http\Controllers\AuditLogPageController;
 use App\Http\Controllers\ApprovalRequestController;
 use App\Http\Controllers\CustomerController;
@@ -353,4 +354,5 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::post('/archive-data/prepare-financial', [ArchiveDataPageController::class, 'prepareFinancial'])->middleware('perm:settings.admin')->name('archive-data.prepare-financial');
     Route::post('/archive-data/check-financial', [ArchiveDataPageController::class, 'checkFinancial'])->middleware('perm:settings.admin')->name('archive-data.check-financial');
     Route::post('/archive-data/purge', [ArchiveDataPageController::class, 'purge'])->middleware('perm:settings.admin')->name('archive-data.purge');
+    Route::get('/about', [AboutPageController::class, 'index'])->name('about.index');
 });
