@@ -24,6 +24,12 @@ class AboutPageController extends Controller
      */
     private function readRecentCommits(): array
     {
+        $storedUpdates = $this->readStoredUpdates();
+
+        if ($storedUpdates !== []) {
+            return $storedUpdates;
+        }
+
         if (! File::exists(base_path('.git'))) {
             return [];
         }
@@ -34,11 +40,56 @@ class AboutPageController extends Controller
             return $updates;
         }
 
+        return [];
+    }
+
+    /**
+     * @return list<array{hash:string,short_hash:string,message:string,committed_at:string}>
+     */
+    private function readStoredUpdates(): array
+    {
+        $path = storage_path('app/about-updates.json');
+
+        if (! is_readable($path)) {
+            return [];
+        }
+
         try {
-            return $this->readCommitsFromGitHeadLog();
+            $payload = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
         } catch (Throwable) {
             return [];
         }
+
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        return collect($payload)
+            ->map(function (mixed $item): ?array {
+                if (! is_array($item)) {
+                    return null;
+                }
+
+                $hash = trim((string) ($item['hash'] ?? ''));
+                $shortHash = trim((string) ($item['short_hash'] ?? ''));
+                $message = trim((string) ($item['message'] ?? ''));
+                $committedAt = trim((string) ($item['committed_at'] ?? ''));
+
+                if ($hash === '' || $message === '') {
+                    return null;
+                }
+
+                return [
+                    'hash' => $hash,
+                    'short_hash' => $shortHash !== '' ? $shortHash : substr($hash, 0, 7),
+                    'message' => $message,
+                    'committed_at' => $committedAt,
+                ];
+            })
+            ->filter()
+            ->take(120)
+            ->values()
+            ->all();
     }
 
     /**
@@ -88,67 +139,6 @@ class AboutPageController extends Controller
             ->filter()
             ->values()
             ->all();
-    }
-
-    /**
-     * Fallback for shared hosting / aaPanel environments where web PHP cannot
-     * start processes even though the repository metadata is readable.
-     *
-     * @return list<array{hash:string,short_hash:string,message:string,committed_at:string}>
-     */
-    private function readCommitsFromGitHeadLog(): array
-    {
-        $headLogPath = base_path('.git/logs/HEAD');
-
-        if (! is_readable($headLogPath)) {
-            return [];
-        }
-
-        $contents = file_get_contents($headLogPath);
-        if ($contents === false) {
-            return [];
-        }
-
-        $lines = preg_split('/\r\n|\r|\n/', trim($contents)) ?: [];
-
-        return collect($lines)
-            ->reverse()
-            ->map(function (string $line): ?array {
-                if (! preg_match('/^[0-9a-f]{40}\s+([0-9a-f]{40})\s+.+?\s+(\d{9,})\s+([+-]\d{4})\t(.+)$/', $line, $matches)) {
-                    return null;
-                }
-
-                $hash = trim($matches[1]);
-                $timestamp = (int) $matches[2];
-                $timezone = trim($matches[3]);
-                $message = trim($matches[4]);
-
-                return [
-                    'hash' => $hash,
-                    'short_hash' => substr($hash, 0, 7),
-                    'message' => $message,
-                    'committed_at' => $this->formatGitTimestamp($timestamp, $timezone),
-                ];
-            })
-            ->filter()
-            ->unique('hash')
-            ->take(120)
-            ->values()
-            ->all();
-    }
-
-    private function formatGitTimestamp(int $timestamp, string $timezone): string
-    {
-        try {
-            $date = new \DateTimeImmutable('@'.$timestamp);
-            $hours = substr($timezone, 0, 3);
-            $minutes = substr($timezone, 3, 2);
-            $offset = $hours.':'.$minutes;
-
-            return $date->setTimezone(new \DateTimeZone($offset))->format(DATE_ATOM);
-        } catch (Throwable) {
-            return date(DATE_ATOM, $timestamp);
-        }
     }
 
     private function canStartProcess(): bool

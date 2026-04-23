@@ -40,6 +40,69 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+Artisan::command('app:about-updates-refresh {--limit=120}', function () {
+    $limit = max(1, min(500, (int) $this->option('limit')));
+    $targetPath = storage_path('app/about-updates.json');
+
+    if (! File::exists(base_path('.git'))) {
+        File::ensureDirectoryExists(dirname($targetPath));
+        File::put($targetPath, json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $this->warn('Folder .git tidak ditemukan. File update dibuat kosong.');
+        return;
+    }
+
+    if (! function_exists('proc_open')) {
+        $this->error('proc_open tidak aktif, tidak bisa membaca git log dari command ini.');
+        return 1;
+    }
+
+    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+    if (in_array('proc_open', $disabled, true)) {
+        $this->error('proc_open ada di disable_functions, tidak bisa membaca git log dari command ini.');
+        return 1;
+    }
+
+    $process = new Process([
+        'git',
+        'log',
+        '--pretty=format:%H%x1f%h%x1f%s%x1f%cI',
+        '-n',
+        (string) $limit,
+    ], base_path());
+    $process->setTimeout(15);
+    $process->run();
+
+    if (! $process->isSuccessful()) {
+        $this->error(trim($process->getErrorOutput()) ?: 'Gagal membaca git log.');
+        return 1;
+    }
+
+    $lines = preg_split('/\r\n|\r|\n/', trim($process->getOutput())) ?: [];
+    $updates = collect($lines)
+        ->map(function (string $line): ?array {
+            $parts = explode("\x1f", $line);
+            if (count($parts) !== 4) {
+                return null;
+            }
+
+            return [
+                'hash' => trim($parts[0]),
+                'short_hash' => trim($parts[1]),
+                'message' => trim($parts[2]),
+                'committed_at' => trim($parts[3]),
+            ];
+        })
+        ->filter()
+        ->values()
+        ->all();
+
+    File::ensureDirectoryExists(dirname($targetPath));
+    File::put($targetPath, json_encode($updates, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+    $this->info('About update history refreshed: '.count($updates).' commit.');
+    $this->line($targetPath);
+})->purpose('Refresh About page update history from git log');
+
 Artisan::command('app:normalize-doc-prefixes {--dry-run}', function () {
     $dryRun = (bool) $this->option('dry-run');
 
