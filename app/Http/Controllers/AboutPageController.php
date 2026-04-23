@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 class AboutPageController extends Controller
 {
@@ -27,22 +28,30 @@ class AboutPageController extends Controller
             return [];
         }
 
-        $process = new Process([
-            'git',
-            'log',
-            '--pretty=format:%H%x1f%h%x1f%s%x1f%cI',
-            '-n',
-            '120',
-        ], base_path());
-
-        $process->setTimeout(10);
-        $process->run();
-
-        if (! $process->isSuccessful()) {
+        if (! $this->canStartProcess()) {
             return [];
         }
 
-        $lines = preg_split('/\r\n|\r|\n/', trim($process->getOutput())) ?: [];
+        try {
+            $process = new Process([
+                'git',
+                'log',
+                '--pretty=format:%H%x1f%h%x1f%s%x1f%cI',
+                '-n',
+                '120',
+            ], base_path());
+
+            $process->setTimeout(10);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                return [];
+            }
+
+            $lines = preg_split('/\r\n|\r|\n/', trim($process->getOutput())) ?: [];
+        } catch (Throwable) {
+            return [];
+        }
 
         return collect($lines)
             ->map(function (string $line): ?array {
@@ -61,5 +70,16 @@ class AboutPageController extends Controller
             ->filter()
             ->values()
             ->all();
+    }
+
+    private function canStartProcess(): bool
+    {
+        if (! function_exists('proc_open')) {
+            return false;
+        }
+
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+
+        return ! in_array('proc_open', $disabled, true);
     }
 }
