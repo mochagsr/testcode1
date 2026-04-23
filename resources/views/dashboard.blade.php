@@ -101,38 +101,6 @@
                 <div class="stat-label">{{ __('ui.dashboard_pending_report_tasks') }}</div>
                 <div class="stat-value">{{ number_format((int) ($summary['pending_report_tasks'] ?? 0), 0, ',', '.') }}</div>
             </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_active_semesters') }}</div>
-                <div class="stat-value">{{ number_format((int) ($summary['active_semesters'] ?? 0), 0, ',', '.') }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_closed_semesters') }}</div>
-                <div class="stat-value">{{ number_format((int) ($summary['closed_semesters'] ?? 0), 0, ',', '.') }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_locked_customer_semesters') }}</div>
-                <div class="stat-value">{{ number_format((int) ($summary['locked_customer_semesters'] ?? 0), 0, ',', '.') }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_locked_supplier_years') }}</div>
-                <div class="stat-value">{{ number_format((int) ($summary['locked_supplier_years'] ?? 0), 0, ',', '.') }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_backup_files') }}</div>
-                <div class="stat-value">{{ number_format((int) ($summary['backup_files'] ?? 0), 0, ',', '.') }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_database_size') }}</div>
-                <div class="stat-value">{{ $archiveSnapshot['databaseSize'] ?? '0 B' }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_backup_size') }}</div>
-                <div class="stat-value">{{ $archiveSnapshot['backupSize'] ?? '0 B' }}</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">{{ __('ui.dashboard_archive_size') }}</div>
-                <div class="stat-value">{{ $archiveSnapshot['archiveSize'] ?? '0 B' }}</div>
-            </div>
         @endif
     </div>
 
