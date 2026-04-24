@@ -24,7 +24,7 @@
     ];
 
     $groupLabelMap = [
-        'dashboard' => 'Menu Dashboard',
+        'dashboard' => 'Dashboard',
         'sales_invoices' => 'Faktur Penjualan',
         'sales_returns' => 'Retur Penjualan',
         'delivery_notes' => 'Surat Jalan',
@@ -33,19 +33,19 @@
         'outgoing_transactions' => 'Tanda Terima Barang',
         'school_bulk_transactions' => 'Sebar Sekolah',
         'ship_locations' => 'Lokasi Kirim Sekolah',
-        'receivables' => 'Menu Piutang Customer',
+        'receivables' => 'Piutang Customer',
         'supplier_payments' => 'Pembayaran Supplier',
-        'suppliers' => 'Menu Supplier',
-        'reports' => 'Menu Laporan',
-        'system' => 'Menu Sistem',
-        'products' => 'Menu Barang',
-        'customers' => 'Menu Customer',
+        'suppliers' => 'Supplier',
+        'reports' => 'Laporan',
+        'system' => 'Sistem',
+        'products' => 'Barang',
+        'customers' => 'Customer',
     ];
 
     $permissionDetailMap = [
         'dashboard.view' => [
             'title' => 'Dashboard',
-            'note' => 'Bisa membuka halaman Dashboard.',
+            'note' => 'Bisa membuka halaman dashboard.',
         ],
         'transactions.view' => [
             'title' => 'Lihat menu transaksi',
@@ -54,28 +54,28 @@
         'sales_invoices.create' => ['title' => 'Buat faktur penjualan', 'note' => 'Bisa membuat faktur penjualan baru.'],
         'sales_invoices.edit' => ['title' => 'Edit faktur penjualan', 'note' => 'Bisa edit dari halaman detail faktur penjualan.'],
         'sales_invoices.cancel' => ['title' => 'Batalkan faktur penjualan', 'note' => 'Bisa membatalkan faktur penjualan yang masih boleh dibatalkan.'],
-        'sales_invoices.export' => ['title' => 'Print / PDF / Excel faktur penjualan', 'note' => 'Bisa cetak dan export dokumen faktur penjualan.'],
+        'sales_invoices.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel faktur penjualan.'],
         'sales_returns.create' => ['title' => 'Buat retur penjualan', 'note' => 'Bisa membuat retur penjualan baru.'],
         'sales_returns.edit' => ['title' => 'Edit retur penjualan', 'note' => 'Bisa edit dari halaman detail retur penjualan.'],
         'sales_returns.cancel' => ['title' => 'Batalkan retur penjualan', 'note' => 'Bisa membatalkan retur penjualan yang masih boleh dibatalkan.'],
-        'sales_returns.export' => ['title' => 'Print / PDF / Excel retur penjualan', 'note' => 'Bisa cetak dan export dokumen retur penjualan.'],
+        'sales_returns.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel retur penjualan.'],
         'delivery_notes.create' => ['title' => 'Buat surat jalan', 'note' => 'Bisa membuat surat jalan baru.'],
         'delivery_notes.edit' => ['title' => 'Edit surat jalan', 'note' => 'Bisa edit dari halaman detail surat jalan.'],
         'delivery_notes.cancel' => ['title' => 'Batalkan surat jalan', 'note' => 'Bisa membatalkan surat jalan yang masih boleh dibatalkan.'],
-        'delivery_notes.export' => ['title' => 'Print / PDF / Excel surat jalan', 'note' => 'Bisa cetak dan export surat jalan.'],
+        'delivery_notes.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel surat jalan.'],
         'order_notes.create' => ['title' => 'Buat surat pesanan', 'note' => 'Bisa membuat surat pesanan baru.'],
         'order_notes.edit' => ['title' => 'Edit surat pesanan', 'note' => 'Bisa edit dari halaman detail surat pesanan.'],
         'order_notes.cancel' => ['title' => 'Batalkan surat pesanan', 'note' => 'Bisa membatalkan surat pesanan yang masih boleh dibatalkan.'],
-        'order_notes.export' => ['title' => 'Print / PDF / Excel surat pesanan', 'note' => 'Bisa cetak dan export surat pesanan.'],
+        'order_notes.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel surat pesanan.'],
         'delivery_trips.create' => ['title' => 'Buat catatan perjalanan', 'note' => 'Bisa membuat catatan perjalanan baru.'],
         'delivery_trips.edit' => ['title' => 'Edit catatan perjalanan', 'note' => 'Bisa edit catatan perjalanan.'],
-        'delivery_trips.export' => ['title' => 'Print / PDF / Excel catatan perjalanan', 'note' => 'Bisa cetak dan export catatan perjalanan.'],
+        'delivery_trips.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel catatan perjalanan.'],
         'outgoing_transactions.create' => ['title' => 'Buat tanda terima barang', 'note' => 'Bisa membuat tanda terima barang baru.'],
         'outgoing_transactions.edit' => ['title' => 'Edit tanda terima barang', 'note' => 'Bisa edit tanda terima barang dari halaman detail.'],
-        'outgoing_transactions.export' => ['title' => 'Print / PDF / Excel tanda terima barang', 'note' => 'Bisa cetak dan export tanda terima barang.'],
+        'outgoing_transactions.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel tanda terima barang.'],
         'school_bulk_transactions.create' => ['title' => 'Buat sebar sekolah', 'note' => 'Bisa membuat transaksi sebar sekolah dan generate invoice.'],
-        'school_bulk_transactions.export' => ['title' => 'Print / PDF / Excel sebar sekolah', 'note' => 'Bisa cetak dan export sebar sekolah.'],
-        'customer_ship_locations.create' => ['title' => 'Kelola lokasi kirim sekolah', 'note' => 'Bisa tambah, edit, hapus, dan import lokasi kirim sekolah.'],
+        'school_bulk_transactions.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel sebar sekolah.'],
+        'customer_ship_locations.create' => ['title' => 'Kelola lokasi kirim', 'note' => 'Bisa tambah, edit, hapus, dan import lokasi kirim sekolah.'],
         'transactions.correction.request' => [
             'title' => 'Ajukan koreksi transaksi',
             'note' => 'Bisa memakai Wizard Koreksi pada transaksi yang perlu diperbaiki.',
@@ -85,8 +85,8 @@
             'note' => 'Menu Sistem > Approval. Bisa menyetujui, menolak, atau jalankan ulang koreksi transaksi.',
         ],
         'receivables.view' => [
-            'title' => 'Lihat menu piutang customer',
-            'note' => 'Piutang, Piutang Global, Piutang Semester, dan Rekap/Cetak Piutang Customer.',
+            'title' => 'Lihat menu piutang',
+            'note' => 'Piutang, Piutang Global, Piutang Semester, dan tagihan customer.',
         ],
         'receivables.pay' => [
             'title' => 'Input pembayaran piutang',
@@ -102,7 +102,7 @@
         ],
         'supplier_payables.view' => [
             'title' => 'Lihat menu hutang supplier',
-            'note' => 'Hutang Supplier, Kartu Stok Supplier, detail pembayaran supplier, dan cetaknya.',
+            'note' => 'Hutang Supplier, Kartu Stok Supplier, dan pembayaran supplier.',
         ],
         'supplier_payables.pay' => [
             'title' => 'Input pembayaran hutang supplier',
@@ -132,31 +132,31 @@
             'title' => 'Lihat menu Barang',
             'note' => 'Barang, Kategori Barang, dan Satuan Barang.',
         ],
-        'products.create' => ['title' => 'Tambah barang', 'note' => 'Tambah barang baru, kategori, dan satuan barang.'],
-        'products.edit' => ['title' => 'Edit barang', 'note' => 'Edit barang, ubah stok cepat, kategori, dan satuan barang.'],
-        'products.delete' => ['title' => 'Hapus barang', 'note' => 'Hapus barang, kategori barang, dan satuan barang.'],
-        'products.import' => ['title' => 'Import barang', 'note' => 'Import barang, kategori barang, dan satuan barang dari template.'],
+        'products.create' => ['title' => 'Tambah data barang', 'note' => 'Tambah barang baru, kategori, dan satuan barang.'],
+        'products.edit' => ['title' => 'Edit data barang', 'note' => 'Edit barang, stok cepat, kategori, dan satuan barang.'],
+        'products.delete' => ['title' => 'Hapus data barang', 'note' => 'Hapus barang, kategori barang, dan satuan barang.'],
+        'products.import' => ['title' => 'Import data barang', 'note' => 'Import barang, kategori barang, dan satuan barang dari template.'],
         'masters.customers.view' => [
             'title' => 'Lihat menu Customer',
             'note' => 'Customer dan informasi level customer.',
         ],
-        'customers.create' => ['title' => 'Tambah customer', 'note' => 'Tambah customer baru dan level customer.'],
-        'customers.edit' => ['title' => 'Edit customer', 'note' => 'Edit customer dan level customer.'],
-        'customers.delete' => ['title' => 'Hapus customer', 'note' => 'Hapus customer dan level customer.'],
-        'customers.import' => ['title' => 'Import customer', 'note' => 'Import customer dari template.'],
+        'customers.create' => ['title' => 'Tambah data customer', 'note' => 'Tambah customer baru dan level customer.'],
+        'customers.edit' => ['title' => 'Edit data customer', 'note' => 'Edit customer dan level customer.'],
+        'customers.delete' => ['title' => 'Hapus data customer', 'note' => 'Hapus customer dan level customer.'],
+        'customers.import' => ['title' => 'Import data customer', 'note' => 'Import customer dari template.'],
         'masters.suppliers.view' => [
             'title' => 'Lihat menu Supplier',
             'note' => 'Bisa membuka daftar Supplier.',
         ],
-        'suppliers.create' => ['title' => 'Tambah supplier', 'note' => 'Tambah supplier baru.'],
-        'suppliers.edit' => ['title' => 'Edit supplier', 'note' => 'Edit data supplier.'],
-        'suppliers.delete' => ['title' => 'Hapus supplier', 'note' => 'Hapus data supplier.'],
-        'suppliers.import' => ['title' => 'Import supplier', 'note' => 'Import supplier dari template.'],
+        'suppliers.create' => ['title' => 'Tambah data supplier', 'note' => 'Tambah supplier baru.'],
+        'suppliers.edit' => ['title' => 'Edit data supplier', 'note' => 'Edit data supplier.'],
+        'suppliers.delete' => ['title' => 'Hapus data supplier', 'note' => 'Hapus data supplier.'],
+        'suppliers.import' => ['title' => 'Import data supplier', 'note' => 'Import supplier dari template.'],
         'receivable_payments.edit' => ['title' => 'Edit pembayaran piutang', 'note' => 'Edit dokumen pembayaran piutang dari halaman detail.'],
         'receivable_payments.cancel' => ['title' => 'Batalkan pembayaran piutang', 'note' => 'Batalkan dokumen pembayaran piutang.'],
-        'receivable_payments.export' => ['title' => 'Print / PDF / Excel pembayaran piutang', 'note' => 'Bisa cetak dan export pembayaran piutang.'],
+        'receivable_payments.export' => ['title' => 'Cetak / PDF / Excel pembayaran piutang', 'note' => 'Bisa cetak, PDF, dan Excel pembayaran piutang.'],
         'supplier_payments.edit' => ['title' => 'Edit pembayaran supplier', 'note' => 'Edit pembayaran hutang supplier dari halaman detail.'],
-        'supplier_payments.export' => ['title' => 'Print / PDF / Excel pembayaran supplier', 'note' => 'Bisa cetak dan export pembayaran supplier.'],
+        'supplier_payments.export' => ['title' => 'Cetak / PDF / Excel pembayaran supplier', 'note' => 'Bisa cetak, PDF, dan Excel pembayaran supplier.'],
         'imports.transactions' => [
             'title' => 'Import Faktur Penjualan',
             'note' => 'Bisa memakai fitur import pada menu Faktur Penjualan.',
@@ -445,7 +445,7 @@
 
 <div class="card permission-card" id="permission-grid-wrapper" style="{{ old('role', $user?->role ?? 'user') === 'admin' ? 'display:none;' : '' }}">
     <p class="permission-detail-title">Hak Akses Detail</p>
-    <p class="permission-detail-note">Pilih akses berdasarkan menu yang benar-benar muncul di aplikasi. Centang judul menu untuk memilih semua akses di menu itu.</p>
+    <p class="permission-detail-note">Menu dan daftar data bisnis tetap bisa dilihat user login. Di sini cukup atur aksi seperti buat, edit, batalkan, hapus, import, dan export. Centang judul menu untuk memilih semua aksi di bagian itu.</p>
     <div class="permission-toolbar">
         <div class="permission-toolbar-left">
             <input
