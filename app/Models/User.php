@@ -69,7 +69,7 @@ class User extends Authenticatable
             ->all();
 
         if ($userPermissions !== []) {
-            return $userPermissions;
+            return $this->expandPermissions($userPermissions);
         }
 
         $role = strtolower(trim((string) $this->role));
@@ -78,11 +78,11 @@ class User extends Authenticatable
         }
         $rolePermissions = config('rbac.roles.'.$role, []);
 
-        return collect(is_array($rolePermissions) ? $rolePermissions : [])
+        return $this->expandPermissions(collect(is_array($rolePermissions) ? $rolePermissions : [])
             ->map(fn ($value): string => strtolower(trim((string) $value)))
             ->filter(fn (string $value): bool => $value !== '')
             ->values()
-            ->all();
+            ->all());
     }
 
     public function canAccess(string $permission): bool
@@ -92,10 +92,41 @@ class User extends Authenticatable
             return false;
         }
 
+        if (in_array($requiredPermission, (array) config('rbac.always_allowed', []), true)) {
+            return true;
+        }
+
         $resolvedPermissions = $this->resolvedPermissions();
 
         return in_array('*', $resolvedPermissions, true)
             || in_array($requiredPermission, $resolvedPermissions, true);
+    }
+
+    /**
+     * @param  array<int, string>  $permissions
+     * @return array<int, string>
+     */
+    private function expandPermissions(array $permissions): array
+    {
+        $normalized = collect($permissions)
+            ->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter(fn (string $value): bool => $value !== '')
+            ->values();
+
+        $impliedPermissions = (array) config('rbac.implied_permissions', []);
+        $expanded = $normalized->all();
+
+        foreach ($normalized as $permission) {
+            foreach ((array) ($impliedPermissions[$permission] ?? []) as $impliedPermission) {
+                $expanded[] = strtolower(trim((string) $impliedPermission));
+            }
+        }
+
+        return collect($expanded)
+            ->filter(fn (string $value): bool => $value !== '')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

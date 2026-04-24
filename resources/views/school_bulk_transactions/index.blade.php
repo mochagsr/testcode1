@@ -5,7 +5,9 @@
 @section('content')
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('school_bulk.bulk_transaction_title') }}</h1>
-        <a class="btn create-transaction-btn" href="{{ route('school-bulk-transactions.create') }}">{{ __('school_bulk.create_bulk_transaction') }}</a>
+        @if(auth()->user()?->canAccess('school_bulk_transactions.create'))
+            <a class="btn create-transaction-btn" href="{{ route('school-bulk-transactions.create') }}">{{ __('school_bulk.create_bulk_transaction') }}</a>
+        @endif
     </div>
 
     <div class="card">

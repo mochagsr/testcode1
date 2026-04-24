@@ -4,8 +4,8 @@
 
 @section('content')
     @php
-        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
-        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
+        $canEditTransactions = auth()->user()?->canAccess('order_notes.edit') ?? false;
+        $canCancelTransactions = auth()->user()?->canAccess('order_notes.cancel') ?? false;
     @endphp
     <style>
         #admin-order-items-table input[type=number].qty-input::-webkit-outer-spin-button,

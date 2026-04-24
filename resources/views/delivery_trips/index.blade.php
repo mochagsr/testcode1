@@ -5,7 +5,9 @@
 @section('content')
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('delivery_trip.title') }}</h1>
-        <a class="btn" href="{{ route('delivery-trips.create') }}">{{ __('delivery_trip.create') }}</a>
+        @if(auth()->user()?->canAccess('delivery_trips.create'))
+            <a class="btn" href="{{ route('delivery-trips.create') }}">{{ __('delivery_trip.create') }}</a>
+        @endif
     </div>
 
     <div class="card">
@@ -43,7 +45,7 @@
                         <select class="action-menu action-menu-sm" onchange="if(this.value){window.location.href=this.value; this.selectedIndex=0;}">
                             <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                             <option value="{{ route('delivery-trips.show', $trip) }}">{{ __('txn.detail') }}</option>
-                            @if(auth()->user()?->canAccess('transactions.edit'))
+                            @if(auth()->user()?->canAccess('delivery_trips.edit'))
                                 <option value="{{ route('delivery-trips.edit', $trip) }}">{{ __('ui.edit') }}</option>
                             @endif
                             <option value="{{ route('delivery-trips.print', $trip) }}">{{ __('txn.print') }}</option>

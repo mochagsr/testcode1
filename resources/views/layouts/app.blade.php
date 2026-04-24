@@ -1137,31 +1137,46 @@
         @php
             $authUser = auth()->user();
             $canDashboard = $authUser?->canAccess('dashboard.view') ?? false;
-            $canTransactionsView = $authUser?->canAccess('transactions.view') ?? false;
-            $canTransactionsCreate = $authUser?->canAccess('transactions.create') ?? false;
-            $canTransactionsExport = $authUser?->canAccess('transactions.export') ?? false;
+            $canTransactionsView = $authUser !== null;
+            $canSalesInvoiceCreate = $authUser?->canAccess('sales_invoices.create') ?? false;
+            $canSalesReturnCreate = $authUser?->canAccess('sales_returns.create') ?? false;
+            $canDeliveryNoteCreate = $authUser?->canAccess('delivery_notes.create') ?? false;
+            $canOrderNoteCreate = $authUser?->canAccess('order_notes.create') ?? false;
+            $canDeliveryTripCreate = $authUser?->canAccess('delivery_trips.create') ?? false;
+            $canOutgoingTransactionCreate = $authUser?->canAccess('outgoing_transactions.create') ?? false;
+            $canSchoolBulkCreate = $authUser?->canAccess('school_bulk_transactions.create') ?? false;
+            $canTransactionsCreate = $canSalesInvoiceCreate || $canSalesReturnCreate || $canDeliveryNoteCreate || $canOrderNoteCreate || $canDeliveryTripCreate || $canOutgoingTransactionCreate || $canSchoolBulkCreate;
+            $canTransactionsExport = $authUser?->canAccessAny([
+                'sales_invoices.export',
+                'sales_returns.export',
+                'delivery_notes.export',
+                'order_notes.export',
+                'delivery_trips.export',
+                'outgoing_transactions.export',
+                'school_bulk_transactions.export',
+            ]) ?? false;
             $canCorrectionApprove = $authUser?->canAccess('transactions.correction.approve') ?? false;
             $canReceivablesView = $authUser?->canAccess('receivables.view') ?? false;
             $canReceivablesPay = $authUser?->canAccess('receivables.pay') ?? false;
-            $canSupplierPayablesView = $authUser?->canAccess('supplier_payables.view') ?? false;
+            $canSupplierPayablesView = $authUser !== null;
             $canReportsView = $authUser?->canAccess('reports.view') ?? false;
-            $canProductsView = $authUser?->canAccess('masters.products.view') ?? false;
-            $canProductsManage = $authUser?->canAccess('masters.products.manage') ?? false;
-            $canCustomersView = $authUser?->canAccess('masters.customers.view') ?? false;
-            $canCustomersManage = $authUser?->canAccess('masters.customers.manage') ?? false;
-            $canSuppliersView = $authUser?->canAccess('masters.suppliers.view') ?? false;
-            $canSuppliersEdit = $authUser?->canAccess('masters.suppliers.edit') ?? false;
+            $canProductsView = $authUser !== null;
+            $canProductsManage = $authUser?->canAccessAny(['products.create', 'products.edit', 'products.delete', 'products.import']) ?? false;
+            $canCustomersView = $authUser !== null;
+            $canCustomersManage = $authUser?->canAccessAny(['customers.create', 'customers.edit', 'customers.delete', 'customers.import']) ?? false;
+            $canSuppliersView = $authUser !== null;
+            $canSuppliersEdit = $authUser?->canAccessAny(['suppliers.create', 'suppliers.edit', 'suppliers.delete', 'suppliers.import']) ?? false;
             $canSettingsProfile = $authUser?->canAccess('settings.profile') ?? false;
             $canSettingsAdmin = $authUser?->canAccess('settings.admin') ?? false;
             $canSemesterBulk = $authUser?->canAccess('semester.bulk') ?? false;
             $canUsersManage = $authUser?->canAccess('users.manage') ?? false;
             $canAuditLogsView = $authUser?->canAccess('audit_logs.view') ?? false;
             $canAboutView = $authUser !== null;
-            $showItemsGroup = $canProductsView || $canProductsManage;
-            $showCustomersGroup = $canCustomersView || $canCustomersManage;
-            $showSuppliersGroup = $canSuppliersView || $canSuppliersEdit || $canSupplierPayablesView || $canTransactionsView || $canTransactionsCreate;
-            $showSchoolDistributionGroup = $canTransactionsView || $canTransactionsCreate;
-            $showTransactionsGroup = $canTransactionsView || $canTransactionsCreate || $canTransactionsExport;
+            $showItemsGroup = $authUser !== null;
+            $showCustomersGroup = $authUser !== null;
+            $showSuppliersGroup = $authUser !== null;
+            $showSchoolDistributionGroup = $authUser !== null;
+            $showTransactionsGroup = $authUser !== null;
             $showReceivablesGroup = $canReceivablesView || $canReceivablesPay;
             $showReportsGroup = $canReportsView;
             $showSystemGroup = $canUsersManage || $canAuditLogsView || $canCorrectionApprove || $canSettingsAdmin || $canSettingsProfile || $canSemesterBulk || $canAboutView;

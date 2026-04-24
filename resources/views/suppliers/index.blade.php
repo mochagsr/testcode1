@@ -108,7 +108,7 @@
         }
     </style>
     @php
-        $canManageSuppliers = auth()->user()?->canAccess('masters.suppliers.edit') ?? false;
+        $canManageSuppliers = auth()->user()?->canAccessAny(['suppliers.create', 'suppliers.edit', 'suppliers.delete', 'suppliers.import']) ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.suppliers_title') }}</h1>

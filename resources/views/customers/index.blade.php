@@ -114,7 +114,7 @@
         }
     </style>
     @php
-        $canManageCustomers = auth()->user()?->canAccess('masters.customers.manage') ?? false;
+        $canManageCustomers = auth()->user()?->canAccessAny(['customers.create', 'customers.edit', 'customers.delete', 'customers.import']) ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.customers_title') }}</h1>

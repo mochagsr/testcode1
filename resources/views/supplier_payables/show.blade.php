@@ -7,7 +7,7 @@
         $resolvedPermissions = auth()->user()?->resolvedPermissions() ?? [];
         $canRequestCorrection = in_array('*', $resolvedPermissions, true)
             || in_array('transactions.correction.request', $resolvedPermissions, true);
-        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
+        $canEditTransactions = auth()->user()?->canAccess('supplier_payments.edit') ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between;">
         <h1 class="page-title" style="margin:0;">{{ $payment->payment_number }}</h1>

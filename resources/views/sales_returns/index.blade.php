@@ -16,7 +16,9 @@
 
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.sales_returns_title') }}</h1>
-        <a class="btn create-transaction-btn" href="{{ route('sales-returns.create') }}">{{ __('txn.create_return') }}</a>
+        @if(auth()->user()?->canAccess('sales_returns.create'))
+            <a class="btn create-transaction-btn" href="{{ route('sales-returns.create') }}">{{ __('txn.create_return') }}</a>
+        @endif
     </div>
 
     <div class="card return-list-card">

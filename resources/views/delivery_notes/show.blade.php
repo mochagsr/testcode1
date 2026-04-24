@@ -4,8 +4,8 @@
 
 @section('content')
     @php
-        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
-        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
+        $canEditTransactions = auth()->user()?->canAccess('delivery_notes.edit') ?? false;
+        $canCancelTransactions = auth()->user()?->canAccess('delivery_notes.cancel') ?? false;
     @endphp
     <style>
         .txn-modal {

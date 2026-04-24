@@ -25,7 +25,9 @@
                     <button type="submit" class="btn process-btn">Import</button>
                 </form>
             @endif
-            <a class="btn create-transaction-btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice') }}</a>
+            @if(auth()->user()?->canAccess('sales_invoices.create'))
+                <a class="btn create-transaction-btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice') }}</a>
+            @endif
         </div>
     </div>
 

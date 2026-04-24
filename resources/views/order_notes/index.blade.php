@@ -17,7 +17,9 @@
     <div class="page-header-actions">
         <h1 class="page-title">{{ __('txn.order_notes_title') }}</h1>
         <div class="actions">
-            <a class="btn create-transaction-btn" href="{{ route('order-notes.create') }}">{{ __('txn.create_order_note') }}</a>
+            @if(auth()->user()?->canAccess('order_notes.create'))
+                <a class="btn create-transaction-btn" href="{{ route('order-notes.create') }}">{{ __('txn.create_order_note') }}</a>
+            @endif
         </div>
     </div>
 

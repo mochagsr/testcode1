@@ -4,7 +4,7 @@
 
 @section('content')
     @php
-        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
+        $canEditTransactions = auth()->user()?->canAccess('delivery_trips.edit') ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('delivery_trip.detail_title', ['number' => $trip->trip_number]) }}</h1>

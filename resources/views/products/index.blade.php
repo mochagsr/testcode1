@@ -192,7 +192,7 @@
         }
     </style>
     @php
-        $canManageProducts = auth()->user()?->canAccess('masters.products.manage') ?? false;
+        $canManageProducts = auth()->user()?->canAccessAny(['products.create', 'products.edit', 'products.delete', 'products.import']) ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.products_title') }}</h1>

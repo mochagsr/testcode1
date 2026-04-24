@@ -4,8 +4,8 @@
 
 @section('content')
     @php
-        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
-        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
+        $canEditTransactions = auth()->user()?->canAccess('receivable_payments.edit') ?? false;
+        $canCancelTransactions = auth()->user()?->canAccess('receivable_payments.cancel') ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('receivable.payment_menu') }} {{ $payment->payment_number }}</h1>

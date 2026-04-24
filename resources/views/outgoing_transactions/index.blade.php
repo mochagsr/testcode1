@@ -90,7 +90,7 @@
     </style>
 
     @php
-        $canCreateOutgoingTransaction = auth()->user()?->canAccess('transactions.create') ?? false;
+        $canCreateOutgoingTransaction = auth()->user()?->canAccess('outgoing_transactions.create') ?? false;
     @endphp
     <div class="page-header-actions">
         <h1 class="page-title">{{ __('txn.outgoing_transactions_title') }}</h1>

@@ -57,7 +57,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/', [DashboardController::class, 'index']);
     Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('perm:dashboard.view')->name('dashboard');
     Route::get('/api/order-notes/lookup', [OrderNotePageController::class, 'lookup'])
-        ->middleware('perm:transactions.create')
+        ->middleware('perm:order_notes.create')
         ->name('api.order-notes.lookup');
     Route::get('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubtypeController::class, 'index'])
         ->middleware('perm:transactions.view')
@@ -67,83 +67,83 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     ->name('api.customers.printing-subtypes.store');
 
     Route::get('/sales-invoices', [SalesInvoicePageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-invoices.index');
-    Route::get('/sales-invoices/create', [SalesInvoicePageController::class, 'create'])->middleware('perm:transactions.create')->name('sales-invoices.create');
-    Route::post('/sales-invoices', [SalesInvoicePageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open', 'idempotent'])->name('sales-invoices.store');
+    Route::get('/sales-invoices/create', [SalesInvoicePageController::class, 'create'])->middleware('perm:sales_invoices.create')->name('sales-invoices.create');
+    Route::post('/sales-invoices', [SalesInvoicePageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open', 'idempotent', 'perm:sales_invoices.create'])->name('sales-invoices.store');
     Route::get('/sales-invoices/{salesInvoice}', [SalesInvoicePageController::class, 'show'])->middleware('perm:transactions.view')->name('sales-invoices.show');
-    Route::get('/sales-invoices/{salesInvoice}/print', [SalesInvoicePageController::class, 'print'])->middleware('perm:transactions.export')->name('sales-invoices.print');
-    Route::get('/sales-invoices/{salesInvoice}/pdf', [SalesInvoicePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('sales-invoices.export.pdf');
-    Route::get('/sales-invoices/{salesInvoice}/excel', [SalesInvoicePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('sales-invoices.export.excel');
+    Route::get('/sales-invoices/{salesInvoice}/print', [SalesInvoicePageController::class, 'print'])->middleware('perm:sales_invoices.export')->name('sales-invoices.print');
+    Route::get('/sales-invoices/{salesInvoice}/pdf', [SalesInvoicePageController::class, 'exportPdf'])->middleware('perm:sales_invoices.export')->name('sales-invoices.export.pdf');
+    Route::get('/sales-invoices/{salesInvoice}/excel', [SalesInvoicePageController::class, 'exportExcel'])->middleware('perm:sales_invoices.export')->name('sales-invoices.export.excel');
     Route::put('/sales-invoices/{salesInvoice}/admin-update', [SalesInvoicePageController::class, 'adminUpdate'])
-        ->middleware(['perm:transactions.edit', 'semester.open'])
+        ->middleware(['perm:sales_invoices.edit', 'semester.open'])
         ->name('sales-invoices.admin-update');
     Route::post('/sales-invoices/{salesInvoice}/cancel', [SalesInvoicePageController::class, 'cancel'])
-        ->middleware(['perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:sales_invoices.cancel', 'semester.open'])
         ->name('sales-invoices.cancel');
 
     Route::get('/sales-returns', [SalesReturnPageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-returns.index');
-    Route::get('/sales-returns/create', [SalesReturnPageController::class, 'create'])->middleware('perm:transactions.create')->name('sales-returns.create');
-    Route::post('/sales-returns', [SalesReturnPageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open', 'idempotent'])->name('sales-returns.store');
+    Route::get('/sales-returns/create', [SalesReturnPageController::class, 'create'])->middleware('perm:sales_returns.create')->name('sales-returns.create');
+    Route::post('/sales-returns', [SalesReturnPageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open', 'idempotent', 'perm:sales_returns.create'])->name('sales-returns.store');
     Route::get('/sales-returns/{salesReturn}', [SalesReturnPageController::class, 'show'])->middleware('perm:transactions.view')->name('sales-returns.show');
-    Route::get('/sales-returns/{salesReturn}/print', [SalesReturnPageController::class, 'print'])->middleware('perm:transactions.export')->name('sales-returns.print');
-    Route::get('/sales-returns/{salesReturn}/pdf', [SalesReturnPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('sales-returns.export.pdf');
-    Route::get('/sales-returns/{salesReturn}/excel', [SalesReturnPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('sales-returns.export.excel');
+    Route::get('/sales-returns/{salesReturn}/print', [SalesReturnPageController::class, 'print'])->middleware('perm:sales_returns.export')->name('sales-returns.print');
+    Route::get('/sales-returns/{salesReturn}/pdf', [SalesReturnPageController::class, 'exportPdf'])->middleware('perm:sales_returns.export')->name('sales-returns.export.pdf');
+    Route::get('/sales-returns/{salesReturn}/excel', [SalesReturnPageController::class, 'exportExcel'])->middleware('perm:sales_returns.export')->name('sales-returns.export.excel');
     Route::put('/sales-returns/{salesReturn}/admin-update', [SalesReturnPageController::class, 'adminUpdate'])
-        ->middleware(['perm:transactions.edit', 'semester.open'])
+        ->middleware(['perm:sales_returns.edit', 'semester.open'])
         ->name('sales-returns.admin-update');
     Route::post('/sales-returns/{salesReturn}/cancel', [SalesReturnPageController::class, 'cancel'])
-        ->middleware(['perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:sales_returns.cancel', 'semester.open'])
         ->name('sales-returns.cancel');
 
     Route::get('/delivery-notes', [DeliveryNotePageController::class, 'index'])->middleware('perm:transactions.view')->name('delivery-notes.index');
-    Route::get('/delivery-notes/create', [DeliveryNotePageController::class, 'create'])->middleware('perm:transactions.create')->name('delivery-notes.create');
-    Route::post('/delivery-notes', [DeliveryNotePageController::class, 'store'])->middleware(['semester.open', 'idempotent'])->name('delivery-notes.store');
+    Route::get('/delivery-notes/create', [DeliveryNotePageController::class, 'create'])->middleware('perm:delivery_notes.create')->name('delivery-notes.create');
+    Route::post('/delivery-notes', [DeliveryNotePageController::class, 'store'])->middleware(['semester.open', 'idempotent', 'perm:delivery_notes.create'])->name('delivery-notes.store');
     Route::get('/delivery-notes/{deliveryNote}', [DeliveryNotePageController::class, 'show'])->middleware('perm:transactions.view')->name('delivery-notes.show');
-    Route::get('/delivery-notes/{deliveryNote}/print', [DeliveryNotePageController::class, 'print'])->middleware('perm:transactions.export')->name('delivery-notes.print');
-    Route::get('/delivery-notes/{deliveryNote}/pdf', [DeliveryNotePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('delivery-notes.export.pdf');
-    Route::get('/delivery-notes/{deliveryNote}/excel', [DeliveryNotePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('delivery-notes.export.excel');
+    Route::get('/delivery-notes/{deliveryNote}/print', [DeliveryNotePageController::class, 'print'])->middleware('perm:delivery_notes.export')->name('delivery-notes.print');
+    Route::get('/delivery-notes/{deliveryNote}/pdf', [DeliveryNotePageController::class, 'exportPdf'])->middleware('perm:delivery_notes.export')->name('delivery-notes.export.pdf');
+    Route::get('/delivery-notes/{deliveryNote}/excel', [DeliveryNotePageController::class, 'exportExcel'])->middleware('perm:delivery_notes.export')->name('delivery-notes.export.excel');
     Route::put('/delivery-notes/{deliveryNote}/admin-update', [DeliveryNotePageController::class, 'adminUpdate'])
-        ->middleware(['perm:transactions.edit', 'semester.open'])
+        ->middleware(['perm:delivery_notes.edit', 'semester.open'])
         ->name('delivery-notes.admin-update');
     Route::post('/delivery-notes/{deliveryNote}/cancel', [DeliveryNotePageController::class, 'cancel'])
-        ->middleware(['perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:delivery_notes.cancel', 'semester.open'])
         ->name('delivery-notes.cancel');
 
     Route::get('/order-notes', [OrderNotePageController::class, 'index'])->middleware('perm:transactions.view')->name('order-notes.index');
-    Route::get('/order-notes/create', [OrderNotePageController::class, 'create'])->middleware('perm:transactions.create')->name('order-notes.create');
-    Route::post('/order-notes', [OrderNotePageController::class, 'store'])->middleware(['semester.open', 'idempotent'])->name('order-notes.store');
+    Route::get('/order-notes/create', [OrderNotePageController::class, 'create'])->middleware('perm:order_notes.create')->name('order-notes.create');
+    Route::post('/order-notes', [OrderNotePageController::class, 'store'])->middleware(['semester.open', 'idempotent', 'perm:order_notes.create'])->name('order-notes.store');
     Route::get('/order-notes/{orderNote}', [OrderNotePageController::class, 'show'])->middleware('perm:transactions.view')->name('order-notes.show');
-    Route::get('/order-notes/{orderNote}/print', [OrderNotePageController::class, 'print'])->middleware('perm:transactions.export')->name('order-notes.print');
-    Route::get('/order-notes/{orderNote}/pdf', [OrderNotePageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('order-notes.export.pdf');
-    Route::get('/order-notes/{orderNote}/excel', [OrderNotePageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('order-notes.export.excel');
+    Route::get('/order-notes/{orderNote}/print', [OrderNotePageController::class, 'print'])->middleware('perm:order_notes.export')->name('order-notes.print');
+    Route::get('/order-notes/{orderNote}/pdf', [OrderNotePageController::class, 'exportPdf'])->middleware('perm:order_notes.export')->name('order-notes.export.pdf');
+    Route::get('/order-notes/{orderNote}/excel', [OrderNotePageController::class, 'exportExcel'])->middleware('perm:order_notes.export')->name('order-notes.export.excel');
     Route::put('/order-notes/{orderNote}/admin-update', [OrderNotePageController::class, 'adminUpdate'])
-        ->middleware(['perm:transactions.edit', 'semester.open'])
+        ->middleware(['perm:order_notes.edit', 'semester.open'])
         ->name('order-notes.admin-update');
     Route::post('/order-notes/{orderNote}/cancel', [OrderNotePageController::class, 'cancel'])
-        ->middleware(['perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:order_notes.cancel', 'semester.open'])
         ->name('order-notes.cancel');
 
     Route::get('/delivery-trips', [DeliveryTripPageController::class, 'index'])->middleware('perm:transactions.view')->name('delivery-trips.index');
-    Route::get('/delivery-trips/create', [DeliveryTripPageController::class, 'create'])->middleware('perm:transactions.create')->name('delivery-trips.create');
-    Route::post('/delivery-trips', [DeliveryTripPageController::class, 'store'])->middleware(['finance.unlocked', 'idempotent'])->name('delivery-trips.store');
+    Route::get('/delivery-trips/create', [DeliveryTripPageController::class, 'create'])->middleware('perm:delivery_trips.create')->name('delivery-trips.create');
+    Route::post('/delivery-trips', [DeliveryTripPageController::class, 'store'])->middleware(['finance.unlocked', 'idempotent', 'perm:delivery_trips.create'])->name('delivery-trips.store');
     Route::get('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'show'])->middleware('perm:transactions.view')->name('delivery-trips.show');
-    Route::get('/delivery-trips/{deliveryTrip}/edit', [DeliveryTripPageController::class, 'edit'])->middleware('perm:transactions.edit')->name('delivery-trips.edit');
-    Route::put('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'update'])->middleware(['finance.unlocked', 'perm:transactions.edit'])->name('delivery-trips.update');
-    Route::get('/delivery-trips/{deliveryTrip}/print', [DeliveryTripPageController::class, 'print'])->middleware('perm:transactions.export')->name('delivery-trips.print');
-    Route::get('/delivery-trips/{deliveryTrip}/pdf', [DeliveryTripPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('delivery-trips.export.pdf');
-    Route::get('/delivery-trips/{deliveryTrip}/excel', [DeliveryTripPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('delivery-trips.export.excel');
+    Route::get('/delivery-trips/{deliveryTrip}/edit', [DeliveryTripPageController::class, 'edit'])->middleware('perm:delivery_trips.edit')->name('delivery-trips.edit');
+    Route::put('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'update'])->middleware(['finance.unlocked', 'perm:delivery_trips.edit'])->name('delivery-trips.update');
+    Route::get('/delivery-trips/{deliveryTrip}/print', [DeliveryTripPageController::class, 'print'])->middleware('perm:delivery_trips.export')->name('delivery-trips.print');
+    Route::get('/delivery-trips/{deliveryTrip}/pdf', [DeliveryTripPageController::class, 'exportPdf'])->middleware('perm:delivery_trips.export')->name('delivery-trips.export.pdf');
+    Route::get('/delivery-trips/{deliveryTrip}/excel', [DeliveryTripPageController::class, 'exportExcel'])->middleware('perm:delivery_trips.export')->name('delivery-trips.export.excel');
 
     Route::get('/outgoing-transactions', [OutgoingTransactionPageController::class, 'index'])->middleware('perm:transactions.view')->name('outgoing-transactions.index');
-    Route::get('/outgoing-transactions/create', [OutgoingTransactionPageController::class, 'create'])->middleware('perm:transactions.create')->name('outgoing-transactions.create');
+    Route::get('/outgoing-transactions/create', [OutgoingTransactionPageController::class, 'create'])->middleware('perm:outgoing_transactions.create')->name('outgoing-transactions.create');
     Route::post('/outgoing-transactions', [OutgoingTransactionPageController::class, 'store'])
-        ->middleware(['finance.unlocked', 'semester.open', 'idempotent'])
+        ->middleware(['finance.unlocked', 'semester.open', 'idempotent', 'perm:outgoing_transactions.create'])
         ->name('outgoing-transactions.store');
     Route::get('/outgoing-transactions/{outgoingTransaction}', [OutgoingTransactionPageController::class, 'show'])->middleware('perm:transactions.view')->name('outgoing-transactions.show');
     Route::get('/outgoing-transactions/{outgoingTransaction}/supplier-invoice-photo/print', [PhotoPrintController::class, 'supplierInvoice'])->middleware('perm:transactions.view')->name('outgoing-transactions.supplier-invoice-photo.print');
-    Route::get('/outgoing-transactions/{outgoingTransaction}/print', [OutgoingTransactionPageController::class, 'print'])->middleware('perm:transactions.export')->name('outgoing-transactions.print');
-    Route::get('/outgoing-transactions/{outgoingTransaction}/pdf', [OutgoingTransactionPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.pdf');
-    Route::get('/outgoing-transactions/{outgoingTransaction}/excel', [OutgoingTransactionPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('outgoing-transactions.export.excel');
+    Route::get('/outgoing-transactions/{outgoingTransaction}/print', [OutgoingTransactionPageController::class, 'print'])->middleware('perm:outgoing_transactions.export')->name('outgoing-transactions.print');
+    Route::get('/outgoing-transactions/{outgoingTransaction}/pdf', [OutgoingTransactionPageController::class, 'exportPdf'])->middleware('perm:outgoing_transactions.export')->name('outgoing-transactions.export.pdf');
+    Route::get('/outgoing-transactions/{outgoingTransaction}/excel', [OutgoingTransactionPageController::class, 'exportExcel'])->middleware('perm:outgoing_transactions.export')->name('outgoing-transactions.export.excel');
     Route::put('/outgoing-transactions/{outgoingTransaction}/admin-update', [OutgoingTransactionPageController::class, 'adminUpdate'])
-        ->middleware(['perm:transactions.edit', 'semester.open'])
+        ->middleware(['perm:outgoing_transactions.edit', 'semester.open'])
         ->name('outgoing-transactions.admin-update');
     Route::post('/outgoing-transactions/supplier/{supplier}/semester-close', [OutgoingTransactionPageController::class, 'closeSupplierSemester'])
         ->middleware('perm:supplier_payables.adjust')
@@ -192,10 +192,10 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/receivable-payments/{receivablePayment}/pdf', [ReceivablePaymentPageController::class, 'exportPdf'])->middleware('perm:receivables.view')->name('receivable-payments.export.pdf');
     Route::get('/receivable-payments/{receivablePayment}/excel', [ReceivablePaymentPageController::class, 'exportExcel'])->middleware('perm:receivables.view')->name('receivable-payments.export.excel');
     Route::put('/receivable-payments/{receivablePayment}/admin-update', [ReceivablePaymentPageController::class, 'adminUpdate'])
-        ->middleware(['perm:transactions.edit', 'semester.open'])
+        ->middleware(['perm:receivable_payments.edit', 'semester.open'])
         ->name('receivable-payments.admin-update');
     Route::post('/receivable-payments/{receivablePayment}/cancel', [ReceivablePaymentPageController::class, 'cancel'])
-        ->middleware(['perm:transactions.cancel', 'semester.open'])
+        ->middleware(['perm:receivable_payments.cancel', 'semester.open'])
         ->name('receivable-payments.cancel');
     Route::get('/transaction-corrections/create', [TransactionCorrectionWizardController::class, 'create'])
         ->middleware('perm:transactions.correction.request')
@@ -208,23 +208,23 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
         ->name('transaction-corrections.preview-stock');
 
     Route::get('/customer-ship-locations', [CustomerShipLocationPageController::class, 'index'])->middleware('perm:transactions.view')->name('customer-ship-locations.index');
-    Route::get('/customer-ship-locations/create', [CustomerShipLocationPageController::class, 'create'])->middleware('perm:transactions.create')->name('customer-ship-locations.create');
-    Route::post('/customer-ship-locations', [CustomerShipLocationPageController::class, 'store'])->middleware('perm:transactions.create')->name('customer-ship-locations.store');
-    Route::get('/customer-ship-locations/{customerShipLocation}/edit', [CustomerShipLocationPageController::class, 'edit'])->middleware('perm:transactions.create')->name('customer-ship-locations.edit');
-    Route::put('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'update'])->middleware('perm:transactions.create')->name('customer-ship-locations.update');
-    Route::delete('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'destroy'])->middleware('perm:transactions.create')->name('customer-ship-locations.destroy');
-    Route::get('/customer-ship-locations/lookup', [CustomerShipLocationPageController::class, 'lookup'])->middleware('perm:transactions.create')->name('customer-ship-locations.lookup');
+    Route::get('/customer-ship-locations/create', [CustomerShipLocationPageController::class, 'create'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.create');
+    Route::post('/customer-ship-locations', [CustomerShipLocationPageController::class, 'store'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.store');
+    Route::get('/customer-ship-locations/{customerShipLocation}/edit', [CustomerShipLocationPageController::class, 'edit'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.edit');
+    Route::put('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'update'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.update');
+    Route::delete('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'destroy'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.destroy');
+    Route::get('/customer-ship-locations/lookup', [CustomerShipLocationPageController::class, 'lookup'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.lookup');
 
     Route::get('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'index'])->middleware('perm:transactions.view')->name('school-bulk-transactions.index');
-    Route::get('/school-bulk-transactions/create', [SchoolBulkTransactionPageController::class, 'create'])->middleware('perm:transactions.create')->name('school-bulk-transactions.create');
-    Route::post('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'store'])->middleware(['semester.open', 'idempotent'])->name('school-bulk-transactions.store');
+    Route::get('/school-bulk-transactions/create', [SchoolBulkTransactionPageController::class, 'create'])->middleware('perm:school_bulk_transactions.create')->name('school-bulk-transactions.create');
+    Route::post('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'store'])->middleware(['semester.open', 'idempotent', 'perm:school_bulk_transactions.create'])->name('school-bulk-transactions.store');
     Route::post('/school-bulk-transactions/{schoolBulkTransaction}/generate-invoices', [SchoolBulkTransactionPageController::class, 'generateInvoices'])
-        ->middleware(['perm:transactions.create', 'finance.unlocked', 'semester.open', 'idempotent'])
+        ->middleware(['perm:school_bulk_transactions.create', 'finance.unlocked', 'semester.open', 'idempotent'])
         ->name('school-bulk-transactions.generate-invoices');
     Route::get('/school-bulk-transactions/{schoolBulkTransaction}', [SchoolBulkTransactionPageController::class, 'show'])->middleware('perm:transactions.view')->name('school-bulk-transactions.show');
-    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/print', [SchoolBulkTransactionPageController::class, 'print'])->middleware('perm:transactions.export')->name('school-bulk-transactions.print');
-    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/pdf', [SchoolBulkTransactionPageController::class, 'exportPdf'])->middleware('perm:transactions.export')->name('school-bulk-transactions.export.pdf');
-    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/excel', [SchoolBulkTransactionPageController::class, 'exportExcel'])->middleware('perm:transactions.export')->name('school-bulk-transactions.export.excel');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/print', [SchoolBulkTransactionPageController::class, 'print'])->middleware('perm:school_bulk_transactions.export')->name('school-bulk-transactions.print');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/pdf', [SchoolBulkTransactionPageController::class, 'exportPdf'])->middleware('perm:school_bulk_transactions.export')->name('school-bulk-transactions.export.pdf');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/excel', [SchoolBulkTransactionPageController::class, 'exportExcel'])->middleware('perm:school_bulk_transactions.export')->name('school-bulk-transactions.export.excel');
 
     Route::get('/reports', [ReportExportController::class, 'index'])->middleware('perm:reports.view')->name('reports.index');
     Route::get('/reports/{dataset}/csv', [ReportExportController::class, 'exportCsv'])->middleware('perm:reports.export')->name('reports.export.csv');
@@ -239,35 +239,35 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/products/print', [ProductPageController::class, 'printReport'])->middleware('perm:masters.products.view')->name('products.print');
     Route::get('/products/pdf', [ProductPageController::class, 'exportPdf'])->middleware('perm:masters.products.view')->name('products.export.pdf');
     Route::get('/products/export.csv', [ProductPageController::class, 'exportCsv'])->middleware('perm:masters.products.view')->name('products.export.csv');
-    Route::get('/item-categories', [ItemCategoryPageController::class, 'index'])->middleware('perm:masters.products.manage')->name('item-categories.index');
-    Route::get('/item-categories/create', [ItemCategoryPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('item-categories.create');
-    Route::post('/item-categories', [ItemCategoryPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('item-categories.store');
-    Route::get('/item-categories/{itemCategory}/edit', [ItemCategoryPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('item-categories.edit');
-    Route::put('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('item-categories.update');
-    Route::delete('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('item-categories.destroy');
-    Route::get('/product-units', [ProductUnitPageController::class, 'index'])->middleware('perm:masters.products.manage')->name('product-units.index');
-    Route::get('/product-units/create', [ProductUnitPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('product-units.create');
-    Route::post('/product-units', [ProductUnitPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('product-units.store');
-    Route::get('/product-units/{productUnit}/edit', [ProductUnitPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('product-units.edit');
-    Route::put('/product-units/{productUnit}', [ProductUnitPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('product-units.update');
-    Route::delete('/product-units/{productUnit}', [ProductUnitPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('product-units.destroy');
-    Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:masters.products.manage')->name('products.import.template');
-    Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:masters.products.manage')->name('products.import');
-    Route::get('/item-categories/import/template', [MassImportController::class, 'templateCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import.template');
-    Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:masters.products.manage')->name('item-categories.import');
-    Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:masters.products.manage')->name('products.create');
-    Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:masters.products.manage')->name('products.store');
+    Route::get('/item-categories', [ItemCategoryPageController::class, 'index'])->middleware('perm:transactions.view')->name('item-categories.index');
+    Route::get('/item-categories/create', [ItemCategoryPageController::class, 'create'])->middleware('perm:products.create')->name('item-categories.create');
+    Route::post('/item-categories', [ItemCategoryPageController::class, 'store'])->middleware('perm:products.create')->name('item-categories.store');
+    Route::get('/item-categories/{itemCategory}/edit', [ItemCategoryPageController::class, 'edit'])->middleware('perm:products.edit')->name('item-categories.edit');
+    Route::put('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'update'])->middleware('perm:products.edit')->name('item-categories.update');
+    Route::delete('/item-categories/{itemCategory}', [ItemCategoryPageController::class, 'destroy'])->middleware('perm:products.delete')->name('item-categories.destroy');
+    Route::get('/product-units', [ProductUnitPageController::class, 'index'])->middleware('perm:transactions.view')->name('product-units.index');
+    Route::get('/product-units/create', [ProductUnitPageController::class, 'create'])->middleware('perm:products.create')->name('product-units.create');
+    Route::post('/product-units', [ProductUnitPageController::class, 'store'])->middleware('perm:products.create')->name('product-units.store');
+    Route::get('/product-units/{productUnit}/edit', [ProductUnitPageController::class, 'edit'])->middleware('perm:products.edit')->name('product-units.edit');
+    Route::put('/product-units/{productUnit}', [ProductUnitPageController::class, 'update'])->middleware('perm:products.edit')->name('product-units.update');
+    Route::delete('/product-units/{productUnit}', [ProductUnitPageController::class, 'destroy'])->middleware('perm:products.delete')->name('product-units.destroy');
+    Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:products.import')->name('products.import.template');
+    Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:products.import')->name('products.import');
+    Route::get('/item-categories/import/template', [MassImportController::class, 'templateCategories'])->middleware('perm:products.import')->name('item-categories.import.template');
+    Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:products.import')->name('item-categories.import');
+    Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:products.create')->name('products.create');
+    Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:products.create')->name('products.store');
     Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
-    Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:masters.products.manage')->name('products.edit');
-    Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:masters.products.manage')->name('products.update');
-    Route::post('/products/{product}/quick-stock', [ProductPageController::class, 'quickUpdateStock'])->middleware('perm:masters.products.manage')->name('products.quick-stock');
-    Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:masters.products.manage')->name('products.destroy');
-    Route::get('/customer-levels-web', [CustomerLevelPageController::class, 'index'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.index');
-    Route::get('/customer-levels-web/create', [CustomerLevelPageController::class, 'create'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.create');
-    Route::post('/customer-levels-web', [CustomerLevelPageController::class, 'store'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.store');
-    Route::get('/customer-levels-web/{customerLevel}/edit', [CustomerLevelPageController::class, 'edit'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.edit');
-    Route::put('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'update'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.update');
-    Route::delete('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'destroy'])->middleware('perm:masters.customers.manage')->name('customer-levels-web.destroy');
+    Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:products.edit')->name('products.edit');
+    Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:products.edit')->name('products.update');
+    Route::post('/products/{product}/quick-stock', [ProductPageController::class, 'quickUpdateStock'])->middleware('perm:products.edit')->name('products.quick-stock');
+    Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:products.delete')->name('products.destroy');
+    Route::get('/customer-levels-web', [CustomerLevelPageController::class, 'index'])->middleware('perm:transactions.view')->name('customer-levels-web.index');
+    Route::get('/customer-levels-web/create', [CustomerLevelPageController::class, 'create'])->middleware('perm:customers.create')->name('customer-levels-web.create');
+    Route::post('/customer-levels-web', [CustomerLevelPageController::class, 'store'])->middleware('perm:customers.create')->name('customer-levels-web.store');
+    Route::get('/customer-levels-web/{customerLevel}/edit', [CustomerLevelPageController::class, 'edit'])->middleware('perm:customers.edit')->name('customer-levels-web.edit');
+    Route::put('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'update'])->middleware('perm:customers.edit')->name('customer-levels-web.update');
+    Route::delete('/customer-levels-web/{customerLevel}', [CustomerLevelPageController::class, 'destroy'])->middleware('perm:customers.delete')->name('customer-levels-web.destroy');
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('perm:settings.profile')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('perm:settings.profile')->name('settings.update');
     Route::post('/settings/semester-close', [SettingsController::class, 'closeSemester'])
@@ -279,24 +279,24 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
 
     Route::get('/suppliers', [SupplierPageController::class, 'index'])->middleware('perm:masters.suppliers.view')->name('suppliers.index');
     Route::get('/suppliers/lookup', [SupplierPageController::class, 'lookup'])->name('suppliers.lookup');
-    Route::get('/suppliers/create', [SupplierPageController::class, 'create'])->middleware('perm:masters.suppliers.edit')->name('suppliers.create');
-    Route::get('/suppliers/import/template', [MassImportController::class, 'templateSuppliers'])->middleware('perm:masters.suppliers.edit')->name('suppliers.import.template');
-    Route::post('/suppliers/import', [MassImportController::class, 'importSuppliers'])->middleware('perm:masters.suppliers.edit')->name('suppliers.import');
-    Route::post('/suppliers', [SupplierPageController::class, 'store'])->middleware('perm:masters.suppliers.edit')->name('suppliers.store');
-    Route::get('/suppliers/{supplier}/edit', [SupplierPageController::class, 'edit'])->middleware('perm:masters.suppliers.edit')->name('suppliers.edit');
-    Route::put('/suppliers/{supplier}', [SupplierPageController::class, 'update'])->middleware('perm:masters.suppliers.edit')->name('suppliers.update');
-    Route::delete('/suppliers/{supplier}', [SupplierPageController::class, 'destroy'])->middleware('perm:masters.suppliers.edit')->name('suppliers.destroy');
+    Route::get('/suppliers/create', [SupplierPageController::class, 'create'])->middleware('perm:suppliers.create')->name('suppliers.create');
+    Route::get('/suppliers/import/template', [MassImportController::class, 'templateSuppliers'])->middleware('perm:suppliers.import')->name('suppliers.import.template');
+    Route::post('/suppliers/import', [MassImportController::class, 'importSuppliers'])->middleware('perm:suppliers.import')->name('suppliers.import');
+    Route::post('/suppliers', [SupplierPageController::class, 'store'])->middleware('perm:suppliers.create')->name('suppliers.store');
+    Route::get('/suppliers/{supplier}/edit', [SupplierPageController::class, 'edit'])->middleware('perm:suppliers.edit')->name('suppliers.edit');
+    Route::put('/suppliers/{supplier}', [SupplierPageController::class, 'update'])->middleware('perm:suppliers.edit')->name('suppliers.update');
+    Route::delete('/suppliers/{supplier}', [SupplierPageController::class, 'destroy'])->middleware('perm:suppliers.delete')->name('suppliers.destroy');
     Route::get('/customers-web', [CustomerPageController::class, 'index'])->middleware('perm:masters.customers.view')->name('customers-web.index');
     Route::get('/customers-web/level/{customerLevel}', [CustomerPageController::class, 'levelCustomers'])->middleware('perm:masters.customers.view')->name('customers-web.level-customers');
     Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->middleware('perm:masters.customers.view')->name('customers-web.export.csv');
-    Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import.template');
-    Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:masters.customers.manage')->name('customers-web.import');
-    Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->middleware('perm:masters.customers.manage')->name('customers-web.create');
-    Route::post('/customers-web', [CustomerPageController::class, 'store'])->middleware('perm:masters.customers.manage')->name('customers-web.store');
-    Route::get('/customers-web/{customer}/edit', [CustomerPageController::class, 'edit'])->middleware('perm:masters.customers.manage')->name('customers-web.edit');
+    Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:customers.import')->name('customers-web.import.template');
+    Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:customers.import')->name('customers-web.import');
+    Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->middleware('perm:customers.create')->name('customers-web.create');
+    Route::post('/customers-web', [CustomerPageController::class, 'store'])->middleware('perm:customers.create')->name('customers-web.store');
+    Route::get('/customers-web/{customer}/edit', [CustomerPageController::class, 'edit'])->middleware('perm:customers.edit')->name('customers-web.edit');
     Route::get('/customers-web/{customer}/id-card-photo/print', [PhotoPrintController::class, 'customerIdCard'])->middleware('perm:masters.customers.view')->name('customers-web.id-card-photo.print');
-    Route::put('/customers-web/{customer}', [CustomerPageController::class, 'update'])->middleware('perm:masters.customers.manage')->name('customers-web.update');
-    Route::delete('/customers-web/{customer}', [CustomerPageController::class, 'destroy'])->middleware('perm:masters.customers.manage')->name('customers-web.destroy');
+    Route::put('/customers-web/{customer}', [CustomerPageController::class, 'update'])->middleware('perm:customers.edit')->name('customers-web.update');
+    Route::delete('/customers-web/{customer}', [CustomerPageController::class, 'destroy'])->middleware('perm:customers.delete')->name('customers-web.destroy');
     Route::get('/supplier-payables', [SupplierPayablePageController::class, 'index'])->middleware('perm:supplier_payables.view')->name('supplier-payables.index');
     Route::get('/supplier-payables/print', [SupplierPayablePageController::class, 'printReport'])->middleware('perm:supplier_payables.view')->name('supplier-payables.print');
     Route::get('/supplier-payables/pdf', [SupplierPayablePageController::class, 'exportReportPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export.pdf');
@@ -322,13 +322,13 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::get('/supplier-payables/payment/{supplierPayment}/pdf', [SupplierPayablePageController::class, 'exportPaymentPdf'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-pdf');
     Route::get('/supplier-payables/payment/{supplierPayment}/excel', [SupplierPayablePageController::class, 'exportPaymentExcel'])->middleware('perm:supplier_payables.view')->name('supplier-payables.export-payment-excel');
     Route::put('/supplier-payables/payment/{supplierPayment}/admin-update', [SupplierPayablePageController::class, 'adminUpdate'])
-        ->middleware(['perm:transactions.edit', 'semester.open'])
+        ->middleware(['perm:supplier_payments.edit', 'semester.open'])
         ->name('supplier-payables.admin-update');
 
     Route::get('/sales-invoices/import/template', [MassImportController::class, 'templateSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import.template');
     Route::post('/sales-invoices/import', [MassImportController::class, 'importSalesInvoices'])->middleware('perm:imports.transactions')->name('sales-invoices.import');
-    Route::get('/customer-ship-locations/import/template', [MassImportController::class, 'templateCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import.template');
-    Route::post('/customer-ship-locations/import', [MassImportController::class, 'importCustomerShipLocations'])->middleware('perm:transactions.create')->name('customer-ship-locations.import');
+    Route::get('/customer-ship-locations/import/template', [MassImportController::class, 'templateCustomerShipLocations'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.import.template');
+    Route::post('/customer-ship-locations/import', [MassImportController::class, 'importCustomerShipLocations'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.import');
 
     Route::get('/users', [UserManagementController::class, 'index'])->middleware('perm:users.manage')->name('users.index');
     Route::get('/users/create', [UserManagementController::class, 'create'])->middleware('perm:users.manage')->name('users.create');

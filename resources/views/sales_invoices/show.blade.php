@@ -25,8 +25,8 @@
         $isPaidTransactionLocked = $hasCashOnCreate || $invoice->payment_status === 'paid';
         $isCreditSemesterLocked = $isCreditReceivableTransaction && $isCustomerSemesterLocked;
         $requiresAdminToEdit = $isPaidTransactionLocked || $isCreditSemesterLocked;
-        $canEditTransactions = auth()->user()?->canAccess('transactions.edit') ?? false;
-        $canCancelTransactions = auth()->user()?->canAccess('transactions.cancel') ?? false;
+        $canEditTransactions = auth()->user()?->canAccess('sales_invoices.edit') ?? false;
+        $canCancelTransactions = auth()->user()?->canAccess('sales_invoices.cancel') ?? false;
         $adminProducts = $products->map(function ($product): array {
             return [
                 'id' => (int) $product->id,

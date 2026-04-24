@@ -13,7 +13,7 @@ class MasterPermissionAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_default_user_cannot_manage_customers_or_products(): void
+    public function test_default_user_can_view_master_lists_but_cannot_manage_them(): void
     {
         $user = User::factory()->create([
             'role' => 'user',
@@ -22,11 +22,11 @@ class MasterPermissionAccessTest extends TestCase
 
         $this->actingAs($user)->get(route('customers-web.index'))->assertOk();
         $this->actingAs($user)->get(route('customers-web.create'))->assertForbidden();
-        $this->actingAs($user)->get(route('products.index'))->assertForbidden();
+        $this->actingAs($user)->get(route('products.index'))->assertOk();
         $this->actingAs($user)->get(route('products.create'))->assertForbidden();
-        $this->actingAs($user)->get(route('customer-levels-web.index'))->assertForbidden();
-        $this->actingAs($user)->get(route('item-categories.index'))->assertForbidden();
-        $this->actingAs($user)->get(route('product-units.index'))->assertForbidden();
+        $this->actingAs($user)->get(route('customer-levels-web.index'))->assertOk();
+        $this->actingAs($user)->get(route('item-categories.index'))->assertOk();
+        $this->actingAs($user)->get(route('product-units.index'))->assertOk();
     }
 
     public function test_user_with_detailed_master_permissions_can_manage_customers_and_products(): void
@@ -36,10 +36,10 @@ class MasterPermissionAccessTest extends TestCase
             'permissions' => [
                 'dashboard.view',
                 'settings.profile',
-                'masters.customers.view',
-                'masters.customers.manage',
-                'masters.products.view',
-                'masters.products.manage',
+                'customers.create',
+                'customers.edit',
+                'products.create',
+                'products.edit',
             ],
         ]);
 
@@ -62,8 +62,8 @@ class MasterPermissionAccessTest extends TestCase
             'permissions' => [
                 'dashboard.view',
                 'settings.profile',
-                'masters.suppliers.view',
-                'masters.suppliers.edit',
+                'suppliers.create',
+                'suppliers.import',
             ],
         ]);
 
@@ -139,7 +139,6 @@ class MasterPermissionAccessTest extends TestCase
             'role' => 'user',
             'permissions' => [
                 'dashboard.view',
-                'transactions.view',
                 'settings.profile',
             ],
         ]);
@@ -156,8 +155,7 @@ class MasterPermissionAccessTest extends TestCase
             'role' => 'user',
             'permissions' => [
                 'dashboard.view',
-                'transactions.view',
-                'transactions.create',
+                'outgoing_transactions.create',
                 'settings.profile',
             ],
         ]);
@@ -167,6 +165,45 @@ class MasterPermissionAccessTest extends TestCase
         $response->assertOk();
         $response->assertSee(route('outgoing-transactions.create'), false);
         $this->actingAs($user)->get(route('outgoing-transactions.create'))->assertOk();
+    }
+
+    public function test_transaction_detail_permissions_are_scoped_per_module(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'dashboard.view',
+                'settings.profile',
+                'sales_invoices.create',
+                'sales_invoices.edit',
+                'sales_invoices.cancel',
+            ],
+        ]);
+
+        $this->actingAs($user)->get(route('sales-invoices.index'))->assertOk();
+        $this->actingAs($user)->get(route('sales-invoices.create'))->assertOk();
+        $this->actingAs($user)->get(route('sales-returns.index'))->assertOk();
+        $this->actingAs($user)->get(route('sales-returns.create'))->assertForbidden();
+        $this->actingAs($user)->get(route('delivery-notes.create'))->assertForbidden();
+    }
+
+    public function test_user_can_view_transaction_lists_without_action_permissions(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'settings.profile',
+            ],
+        ]);
+
+        $this->actingAs($user)->get(route('sales-invoices.index'))->assertOk();
+        $this->actingAs($user)->get(route('sales-returns.index'))->assertOk();
+        $this->actingAs($user)->get(route('delivery-notes.index'))->assertOk();
+        $this->actingAs($user)->get(route('order-notes.index'))->assertOk();
+        $this->actingAs($user)->get(route('outgoing-transactions.index'))->assertOk();
+        $this->actingAs($user)->get(route('products.index'))->assertOk();
+        $this->actingAs($user)->get(route('customers-web.index'))->assertOk();
+        $this->actingAs($user)->get(route('suppliers.index'))->assertOk();
     }
 
     public function test_user_edit_form_checks_effective_default_role_permissions(): void
@@ -181,7 +218,8 @@ class MasterPermissionAccessTest extends TestCase
         $this->assertContains('dashboard.view', $resolvedPermissions);
         $this->assertContains('transactions.view', $resolvedPermissions);
         $this->assertContains('transactions.create', $resolvedPermissions);
-        $this->assertContains('masters.suppliers.edit', $resolvedPermissions);
+        $this->assertContains('outgoing_transactions.create', $resolvedPermissions);
+        $this->assertContains('suppliers.create', $resolvedPermissions);
         $this->assertNotContains('settings.admin', $resolvedPermissions);
     }
 

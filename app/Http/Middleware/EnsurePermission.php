@@ -25,6 +25,10 @@ class EnsurePermission
             : (array) config('rbac.roles.'.(string) ($user->role ?? 'user'), []);
         $requiredPermission = strtolower(trim($permission));
 
+        if (in_array($requiredPermission, (array) config('rbac.always_allowed', []), true)) {
+            return $next($request);
+        }
+
         if (in_array('*', $resolvedPermissions, true) || in_array($requiredPermission, $resolvedPermissions, true)) {
             return $next($request);
         }
