@@ -27,6 +27,7 @@ return [
     'transaction_type_sale' => 'Sales',
     'transaction_type_payment' => 'Payment',
     'transaction_type_return' => 'Return',
+    'transaction_type_user_edit' => 'User Edit',
     'transaction_subtype_product' => 'Product',
     'transaction_subtype_printing_named' => 'Print - :name',
     'debit' => 'Debit',

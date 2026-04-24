@@ -1922,6 +1922,73 @@ class ReceivableFlowsTest extends TestCase
         $response->assertDontSee('[ADMIN EDIT FAKTUR +]');
     }
 
+    public function test_customer_bill_print_marks_invoice_cancellation_as_user_edit(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-CANCEL-001',
+            'name' => 'Angga Cancellation',
+            'city' => 'Sidoarjo',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-CANCEL-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-04-24',
+            'semester_period' => 'S2-2526',
+            'transaction_type' => 'product',
+            'subtotal' => 25000,
+            'total' => 25000,
+            'total_paid' => 0,
+            'balance' => 25000,
+            'payment_status' => 'unpaid',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-24',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-CANCEL-001',
+            'debit' => 25000,
+            'credit' => 0,
+            'balance_after' => 25000,
+            'period_code' => 'S2-2526',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-04-24',
+            'transaction_type' => 'product',
+            'description' => '[ADMIN BATAL FAKTUR] Pembatalan faktur INV-CANCEL-001',
+            'debit' => 0,
+            'credit' => 25000,
+            'balance_after' => 0,
+            'period_code' => 'S2-2526',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.transaction_type_user_edit'));
+        $response->assertSee(__('txn.status_canceled'));
+        $response->assertSee('Admin - Pembatalan faktur INV-CANCEL-001 (-Rp 25.000)');
+        $response->assertDontSee('[ADMIN BATAL FAKTUR]');
+
+        $screenResponse = $this->actingAs($user)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $screenResponse->assertOk();
+        $screenResponse->assertSee(__('receivable.transaction_type_user_edit'));
+        $screenResponse->assertSee(__('txn.status_canceled'));
+    }
+
     public function test_customer_bill_print_uses_audit_log_actor_for_legacy_admin_adjustment_rows(): void
     {
         $user = User::factory()->create();

@@ -27,6 +27,7 @@ return [
     'transaction_type_sale' => 'Penjualan',
     'transaction_type_payment' => 'Pembayaran',
     'transaction_type_return' => 'Retur',
+    'transaction_type_user_edit' => 'User Edit',
     'transaction_subtype_product' => 'Produk',
     'transaction_subtype_printing_named' => 'Cetak - :name',
     'debit' => 'Debit',

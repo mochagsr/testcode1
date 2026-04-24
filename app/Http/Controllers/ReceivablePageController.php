@@ -1770,17 +1770,23 @@ class ReceivablePageController extends Controller
             $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
             $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
             $isDiscount = str_contains($description, 'diskon') || str_contains($description, 'discount');
+            $isInvoiceCancellation = str_contains($description, 'batal faktur')
+                || str_contains($description, 'pembatalan faktur')
+                || str_contains($description, 'invoice cancel')
+                || str_contains($description, 'invoice cancellation');
             $isAdminInvoiceAdjustment = str_contains($description, 'admin edit faktur')
                 || str_contains($description, 'admin invoice edit')
                 || str_contains($description, 'penyesuaian nilai faktur')
                 || str_contains($description, 'invoice adjustment');
             $salesReturn = $isReturn ? $credit : 0;
-            $installment = $isReturn ? 0 : $credit;
+            $installment = ($isReturn || $isInvoiceCancellation) ? 0 : $credit;
             $entryType = 'payment';
             if ($debit > 0) {
                 $entryType = 'debit';
             } elseif ($salesReturn > 0) {
                 $entryType = 'return';
+            } elseif ($isInvoiceCancellation) {
+                $entryType = 'cancel';
             } elseif ($isWriteoff) {
                 $entryType = 'writeoff';
             } elseif ($isDiscount) {
@@ -1826,6 +1832,9 @@ class ReceivablePageController extends Controller
                 'adjustment' => $rawDescription !== ''
                     ? $rawDescription
                     : $baseProofNumber,
+                'cancel' => $rawDescription !== ''
+                    ? $rawDescription
+                    : $baseProofNumber,
                 default => $baseProofNumber,
             };
             $invoiceId = $ledgerRow->invoice?->id;
@@ -1859,7 +1868,7 @@ class ReceivablePageController extends Controller
                 ];
             }
 
-            if ($entryType === 'adjustment') {
+            if (in_array($entryType, ['adjustment', 'cancel'], true)) {
                 $groupedRows[$groupKey]['adjustment_amount'] += ($debit - $credit);
             } else {
                 $groupedRows[$groupKey]['credit_sales'] += $debit;
@@ -1939,14 +1948,19 @@ class ReceivablePageController extends Controller
     ): string
     {
         $proofNumber = trim($proofNumber);
-        if ($entryType !== 'adjustment') {
+        if (! in_array($entryType, ['adjustment', 'cancel'], true)) {
             return $proofNumber !== '' ? $proofNumber : '-';
         }
 
-        $formatted = $this->formatCustomerBillAdjustmentDescription(
-            $proofNumber,
-            $invoiceId !== null ? ($adjustmentActorsByInvoiceId[$invoiceId] ?? null) : null
-        );
+        $formatted = $entryType === 'cancel'
+            ? $this->formatCustomerBillCancellationDescription(
+                $proofNumber,
+                $invoiceId !== null ? ($adjustmentActorsByInvoiceId[$invoiceId] ?? null) : null
+            )
+            : $this->formatCustomerBillAdjustmentDescription(
+                $proofNumber,
+                $invoiceId !== null ? ($adjustmentActorsByInvoiceId[$invoiceId] ?? null) : null
+            );
         $sign = $adjustmentAmount > 0 ? '+' : ($adjustmentAmount < 0 ? '-' : '');
         if ($sign !== '') {
             $formatted .= ' ('.$sign.'Rp '.number_format(abs($adjustmentAmount), 0, ',', '.').')';
@@ -1970,6 +1984,23 @@ class ReceivablePageController extends Controller
         }
 
         return preg_replace('/^\[ADMIN EDIT FAKTUR [+-]\]\s*/i', '', $raw) ?? $raw;
+    }
+
+    private function formatCustomerBillCancellationDescription(string $description, ?string $fallbackActor = null): string
+    {
+        $raw = trim($description);
+        if ($raw === '') {
+            return __('receivable.bill_proof_number');
+        }
+
+        if (preg_match('/^\[(.+?)\s+BATAL\s+FAKTUR\]\s*(.+)$/i', $raw, $matches) === 1) {
+            $actor = $this->formatCustomerBillAdjustmentActor((string) ($matches[1] ?? ''), $fallbackActor);
+            $tail = trim((string) ($matches[2] ?? ''));
+
+            return $actor !== '' ? $actor.' - '.$tail : $tail;
+        }
+
+        return preg_replace('/^\[ADMIN BATAL FAKTUR\]\s*/i', '', $raw) ?? $raw;
     }
 
     private function formatCustomerBillAdjustmentActor(string $actor, ?string $fallbackActor = null): string
@@ -2059,6 +2090,7 @@ class ReceivablePageController extends Controller
     {
         return match ($entryType) {
             'payment', 'writeoff', 'discount' => __('receivable.transaction_type_payment'),
+            'cancel', 'adjustment' => __('receivable.transaction_type_user_edit'),
             'return' => __('receivable.transaction_type_return'),
             default => __('receivable.transaction_type_sale'),
         };
@@ -2066,6 +2098,10 @@ class ReceivablePageController extends Controller
 
     private function customerBillEntrySubtypeLabel(?string $transactionType, ?string $printingSubtypeName, string $entryType): string
     {
+        if ($entryType === 'cancel') {
+            return __('txn.status_canceled');
+        }
+
         if (in_array($entryType, ['payment', 'writeoff', 'discount', 'return'], true)) {
             return __('receivable.printing_subtype_none');
         }

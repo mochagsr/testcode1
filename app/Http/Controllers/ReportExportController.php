@@ -1453,18 +1453,24 @@ class ReportExportController extends Controller
             $isReturn = str_contains($description, 'retur') || str_contains($description, 'return');
             $isWriteoff = str_contains($description, 'write-off') || str_contains($description, 'writeoff');
             $isDiscount = str_contains($description, 'diskon') || str_contains($description, 'discount');
+            $isInvoiceCancellation = str_contains($description, 'batal faktur')
+                || str_contains($description, 'pembatalan faktur')
+                || str_contains($description, 'invoice cancel')
+                || str_contains($description, 'invoice cancellation');
             $isAdminInvoiceAdjustment = str_contains($description, 'admin edit faktur')
                 || str_contains($description, 'admin invoice edit')
                 || str_contains($description, 'penyesuaian nilai faktur')
                 || str_contains($description, 'invoice adjustment');
             $salesReturn = $isReturn ? $credit : 0;
-            $installment = $isReturn ? 0 : $credit;
+            $installment = ($isReturn || $isInvoiceCancellation) ? 0 : $credit;
             $baseProofNumber = $ledgerRow->invoice?->invoice_number ?: (trim((string) ($ledgerRow->description ?? '')) ?: '-');
             $entryType = 'payment';
             if ($debit > 0) {
                 $entryType = 'debit';
             } elseif ($salesReturn > 0) {
                 $entryType = 'return';
+            } elseif ($isInvoiceCancellation) {
+                $entryType = 'cancel';
             } elseif ($isWriteoff) {
                 $entryType = 'writeoff';
             } elseif ($isDiscount) {
@@ -1478,6 +1484,9 @@ class ReportExportController extends Controller
                 'writeoff' => $baseProofNumber . ' - ' . __('receivable.method_writeoff'),
                 'discount' => $baseProofNumber . ' - ' . __('receivable.method_discount'),
                 'adjustment' => (trim((string) ($ledgerRow->description ?? '')) !== '')
+                    ? trim((string) $ledgerRow->description)
+                    : $baseProofNumber,
+                'cancel' => (trim((string) ($ledgerRow->description ?? '')) !== '')
                     ? trim((string) $ledgerRow->description)
                     : $baseProofNumber,
                 default => $baseProofNumber,
@@ -1507,7 +1516,7 @@ class ReportExportController extends Controller
                 ];
             }
 
-            if ($entryType === 'adjustment') {
+            if (in_array($entryType, ['adjustment', 'cancel'], true)) {
                 $groupedRows[$groupKey]['adjustment_amount'] += ($debit - $credit);
             } else {
                 $groupedRows[$groupKey]['credit_sales'] += $debit;
@@ -1585,14 +1594,19 @@ class ReportExportController extends Controller
     ): string
     {
         $proofNumber = trim($proofNumber);
-        if ($entryType !== 'adjustment') {
+        if (! in_array($entryType, ['adjustment', 'cancel'], true)) {
             return $proofNumber !== '' ? $proofNumber : '-';
         }
 
-        $formatted = $this->formatCustomerBillAdjustmentDescription(
-            $proofNumber,
-            $invoiceId !== null ? ($adjustmentActorsByInvoiceId[$invoiceId] ?? null) : null
-        );
+        $formatted = $entryType === 'cancel'
+            ? $this->formatCustomerBillCancellationDescription(
+                $proofNumber,
+                $invoiceId !== null ? ($adjustmentActorsByInvoiceId[$invoiceId] ?? null) : null
+            )
+            : $this->formatCustomerBillAdjustmentDescription(
+                $proofNumber,
+                $invoiceId !== null ? ($adjustmentActorsByInvoiceId[$invoiceId] ?? null) : null
+            );
         $sign = $adjustmentAmount > 0 ? '+' : ($adjustmentAmount < 0 ? '-' : '');
         if ($sign !== '') {
             $formatted .= ' ('.$sign.'Rp '.number_format(abs($adjustmentAmount), 0, ',', '.').')';
@@ -1616,6 +1630,23 @@ class ReportExportController extends Controller
         }
 
         return preg_replace('/^\[ADMIN EDIT FAKTUR [+-]\]\s*/i', '', $raw) ?? $raw;
+    }
+
+    private function formatCustomerBillCancellationDescription(string $description, ?string $fallbackActor = null): string
+    {
+        $raw = trim($description);
+        if ($raw === '') {
+            return '-';
+        }
+
+        if (preg_match('/^\[(.+?)\s+BATAL\s+FAKTUR\]\s*(.+)$/i', $raw, $matches) === 1) {
+            $actor = $this->formatCustomerBillAdjustmentActor((string) ($matches[1] ?? ''), $fallbackActor);
+            $tail = trim((string) ($matches[2] ?? ''));
+
+            return $actor !== '' ? $actor.' - '.$tail : $tail;
+        }
+
+        return preg_replace('/^\[ADMIN BATAL FAKTUR\]\s*/i', '', $raw) ?? $raw;
     }
 
     private function formatCustomerBillAdjustmentActor(string $actor, ?string $fallbackActor = null): string

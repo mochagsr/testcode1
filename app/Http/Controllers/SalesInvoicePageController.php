@@ -1013,6 +1013,15 @@ class SalesInvoicePageController extends Controller
         return preg_replace('/\s+/', ' ', $label) ?? $label;
     }
 
+    private function adminInvoiceCancellationLedgerDescription(SalesInvoice $invoice): string
+    {
+        return sprintf(
+            '[%s BATAL FAKTUR] %s',
+            $this->adminInvoiceAdjustmentActorLabel(),
+            __('txn.cancel_invoice_ledger_note', ['invoice' => $invoice->invoice_number])
+        );
+    }
+
     public function cancel(Request $request, SalesInvoice $salesInvoice): RedirectResponse
     {
         $data = $request->validate([
@@ -1065,7 +1074,7 @@ class SalesInvoicePageController extends Controller
                     entryDate: now(),
                     amount: $openBalance,
                     periodCode: $invoice->semester_period,
-                    description: __('txn.admin_invoice_cancel_ledger_note', ['invoice' => $invoice->invoice_number]),
+                    description: $this->adminInvoiceCancellationLedgerDescription($invoice),
                     transactionType: (string) $invoice->transaction_type,
                     printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
                     printingSubtypeName: $invoice->printing_subtype_name,
