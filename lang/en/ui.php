@@ -402,7 +402,7 @@ return [
     'settings_preferences_note' => 'Language and theme preferences.',
     'product_info' => 'Product Information',
     'product_info_note' => 'Complete the main product details.',
-    'product_code_format_hint' => 'Example format: mt1e5s156. Bahasa Indonesia: bhid, Bahasa Inggris: bhig.',
+    'product_code_format_hint' => 'Example format: mt1e5s156. Bahasa Indonesia: bhid, Bahasa Inggris: bhig, Bahasa Jawa: bhjw.',
     'product_code_use_auto' => 'Use automatic code',
     'product_code_auto_preview' => 'Auto: :code',
     'product_code_auto_preview_manual' => 'Auto: :code (manual mode)',

@@ -57,7 +57,7 @@ class ProductCodeGeneratorTest extends TestCase
         $this->assertSame('pmt1e5s156', $code);
     }
 
-    public function test_generate_base_distinguishes_indonesian_and_english_language_books(): void
+    public function test_generate_base_distinguishes_language_books(): void
     {
         $generator = app(ProductCodeGenerator::class);
 
@@ -68,6 +68,10 @@ class ProductCodeGeneratorTest extends TestCase
         $this->assertSame(
             'pbhig7e7s156',
             $generator->generateBase('Bahasa Inggris 7 Edisi 7 Smt 1 25/26', 'pintar')
+        );
+        $this->assertSame(
+            'pbhjw7e7s156',
+            $generator->generateBase('Bahasa Jawa 7 Edisi 7 Smt 1 25/26', 'pintar')
         );
     }
 

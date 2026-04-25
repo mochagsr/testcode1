@@ -157,6 +157,10 @@ class ProductCodeGenerator
             return 'bhig';
         }
 
+        if (preg_match('/\bbahasa\s+jawa\b/', $normalized) === 1) {
+            return 'bhjw';
+        }
+
         preg_match('/[a-z]+/', $normalized, $subjectMatch);
         $subjectRaw = $subjectMatch[0] ?? 'item';
 

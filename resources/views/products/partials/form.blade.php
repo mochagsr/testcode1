@@ -245,6 +245,8 @@
                 subject = 'bhid';
             } else if (/\bbahasa\s+inggris\b/.test(cleaned)) {
                 subject = 'bhig';
+            } else if (/\bbahasa\s+jawa\b/.test(cleaned)) {
+                subject = 'bhjw';
             } else {
                 const subjectMatch = cleaned.match(/[a-z]+/);
                 const subjectRaw = subjectMatch ? subjectMatch[0] : 'item';

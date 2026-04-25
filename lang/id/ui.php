@@ -402,7 +402,7 @@ return [
     'settings_preferences_note' => 'Bahasa dan tema tampilan aplikasi.',
     'product_info' => 'Informasi Barang',
     'product_info_note' => 'Lengkapi identitas utama barang.',
-    'product_code_format_hint' => 'Format contoh: mt1e5s156. Bahasa Indonesia: bhid, Bahasa Inggris: bhig.',
+    'product_code_format_hint' => 'Format contoh: mt1e5s156. Bahasa Indonesia: bhid, Bahasa Inggris: bhig, Bahasa Jawa: bhjw.',
     'product_code_use_auto' => 'Gunakan kode otomatis',
     'product_code_auto_preview' => 'Auto: :code',
     'product_code_auto_preview_manual' => 'Auto: :code (manual aktif)',
