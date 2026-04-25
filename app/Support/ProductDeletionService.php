@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\Product;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -15,38 +16,47 @@ class ProductDeletionService
      */
     public function deleteOrDeactivate(Product $product): array
     {
-        return DB::transaction(function () use ($product): array {
-            $lockedProduct = Product::query()
-                ->whereKey($product->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        try {
+            return DB::transaction(function () use ($product): array {
+                $lockedProduct = Product::query()
+                    ->whereKey($product->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            $code = (string) ($lockedProduct->code ?? '-');
+                $code = (string) ($lockedProduct->code ?? '-');
 
-            if ($this->hasBusinessUsage((int) $lockedProduct->id)) {
-                $lockedProduct->update(['is_active' => false]);
+                if ($this->hasBusinessUsage((int) $lockedProduct->id)) {
+                    return $this->deactivate($lockedProduct);
+                }
+
+                if (Schema::hasTable('stock_mutations') && Schema::hasColumn('stock_mutations', 'product_id')) {
+                    DB::table('stock_mutations')
+                        ->where('product_id', (int) $lockedProduct->id)
+                        ->delete();
+                }
+
+                $lockedProduct->delete();
 
                 return [
-                    'status' => 'deactivated',
+                    'status' => 'deleted',
                     'code' => $code,
-                    'product' => $lockedProduct->fresh(),
+                    'product' => null,
                 ];
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isDeleteBlockedByRelation($exception)) {
+                throw $exception;
             }
 
-            if (Schema::hasTable('stock_mutations') && Schema::hasColumn('stock_mutations', 'product_id')) {
-                DB::table('stock_mutations')
-                    ->where('product_id', (int) $lockedProduct->id)
-                    ->delete();
-            }
+            return DB::transaction(function () use ($product): array {
+                $lockedProduct = Product::query()
+                    ->whereKey($product->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            $lockedProduct->delete();
-
-            return [
-                'status' => 'deleted',
-                'code' => $code,
-                'product' => null,
-            ];
-        });
+                return $this->deactivate($lockedProduct);
+            });
+        }
     }
 
     private function hasBusinessUsage(int $productId): bool
@@ -80,5 +90,29 @@ class ProductDeletionService
             'order_note_items',
             'school_bulk_transaction_items',
         ];
+    }
+
+    /**
+     * @return array{status:string, code:string, product:?Product}
+     */
+    private function deactivate(Product $product): array
+    {
+        $code = (string) ($product->code ?? '-');
+        $product->update(['is_active' => false]);
+
+        return [
+            'status' => 'deactivated',
+            'code' => $code,
+            'product' => $product->fresh(),
+        ];
+    }
+
+    private function isDeleteBlockedByRelation(QueryException $exception): bool
+    {
+        $sqlState = (string) $exception->getCode();
+        $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+
+        return in_array($sqlState, ['23000', '23503'], true)
+            || in_array($driverCode, [1451, 1452], true);
     }
 }
