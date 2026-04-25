@@ -80,6 +80,7 @@
             $companyEmail !== '' ? 'Email: '.$companyEmail : '',
             $companyNotes,
         ])->filter(fn (string $line): bool => trim($line) !== '');
+        $schoolBreakdownRows = collect($schoolBreakdown ?? []);
     @endphp
 
     @if(empty($isPdf))
@@ -202,6 +203,52 @@
         </tr>
         </tbody>
     </table>
+
+    @if($schoolBreakdownRows->isNotEmpty())
+        <table>
+            <thead>
+            <tr>
+                <th colspan="7" style="text-align:left;">{{ __('receivable.school_breakdown_title') }}</th>
+            </tr>
+            <tr>
+                <th style="width: 20%;">{{ __('receivable.school_name') }}</th>
+                <th style="width: 14%;">{{ __('receivable.school_city') }}</th>
+                <th style="width: 12%;">{{ __('receivable.bill_date') }}</th>
+                <th style="width: 20%;">{{ __('receivable.bill_proof_number') }}</th>
+                <th style="width: 12%;">{{ __('receivable.school_invoice_total') }}</th>
+                <th style="width: 11%;">{{ __('receivable.school_paid_total') }}</th>
+                <th style="width: 11%;">{{ __('receivable.school_balance_total') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($schoolBreakdownRows as $group)
+                @php
+                    $groupRows = collect($group['rows'] ?? []);
+                    $schoolName = (string) ($group['school_name'] ?? '-');
+                    $schoolCity = (string) ($group['school_city'] ?? '-');
+                @endphp
+                @foreach($groupRows as $groupRow)
+                    <tr>
+                        <td>{{ $schoolName }}</td>
+                        <td>{{ $schoolCity }}</td>
+                        <td>{{ $groupRow['date_label'] ?? '' }}</td>
+                        <td>{{ $groupRow['invoice_number'] ?? '' }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($groupRow['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($groupRow['paid_total'] ?? 0)), 0, ',', '.') }}</td>
+                        <td class="num">Rp {{ number_format((int) round((float) ($groupRow['balance_total'] ?? 0)), 0, ',', '.') }}</td>
+                    </tr>
+                @endforeach
+                @php $groupTotals = (array) ($group['totals'] ?? []); @endphp
+                <tr class="total-row">
+                    <td colspan="4" style="text-align:right;">{{ __('receivable.bill_total') }} {{ $schoolName }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['paid_total'] ?? 0)), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['balance_total'] ?? 0)), 0, ',', '.') }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    @endif
 
     @if($notesText !== '' || $transferText !== '')
         <div class="footer-summary">
