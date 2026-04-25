@@ -149,16 +149,8 @@ class ProductCodeGenerator
 
     private function subjectToken(string $normalized): string
     {
-        if (preg_match('/\bbahasa\s+indonesia\b/', $normalized) === 1) {
-            return 'bhid';
-        }
-
-        if (preg_match('/\bbahasa\s+inggris\b/', $normalized) === 1) {
-            return 'bhig';
-        }
-
-        if (preg_match('/\bbahasa\s+jawa\b/', $normalized) === 1) {
-            return 'bhjw';
+        if (preg_match('/\bbahasa\s+([a-z]+)/', $normalized, $languageMatch) === 1) {
+            return 'b'.$this->compactSubjectToken((string) ($languageMatch[1] ?? ''));
         }
 
         preg_match('/[a-z]+/', $normalized, $subjectMatch);

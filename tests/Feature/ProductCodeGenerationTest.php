@@ -112,17 +112,41 @@ class ProductCodeGenerationTest extends TestCase
             'name' => 'Bahasa Jawa 7 Edisi 7 Smt 1 25/26',
         ])->assertRedirect(route('products.index'));
 
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + [
+            'name' => 'Bahasa Sunda 7 Edisi 7 Smt 1 25/26',
+        ])->assertRedirect(route('products.index'));
+
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + [
+            'name' => 'Bahasa Madura 7 Edisi 7 Smt 1 25/26',
+        ])->assertRedirect(route('products.index'));
+
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + [
+            'name' => 'Bahasa Bali 7 Edisi 7 Smt 1 25/26',
+        ])->assertRedirect(route('products.index'));
+
         $this->assertDatabaseHas('products', [
             'name' => 'Bahasa Indonesia 7 Edisi 7 Smt 1 25/26',
-            'code' => 'pbhid7e7s156',
+            'code' => 'pbnd7e7s156',
         ]);
         $this->assertDatabaseHas('products', [
             'name' => 'Bahasa Inggris 7 Edisi 7 Smt 1 25/26',
-            'code' => 'pbhig7e7s156',
+            'code' => 'pbng7e7s156',
         ]);
         $this->assertDatabaseHas('products', [
             'name' => 'Bahasa Jawa 7 Edisi 7 Smt 1 25/26',
-            'code' => 'pbhjw7e7s156',
+            'code' => 'pbjw7e7s156',
+        ]);
+        $this->assertDatabaseHas('products', [
+            'name' => 'Bahasa Sunda 7 Edisi 7 Smt 1 25/26',
+            'code' => 'pbsn7e7s156',
+        ]);
+        $this->assertDatabaseHas('products', [
+            'name' => 'Bahasa Madura 7 Edisi 7 Smt 1 25/26',
+            'code' => 'pbmd7e7s156',
+        ]);
+        $this->assertDatabaseHas('products', [
+            'name' => 'Bahasa Bali 7 Edisi 7 Smt 1 25/26',
+            'code' => 'pbbl7e7s156',
         ]);
     }
 

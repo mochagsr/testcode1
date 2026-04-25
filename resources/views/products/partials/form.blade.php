@@ -241,12 +241,14 @@
             }
 
             let subject = '';
-            if (/\bbahasa\s+indonesia\b/.test(cleaned)) {
-                subject = 'bhid';
-            } else if (/\bbahasa\s+inggris\b/.test(cleaned)) {
-                subject = 'bhig';
-            } else if (/\bbahasa\s+jawa\b/.test(cleaned)) {
-                subject = 'bhjw';
+            const languageMatch = cleaned.match(/\bbahasa\s+([a-z]+)/);
+            if (languageMatch) {
+                const language = languageMatch[1] || '';
+                subject = language.replace(/[aeiou]/g, '').slice(0, 2);
+                if (!subject) {
+                    subject = language.slice(0, 2);
+                }
+                subject = `b${subject || 'it'}`;
             } else {
                 const subjectMatch = cleaned.match(/[a-z]+/);
                 const subjectRaw = subjectMatch ? subjectMatch[0] : 'item';

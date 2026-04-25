@@ -62,16 +62,28 @@ class ProductCodeGeneratorTest extends TestCase
         $generator = app(ProductCodeGenerator::class);
 
         $this->assertSame(
-            'pbhid7e7s156',
+            'pbnd7e7s156',
             $generator->generateBase('Bahasa Indonesia 7 Edisi 7 Smt 1 25/26', 'pintar')
         );
         $this->assertSame(
-            'pbhig7e7s156',
+            'pbng7e7s156',
             $generator->generateBase('Bahasa Inggris 7 Edisi 7 Smt 1 25/26', 'pintar')
         );
         $this->assertSame(
-            'pbhjw7e7s156',
+            'pbjw7e7s156',
             $generator->generateBase('Bahasa Jawa 7 Edisi 7 Smt 1 25/26', 'pintar')
+        );
+        $this->assertSame(
+            'pbsn7e7s156',
+            $generator->generateBase('Bahasa Sunda 7 Edisi 7 Smt 1 25/26', 'pintar')
+        );
+        $this->assertSame(
+            'pbmd7e7s156',
+            $generator->generateBase('Bahasa Madura 7 Edisi 7 Smt 1 25/26', 'pintar')
+        );
+        $this->assertSame(
+            'pbbl7e7s156',
+            $generator->generateBase('Bahasa Bali 7 Edisi 7 Smt 1 25/26', 'pintar')
         );
     }
 
