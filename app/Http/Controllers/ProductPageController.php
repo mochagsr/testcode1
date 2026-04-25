@@ -17,6 +17,7 @@ use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
+use App\Support\ProductDeletionService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -37,7 +38,8 @@ class ProductPageController extends Controller
 
     public function __construct(
         private readonly AuditLogService $auditLogService,
-        private readonly ProductCodeGenerator $productCodeGenerator
+        private readonly ProductCodeGenerator $productCodeGenerator,
+        private readonly ProductDeletionService $productDeletionService
     ) {}
 
     public function index(Request $request): View
@@ -402,19 +404,27 @@ class ProductPageController extends Controller
 
     public function destroy(Request $request, Product $product): RedirectResponse
     {
-        $code = $product->code;
-        $product->delete();
+        $result = $this->productDeletionService->deleteOrDeactivate($product);
+        $code = (string) ($result['code'] ?? '-');
+        $status = (string) ($result['status'] ?? 'deleted');
+        $targetProduct = $result['product'] instanceof Product ? $result['product'] : null;
+
         $this->auditLogService->log(
-            'master.product.delete',
-            null,
-            __('ui.audit_desc_product_deleted_short', ['code' => (string) ($code ?? '-')]),
+            $status === 'deactivated' ? 'master.product.update' : 'master.product.delete',
+            $targetProduct,
+            $status === 'deactivated'
+                ? __('ui.audit_desc_product_deactivated_short', ['code' => $code])
+                : __('ui.audit_desc_product_deleted_short', ['code' => $code]),
             $request
         );
         AppCache::forgetAfterFinancialMutation();
 
         return redirect()
             ->route('products.index')
-            ->with('success', __('ui.product_deleted_success'));
+            ->with('success', $status === 'deactivated'
+                ? __('ui.product_deactivated_success')
+                : __('ui.product_deleted_success'))
+            ->with('success_type', 'decrease');
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
+use App\Support\ProductDeletionService;
 use App\Support\ValidatesSearchTokens;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +23,8 @@ class ProductController extends Controller
     use ValidatesSearchTokens;
 
     public function __construct(
-        private readonly ProductCodeGenerator $productCodeGenerator
+        private readonly ProductCodeGenerator $productCodeGenerator,
+        private readonly ProductDeletionService $productDeletionService
     ) {}
 
     /**
@@ -190,8 +192,16 @@ class ProductController extends Controller
      */
     public function destroy(Product $product): JsonResponse
     {
-        $product->delete();
+        $result = $this->productDeletionService->deleteOrDeactivate($product);
         AppCache::bumpLookupVersion();
+
+        if (($result['status'] ?? '') === 'deactivated') {
+            return response()->json([
+                'ok' => true,
+                'status' => 'deactivated',
+                'message' => __('ui.product_deactivated_success'),
+            ]);
+        }
 
         return response()->json(status: 204);
     }
