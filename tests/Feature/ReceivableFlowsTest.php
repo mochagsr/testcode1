@@ -1464,6 +1464,45 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee(__('ui.semester_close_button'));
     }
 
+    public function test_paid_customer_semester_stays_open_until_manually_closed(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-PAID-OPEN-001',
+            'name' => 'Customer Paid Open',
+            'city' => 'Malang',
+        ]);
+
+        SalesInvoice::query()->create([
+            'invoice_number' => 'INV-PAID-OPEN-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-03-12',
+            'semester_period' => 'S2-2526',
+            'subtotal' => 125000,
+            'total' => 125000,
+            'total_paid' => 125000,
+            'balance' => 0,
+            'payment_status' => 'paid',
+            'is_canceled' => false,
+        ]);
+
+        $service = app(\App\Support\SemesterBookService::class);
+        $states = $service->customerSemesterLockStates([(int) $customer->id], 'S2-2526');
+
+        $this->assertFalse($service->isCustomerLocked((int) $customer->id, 'S2-2526'));
+        $this->assertFalse((bool) ($states[(int) $customer->id]['locked'] ?? true));
+        $this->assertFalse((bool) ($states[(int) $customer->id]['auto'] ?? true));
+
+        $response = $this->actingAs($admin)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+            'semester' => 'S2-2526',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.customer_semester_unlocked'));
+        $response->assertDontSee('Terkunci Otomatis', false);
+    }
+
     public function test_user_with_receivable_lock_permission_can_access_customer_semester_book_controls(): void
     {
         $user = User::factory()->create([

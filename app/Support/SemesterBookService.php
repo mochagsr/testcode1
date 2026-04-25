@@ -434,29 +434,13 @@ class SemesterBookService
 
     public function isCustomerAutoClosed(?int $customerId, ?string $semester): bool
     {
-        $normalizedSemester = $this->normalizeSemester((string) $semester);
-        $normalizedCustomerId = (int) ($customerId ?? 0);
-        if ($normalizedSemester === null || $normalizedCustomerId <= 0) {
-            return false;
-        }
-
-        $aggregate = SalesInvoice::query()
-            ->selectRaw('COUNT(*) as invoice_count, COALESCE(SUM(balance), 0) as outstanding')
-            ->where('customer_id', $normalizedCustomerId)
-            ->where('is_canceled', false)
-            ->where('semester_period', $normalizedSemester)
-            ->first();
-
-        $invoiceCount = (int) ($aggregate?->invoice_count ?? 0);
-        $outstanding = (float) ($aggregate?->outstanding ?? 0);
-
-        return $invoiceCount > 0 && round($outstanding) <= 0;
+        // Paid-off customers are only "ready to close"; the actual lock is manual.
+        return false;
     }
 
     public function isCustomerLocked(?int $customerId, ?string $semester): bool
     {
-        return $this->isCustomerClosed($customerId, $semester)
-            || $this->isCustomerAutoClosed($customerId, $semester);
+        return $this->isCustomerClosed($customerId, $semester);
     }
 
     /**
@@ -503,10 +487,10 @@ class SemesterBookService
             $invoiceCount = (int) ($aggregate?->invoice_count ?? 0);
             $outstanding = (int) round((float) ($aggregate?->outstanding ?? 0));
             $manual = (bool) $manualClosedMap->get($customerId, false);
-            $auto = $invoiceCount > 0 && $outstanding <= 0;
+            $auto = false;
 
             $states[$customerId] = [
-                'locked' => $manual || $auto,
+                'locked' => $manual,
                 'manual' => $manual,
                 'auto' => $auto,
                 'outstanding' => $outstanding,
@@ -582,10 +566,10 @@ class SemesterBookService
             $invoiceCount = (int) ($aggregateMap[$key]['invoice_count'] ?? 0);
             $outstanding = (int) ($aggregateMap[$key]['outstanding'] ?? 0);
             $manual = (bool) ($manualMap[$key] ?? false);
-            $auto = $invoiceCount > 0 && $outstanding <= 0;
+            $auto = false;
 
             $states[$key] = [
-                'locked' => $manual || $auto,
+                'locked' => $manual,
                 'manual' => $manual,
                 'auto' => $auto,
                 'outstanding' => $outstanding,

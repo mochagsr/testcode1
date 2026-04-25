@@ -494,9 +494,7 @@
                         | {{ $selectedSemester }}
                         |
                         @if($selectedCustomerSemesterClosed)
-                            @if(($customerSemesterAutoClosedMap[$selectedCustomerId] ?? false) === true)
-                                {{ __('receivable.customer_semester_locked_auto') }}
-                            @elseif(($customerSemesterManualClosedMap[$selectedCustomerId] ?? false) === true)
+                            @if(($customerSemesterManualClosedMap[$selectedCustomerId] ?? false) === true)
                                 {{ __('receivable.customer_semester_locked_manual') }}
                             @else
                                 {{ __('receivable.customer_semester_closed') }}
@@ -556,7 +554,6 @@
                     @forelse($customers as $customer)
                         @php
                             $rowCustomerSemesterClosed = $selectedSemester ? ((bool) ($customerSemesterClosedMap[$customer->id] ?? false)) : false;
-                            $rowCustomerSemesterAutoClosed = $selectedSemester ? ((bool) ($customerSemesterAutoClosedMap[$customer->id] ?? false)) : false;
                             $rowCustomerSemesterManualClosed = $selectedSemester ? ((bool) ($customerSemesterManualClosedMap[$customer->id] ?? false)) : false;
                         @endphp
                         <tr>
@@ -565,9 +562,7 @@
                                 @if($selectedSemester)
                                     <span class="badge receivable-customer-lock {{ $rowCustomerSemesterClosed ? 'danger' : 'success' }}">
                                         @if($rowCustomerSemesterClosed)
-                                            @if($rowCustomerSemesterAutoClosed)
-                                                {{ __('receivable.customer_semester_locked_auto') }}
-                                            @elseif($rowCustomerSemesterManualClosed)
+                                            @if($rowCustomerSemesterManualClosed)
                                                 {{ __('receivable.customer_semester_locked_manual') }}
                                             @else
                                                 {{ __('receivable.customer_semester_closed') }}

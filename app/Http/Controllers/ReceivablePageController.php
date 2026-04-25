@@ -123,7 +123,6 @@ class ReceivablePageController extends Controller
             ? $this->semesterBookService->isActive($selectedSemester)
             : true;
         $customerSemesterClosedMap = [];
-        $customerSemesterAutoClosedMap = [];
         $customerSemesterManualClosedMap = [];
         if ($selectedSemester !== null) {
             $lockStates = $this->semesterBookService->customerSemesterLockStates(
@@ -133,7 +132,6 @@ class ReceivablePageController extends Controller
             foreach ($customers as $customerRow) {
                 $state = $lockStates[(int) $customerRow->id] ?? null;
                 $customerSemesterClosedMap[(int) $customerRow->id] = (bool) ($state['locked'] ?? false);
-                $customerSemesterAutoClosedMap[(int) $customerRow->id] = (bool) ($state['auto'] ?? false);
                 $customerSemesterManualClosedMap[(int) $customerRow->id] = (bool) ($state['manual'] ?? false);
             }
         }
@@ -274,7 +272,6 @@ class ReceivablePageController extends Controller
             'selectedSemesterGlobalClosed' => $selectedSemesterGlobalClosed,
             'selectedSemesterActive' => $selectedSemesterActive,
             'customerSemesterClosedMap' => $customerSemesterClosedMap,
-            'customerSemesterAutoClosedMap' => $customerSemesterAutoClosedMap,
             'customerSemesterManualClosedMap' => $customerSemesterManualClosedMap,
             'paymentRefsWithAlloc' => $paymentRefsWithAlloc,
             'salesReturnLinkMap' => $salesReturnLinkMap,

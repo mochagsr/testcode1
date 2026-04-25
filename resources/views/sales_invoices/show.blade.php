@@ -123,9 +123,7 @@
                     <div>
                         @if((bool) ($customerSemesterLockState['locked'] ?? false))
                             <span class="badge danger">
-                                @if((bool) ($customerSemesterLockState['auto'] ?? false))
-                                    {{ __('receivable.customer_semester_locked_auto') }}
-                                @elseif((bool) ($customerSemesterLockState['manual'] ?? false))
+                                @if((bool) ($customerSemesterLockState['manual'] ?? false))
                                     {{ __('receivable.customer_semester_locked_manual') }}
                                 @else
                                     {{ __('receivable.customer_semester_closed') }}
