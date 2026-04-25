@@ -43,9 +43,7 @@ class ProductCodeGenerator
             return 'item';
         }
 
-        preg_match('/[a-z]+/', $normalized, $subjectMatch);
-        $subjectRaw = $subjectMatch[0] ?? 'item';
-        $subject = $this->compactSubjectToken($subjectRaw);
+        $subject = $this->subjectToken($normalized);
 
         preg_match('/\b(\d+)\b/', $normalized, $numberMatch);
         $level = $numberMatch[1] ?? '';
@@ -147,6 +145,22 @@ class ProductCodeGenerator
         }
 
         return $token !== '' ? $token : 'it';
+    }
+
+    private function subjectToken(string $normalized): string
+    {
+        if (preg_match('/\bbahasa\s+indonesia\b/', $normalized) === 1) {
+            return 'bhid';
+        }
+
+        if (preg_match('/\bbahasa\s+inggris\b/', $normalized) === 1) {
+            return 'bhig';
+        }
+
+        preg_match('/[a-z]+/', $normalized, $subjectMatch);
+        $subjectRaw = $subjectMatch[0] ?? 'item';
+
+        return $this->compactSubjectToken($subjectRaw);
     }
 
     private function productCodeExists(string $code, ?int $ignoreId = null): bool

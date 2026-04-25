@@ -57,6 +57,20 @@ class ProductCodeGeneratorTest extends TestCase
         $this->assertSame('pmt1e5s156', $code);
     }
 
+    public function test_generate_base_distinguishes_indonesian_and_english_language_books(): void
+    {
+        $generator = app(ProductCodeGenerator::class);
+
+        $this->assertSame(
+            'pbhid7e7s156',
+            $generator->generateBase('Bahasa Indonesia 7 Edisi 7 Smt 1 25/26', 'pintar')
+        );
+        $this->assertSame(
+            'pbhig7e7s156',
+            $generator->generateBase('Bahasa Inggris 7 Edisi 7 Smt 1 25/26', 'pintar')
+        );
+    }
+
     public function test_generate_base_adds_prefix_for_paket_categories(): void
     {
         $generator = app(ProductCodeGenerator::class);

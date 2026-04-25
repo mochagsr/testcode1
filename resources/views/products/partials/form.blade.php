@@ -240,14 +240,21 @@
                 return 'item';
             }
 
-            const subjectMatch = cleaned.match(/[a-z]+/);
-            const subjectRaw = subjectMatch ? subjectMatch[0] : 'item';
-            let subject = subjectRaw.replace(/[aeiou]/g, '').slice(0, 2);
-            if (!subject) {
-                subject = subjectRaw.slice(0, 2);
-            }
-            if (!subject) {
-                subject = 'it';
+            let subject = '';
+            if (/\bbahasa\s+indonesia\b/.test(cleaned)) {
+                subject = 'bhid';
+            } else if (/\bbahasa\s+inggris\b/.test(cleaned)) {
+                subject = 'bhig';
+            } else {
+                const subjectMatch = cleaned.match(/[a-z]+/);
+                const subjectRaw = subjectMatch ? subjectMatch[0] : 'item';
+                subject = subjectRaw.replace(/[aeiou]/g, '').slice(0, 2);
+                if (!subject) {
+                    subject = subjectRaw.slice(0, 2);
+                }
+                if (!subject) {
+                    subject = 'it';
+                }
             }
 
             const levelMatch = cleaned.match(/\b(\d+)\b/);

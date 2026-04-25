@@ -82,6 +82,42 @@ class ProductCodeGenerationTest extends TestCase
         ]);
     }
 
+    public function test_web_store_generates_distinct_codes_for_indonesian_and_english_books(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $pintar = ItemCategory::query()->create([
+            'code' => 'CAT-PINTAR',
+            'name' => 'pintar',
+        ]);
+
+        $payloadBase = [
+            'item_category_id' => $pintar->id,
+            'code' => '',
+            'unit' => 'exp',
+            'stock' => 10,
+            'price_agent' => 3200,
+            'price_sales' => 3500,
+            'price_general' => 12000,
+        ];
+
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + [
+            'name' => 'Bahasa Indonesia 7 Edisi 7 Smt 1 25/26',
+        ])->assertRedirect(route('products.index'));
+
+        $this->actingAs($admin)->post(route('products.store'), $payloadBase + [
+            'name' => 'Bahasa Inggris 7 Edisi 7 Smt 1 25/26',
+        ])->assertRedirect(route('products.index'));
+
+        $this->assertDatabaseHas('products', [
+            'name' => 'Bahasa Indonesia 7 Edisi 7 Smt 1 25/26',
+            'code' => 'pbhid7e7s156',
+        ]);
+        $this->assertDatabaseHas('products', [
+            'name' => 'Bahasa Inggris 7 Edisi 7 Smt 1 25/26',
+            'code' => 'pbhig7e7s156',
+        ]);
+    }
+
     public function test_web_store_adds_category_prefix_for_paket_levels(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
