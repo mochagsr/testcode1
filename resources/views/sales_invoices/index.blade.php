@@ -17,14 +17,6 @@
     <div class="page-header-actions">
         <h1 class="page-title">{{ __('txn.sales_invoices_title') }}</h1>
         <div class="actions">
-            @if(auth()->user()?->canAccess('imports.transactions'))
-                <a class="btn info-btn" href="{{ route('sales-invoices.import.template') }}">Template Import</a>
-                <form method="post" action="{{ route('sales-invoices.import') }}" enctype="multipart/form-data" class="flex">
-                    @csrf
-                    <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required style="max-width: 220px;">
-                    <button type="submit" class="btn process-btn">Import</button>
-                </form>
-            @endif
             @if(auth()->user()?->canAccess('sales_invoices.create'))
                 <a class="btn process-btn" href="{{ route('sales-invoices.pending-delivery-notes') }}">{{ __('txn.pending_delivery_notes_invoice') }}</a>
                 <a class="btn create-transaction-btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice_manual') }}</a>

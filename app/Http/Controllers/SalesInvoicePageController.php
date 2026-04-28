@@ -1331,13 +1331,21 @@ class SalesInvoicePageController extends Controller
             ->selectRaw('sii.delivery_note_item_id, COALESCE(SUM(sii.quantity), 0) as invoiced_qty')
             ->groupBy('sii.delivery_note_item_id');
 
+        $deliveryTotalsSubquery = DB::table('delivery_note_items as dni')
+            ->leftJoinSub($invoicedSubquery, 'invoiced_items', function ($join): void {
+                $join->on('invoiced_items.delivery_note_item_id', '=', 'dni.id');
+            })
+            ->selectRaw('dni.delivery_note_id')
+            ->selectRaw('COALESCE(SUM(dni.quantity), 0) as delivered_qty')
+            ->selectRaw('COALESCE(SUM(COALESCE(invoiced_items.invoiced_qty, 0)), 0) as invoiced_qty')
+            ->groupBy('dni.delivery_note_id');
+
         return DeliveryNote::query()
             ->select('delivery_notes.*')
-            ->selectRaw('COALESCE(SUM(delivery_note_items.quantity), 0) as delivered_qty')
-            ->selectRaw('COALESCE(SUM(COALESCE(invoiced_items.invoiced_qty, 0)), 0) as invoiced_qty')
-            ->leftJoin('delivery_note_items', 'delivery_note_items.delivery_note_id', '=', 'delivery_notes.id')
-            ->leftJoinSub($invoicedSubquery, 'invoiced_items', function ($join): void {
-                $join->on('invoiced_items.delivery_note_item_id', '=', 'delivery_note_items.id');
+            ->selectRaw('delivery_totals.delivered_qty')
+            ->selectRaw('delivery_totals.invoiced_qty')
+            ->joinSub($deliveryTotalsSubquery, 'delivery_totals', function ($join): void {
+                $join->on('delivery_totals.delivery_note_id', '=', 'delivery_notes.id');
             })
             ->with(['customer:id,name,city', 'orderNote:id,note_number'])
             ->where('delivery_notes.is_canceled', false)
@@ -1348,8 +1356,7 @@ class SalesInvoicePageController extends Controller
                         ->orWhere('delivery_notes.city', 'like', "%{$search}%");
                 });
             })
-            ->groupBy('delivery_notes.id')
-            ->havingRaw('COALESCE(SUM(delivery_note_items.quantity), 0) > COALESCE(SUM(COALESCE(invoiced_items.invoiced_qty, 0)), 0)')
+            ->whereRaw('delivery_totals.delivered_qty > delivery_totals.invoiced_qty')
             ->orderByDesc('delivery_notes.note_date')
             ->orderByDesc('delivery_notes.id');
     }
