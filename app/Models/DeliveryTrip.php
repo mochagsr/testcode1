@@ -110,4 +110,3 @@ class DeliveryTrip extends Model
         });
     }
 }
-

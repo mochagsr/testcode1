@@ -234,8 +234,8 @@ class Customer extends Model
         }
 
         $tokens = collect(preg_split('/\s+/u', mb_strtolower($search)) ?: [])
-            ->map(static fn($token): string => preg_replace('/[^\pL\pN]/u', '', (string) $token) ?? '')
-            ->filter(static fn(string $token): bool => $token !== '')
+            ->map(static fn ($token): string => preg_replace('/[^\pL\pN]/u', '', (string) $token) ?? '')
+            ->filter(static fn (string $token): bool => $token !== '')
             ->values();
 
         return $query->where(function (Builder $subQuery) use ($search, $tokens): void {
@@ -273,7 +273,6 @@ class Customer extends Model
      * Scope: Filter customers by city.
      *
      * @param  Builder<Customer>  $query
-     * @param  string  $city
      * @return Builder<Customer>
      */
     public function scopeInCity(Builder $query, string $city): Builder

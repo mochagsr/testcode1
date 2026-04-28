@@ -73,9 +73,6 @@ class SalesInvoiceItem extends Model
 
     /**
      * Scope to filter active items (not canceled).
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -84,9 +81,6 @@ class SalesInvoiceItem extends Model
 
     /**
      * Scope to eager load the associated sales invoice.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeWithInvoiceInfo(Builder $query): Builder
     {
@@ -95,9 +89,6 @@ class SalesInvoiceItem extends Model
 
     /**
      * Scope to eager load the associated product.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeWithProductInfo(Builder $query): Builder
     {
@@ -106,9 +97,6 @@ class SalesInvoiceItem extends Model
 
     /**
      * Scope to order items by position ascending.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeOrderByPosition(Builder $query): Builder
     {

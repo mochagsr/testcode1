@@ -34,7 +34,7 @@ trait ResolvesProductUnits
     {
         return collect($this->configuredProductUnitOptions())
             ->pluck('code')
-            ->filter(fn(string $code): bool => $code !== '')
+            ->filter(fn (string $code): bool => $code !== '')
             ->values()
             ->all();
     }

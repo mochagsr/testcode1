@@ -18,7 +18,7 @@ class EnsureIdempotentRequest
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!in_array(strtoupper($request->method()), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        if (! in_array(strtoupper($request->method()), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             return $next($request);
         }
 
@@ -31,7 +31,7 @@ class EnsureIdempotentRequest
             : sha1(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
         $cacheKey = "idempotency:{$userId}:{$route}:{$fingerprint}";
 
-        if (!Cache::add($cacheKey, now()->timestamp, now()->addSeconds(30))) {
+        if (! Cache::add($cacheKey, now()->timestamp, now()->addSeconds(30))) {
             return back()
                 ->withErrors(['submit' => __('ui.duplicate_submit_blocked')])
                 ->withInput()

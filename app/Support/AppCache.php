@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 final class AppCache
 {
     private const LOOKUP_CACHE_VERSION_KEY = 'lookups.cache.version';
+
     private const DEFAULT_LOOKUP_VERSION = 1;
 
     /**
@@ -38,6 +39,7 @@ final class AppCache
             self::forgetLookupKey($prefix);
         }
     }
+
     /**
      * Forget sales invoice and related summary caches.
      */
@@ -64,10 +66,10 @@ final class AppCache
             ]);
 
             // Legacy/non-versioned keys.
-            Cache::forget('sales_invoices.index.today_summary.' . $status);
-            Cache::forget('sales_returns.index.today_summary.' . $status);
-            Cache::forget('delivery_notes.index.today_summary.' . $status);
-            Cache::forget('order_notes.index.today_summary.' . $status);
+            Cache::forget('sales_invoices.index.today_summary.'.$status);
+            Cache::forget('sales_returns.index.today_summary.'.$status);
+            Cache::forget('delivery_notes.index.today_summary.'.$status);
+            Cache::forget('order_notes.index.today_summary.'.$status);
         }
     }
 
@@ -89,13 +91,13 @@ final class AppCache
                     return null;
                 }
             })
-            ->filter(fn(?string $month): bool => $month !== null)
+            ->filter(fn (?string $month): bool => $month !== null)
             ->unique()
             ->values();
 
         foreach ($monthKeys as $month) {
-            Cache::forget('dashboard.summary.' . $month . '.with_outgoing');
-            Cache::forget('dashboard.summary.' . $month . '.without_outgoing');
+            Cache::forget('dashboard.summary.'.$month.'.with_outgoing');
+            Cache::forget('dashboard.summary.'.$month.'.without_outgoing');
         }
     }
 
@@ -136,15 +138,16 @@ final class AppCache
     /**
      * Generate a versioned cache key with parameters.
      *
-     * @param  string  $prefix The cache key prefix
-     * @param  array<string, mixed>  $params Cache parameters
+     * @param  string  $prefix  The cache key prefix
+     * @param  array<string, mixed>  $params  Cache parameters
      * @return string The generated cache key
      */
     public static function lookupCacheKey(string $prefix, array $params = []): string
     {
         ksort($params);
         $jsonEncoded = json_encode($params, JSON_UNESCAPED_UNICODE) ?: '';
-        return $prefix . '.v' . self::lookupVersion() . '.' . md5($jsonEncoded);
+
+        return $prefix.'.v'.self::lookupVersion().'.'.md5($jsonEncoded);
     }
 
     /**

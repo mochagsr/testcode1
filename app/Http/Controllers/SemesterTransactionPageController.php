@@ -12,6 +12,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use SanderMuller\FluentValidation\FluentRule;
 
 class SemesterTransactionPageController extends Controller
 {
@@ -76,10 +77,10 @@ class SemesterTransactionPageController extends Controller
     public function bulkAction(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'semester' => ['required', 'string', 'max:30'],
-            'type' => ['nullable', 'string', 'max:40'],
-            'action' => ['required', 'in:close_customer_all,open_customer_all,close_supplier_all,open_supplier_all,export_print,export_pdf,export_excel'],
-            'search' => ['nullable', 'string', 'max:120'],
+            'semester' => FluentRule::string()->required()->max(30),
+            'type' => FluentRule::string()->nullable()->max(40),
+            'action' => FluentRule::field()->required()->rule('in:close_customer_all,open_customer_all,close_supplier_all,open_supplier_all,export_print,export_pdf,export_excel'),
+            'search' => FluentRule::string()->nullable()->max(120),
         ]);
 
         $semester = $this->semesterBookService->normalizeSemester((string) $data['semester']);
@@ -265,34 +266,34 @@ class SemesterTransactionPageController extends Controller
     private function semesterOptions(): \Illuminate\Support\Collection
     {
         $configured = collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('semester_period_options', '')) ?: [])
-            ->map(fn(string $item): string => trim($item))
-            ->filter(fn(string $item): bool => $item !== '')
-            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn(?string $item): bool => $item !== null);
+            ->map(fn (string $item): string => trim($item))
+            ->filter(fn (string $item): bool => $item !== '')
+            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn (?string $item): bool => $item !== null);
 
         $invoiceSemesters = DB::table('sales_invoices')
             ->whereNotNull('semester_period')
             ->where('semester_period', '!=', '')
             ->distinct()
             ->pluck('semester_period')
-            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn(?string $item): bool => $item !== null);
+            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn (?string $item): bool => $item !== null);
 
         $returnSemesters = DB::table('sales_returns')
             ->whereNotNull('semester_period')
             ->where('semester_period', '!=', '')
             ->distinct()
             ->pluck('semester_period')
-            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn(?string $item): bool => $item !== null);
+            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn (?string $item): bool => $item !== null);
 
         $outgoingSemesters = DB::table('outgoing_transactions')
             ->whereNotNull('semester_period')
             ->where('semester_period', '!=', '')
             ->distinct()
             ->pluck('semester_period')
-            ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-            ->filter(fn(?string $item): bool => $item !== null);
+            ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+            ->filter(fn (?string $item): bool => $item !== null);
 
         return $this->semesterBookService->sortSemesterCollection(
             $configured

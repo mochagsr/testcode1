@@ -76,7 +76,7 @@ class AuditLogPageController extends Controller
         $filename = 'audit-logs-'.$this->nowWib()->format('Ymd-His').'.xlsx';
 
         return response()->streamDownload(function () use ($logQuery, $logCount): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Audit Logs');
             $rows = [[
@@ -157,7 +157,7 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @param array{search:string,documentCode:string,selectedModule:string,dateFrom:string,dateTo:string} $filters
+     * @param  array{search:string,documentCode:string,selectedModule:string,dateFrom:string,dateTo:string}  $filters
      */
     private function buildFilteredLogsQuery(array $filters)
     {
@@ -240,6 +240,7 @@ class AuditLogPageController extends Controller
                                     ->whereIn('subject_id', SalesInvoice::query()
                                         ->where('invoice_number', $documentCode)
                                         ->select('id'));
+
                                 return;
                             }
                             if (str_starts_with($documentCode, 'RTR-') || str_starts_with($documentCode, 'RET-') || str_starts_with($documentCode, 'RTN-')) {
@@ -247,6 +248,7 @@ class AuditLogPageController extends Controller
                                     ->whereIn('subject_id', SalesReturn::query()
                                         ->where('return_number', $documentCode)
                                         ->select('id'));
+
                                 return;
                             }
                             if (str_starts_with($documentCode, 'SJ-')) {
@@ -254,6 +256,7 @@ class AuditLogPageController extends Controller
                                     ->whereIn('subject_id', DeliveryNote::query()
                                         ->where('note_number', $documentCode)
                                         ->select('id'));
+
                                 return;
                             }
                             if (str_starts_with($documentCode, 'PO-')) {
@@ -261,6 +264,7 @@ class AuditLogPageController extends Controller
                                     ->whereIn('subject_id', OrderNote::query()
                                         ->where('note_number', $documentCode)
                                         ->select('id'));
+
                                 return;
                             }
                             if (str_starts_with($documentCode, 'KWT-') || str_starts_with($documentCode, 'PYT-')) {
@@ -268,6 +272,7 @@ class AuditLogPageController extends Controller
                                     ->whereIn('subject_id', ReceivablePayment::query()
                                         ->where('payment_number', $documentCode)
                                         ->select('id'));
+
                                 return;
                             }
                             if (str_starts_with($documentCode, 'SPY-')) {
@@ -297,7 +302,7 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @param Collection<int, AuditLog> $logs
+     * @param  Collection<int, AuditLog>  $logs
      * @return array{
      *   subjectMap: array<int,string>,
      *   subjectCodeMap: array<int,string>,
@@ -492,7 +497,7 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @param Collection<int, AuditLog> $logs
+     * @param  Collection<int, AuditLog>  $logs
      * @return array<string, string>
      */
     private function resolveCodeLinks(Collection $logs): array
@@ -564,6 +569,7 @@ class AuditLogPageController extends Controller
             if ($normalized !== '') {
                 return $actionLabel.' - '.$normalized;
             }
+
             return $actionLabel;
         }
 
@@ -591,7 +597,7 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @param Collection<int, AuditLog> $logs
+     * @param  Collection<int, AuditLog>  $logs
      * @return array<string, string>
      */
     private function actionLabelMap(Collection $logs): array
@@ -624,7 +630,7 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @param array<string, mixed>|array<int, mixed> $payload
+     * @param  array<string, mixed>|array<int, mixed>  $payload
      */
     private function formatAuditPayloadForDisplay(array $payload): string
     {
@@ -639,15 +645,11 @@ class AuditLogPageController extends Controller
         return $lines !== [] ? implode(PHP_EOL, $lines) : '-';
     }
 
-    /**
-     * @param mixed $value
-     * @return mixed
-     */
     private function translateAuditPayload(mixed $value, ?string $fieldKey = null): mixed
     {
         if (is_array($value)) {
             if (array_is_list($value)) {
-                return array_map(fn($row) => $this->translateAuditPayload($row), $value);
+                return array_map(fn ($row) => $this->translateAuditPayload($row), $value);
             }
 
             $translated = [];
@@ -696,8 +698,7 @@ class AuditLogPageController extends Controller
     }
 
     /**
-     * @param mixed $value
-     * @param array<int, string> $lines
+     * @param  array<int, string>  $lines
      */
     private function flattenAuditPayloadLines(mixed $value, array &$lines, string $indent = ''): void
     {
@@ -708,6 +709,7 @@ class AuditLogPageController extends Controller
                     if (is_array($row)) {
                         $lines[] = $indent.'- #'.$number;
                         $this->flattenAuditPayloadLines($row, $lines, $indent.'  ');
+
                         continue;
                     }
 
@@ -722,6 +724,7 @@ class AuditLogPageController extends Controller
                 if (is_array($row)) {
                     $lines[] = $indent.$keyText.':';
                     $this->flattenAuditPayloadLines($row, $lines, $indent.'  ');
+
                     continue;
                 }
 
@@ -734,9 +737,6 @@ class AuditLogPageController extends Controller
         $lines[] = $indent.$this->stringifyAuditValue($value);
     }
 
-    /**
-     * @param mixed $value
-     */
     private function stringifyAuditValue(mixed $value): string
     {
         if ($value === null) {
@@ -747,10 +747,12 @@ class AuditLogPageController extends Controller
         }
         if (is_scalar($value)) {
             $text = trim((string) $value);
+
             return $text !== '' ? $text : '-';
         }
 
         $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
         return is_string($encoded) && $encoded !== '' ? $encoded : '-';
     }
 

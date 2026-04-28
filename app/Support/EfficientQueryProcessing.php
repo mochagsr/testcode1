@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -16,9 +15,8 @@ trait EfficientQueryProcessing
     /**
      * Process large dataset in chunks without loading all into memory.
      *
-     * @param  callable  $callback The function to process each chunk
-     * @param  int  $chunkSize The size of each chunk (default 500 for 2GB RAM)
-     * @return void
+     * @param  callable  $callback  The function to process each chunk
+     * @param  int  $chunkSize  The size of each chunk (default 500 for 2GB RAM)
      */
     public static function processInChunks(callable $callback, int $chunkSize = 500): void
     {
@@ -28,8 +26,6 @@ trait EfficientQueryProcessing
     /**
      * Lazy load results using cursor for memory efficiency.
      * Useful for exporting large datasets to CSV/Excel.
-     *
-     * @return \Generator
      */
     public static function lazyLoad(): \Generator
     {
@@ -41,10 +37,9 @@ trait EfficientQueryProcessing
     /**
      * Get paginated results with optimized memory usage.
      *
-     * @param  int  $perPage Items per page (default 15 for limited RAM)
-     * @param  string  $pageName Page query string name
-     * @param  int  $page Current page number
-     * @return LengthAwarePaginator
+     * @param  int  $perPage  Items per page (default 15 for limited RAM)
+     * @param  string  $pageName  Page query string name
+     * @param  int  $page  Current page number
      */
     public static function paginateEfficiently(
         int $perPage = 15,

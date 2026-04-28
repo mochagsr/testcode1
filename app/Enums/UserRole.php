@@ -11,8 +11,6 @@ enum UserRole: string
 
     /**
      * Get a human-readable label for the role.
-     *
-     * @return string
      */
     public function label(): string
     {
@@ -24,8 +22,6 @@ enum UserRole: string
 
     /**
      * Check if role is admin.
-     *
-     * @return bool
      */
     public function isAdmin(): bool
     {

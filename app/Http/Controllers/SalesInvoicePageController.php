@@ -6,8 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
-use App\Models\Customer;
 use App\Models\AuditLog;
+use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\InvoicePayment;
@@ -16,9 +16,9 @@ use App\Models\OrderNoteItem;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
-use App\Services\ReceivableLedgerService;
-use App\Services\AuditLogService;
 use App\Services\AccountingService;
+use App\Services\AuditLogService;
+use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\CustomerPrintingSubtypeResolver;
 use App\Support\ExcelExportStyler;
@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SalesInvoicePageController extends Controller
@@ -77,8 +78,8 @@ class SalesInvoicePageController extends Controller
             ->onlyListColumns()
             ->withCustomerInfo()
             ->searchKeyword($search)
-            ->when($selectedStatus === 'active', fn($q) => $q->active())
-            ->when($selectedStatus === 'canceled', fn($q) => $q->canceled())
+            ->when($selectedStatus === 'active', fn ($q) => $q->active())
+            ->when($selectedStatus === 'canceled', fn ($q) => $q->canceled())
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                 $query->forSemester($selectedSemester);
             })
@@ -112,7 +113,7 @@ class SalesInvoicePageController extends Controller
                     'semester' => trim((string) $invoice->semester_period),
                 ];
             })
-            ->filter(fn(array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
+            ->filter(fn (array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
             ->values();
         $customerSemesterLockMap = [];
         if ($lockPairs->isNotEmpty()) {
@@ -129,8 +130,8 @@ class SalesInvoicePageController extends Controller
             }
         }
         $invoiceIds = collect($invoices->items())
-            ->map(fn(SalesInvoice $invoice): int => (int) $invoice->id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn (SalesInvoice $invoice): int => (int) $invoice->id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $invoiceAdminActionMap = [];
         if ($invoiceIds->isNotEmpty()) {
@@ -249,17 +250,17 @@ class SalesInvoicePageController extends Controller
     public function storeFromDeliveryNotes(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'invoice_date' => ['required', 'date'],
-            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'payment_method' => ['required', 'in:tunai,kredit'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.delivery_note_item_id' => ['required', 'integer', 'exists:delivery_note_items,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:1'],
-            'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'invoice_date' => FluentRule::date()->required(),
+            'due_date' => FluentRule::date()->nullable()->afterOrEqual('invoice_date'),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'payment_method' => FluentRule::field()->required()->rule('in:tunai,kredit'),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.delivery_note_item_id' => FluentRule::integer()->required()->exists('delivery_note_items', 'id'),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.unit_price' => FluentRule::numeric()->required()->min(1),
+            'items.*.discount' => FluentRule::numeric()->nullable()->min(0)->max(100),
         ]);
 
         $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
@@ -422,7 +423,7 @@ class SalesInvoicePageController extends Controller
         $initialCustomers = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_invoices.customers', ['limit' => 20]),
             now()->addSeconds(60),
-            fn() => Customer::query()
+            fn () => Customer::query()
                 ->onlySalesFormColumns()
                 ->with('level:id,code,name')
                 ->orderBy('name')
@@ -443,13 +444,13 @@ class SalesInvoicePageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $initialProducts = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_invoices.products', ['limit' => 20, 'active_only' => 1]),
             now()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlySalesFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -480,21 +481,21 @@ class SalesInvoicePageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'order_note_id' => ['nullable', 'integer', 'exists:order_notes,id'],
-            'invoice_date' => ['required', 'date'],
-            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'notes' => ['nullable', 'string'],
-            'payment_method' => ['required', 'in:tunai,kredit'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.order_note_item_id' => ['nullable', 'integer', 'exists:order_note_items,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'order_note_id' => FluentRule::integer()->nullable()->exists('order_notes', 'id'),
+            'invoice_date' => FluentRule::date()->required(),
+            'due_date' => FluentRule::date()->nullable()->afterOrEqual('invoice_date'),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'notes' => FluentRule::string()->nullable(),
+            'payment_method' => FluentRule::field()->required()->rule('in:tunai,kredit'),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.order_note_item_id' => FluentRule::integer()->nullable()->exists('order_note_items', 'id'),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.unit_price' => FluentRule::numeric()->required()->min(0),
+            'items.*.discount' => FluentRule::numeric()->nullable()->min(0)->max(100),
         ]);
         $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
         $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['invoice_date']);
@@ -552,8 +553,8 @@ class SalesInvoicePageController extends Controller
 
                 $orderNoteItemsById = $selectedOrderNote->items->keyBy('id');
                 $orderNoteItemsByProductId = $selectedOrderNote->items
-                    ->filter(fn(OrderNoteItem $item): bool => (int) ($item->product_id ?? 0) > 0)
-                    ->groupBy(fn(OrderNoteItem $item): int => (int) $item->product_id)
+                    ->filter(fn (OrderNoteItem $item): bool => (int) ($item->product_id ?? 0) > 0)
+                    ->groupBy(fn (OrderNoteItem $item): int => (int) $item->product_id)
                     ->all();
             }
 
@@ -662,7 +663,7 @@ class SalesInvoicePageController extends Controller
                 entryDate: $invoiceDate,
                 amount: $subtotal,
                 periodCode: $invoice->semester_period,
-                description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number,
+                description: __('receivable.invoice_label').' '.$invoice->invoice_number,
                 transactionType: (string) $invoice->transaction_type,
                 printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
                 printingSubtypeName: $invoice->printing_subtype_name,
@@ -815,8 +816,8 @@ class SalesInvoicePageController extends Controller
         }
         $itemProductIds = $salesInvoice->items
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $products = Product::query()
             ->onlySalesFormColumns()
@@ -844,19 +845,19 @@ class SalesInvoicePageController extends Controller
     public function adminUpdate(Request $request, SalesInvoice $salesInvoice): RedirectResponse
     {
         $data = $request->validate([
-            'invoice_date' => ['required', 'date'],
-            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'payment_method' => ['nullable', 'in:tunai,kredit'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.order_note_item_id' => ['nullable', 'integer', 'exists:order_note_items,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'invoice_date' => FluentRule::date()->required(),
+            'due_date' => FluentRule::date()->nullable()->afterOrEqual('invoice_date'),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'payment_method' => FluentRule::field()->nullable()->rule('in:tunai,kredit'),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.order_note_item_id' => FluentRule::integer()->nullable()->exists('order_note_items', 'id'),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.unit_price' => FluentRule::numeric()->required()->min(0),
+            'items.*.discount' => FluentRule::numeric()->nullable()->min(0)->max(100),
         ]);
 
         $auditBefore = '';
@@ -895,8 +896,8 @@ class SalesInvoicePageController extends Controller
                 if ($linkedOrderNote !== null) {
                     $orderNoteItemsById = $linkedOrderNote->items->keyBy('id');
                     $orderNoteItemsByProductId = $linkedOrderNote->items
-                        ->filter(fn(OrderNoteItem $item): bool => (int) ($item->product_id ?? 0) > 0)
-                        ->groupBy(fn(OrderNoteItem $item): int => (int) $item->product_id)
+                        ->filter(fn (OrderNoteItem $item): bool => (int) ($item->product_id ?? 0) > 0)
+                        ->groupBy(fn (OrderNoteItem $item): int => (int) $item->product_id)
                         ->all();
                 }
             }
@@ -917,7 +918,7 @@ class SalesInvoicePageController extends Controller
                 subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
             );
             $auditBefore = $invoice->items
-                ->map(fn(SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
+                ->map(fn (SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price".(int) round((float) $item->unit_price))
                 ->implode(' | ');
 
             $productIds = $rows
@@ -1024,9 +1025,9 @@ class SalesInvoicePageController extends Controller
                     || ($paymentDate === $invoiceDateValue && (float) $payment->amount >= (float) $invoice->total)
                 );
             })->values();
-            $fullCashIds = $fullCashOnCreatePayments->pluck('id')->map(fn($id): int => (int) $id)->all();
+            $fullCashIds = $fullCashOnCreatePayments->pluck('id')->map(fn ($id): int => (int) $id)->all();
             $nonSyntheticPaid = (float) $invoice->payments
-                ->filter(fn(InvoicePayment $payment): bool => ! in_array((int) $payment->id, $fullCashIds, true))
+                ->filter(fn (InvoicePayment $payment): bool => ! in_array((int) $payment->id, $fullCashIds, true))
                 ->sum('amount');
 
             $syntheticAmount = 0.0;
@@ -1045,7 +1046,7 @@ class SalesInvoicePageController extends Controller
                         $extraSyntheticIds = $fullCashOnCreatePayments
                             ->skip(1)
                             ->pluck('id')
-                            ->map(fn($id): int => (int) $id)
+                            ->map(fn ($id): int => (int) $id)
                             ->all();
                         if ($extraSyntheticIds !== []) {
                             InvoicePayment::query()->whereIn('id', $extraSyntheticIds)->delete();
@@ -1171,7 +1172,7 @@ class SalesInvoicePageController extends Controller
     public function cancel(Request $request, SalesInvoice $salesInvoice): RedirectResponse
     {
         $data = $request->validate([
-            'cancel_reason' => ['required', 'string', 'max:1000'],
+            'cancel_reason' => FluentRule::string()->required()->max(1000),
         ]);
 
         DB::transaction(function () use ($salesInvoice, $data): void {
@@ -1186,7 +1187,7 @@ class SalesInvoicePageController extends Controller
             }
 
             $openBalance = max(0, (float) $invoice->balance);
-                if ($openBalance > 0) {
+            if ($openBalance > 0) {
                 $this->receivableLedgerService->addCredit(
                     customerId: (int) $invoice->customer_id,
                     invoiceId: (int) $invoice->id,
@@ -1244,7 +1245,7 @@ class SalesInvoicePageController extends Controller
             'payments',
         ]);
 
-        $filename = $salesInvoice->invoice_number . '.pdf';
+        $filename = $salesInvoice->invoice_number.'.pdf';
         $pdf = Pdf::loadView('sales_invoices.print', [
             'invoice' => $salesInvoice,
             'isPdf' => true,
@@ -1261,10 +1262,10 @@ class SalesInvoicePageController extends Controller
             'payments',
         ]);
 
-        $filename = $salesInvoice->invoice_number . '.xlsx';
+        $filename = $salesInvoice->invoice_number.'.xlsx';
 
         return response()->streamDownload(function () use ($salesInvoice): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Invoice');
 
@@ -1294,7 +1295,7 @@ class SalesInvoicePageController extends Controller
             $rows[] = [__('txn.address'), $address !== '' ? $address : '-'];
             $rows[] = [];
             $rows[] = [__('txn.items')];
-            $rows[] = [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount') . ' (%)', __('txn.line_total')];
+            $rows[] = [__('txn.name'), __('txn.qty'), __('txn.price'), __('txn.discount').' (%)', __('txn.line_total')];
 
             foreach ($salesInvoice->items as $item) {
                 $gross = (float) $item->quantity * (float) $item->unit_price;
@@ -1491,7 +1492,7 @@ class SalesInvoicePageController extends Controller
             entryDate: $invoiceDate,
             amount: $subtotal,
             periodCode: $invoice->semester_period,
-            description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number,
+            description: __('receivable.invoice_label').' '.$invoice->invoice_number,
             transactionType: (string) $invoice->transaction_type,
             printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
             printingSubtypeName: $invoice->printing_subtype_name,
@@ -1606,7 +1607,7 @@ class SalesInvoicePageController extends Controller
             return collect();
         }
 
-        $noteIds = $notes->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $noteIds = $notes->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $orderedByNote = DB::table('order_note_items')
             ->whereIn('order_note_id', $noteIds)
             ->selectRaw('order_note_id, COALESCE(SUM(quantity), 0) as ordered_qty')
@@ -1638,7 +1639,7 @@ class SalesInvoicePageController extends Controller
                     'progress_percent' => $progress,
                 ];
             })
-            ->filter(fn(array $row): bool => (int) ($row['remaining_total'] ?? 0) > 0)
+            ->filter(fn (array $row): bool => (int) ($row['remaining_total'] ?? 0) > 0)
             ->values()
             ->take(max(1, $limit))
             ->values();
@@ -1646,7 +1647,7 @@ class SalesInvoicePageController extends Controller
 
     private function generateInvoiceNumber(string $date): string
     {
-        $prefix = 'INV-' . date('dmY', strtotime($date));
+        $prefix = 'INV-'.date('dmY', strtotime($date));
         $count = SalesInvoice::query()
             ->whereDate('invoice_date', $date)
             ->lockForUpdate()

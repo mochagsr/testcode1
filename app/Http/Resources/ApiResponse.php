@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\ResourceCollection;
-
 /**
  * Unified API response format for all JSON endpoints.
  * Provides consistent response structure across the application.
@@ -16,9 +13,9 @@ final class ApiResponse
     /**
      * Success response with data.
      *
-     * @param  mixed  $data The response data
-     * @param  string  $message Success message
-     * @param  int  $statusCode HTTP status code
+     * @param  mixed  $data  The response data
+     * @param  string  $message  Success message
+     * @param  int  $statusCode  HTTP status code
      * @return array<string, mixed>
      */
     public static function success(
@@ -37,9 +34,9 @@ final class ApiResponse
     /**
      * Error response.
      *
-     * @param  string  $message Error message
-     * @param  int  $statusCode HTTP status code
-     * @param  array<string, mixed>|null  $errors Validation errors
+     * @param  string  $message  Error message
+     * @param  int  $statusCode  HTTP status code
+     * @param  array<string, mixed>|null  $errors  Validation errors
      * @return array<string, mixed>
      */
     public static function error(
@@ -63,8 +60,8 @@ final class ApiResponse
     /**
      * Paginated response.
      *
-     * @param  mixed  $data The paginated data
-     * @param  string  $message Success message
+     * @param  mixed  $data  The paginated data
+     * @param  string  $message  Success message
      * @return array<string, mixed>
      */
     public static function paginated(mixed $data, string $message = 'Success'): array
@@ -88,7 +85,7 @@ final class ApiResponse
     /**
      * Validation error response.
      *
-     * @param  array<string, array<int, string>>  $errors Validation errors
+     * @param  array<string, array<int, string>>  $errors  Validation errors
      * @return array<string, mixed>
      */
     public static function validationError(array $errors): array

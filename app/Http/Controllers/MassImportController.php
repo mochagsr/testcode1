@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
-use App\Models\CustomerShipLocation;
 use App\Models\CustomerLevel;
+use App\Models\CustomerShipLocation;
 use App\Models\InvoicePayment;
 use App\Models\ItemCategory;
 use App\Models\Product;
@@ -15,8 +15,8 @@ use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
 use App\Models\StockMutation;
 use App\Models\Supplier;
-use App\Services\AuditLogService;
 use App\Services\AccountingService;
+use App\Services\AuditLogService;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
@@ -31,6 +31,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MassImportController extends Controller
@@ -93,7 +94,7 @@ class MassImportController extends Controller
     public function importProducts(Request $request): RedirectResponse
     {
         $request->validate([
-            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'import_file' => FluentRule::file()->required()->rule('mimes:xlsx,xls,csv,txt'),
         ]);
 
         $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
@@ -119,23 +120,25 @@ class MassImportController extends Controller
                 }
 
                 $validator = Validator::make($data, [
-                    'name' => ['required', 'string', 'max:200'],
-                    'category' => ['required', 'string', 'max:200'],
-                    'unit' => ['required', 'string', 'max:30'],
-                    'stock' => ['required', 'integer', 'min:0'],
-                    'price_agent' => ['required', 'numeric', 'min:0'],
-                    'price_sales' => ['required', 'numeric', 'min:0'],
-                    'price_general' => ['required', 'numeric', 'min:0'],
+                    'name' => FluentRule::string()->required()->max(200),
+                    'category' => FluentRule::string()->required()->max(200),
+                    'unit' => FluentRule::string()->required()->max(30),
+                    'stock' => FluentRule::integer()->required()->min(0),
+                    'price_agent' => FluentRule::numeric()->required()->min(0),
+                    'price_sales' => FluentRule::numeric()->required()->min(0),
+                    'price_general' => FluentRule::numeric()->required()->min(0),
                 ]);
 
                 if ($validator->fails()) {
                     $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
+
                     continue;
                 }
 
                 $categoryId = $this->resolveCategoryId((string) $data['category']);
                 if ($categoryId === null) {
                     $errors[] = $this->formatImportRowError($rowIndex + 2, 'Kategori tidak terdaftar. Samakan nama kategori dengan data master.');
+
                     continue;
                 }
 
@@ -181,6 +184,7 @@ class MassImportController extends Controller
                         ]);
                     }
                     $updated++;
+
                     continue;
                 }
 
@@ -215,7 +219,7 @@ class MassImportController extends Controller
     public function importCustomers(Request $request): RedirectResponse
     {
         $request->validate([
-            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'import_file' => FluentRule::file()->required()->rule('mimes:xlsx,xls,csv,txt'),
         ]);
 
         $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
@@ -241,16 +245,17 @@ class MassImportController extends Controller
                 }
 
                 $validator = Validator::make($data, [
-                    'name' => ['required', 'string', 'max:150'],
-                    'level' => ['nullable', 'string', 'max:120'],
-                    'phone' => ['nullable', 'string', 'max:30'],
-                    'city' => ['nullable', 'string', 'max:100'],
-                    'address' => ['nullable', 'string'],
-                    'notes' => ['nullable', 'string'],
+                    'name' => FluentRule::string()->required()->max(150),
+                    'level' => FluentRule::string()->nullable()->max(120),
+                    'phone' => FluentRule::string()->nullable()->max(30),
+                    'city' => FluentRule::string()->nullable()->max(100),
+                    'address' => FluentRule::string()->nullable(),
+                    'notes' => FluentRule::string()->nullable(),
                 ]);
 
                 if ($validator->fails()) {
                     $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
+
                     continue;
                 }
 
@@ -269,6 +274,7 @@ class MassImportController extends Controller
                 if ($existing !== null) {
                     $existing->update($payload);
                     $updated++;
+
                     continue;
                 }
 
@@ -295,7 +301,7 @@ class MassImportController extends Controller
     public function importCategories(Request $request): RedirectResponse
     {
         $request->validate([
-            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'import_file' => FluentRule::file()->required()->rule('mimes:xlsx,xls,csv,txt'),
         ]);
 
         $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
@@ -321,13 +327,14 @@ class MassImportController extends Controller
                 }
 
                 $validator = Validator::make($data, [
-                    'name' => ['required', 'string', 'max:150'],
-                    'description' => ['nullable', 'string'],
-                    'code' => ['nullable', 'string', 'max:50'],
+                    'name' => FluentRule::string()->required()->max(150),
+                    'description' => FluentRule::string()->nullable(),
+                    'code' => FluentRule::string()->nullable()->max(50),
                 ]);
 
                 if ($validator->fails()) {
                     $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
+
                     continue;
                 }
 
@@ -348,6 +355,7 @@ class MassImportController extends Controller
                 if ($existing !== null) {
                     $existing->update($payload);
                     $updated++;
+
                     continue;
                 }
 
@@ -370,7 +378,7 @@ class MassImportController extends Controller
     public function importCustomerShipLocations(Request $request): RedirectResponse
     {
         $request->validate([
-            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'import_file' => FluentRule::file()->required()->rule('mimes:xlsx,xls,csv,txt'),
         ]);
 
         $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
@@ -396,17 +404,18 @@ class MassImportController extends Controller
                 }
 
                 $validator = Validator::make($data, [
-                    'customer' => ['required', 'string', 'max:150'],
-                    'school_name' => ['required', 'string', 'max:150'],
-                    'phone' => ['nullable', 'string', 'max:30'],
-                    'city' => ['nullable', 'string', 'max:100'],
-                    'address' => ['nullable', 'string'],
-                    'notes' => ['nullable', 'string'],
-                    'is_active' => ['nullable'],
+                    'customer' => FluentRule::string()->required()->max(150),
+                    'school_name' => FluentRule::string()->required()->max(150),
+                    'phone' => FluentRule::string()->nullable()->max(30),
+                    'city' => FluentRule::string()->nullable()->max(100),
+                    'address' => FluentRule::string()->nullable(),
+                    'notes' => FluentRule::string()->nullable(),
+                    'is_active' => FluentRule::field()->nullable(),
                 ]);
 
                 if ($validator->fails()) {
                     $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
+
                     continue;
                 }
 
@@ -417,6 +426,7 @@ class MassImportController extends Controller
                     ->first();
                 if ($customer === null) {
                     $errors[] = $this->formatImportRowError($rowIndex + 2, 'Customer tidak terdaftar. Buat customer dulu atau samakan nama/kode customer.');
+
                     continue;
                 }
 
@@ -439,6 +449,7 @@ class MassImportController extends Controller
                 if ($existing !== null) {
                     $existing->update($payload);
                     $updated++;
+
                     continue;
                 }
 
@@ -461,7 +472,7 @@ class MassImportController extends Controller
     public function importSuppliers(Request $request): RedirectResponse
     {
         $request->validate([
-            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'import_file' => FluentRule::file()->required()->rule('mimes:xlsx,xls,csv,txt'),
         ]);
 
         $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
@@ -487,15 +498,16 @@ class MassImportController extends Controller
                 }
 
                 $validator = Validator::make($data, [
-                    'name' => ['required', 'string', 'max:150'],
-                    'company_name' => ['nullable', 'string', 'max:200'],
-                    'phone' => ['nullable', 'string', 'max:30'],
-                    'address' => ['nullable', 'string', 'max:255'],
-                    'notes' => ['nullable', 'string'],
+                    'name' => FluentRule::string()->required()->max(150),
+                    'company_name' => FluentRule::string()->nullable()->max(200),
+                    'phone' => FluentRule::string()->nullable()->max(30),
+                    'address' => FluentRule::string()->nullable()->max(255),
+                    'notes' => FluentRule::string()->nullable(),
                 ]);
 
                 if ($validator->fails()) {
                     $errors[] = $this->formatImportRowError($rowIndex + 2, implode('; ', $validator->errors()->all()));
+
                     continue;
                 }
 
@@ -512,6 +524,7 @@ class MassImportController extends Controller
                 if ($existing !== null) {
                     $existing->update($payload);
                     $updated++;
+
                     continue;
                 }
 
@@ -536,7 +549,7 @@ class MassImportController extends Controller
     public function importSalesInvoices(Request $request): RedirectResponse
     {
         $request->validate([
-            'import_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'import_file' => FluentRule::file()->required()->rule('mimes:xlsx,xls,csv,txt'),
         ]);
 
         $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
@@ -562,21 +575,22 @@ class MassImportController extends Controller
                 }
 
                 $validator = Validator::make($data, [
-                    'customer' => ['required', 'string', 'max:150'],
-                    'invoice_date' => ['required', 'date'],
-                    'due_date' => ['nullable', 'date'],
-                    'semester_period' => ['nullable', 'string', 'max:30'],
-                    'transaction_type' => ['nullable', 'in:product,printing'],
-                    'payment_method' => ['required', 'in:tunai,kredit'],
-                    'product' => ['required', 'string', 'max:200'],
-                    'quantity' => ['required', 'integer', 'min:1'],
-                    'unit_price' => ['required', 'numeric', 'min:0'],
-                    'discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
-                    'notes' => ['nullable', 'string'],
+                    'customer' => FluentRule::string()->required()->max(150),
+                    'invoice_date' => FluentRule::date()->required(),
+                    'due_date' => FluentRule::date()->nullable(),
+                    'semester_period' => FluentRule::string()->nullable()->max(30),
+                    'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+                    'payment_method' => FluentRule::field()->required()->rule('in:tunai,kredit'),
+                    'product' => FluentRule::string()->required()->max(200),
+                    'quantity' => FluentRule::integer()->required()->min(1),
+                    'unit_price' => FluentRule::numeric()->required()->min(0),
+                    'discount' => FluentRule::numeric()->nullable()->min(0)->max(100),
+                    'notes' => FluentRule::string()->nullable(),
                 ]);
 
                 if ($validator->fails()) {
                     $errors[] = $this->formatImportRowError($line, implode('; ', $validator->errors()->all()));
+
                     continue;
                 }
 
@@ -586,6 +600,7 @@ class MassImportController extends Controller
                     ->first();
                 if ($customer === null) {
                     $errors[] = $this->formatImportRowError($line, 'Customer tidak terdaftar. Buat customer dulu atau samakan nama/kode customer.');
+
                     continue;
                 }
 
@@ -595,12 +610,14 @@ class MassImportController extends Controller
                     ->first();
                 if ($product === null) {
                     $errors[] = $this->formatImportRowError($line, 'Barang tidak terdaftar. Buat barang dulu atau samakan nama/kode barang.');
+
                     continue;
                 }
 
                 $quantity = (int) $data['quantity'];
                 if ((int) $product->stock < $quantity) {
                     $errors[] = $this->formatImportRowError($line, 'Stok barang '.$product->name.' tidak cukup untuk jumlah yang diimport.');
+
                     continue;
                 }
 
@@ -655,7 +672,7 @@ class MassImportController extends Controller
                     entryDate: $invoiceDate,
                     amount: $lineTotal,
                     periodCode: $invoice->semester_period,
-                    description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number,
+                    description: __('receivable.invoice_label').' '.$invoice->invoice_number,
                     transactionType: (string) $invoice->transaction_type
                 );
 
@@ -707,7 +724,7 @@ class MassImportController extends Controller
     }
 
     /**
-     * @param array<int, array<int, mixed>> $rows
+     * @param  array<int, array<int, mixed>>  $rows
      * @return array<int, string>
      */
     private function normalizeHeaders(array $rows): array
@@ -729,8 +746,8 @@ class MassImportController extends Controller
     }
 
     /**
-     * @param array<int, string> $headers
-     * @param array<int, string> $requiredHeaders
+     * @param  array<int, string>  $headers
+     * @param  array<int, string>  $requiredHeaders
      * @return array<int, string>
      */
     private function missingHeaders(array $headers, array $requiredHeaders): array
@@ -825,8 +842,8 @@ class MassImportController extends Controller
     }
 
     /**
-     * @param array<int, string> $headers
-     * @param array<int, mixed> $row
+     * @param  array<int, string>  $headers
+     * @param  array<int, mixed>  $row
      * @return array<string, mixed>
      */
     private function mapRow(array $headers, array $row): array
@@ -867,7 +884,7 @@ class MassImportController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $row
+     * @param  array<string, mixed>  $row
      */
     private function isEmptyRow(array $row): bool
     {
@@ -908,9 +925,9 @@ class MassImportController extends Controller
 
     private function generateCustomerCode(): string
     {
-        $prefix = 'CUS-' . now()->format('Ymd');
+        $prefix = 'CUS-'.now()->format('Ymd');
         do {
-            $code = $prefix . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            $code = $prefix.'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
         } while (Customer::query()->where('code', $code)->exists());
 
         return $code;
@@ -918,7 +935,7 @@ class MassImportController extends Controller
 
     private function generateInvoiceNumber(string $date): string
     {
-        $prefix = 'INV-' . date('dmY', strtotime($date));
+        $prefix = 'INV-'.date('dmY', strtotime($date));
         $count = SalesInvoice::query()
             ->whereDate('invoice_date', $date)
             ->lockForUpdate()
@@ -961,12 +978,12 @@ class MassImportController extends Controller
     }
 
     /**
-     * @param array<int, array<int, mixed>> $rows
+     * @param  array<int, array<int, mixed>>  $rows
      */
     private function downloadTemplate(string $filename, array $rows, string $sheetTitle): StreamedResponse
     {
         return response()->streamDownload(function () use ($rows, $sheetTitle): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle($sheetTitle);
             $sheet->fromArray($rows, null, 'A1');

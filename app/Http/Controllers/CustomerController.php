@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use SanderMuller\FluentValidation\FluentRule;
 
 class CustomerController extends Controller
 {
@@ -43,7 +44,7 @@ class CustomerController extends Controller
                 'credit_balance',
             ])
             ->with('level:id,code,name')
-            ->when($hasSearch, fn(Builder $query) => $query->searchKeyword($search))
+            ->when($hasSearch, fn (Builder $query) => $query->searchKeyword($search))
             ->orderBy('name')
             ->orderBy('id');
 
@@ -62,15 +63,15 @@ class CustomerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'customer_level_id' => ['required', 'integer', 'exists:customer_levels,id'],
-            'name' => ['required', 'string', 'max:150'],
-            'phone' => ['required', 'string', 'max:30'],
-            'phone_secondary' => ['nullable', 'string', 'max:30'],
-            'city' => ['required', 'string', 'max:100'],
-            'address' => ['required', 'string'],
-            'id_card_photo' => ['nullable', 'image', 'max:3072'],
-            'outstanding_receivable' => ['nullable', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string'],
+            'customer_level_id' => FluentRule::integer()->required()->exists('customer_levels', 'id'),
+            'name' => FluentRule::string()->required()->max(150),
+            'phone' => FluentRule::string()->required()->max(30),
+            'phone_secondary' => FluentRule::string()->nullable()->max(30),
+            'city' => FluentRule::string()->required()->max(100),
+            'address' => FluentRule::string()->required(),
+            'id_card_photo' => FluentRule::image()->nullable()->max(3072),
+            'outstanding_receivable' => FluentRule::numeric()->nullable()->min(0),
+            'notes' => FluentRule::string()->nullable(),
         ]);
         $data['code'] = $this->generateCustomerCode();
 
@@ -93,16 +94,16 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer): JsonResponse
     {
         $data = $request->validate([
-            'customer_level_id' => ['required', 'integer', 'exists:customer_levels,id'],
-            'name' => ['required', 'string', 'max:150'],
-            'phone' => ['required', 'string', 'max:30'],
-            'phone_secondary' => ['nullable', 'string', 'max:30'],
-            'city' => ['required', 'string', 'max:100'],
-            'address' => ['required', 'string'],
-            'id_card_photo' => ['nullable', 'image', 'max:3072'],
-            'outstanding_receivable' => ['nullable', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string'],
-            'remove_id_card_photo' => ['nullable', 'boolean'],
+            'customer_level_id' => FluentRule::integer()->required()->exists('customer_levels', 'id'),
+            'name' => FluentRule::string()->required()->max(150),
+            'phone' => FluentRule::string()->required()->max(30),
+            'phone_secondary' => FluentRule::string()->nullable()->max(30),
+            'city' => FluentRule::string()->required()->max(100),
+            'address' => FluentRule::string()->required(),
+            'id_card_photo' => FluentRule::image()->nullable()->max(3072),
+            'outstanding_receivable' => FluentRule::numeric()->nullable()->min(0),
+            'notes' => FluentRule::string()->nullable(),
+            'remove_id_card_photo' => FluentRule::boolean()->nullable(),
         ]);
 
         if ($request->boolean('remove_id_card_photo') && $customer->id_card_photo_path) {
@@ -139,13 +140,12 @@ class CustomerController extends Controller
 
     private function generateCustomerCode(): string
     {
-        $prefix = 'CUS-' . now()->format('Ymd');
+        $prefix = 'CUS-'.now()->format('Ymd');
 
         do {
-            $code = $prefix . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            $code = $prefix.'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
         } while (Customer::query()->where('code', $code)->exists());
 
         return $code;
     }
-
 }

@@ -18,12 +18,10 @@ final class PerformanceMonitor
     /**
      * Enable query logging to identify slow queries.
      * WARNING: Only use in development/staging, not production!
-     *
-     * @return void
      */
     public static function enableQueryLogging(): void
     {
-        if (!config('app.debug') || self::$queryLoggingEnabled) {
+        if (! config('app.debug') || self::$queryLoggingEnabled) {
             return;
         }
 
@@ -41,7 +39,7 @@ final class PerformanceMonitor
                 Log::warning('Slow Query Detected', [
                     'query' => $query->sql,
                     'bindings' => $query->bindings,
-                    'time' => $query->time . 'ms',
+                    'time' => $query->time.'ms',
                     'threshold_ms' => $thresholdMs,
                 ]);
             }
@@ -53,8 +51,7 @@ final class PerformanceMonitor
     /**
      * Log memory usage for monitoring VPS consumption.
      *
-     * @param  string  $label Description of operation
-     * @return void
+     * @param  string  $label  Description of operation
      */
     public static function logMemoryUsage(string $label): void
     {
@@ -71,8 +68,6 @@ final class PerformanceMonitor
 
     /**
      * Get current memory usage in MB.
-     *
-     * @return float
      */
     public static function getCurrentMemoryUsage(): float
     {
@@ -81,8 +76,6 @@ final class PerformanceMonitor
 
     /**
      * Get peak memory usage in MB.
-     *
-     * @return float
      */
     public static function getPeakMemoryUsage(): float
     {

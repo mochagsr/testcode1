@@ -8,11 +8,12 @@ use App\Models\Supplier;
 use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ValidatesSearchTokens;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use SanderMuller\FluentValidation\FluentRule;
 
 class SupplierPageController extends Controller
 {
@@ -149,11 +150,11 @@ class SupplierPageController extends Controller
     private function validatePayload(Request $request): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'company_name' => ['nullable', 'string', 'max:200'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
+            'name' => FluentRule::string()->required()->max(150),
+            'company_name' => FluentRule::string()->nullable()->max(200),
+            'phone' => FluentRule::string()->nullable()->max(30),
+            'address' => FluentRule::string()->nullable()->max(255),
+            'notes' => FluentRule::string()->nullable(),
         ]);
     }
 }

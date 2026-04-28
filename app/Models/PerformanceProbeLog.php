@@ -29,4 +29,3 @@ class PerformanceProbeLog extends Model
         ];
     }
 }
-

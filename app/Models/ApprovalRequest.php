@@ -60,7 +60,7 @@ class ApprovalRequest extends Model
     }
 
     /**
-     * @param Builder<ApprovalRequest> $query
+     * @param  Builder<ApprovalRequest>  $query
      * @return Builder<ApprovalRequest>
      */
     public function scopePending(Builder $query): Builder
@@ -68,4 +68,3 @@ class ApprovalRequest extends Model
         return $query->where('status', 'pending');
     }
 }
-

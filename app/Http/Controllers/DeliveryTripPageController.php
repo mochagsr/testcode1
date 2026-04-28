@@ -16,9 +16,10 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DeliveryTripPageController extends Controller
@@ -222,7 +223,7 @@ class DeliveryTripPageController extends Controller
             'updater:id,name',
         ]);
 
-        $filename = strtolower((string) $deliveryTrip->trip_number) . '.pdf';
+        $filename = strtolower((string) $deliveryTrip->trip_number).'.pdf';
 
         return Pdf::loadView('delivery_trips.print', [
             'trip' => $deliveryTrip,
@@ -237,10 +238,10 @@ class DeliveryTripPageController extends Controller
             'updater:id,name',
         ]);
 
-        $filename = strtolower((string) $deliveryTrip->trip_number) . '.xlsx';
+        $filename = strtolower((string) $deliveryTrip->trip_number).'.xlsx';
 
         return response()->streamDownload(function () use ($deliveryTrip): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Perjalanan Kirim');
             $settings = AppSetting::getValues([
@@ -284,14 +285,14 @@ class DeliveryTripPageController extends Controller
             ];
             $metaRow = 2;
             foreach ($metaRows as [$label, $value]) {
-                $sheet->setCellValue('E' . $metaRow, $label);
-                $sheet->setCellValue('F' . $metaRow, $value);
+                $sheet->setCellValue('E'.$metaRow, $label);
+                $sheet->setCellValue('F'.$metaRow, $value);
                 $metaRow++;
             }
             $sheet->getStyle('E2:E5')->getFont()->setBold(true);
 
             $costHeaderRow = 7;
-            $sheet->fromArray([[__('delivery_trip.cost_breakdown'), __('txn.amount')]], null, 'A' . $costHeaderRow);
+            $sheet->fromArray([[__('delivery_trip.cost_breakdown'), __('txn.amount')]], null, 'A'.$costHeaderRow);
             $costRows = [
                 [__('delivery_trip.fuel_cost'), (int) $deliveryTrip->fuel_cost],
                 [__('delivery_trip.toll_cost'), (int) $deliveryTrip->toll_cost],
@@ -299,14 +300,14 @@ class DeliveryTripPageController extends Controller
                 [__('delivery_trip.other_cost'), (int) $deliveryTrip->other_cost],
                 [__('delivery_trip.total_cost'), (int) $deliveryTrip->total_cost],
             ];
-            $sheet->fromArray($costRows, null, 'A' . ($costHeaderRow + 1));
+            $sheet->fromArray($costRows, null, 'A'.($costHeaderRow + 1));
             ExcelExportStyler::styleTable($sheet, $costHeaderRow, 2, count($costRows), true);
             ExcelExportStyler::formatNumberColumns($sheet, $costHeaderRow + 1, $costHeaderRow + count($costRows), [2], '#,##0');
 
             $notesHeaderRow = 7;
-            $sheet->mergeCells('D' . $notesHeaderRow . ':F' . $notesHeaderRow);
-            $sheet->setCellValue('D' . $notesHeaderRow, __('txn.notes'));
-            $sheet->getStyle('D' . $notesHeaderRow . ':F' . $notesHeaderRow)->applyFromArray([
+            $sheet->mergeCells('D'.$notesHeaderRow.':F'.$notesHeaderRow);
+            $sheet->setCellValue('D'.$notesHeaderRow, __('txn.notes'));
+            $sheet->getStyle('D'.$notesHeaderRow.':F'.$notesHeaderRow)->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F2937']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -317,18 +318,18 @@ class DeliveryTripPageController extends Controller
             $sheet->getStyle('D8:F12')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
             $signatureRow = 15;
-            $sheet->mergeCells('A' . $signatureRow . ':B' . $signatureRow);
-            $sheet->mergeCells('E' . $signatureRow . ':F' . $signatureRow);
-            $sheet->setCellValue('A' . $signatureRow, __('delivery_trip.signature_driver'));
-            $sheet->setCellValue('E' . $signatureRow, __('delivery_trip.signature_admin'));
-            $sheet->getStyle('A' . $signatureRow . ':F' . $signatureRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->mergeCells('A' . ($signatureRow + 2) . ':B' . ($signatureRow + 2));
-            $sheet->mergeCells('E' . ($signatureRow + 2) . ':F' . ($signatureRow + 2));
-            $sheet->setCellValue('A' . ($signatureRow + 2), $deliveryTrip->driver_name);
-            $sheet->setCellValue('E' . ($signatureRow + 2), $deliveryTrip->creator?->name ?: '-');
-            $sheet->getStyle('A' . ($signatureRow + 2) . ':F' . ($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A' . ($signatureRow + 1) . ':B' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('E' . ($signatureRow + 1) . ':F' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->mergeCells('A'.$signatureRow.':B'.$signatureRow);
+            $sheet->mergeCells('E'.$signatureRow.':F'.$signatureRow);
+            $sheet->setCellValue('A'.$signatureRow, __('delivery_trip.signature_driver'));
+            $sheet->setCellValue('E'.$signatureRow, __('delivery_trip.signature_admin'));
+            $sheet->getStyle('A'.$signatureRow.':F'.$signatureRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->mergeCells('A'.($signatureRow + 2).':B'.($signatureRow + 2));
+            $sheet->mergeCells('E'.($signatureRow + 2).':F'.($signatureRow + 2));
+            $sheet->setCellValue('A'.($signatureRow + 2), $deliveryTrip->driver_name);
+            $sheet->setCellValue('E'.($signatureRow + 2), $deliveryTrip->creator?->name ?: '-');
+            $sheet->getStyle('A'.($signatureRow + 2).':F'.($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 
             foreach (range('A', 'F') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
@@ -349,20 +350,20 @@ class DeliveryTripPageController extends Controller
     private function validatedData(Request $request): array
     {
         return $request->validate([
-            'trip_date' => ['required', 'date'],
-            'driver_name' => ['required', 'string', 'max:120'],
-            'assistant_name' => ['nullable', 'string', 'max:120'],
-            'vehicle_plate' => ['nullable', 'string', 'max:40'],
-            'fuel_cost' => ['nullable', 'integer', 'min:0'],
-            'toll_cost' => ['nullable', 'integer', 'min:0'],
-            'meal_cost' => ['nullable', 'integer', 'min:0'],
-            'other_cost' => ['nullable', 'integer', 'min:0'],
-            'notes' => ['nullable', 'string'],
+            'trip_date' => FluentRule::date()->required(),
+            'driver_name' => FluentRule::string()->required()->max(120),
+            'assistant_name' => FluentRule::string()->nullable()->max(120),
+            'vehicle_plate' => FluentRule::string()->nullable()->max(40),
+            'fuel_cost' => FluentRule::integer()->nullable()->min(0),
+            'toll_cost' => FluentRule::integer()->nullable()->min(0),
+            'meal_cost' => FluentRule::integer()->nullable()->min(0),
+            'other_cost' => FluentRule::integer()->nullable()->min(0),
+            'notes' => FluentRule::string()->nullable(),
         ]);
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function totalCostFromData(array $data): int
     {
@@ -381,11 +382,11 @@ class DeliveryTripPageController extends Controller
 
     private function generateTripNumber(string $tripDate): string
     {
-        $prefix = 'TRP-' . date('dmY', strtotime($tripDate));
+        $prefix = 'TRP-'.date('dmY', strtotime($tripDate));
 
         $latest = DeliveryTrip::query()
             ->whereDate('trip_date', $tripDate)
-            ->where('trip_number', 'like', $prefix . '-%')
+            ->where('trip_number', 'like', $prefix.'-%')
             ->lockForUpdate()
             ->max('trip_number');
 

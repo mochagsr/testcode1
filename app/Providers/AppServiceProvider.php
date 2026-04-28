@@ -18,9 +18,9 @@ use App\Observers\CustomerAuditObserver;
 use App\Observers\FinancialModelAuditObserver;
 use App\Observers\ProductAuditObserver;
 use App\Observers\SalesInvoiceAuditObserver;
-use App\Services\AuditLogService;
-use App\Services\ApprovalWorkflowService;
 use App\Services\AccountingService;
+use App\Services\ApprovalWorkflowService;
+use App\Services\AuditLogService;
 use App\Services\ConfigurationService;
 use App\Support\PerformanceMonitor;
 use Illuminate\Pagination\Paginator;
@@ -52,7 +52,7 @@ class AppServiceProvider extends ServiceProvider
         Paginator::defaultSimpleView('vendor.pagination.pgpos-simple');
 
         // Enable query logging in debug mode (except unit tests)
-        if (config('app.debug') && !app()->runningUnitTests()) {
+        if (config('app.debug') && ! app()->runningUnitTests()) {
             PerformanceMonitor::enableQueryLogging();
         }
 

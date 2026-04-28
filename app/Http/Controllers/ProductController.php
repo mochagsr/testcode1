@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use SanderMuller\FluentValidation\FluentRule;
 
 class ProductController extends Controller
 {
@@ -30,7 +31,7 @@ class ProductController extends Controller
     /**
      * Retrieve paginated list of products with optional filtering and search.
      *
-     * @param  Request  $request The HTTP request containing query parameters
+     * @param  Request  $request  The HTTP request containing query parameters
      * @return JsonResponse The JSON response with products
      */
     public function index(Request $request): JsonResponse
@@ -61,9 +62,9 @@ class ProductController extends Controller
                 'is_active',
             ])
             ->with('category:id,code,name')
-            ->when($activeOnly, fn(Builder $query) => $query->active())
-            ->when($hasSearch, fn(Builder $query) => $query->searchKeyword($search))
-            ->when($itemCategoryId !== null, fn(Builder $query) => $query->inCategory((int) $itemCategoryId))
+            ->when($activeOnly, fn (Builder $query) => $query->active())
+            ->when($hasSearch, fn (Builder $query) => $query->searchKeyword($search))
+            ->when($itemCategoryId !== null, fn (Builder $query) => $query->inCategory((int) $itemCategoryId))
             ->orderBy('name')
             ->orderBy('id');
 
@@ -84,7 +85,7 @@ class ProductController extends Controller
     /**
      * Create a new product.
      *
-     * @param  Request  $request The HTTP request with product data
+     * @param  Request  $request  The HTTP request with product data
      * @return JsonResponse The JSON response with created product
      */
     public function store(Request $request): JsonResponse
@@ -95,14 +96,14 @@ class ProductController extends Controller
         ]);
 
         $data = $request->validate([
-            'item_category_id' => ['required', 'integer', 'exists:item_categories,id'],
-            'code' => ['nullable', 'string', 'max:60', 'unique:products,code'],
-            'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30'],
-            'stock' => ['nullable', 'integer', 'min:0'],
-            'price_agent' => ['nullable', 'numeric', 'min:0'],
-            'price_sales' => ['nullable', 'numeric', 'min:0'],
-            'price_general' => ['nullable', 'numeric', 'min:0'],
+            'item_category_id' => FluentRule::integer()->required()->exists('item_categories', 'id'),
+            'code' => FluentRule::string()->nullable()->max(60)->unique('products', 'code'),
+            'name' => FluentRule::string()->required()->max(200),
+            'unit' => FluentRule::string()->required()->max(30),
+            'stock' => FluentRule::integer()->nullable()->min(0),
+            'price_agent' => FluentRule::numeric()->nullable()->min(0),
+            'price_sales' => FluentRule::numeric()->nullable()->min(0),
+            'price_general' => FluentRule::numeric()->nullable()->min(0),
         ], [
             'code.unique' => __('ui.product_code_unique_error'),
         ]);
@@ -127,7 +128,7 @@ class ProductController extends Controller
     /**
      * Retrieve a specific product by ID.
      *
-     * @param  Product  $product The product instance
+     * @param  Product  $product  The product instance
      * @return JsonResponse The JSON response with product details
      */
     public function show(Product $product): JsonResponse
@@ -138,8 +139,8 @@ class ProductController extends Controller
     /**
      * Update an existing product.
      *
-     * @param  Request  $request The HTTP request with updated data
-     * @param  Product  $product The product instance to update
+     * @param  Request  $request  The HTTP request with updated data
+     * @param  Product  $product  The product instance to update
      * @return JsonResponse The JSON response with updated product
      */
     public function update(Request $request, Product $product): JsonResponse
@@ -150,19 +151,14 @@ class ProductController extends Controller
         ]);
 
         $data = $request->validate([
-            'item_category_id' => ['required', 'integer', 'exists:item_categories,id'],
-            'code' => [
-                'nullable',
-                'string',
-                'max:60',
-                Rule::unique('products', 'code')->ignore($product->id),
-            ],
-            'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30'],
-            'stock' => ['nullable', 'integer', 'min:0'],
-            'price_agent' => ['nullable', 'numeric', 'min:0'],
-            'price_sales' => ['nullable', 'numeric', 'min:0'],
-            'price_general' => ['nullable', 'numeric', 'min:0'],
+            'item_category_id' => FluentRule::integer()->required()->exists('item_categories', 'id'),
+            'code' => FluentRule::string()->nullable()->max(60)->rule(Rule::unique('products', 'code')->ignore($product->id)),
+            'name' => FluentRule::string()->required()->max(200),
+            'unit' => FluentRule::string()->required()->max(30),
+            'stock' => FluentRule::integer()->nullable()->min(0),
+            'price_agent' => FluentRule::numeric()->nullable()->min(0),
+            'price_sales' => FluentRule::numeric()->nullable()->min(0),
+            'price_general' => FluentRule::numeric()->nullable()->min(0),
         ], [
             'code.unique' => __('ui.product_code_unique_error'),
         ]);
@@ -187,7 +183,7 @@ class ProductController extends Controller
     /**
      * Delete a product.
      *
-     * @param  Product  $product The product instance to delete
+     * @param  Product  $product  The product instance to delete
      * @return JsonResponse The JSON response
      */
     public function destroy(Product $product): JsonResponse
@@ -205,5 +201,4 @@ class ProductController extends Controller
 
         return response()->json(status: 204);
     }
-
 }

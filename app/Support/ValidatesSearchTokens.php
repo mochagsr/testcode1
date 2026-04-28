@@ -12,8 +12,8 @@ trait ValidatesSearchTokens
     /**
      * Validate that all search tokens meet the minimum length requirement.
      *
-     * @param  string  $search The search string
-     * @param  int  $minimumTokenLength The minimum characters per token
+     * @param  string  $search  The search string
+     * @param  int  $minimumTokenLength  The minimum characters per token
      * @return bool True if all tokens are valid
      */
     protected function hasValidSearchTokens(string $search, int $minimumTokenLength = 3): bool

@@ -50,4 +50,3 @@ class JournalEntryLine extends Model
         return $this->belongsTo(Account::class);
     }
 }
-

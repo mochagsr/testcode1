@@ -33,6 +33,6 @@ class EnsurePermission
             return $next($request);
         }
 
-        abort(403, 'Permission denied for action: ' . $requiredPermission);
+        abort(403, 'Permission denied for action: '.$requiredPermission);
     }
 }

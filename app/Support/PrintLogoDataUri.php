@@ -23,25 +23,25 @@ final class PrintLogoDataUri
         $rawLogoPath = trim((string) $logoPath);
 
         if ($rawLogoPath === '') {
-            return $preferPublicUrl ? static::publicUrl($logoPath) : null;
+            return $preferPublicUrl ? self::publicUrl($logoPath) : null;
         }
 
-        foreach (static::candidatePaths($rawLogoPath) as $candidatePath) {
+        foreach (self::candidatePaths($rawLogoPath) as $candidatePath) {
             if (! is_file($candidatePath) || ! is_readable($candidatePath)) {
                 continue;
             }
 
-            $optimizedDataUri = static::optimizedDataUri($candidatePath, $preferPublicUrl);
+            $optimizedDataUri = self::optimizedDataUri($candidatePath, $preferPublicUrl);
             if ($optimizedDataUri !== null) {
                 return $optimizedDataUri;
             }
         }
 
         if ($preferPublicUrl) {
-            return static::publicUrl($logoPath);
+            return self::publicUrl($logoPath);
         }
 
-        return static::resolve($logoPath);
+        return self::resolve($logoPath);
     }
 
     public static function resolve(?string $logoPath): ?string
@@ -52,7 +52,7 @@ final class PrintLogoDataUri
             return null;
         }
 
-        foreach (static::candidatePaths($rawLogoPath) as $candidatePath) {
+        foreach (self::candidatePaths($rawLogoPath) as $candidatePath) {
             if (! is_file($candidatePath) || ! is_readable($candidatePath)) {
                 continue;
             }
@@ -67,7 +67,7 @@ final class PrintLogoDataUri
                 continue;
             }
 
-            return 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+            return 'data:'.$mimeType.';base64,'.base64_encode($contents);
         }
 
         if (preg_match('#^https?://#i', $rawLogoPath) === 1) {
@@ -91,7 +91,7 @@ final class PrintLogoDataUri
 
         foreach (array_filter([
             $rawLogoPath,
-            static::pathFromUrl($rawLogoPath),
+            self::pathFromUrl($rawLogoPath),
         ]) as $possiblePath) {
             $normalized = ltrim((string) $possiblePath, '/\\');
 
@@ -105,18 +105,18 @@ final class PrintLogoDataUri
 
             try {
                 if (Storage::disk('public')->exists($storageRelative)) {
-                    return '/storage/' . str_replace('\\', '/', ltrim($storageRelative, '/\\'));
+                    return '/storage/'.str_replace('\\', '/', ltrim($storageRelative, '/\\'));
                 }
             } catch (\Throwable) {
                 // Fall through to public path checks.
             }
 
             if (is_file(public_path($normalized))) {
-                return '/' . ltrim(str_replace('\\', '/', $normalized), '/');
+                return '/'.ltrim(str_replace('\\', '/', $normalized), '/');
             }
 
-            if (is_file(public_path('storage/' . $storageRelative))) {
-                return '/storage/' . str_replace('\\', '/', ltrim($storageRelative, '/\\'));
+            if (is_file(public_path('storage/'.$storageRelative))) {
+                return '/storage/'.str_replace('\\', '/', ltrim($storageRelative, '/\\'));
             }
         }
 
@@ -132,7 +132,7 @@ final class PrintLogoDataUri
 
         foreach (array_filter([
             $rawLogoPath,
-            static::pathFromUrl($rawLogoPath),
+            self::pathFromUrl($rawLogoPath),
         ]) as $possiblePath) {
             $normalized = ltrim((string) $possiblePath, '/\\');
 
@@ -144,13 +144,13 @@ final class PrintLogoDataUri
                 ? substr($normalized, strlen('storage/'))
                 : $normalized;
 
-            $paths[] = static::publicDiskPath($storageRelative);
-            $paths[] = public_path('storage/' . $storageRelative);
+            $paths[] = self::publicDiskPath($storageRelative);
+            $paths[] = public_path('storage/'.$storageRelative);
             $paths[] = public_path($normalized);
-            $paths[] = storage_path('app/public/' . $storageRelative);
-            $paths[] = storage_path('app/' . $storageRelative);
+            $paths[] = storage_path('app/public/'.$storageRelative);
+            $paths[] = storage_path('app/'.$storageRelative);
 
-            if (static::isAbsoluteFilesystemPath($possiblePath)) {
+            if (self::isAbsoluteFilesystemPath($possiblePath)) {
                 $paths[] = $possiblePath;
             }
         }
@@ -188,7 +188,7 @@ final class PrintLogoDataUri
     {
         $imageInfo = @getimagesize($candidatePath);
         if (! is_array($imageInfo)) {
-            return static::fileDataUri($candidatePath);
+            return self::fileDataUri($candidatePath);
         }
 
         $width = (int) ($imageInfo[0] ?? 0);
@@ -209,11 +209,11 @@ final class PrintLogoDataUri
             && $fileSize > 0
             && $fileSize <= $inlineThreshold
         ) {
-            return static::fileDataUri($candidatePath, $mimeType);
+            return self::fileDataUri($candidatePath, $mimeType);
         }
 
         if (! function_exists('imagecreatefromstring')) {
-            return static::fileDataUri($candidatePath, $mimeType);
+            return self::fileDataUri($candidatePath, $mimeType);
         }
 
         $contents = @file_get_contents($candidatePath);
@@ -223,7 +223,7 @@ final class PrintLogoDataUri
 
         $source = @imagecreatefromstring($contents);
         if (! is_object($source) && ! is_resource($source)) {
-            return static::fileDataUri($candidatePath, $mimeType);
+            return self::fileDataUri($candidatePath, $mimeType);
         }
 
         $targetWidth = $width;
@@ -242,7 +242,8 @@ final class PrintLogoDataUri
         $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
         if (! $canvas) {
             imagedestroy($source);
-            return static::fileDataUri($candidatePath, $mimeType);
+
+            return self::fileDataUri($candidatePath, $mimeType);
         }
 
         imagealphablending($canvas, false);
@@ -260,10 +261,10 @@ final class PrintLogoDataUri
         imagedestroy($source);
 
         if (! is_string($optimizedBinary) || $optimizedBinary === '') {
-            return static::fileDataUri($candidatePath, $mimeType);
+            return self::fileDataUri($candidatePath, $mimeType);
         }
 
-        return 'data:image/png;base64,' . base64_encode($optimizedBinary);
+        return 'data:image/png;base64,'.base64_encode($optimizedBinary);
     }
 
     private static function fileDataUri(string $candidatePath, ?string $mimeType = null): ?string
@@ -277,6 +278,6 @@ final class PrintLogoDataUri
         $resolvedMimeType = $mimeType
             ?: (function_exists('mime_content_type') ? (mime_content_type($candidatePath) ?: 'image/png') : 'image/png');
 
-        return 'data:' . $resolvedMimeType . ';base64,' . base64_encode($contents);
+        return 'data:'.$resolvedMimeType.';base64,'.base64_encode($contents);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\CustomerPrintingSubtype;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use SanderMuller\FluentValidation\FluentRule;
 
 class CustomerPrintingSubtypeController extends Controller
 {
@@ -27,7 +28,7 @@ class CustomerPrintingSubtypeController extends Controller
     public function store(Request $request, Customer $customer): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:120'],
+            'name' => FluentRule::string()->required()->max(120),
         ]);
 
         $normalizedName = CustomerPrintingSubtype::normalizeName((string) $data['name']);

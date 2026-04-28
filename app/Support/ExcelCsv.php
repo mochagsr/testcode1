@@ -5,10 +5,11 @@ namespace App\Support;
 final class ExcelCsv
 {
     private const DELIMITER = ';';
+
     private const EOL = "\r\n";
 
     /**
-     * @param resource $handle
+     * @param  resource  $handle
      */
     public static function start($handle): void
     {
@@ -17,8 +18,8 @@ final class ExcelCsv
     }
 
     /**
-     * @param resource $handle
-     * @param array<int, mixed> $row
+     * @param  resource  $handle
+     * @param  array<int, mixed>  $row
      */
     public static function row($handle, array $row): void
     {

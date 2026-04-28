@@ -9,7 +9,7 @@ use App\Support\AppCache;
 use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use SanderMuller\FluentValidation\FluentRule;
 
 class ItemCategoryController extends Controller
 {
@@ -32,8 +32,8 @@ class ItemCategoryController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'unique:item_categories,code'],
-            'description' => ['nullable', 'string'],
+            'code' => FluentRule::string()->required()->max(50)->unique('item_categories', 'code'),
+            'description' => FluentRule::string()->nullable(),
         ]);
         $data['name'] = $data['code'];
 
@@ -51,13 +51,8 @@ class ItemCategoryController extends Controller
     public function update(Request $request, ItemCategory $itemCategory): JsonResponse
     {
         $data = $request->validate([
-            'code' => [
-                'required',
-                'string',
-                'max:50',
-                Rule::unique('item_categories', 'code')->ignore($itemCategory->id),
-            ],
-            'description' => ['nullable', 'string'],
+            'code' => FluentRule::string()->required()->max(50)->unique('item_categories', 'code', fn ($rule) => $rule->ignore($itemCategory->id)),
+            'description' => FluentRule::string()->nullable(),
         ]);
         $data['name'] = $data['code'];
 

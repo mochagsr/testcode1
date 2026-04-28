@@ -2,20 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\AuditLogService;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use SanderMuller\FluentValidation\FluentRule;
 
 class AuthController extends Controller
 {
     public function __construct(
         private readonly AuditLogService $auditLogService
-    ) {
-    }
+    ) {}
 
     public function showLogin(): View|RedirectResponse
     {
@@ -29,8 +29,8 @@ class AuthController extends Controller
     public function login(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
-            'login' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string'],
+            'login' => FluentRule::string()->required()->max(255),
+            'password' => FluentRule::string()->required(),
         ]);
 
         $loginInput = trim((string) ($credentials['login'] ?? ''));

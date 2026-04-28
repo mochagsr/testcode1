@@ -15,9 +15,7 @@ trait QueryOptimization
     /**
      * Apply pagination with safe defaults for VPS.
      *
-     * @param  Builder  $query
-     * @param  int  $perPage Items per page
-     * @return mixed
+     * @param  int  $perPage  Items per page
      */
     protected function safePaginate(Builder $query, int $perPage = 15): mixed
     {
@@ -32,10 +30,7 @@ trait QueryOptimization
     /**
      * Apply search filtering with validation.
      *
-     * @param  Builder  $query
-     * @param  string  $searchTerm
-     * @param  array<int, string>  $searchableFields Fields to search
-     * @return Builder
+     * @param  array<int, string>  $searchableFields  Fields to search
      */
     protected function applySearch(Builder $query, string $searchTerm, array $searchableFields): Builder
     {
@@ -55,16 +50,13 @@ trait QueryOptimization
     /**
      * Apply status filtering.
      *
-     * @param  Builder  $query
-     * @param  string  $status
-     * @param  array<string, mixed>  $statusMap Map of status => condition
-     * @return Builder
+     * @param  array<string, mixed>  $statusMap  Map of status => condition
      */
     protected function applyStatusFilter(Builder $query, string $status, array $statusMap): Builder
     {
         $status = trim($status);
 
-        if ($status === '' || !isset($statusMap[$status])) {
+        if ($status === '' || ! isset($statusMap[$status])) {
             return $query;
         }
 
@@ -82,16 +74,14 @@ trait QueryOptimization
     /**
      * Apply date range filtering.
      *
-     * @param  Builder  $query
-     * @param  string  $dateString Format: YYYY-MM-DD
-     * @param  string  $dateField Field name
-     * @return Builder
+     * @param  string  $dateString  Format: YYYY-MM-DD
+     * @param  string  $dateField  Field name
      */
     protected function applyDateFilter(Builder $query, string $dateString, string $dateField = 'created_at'): Builder
     {
         $dateString = trim($dateString);
 
-        if ($dateString === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateString)) {
+        if ($dateString === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateString)) {
             return $query;
         }
 
@@ -110,9 +100,9 @@ trait QueryOptimization
     /**
      * Get sorting order.
      *
-     * @param  string  $sort Column name
-     * @param  string  $direction 'asc' or 'desc'
-     * @param  array<int, string>  $allowedColumns Allowed sortable columns
+     * @param  string  $sort  Column name
+     * @param  string  $direction  'asc' or 'desc'
+     * @param  array<int, string>  $allowedColumns  Allowed sortable columns
      * @return array{column: string, direction: string}
      */
     protected function getSafeSort(string $sort, string $direction, array $allowedColumns): array
@@ -121,11 +111,11 @@ trait QueryOptimization
         $direction = strtolower(trim($direction));
 
         // Prevent SQL injection by validating column name
-        if (!in_array($sort, $allowedColumns, true)) {
+        if (! in_array($sort, $allowedColumns, true)) {
             $sort = 'id';
         }
 
-        if (!in_array($direction, ['asc', 'desc'], true)) {
+        if (! in_array($direction, ['asc', 'desc'], true)) {
             $direction = 'desc';
         }
 

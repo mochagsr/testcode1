@@ -9,6 +9,7 @@ use App\Services\ApprovalWorkflowService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use SanderMuller\FluentValidation\FluentRule;
 
 class ApprovalRequestController extends Controller
 {
@@ -39,7 +40,7 @@ class ApprovalRequestController extends Controller
     public function approve(Request $request, ApprovalRequest $approvalRequest): RedirectResponse
     {
         $data = $request->validate([
-            'approval_note' => ['nullable', 'string', 'max:1000'],
+            'approval_note' => FluentRule::string()->nullable()->max(1000),
         ]);
         if ((string) $approvalRequest->status !== 'pending') {
             return back()->withErrors(['approval' => 'Approval request sudah diproses.']);
@@ -56,7 +57,7 @@ class ApprovalRequestController extends Controller
     public function reject(Request $request, ApprovalRequest $approvalRequest): RedirectResponse
     {
         $data = $request->validate([
-            'approval_note' => ['nullable', 'string', 'max:1000'],
+            'approval_note' => FluentRule::string()->nullable()->max(1000),
         ]);
         if ((string) $approvalRequest->status !== 'pending') {
             return back()->withErrors(['approval' => 'Approval request sudah diproses.']);

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\ApprovalRequest;
 use App\Models\DeliveryNote;
 use App\Models\OrderNote;
 use App\Models\OutgoingTransaction;
@@ -15,11 +14,12 @@ use App\Models\SalesReturn;
 use App\Models\SupplierPayment;
 use App\Services\ApprovalWorkflowService;
 use Illuminate\Contracts\View\View;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use SanderMuller\FluentValidation\FluentRule;
 
 class TransactionCorrectionWizardController extends Controller
 {
@@ -68,10 +68,10 @@ class TransactionCorrectionWizardController extends Controller
         $allowedTypes = implode(',', array_keys(self::TYPE_MODEL_MAP));
         $data = $request->validate([
             'type' => ['required', 'in:'.$allowedTypes],
-            'subject_id' => ['required', 'integer', 'min:1'],
-            'reason' => ['required', 'string', 'max:1200'],
-            'requested_changes' => ['required', 'string', 'max:5000'],
-            'requested_patch_json' => ['nullable', 'string', 'max:50000'],
+            'subject_id' => FluentRule::integer()->required()->min(1),
+            'reason' => FluentRule::string()->required()->max(1200),
+            'requested_changes' => FluentRule::string()->required()->max(5000),
+            'requested_patch_json' => FluentRule::string()->nullable()->max(50000),
         ]);
 
         $subject = $this->resolveSubject((string) $data['type'], (int) $data['subject_id']);
@@ -109,9 +109,9 @@ class TransactionCorrectionWizardController extends Controller
     public function stockImpactPreview(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'type' => ['required', 'in:sales_invoice'],
-            'subject_id' => ['required', 'integer', 'min:1'],
-            'requested_patch_json' => ['required', 'string', 'max:50000'],
+            'type' => FluentRule::field()->required()->rule('in:sales_invoice'),
+            'subject_id' => FluentRule::integer()->required()->min(1),
+            'requested_patch_json' => FluentRule::string()->required()->max(50000),
         ]);
 
         $invoice = SalesInvoice::query()

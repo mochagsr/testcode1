@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
 class UpdateCustomerRequest extends FormRequest
 {
+    use HasFluentRules;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -22,14 +26,14 @@ class UpdateCustomerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['nullable', 'unique:customers,code,' . $this->route('customer'), 'max:20'],
-            'name' => ['required', 'string', 'max:255'],
-            'city' => ['required', 'string', 'max:100'],
-            'customer_level_id' => ['nullable', 'exists:customer_levels,id'],
-            'credit_balance' => ['nullable', 'numeric', 'min:0'],
-            'phone_number' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'address' => ['nullable', 'string', 'max:500'],
+            'code' => ['nullable', 'unique:customers,code,'.$this->route('customer'), 'max:20'],
+            'name' => FluentRule::string()->required()->max(255),
+            'city' => FluentRule::string()->required()->max(100),
+            'customer_level_id' => FluentRule::field()->nullable()->rule('exists:customer_levels,id'),
+            'credit_balance' => FluentRule::numeric()->nullable()->min(0),
+            'phone_number' => FluentRule::string()->nullable()->max(20),
+            'email' => FluentRule::email()->nullable()->max(255),
+            'address' => FluentRule::string()->nullable()->max(500),
         ];
     }
 

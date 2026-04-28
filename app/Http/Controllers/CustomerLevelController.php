@@ -8,7 +8,7 @@ use App\Models\CustomerLevel;
 use App\Support\ValidatesSearchTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use SanderMuller\FluentValidation\FluentRule;
 
 class CustomerLevelController extends Controller
 {
@@ -31,8 +31,8 @@ class CustomerLevelController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:30', 'unique:customer_levels,code'],
-            'description' => ['nullable', 'string'],
+            'code' => FluentRule::string()->required()->max(30)->unique('customer_levels', 'code'),
+            'description' => FluentRule::string()->nullable(),
         ]);
         $data['name'] = $data['code'];
 
@@ -49,13 +49,8 @@ class CustomerLevelController extends Controller
     public function update(Request $request, CustomerLevel $customerLevel): JsonResponse
     {
         $data = $request->validate([
-            'code' => [
-                'required',
-                'string',
-                'max:30',
-                Rule::unique('customer_levels', 'code')->ignore($customerLevel->id),
-            ],
-            'description' => ['nullable', 'string'],
+            'code' => FluentRule::string()->required()->max(30)->unique('customer_levels', 'code', fn ($rule) => $rule->ignore($customerLevel->id)),
+            'description' => FluentRule::string()->nullable(),
         ]);
         $data['name'] = $data['code'];
 

@@ -54,7 +54,7 @@ trait ResolvesSemesterOptions
                         ->whereNotNull($dateColumn)
                         ->orderByDesc($dateColumn)
                         ->pluck($dateColumn)
-                        ->map(fn($date): string => $this->semesterPeriodFromDate($date))
+                        ->map(fn ($date): string => $this->semesterPeriodFromDate($date))
                         ->merge($this->resolveSemesterBookService()->configuredSemesterOptions()),
                     false,
                     true

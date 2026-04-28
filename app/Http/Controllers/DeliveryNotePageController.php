@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DeliveryNotePageController extends Controller
@@ -78,8 +79,8 @@ class DeliveryNotePageController extends Controller
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->betweenDates($semesterRange['start'], $semesterRange['end']);
             })
-            ->when($selectedStatus === 'active', fn($query) => $query->active())
-            ->when($selectedStatus === 'canceled', fn($query) => $query->canceled())
+            ->when($selectedStatus === 'active', fn ($query) => $query->active())
+            ->when($selectedStatus === 'canceled', fn ($query) => $query->canceled())
             ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
                 $query->betweenDates($selectedNoteDateRange[0], $selectedNoteDateRange[1]);
             })
@@ -173,7 +174,7 @@ class DeliveryNotePageController extends Controller
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.delivery_notes.customers', ['limit' => 20]),
             $now->copy()->addSeconds(60),
-            fn() => Customer::query()
+            fn () => Customer::query()
                 ->onlyDeliveryFormColumns()
                 ->with('level:id,code,name')
                 ->orderBy('name')
@@ -194,13 +195,13 @@ class DeliveryNotePageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.delivery_notes.products', ['limit' => 20, 'active_only' => 1]),
             $now->copy()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlyDeliveryFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -238,25 +239,25 @@ class DeliveryNotePageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'note_date' => ['required', 'date'],
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'order_note_id' => ['nullable', 'integer', 'exists:order_notes,id'],
-            'customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'recipient_name' => ['nullable', 'string', 'max:150'],
-            'recipient_phone' => ['nullable', 'string', 'max:30'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.order_note_item_id' => ['nullable', 'integer', 'exists:order_note_items,id'],
-            'items.*.product_code' => ['nullable', 'string', 'max:60'],
-            'items.*.product_name' => ['required', 'string', 'max:200'],
-            'items.*.unit' => ['nullable', 'string', 'max:30'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.notes' => ['nullable', 'string'],
+            'note_date' => FluentRule::date()->required(),
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'order_note_id' => FluentRule::integer()->nullable()->exists('order_notes', 'id'),
+            'customer_ship_location_id' => FluentRule::integer()->nullable()->exists('customer_ship_locations', 'id'),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'recipient_name' => FluentRule::string()->nullable()->max(150),
+            'recipient_phone' => FluentRule::string()->nullable()->max(30),
+            'city' => FluentRule::string()->nullable()->max(100),
+            'address' => FluentRule::string()->nullable(),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.order_note_item_id' => FluentRule::integer()->nullable()->exists('order_note_items', 'id'),
+            'items.*.product_code' => FluentRule::string()->nullable()->max(60),
+            'items.*.product_name' => FluentRule::string()->required()->max(200),
+            'items.*.unit' => FluentRule::string()->nullable()->max(30),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.notes' => FluentRule::string()->nullable(),
         ]);
 
         $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? TransactionType::PRODUCT));
@@ -438,7 +439,7 @@ class DeliveryNotePageController extends Controller
                     'reference_id' => (int) $note->id,
                     'mutation_type' => 'out',
                     'quantity' => (int) $quantity,
-                    'notes' => 'Delivery note ' . $note->note_number,
+                    'notes' => 'Delivery note '.$note->note_number,
                     'created_by_user_id' => auth()->id(),
                 ]);
             }
@@ -470,13 +471,13 @@ class DeliveryNotePageController extends Controller
         ]);
         $itemProductIds = $deliveryNote->items
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.delivery_notes.products', ['limit' => 20, 'active_only' => 1]),
             $now->copy()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlyDeliveryFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -500,20 +501,20 @@ class DeliveryNotePageController extends Controller
     public function adminUpdate(Request $request, DeliveryNote $deliveryNote): RedirectResponse
     {
         $data = $request->validate([
-            'note_date' => ['required', 'date'],
-            'recipient_name' => ['required', 'string', 'max:150'],
-            'recipient_phone' => ['nullable', 'string', 'max:30'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.product_name' => ['required', 'string', 'max:200'],
-            'items.*.unit' => ['nullable', 'string', 'max:30'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.notes' => ['nullable', 'string'],
+            'note_date' => FluentRule::date()->required(),
+            'recipient_name' => FluentRule::string()->required()->max(150),
+            'recipient_phone' => FluentRule::string()->nullable()->max(30),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'city' => FluentRule::string()->nullable()->max(100),
+            'address' => FluentRule::string()->nullable(),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.product_name' => FluentRule::string()->required()->max(200),
+            'items.*.unit' => FluentRule::string()->nullable()->max(30),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.notes' => FluentRule::string()->nullable(),
         ]);
 
         DB::transaction(function () use ($deliveryNote, $data): void {
@@ -618,7 +619,7 @@ class DeliveryNotePageController extends Controller
                         'reference_id' => (int) $note->id,
                         'mutation_type' => 'in',
                         'quantity' => (int) $delta,
-                        'notes' => 'Admin edit delivery note ' . $note->note_number,
+                        'notes' => 'Admin edit delivery note '.$note->note_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 } else {
@@ -630,7 +631,7 @@ class DeliveryNotePageController extends Controller
                         'reference_id' => (int) $note->id,
                         'mutation_type' => 'out',
                         'quantity' => (int) $outQty,
-                        'notes' => 'Admin edit delivery note ' . $note->note_number,
+                        'notes' => 'Admin edit delivery note '.$note->note_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 }
@@ -697,7 +698,7 @@ class DeliveryNotePageController extends Controller
     public function cancel(Request $request, DeliveryNote $deliveryNote): RedirectResponse
     {
         $data = $request->validate([
-            'cancel_reason' => ['required', 'string', 'max:1000'],
+            'cancel_reason' => FluentRule::string()->required()->max(1000),
         ]);
 
         DB::transaction(function () use ($deliveryNote, $data): void {
@@ -736,7 +737,7 @@ class DeliveryNotePageController extends Controller
                     'reference_id' => (int) $note->id,
                     'mutation_type' => 'in',
                     'quantity' => (int) $quantity,
-                    'notes' => 'Cancel delivery note ' . $note->note_number,
+                    'notes' => 'Cancel delivery note '.$note->note_number,
                     'created_by_user_id' => auth()->id(),
                 ]);
             }
@@ -775,7 +776,7 @@ class DeliveryNotePageController extends Controller
     {
         $deliveryNote->load(['customer:id,name,city,phone,address', 'shipLocation:id,school_name,recipient_name,recipient_phone,city,address', 'items']);
 
-        $filename = $deliveryNote->note_number . '.pdf';
+        $filename = $deliveryNote->note_number.'.pdf';
         $pdf = Pdf::loadView('delivery_notes.print', [
             'note' => $deliveryNote,
             'isPdf' => true,
@@ -787,10 +788,10 @@ class DeliveryNotePageController extends Controller
     public function exportExcel(DeliveryNote $deliveryNote): StreamedResponse
     {
         $deliveryNote->load(['customer:id,name,city,phone,address', 'shipLocation:id,school_name,recipient_name,recipient_phone,city,address', 'items']);
-        $filename = $deliveryNote->note_number . '.xlsx';
+        $filename = $deliveryNote->note_number.'.xlsx';
 
         return response()->streamDownload(function () use ($deliveryNote): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Surat Jalan');
             $address = \App\Support\PrintTextFormatter::wrapWords((string) ($deliveryNote->address ?: ''), 5);
@@ -799,7 +800,7 @@ class DeliveryNotePageController extends Controller
                 4
             );
             $rows = [];
-            $rows[] = [__('txn.delivery_notes_title') . ' ' . __('txn.note_number'), $deliveryNote->note_number];
+            $rows[] = [__('txn.delivery_notes_title').' '.__('txn.note_number'), $deliveryNote->note_number];
             $rows[] = [__('txn.date'), $deliveryNote->note_date?->format('d-m-Y')];
             if (($deliveryNote->shipLocation?->school_name ?? '') !== '') {
                 $rows[] = [__('school_bulk.ship_to_school'), $deliveryNote->shipLocation->school_name];
@@ -843,7 +844,7 @@ class DeliveryNotePageController extends Controller
 
     private function generateNoteNumber(string $date): string
     {
-        $prefix = 'SJ-' . date('dmY', strtotime($date));
+        $prefix = 'SJ-'.date('dmY', strtotime($date));
         $count = DeliveryNote::query()
             ->whereDate('note_date', $date)
             ->lockForUpdate()
@@ -870,6 +871,7 @@ class DeliveryNotePageController extends Controller
     private function semesterPeriodFromDate(Carbon|string|null $date): string
     {
         $rawDate = $date instanceof Carbon ? $date->format('Y-m-d') : (string) $date;
+
         return $this->semesterBookService->semesterFromDate($rawDate) ?? $this->currentSemesterPeriod();
     }
 
@@ -877,7 +879,7 @@ class DeliveryNotePageController extends Controller
     {
         $levelCode = strtolower(trim((string) ($customer?->level?->code ?? '')));
         $levelName = strtolower(trim((string) ($customer?->level?->name ?? '')));
-        $combined = trim($levelCode . ' ' . $levelName);
+        $combined = trim($levelCode.' '.$levelName);
 
         if (str_contains($combined, 'agent') || str_contains($combined, 'agen')) {
             return (float) round((float) ($product->price_agent ?? $product->price_general ?? 0));

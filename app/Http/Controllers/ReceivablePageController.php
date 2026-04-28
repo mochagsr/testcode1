@@ -7,7 +7,6 @@ namespace App\Http\Controllers;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Customer;
-use App\Models\CustomerLevel;
 use App\Models\InvoicePayment;
 use App\Models\ReceivableLedger;
 use App\Models\ReceivablePayment;
@@ -25,15 +24,16 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Collection;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivablePageController extends Controller
@@ -60,7 +60,7 @@ class ReceivablePageController extends Controller
         $baseSemesterOptions = Cache::remember(
             AppCache::lookupCacheKey('receivables.index.semester_options.base'),
             now()->addSeconds(60),
-            fn() => $this->semesterBookService->buildSemesterOptionCollection(
+            fn () => $this->semesterBookService->buildSemesterOptionCollection(
                 ReceivableLedger::query()
                     ->whereNotNull('period_code')
                     ->where('period_code', '!=', '')
@@ -322,8 +322,8 @@ class ReceivablePageController extends Controller
         $pdf = Pdf::loadHTML($html)->setPaper('a4', $selectedCustomer instanceof Customer ? 'portrait' : 'landscape');
 
         $filename = $selectedCustomer instanceof Customer
-            ? 'invoice-piutang-' . Str::slug((string) $selectedCustomer->name) . '-' . $this->nowWib()->format('Ymd-His') . '.pdf'
-            : 'piutang-global-' . $this->nowWib()->format('Ymd-His') . '.pdf';
+            ? 'invoice-piutang-'.Str::slug((string) $selectedCustomer->name).'-'.$this->nowWib()->format('Ymd-His').'.pdf'
+            : 'piutang-global-'.$this->nowWib()->format('Ymd-His').'.pdf';
 
         return $pdf->download($filename);
     }
@@ -335,7 +335,7 @@ class ReceivablePageController extends Controller
         $filename = $this->semesterReportFilename('xlsx', (string) ($data['selectedSemester'] ?? ''));
 
         return response()->streamDownload(function () use ($rows, $data): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Piutang Semester');
 
@@ -346,7 +346,7 @@ class ReceivablePageController extends Controller
             $sheet->getStyle('A1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
             $sheet->mergeCells('H2:I2');
-            $sheet->setCellValue('H2', 'Update : ' . now()->translatedFormat('j F Y'));
+            $sheet->setCellValue('H2', 'Update : '.now()->translatedFormat('j F Y'));
             $sheet->getStyle('H2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $sheet->getStyle('H2')->getFont()->setItalic(true)->setBold(true);
 
@@ -370,10 +370,10 @@ class ReceivablePageController extends Controller
                     strtoupper((string) ($row['name'] ?? '')),
                     (string) ($row['address'] ?? '-'),
                     strtoupper((string) (($row['level_label'] ?? '') !== '' ? $row['level_label'] : '-')),
-                    'Rp ' . number_format((int) ($row['sales_total'] ?? 0), 0, ',', '.'),
-                    'Rp ' . number_format((int) ($row['payment_total'] ?? 0), 0, ',', '.'),
-                    'Rp ' . number_format((int) ($row['return_total'] ?? 0), 0, ',', '.'),
-                    ($outstanding < 0 ? '-Rp ' : 'Rp ') . number_format(abs($outstanding), 0, ',', '.'),
+                    'Rp '.number_format((int) ($row['sales_total'] ?? 0), 0, ',', '.'),
+                    'Rp '.number_format((int) ($row['payment_total'] ?? 0), 0, ',', '.'),
+                    'Rp '.number_format((int) ($row['return_total'] ?? 0), 0, ',', '.'),
+                    ($outstanding < 0 ? '-Rp ' : 'Rp ').number_format(abs($outstanding), 0, ',', '.'),
                     $outstanding <= 0 ? 'LUNAS' : '-',
                 ];
             }
@@ -384,39 +384,39 @@ class ReceivablePageController extends Controller
                 __('receivable.semester_total'),
                 '',
                 '',
-                'Rp ' . number_format((int) ($totals['sales_total'] ?? 0), 0, ',', '.'),
-                'Rp ' . number_format((int) ($totals['payment_total'] ?? 0), 0, ',', '.'),
-                'Rp ' . number_format((int) ($totals['return_total'] ?? 0), 0, ',', '.'),
-                ((int) ($totals['outstanding_total'] ?? 0) < 0 ? '-Rp ' : 'Rp ') . number_format(abs((int) ($totals['outstanding_total'] ?? 0)), 0, ',', '.'),
+                'Rp '.number_format((int) ($totals['sales_total'] ?? 0), 0, ',', '.'),
+                'Rp '.number_format((int) ($totals['payment_total'] ?? 0), 0, ',', '.'),
+                'Rp '.number_format((int) ($totals['return_total'] ?? 0), 0, ',', '.'),
+                ((int) ($totals['outstanding_total'] ?? 0) < 0 ? '-Rp ' : 'Rp ').number_format(abs((int) ($totals['outstanding_total'] ?? 0)), 0, ',', '.'),
                 '',
             ];
 
-            $sheet->fromArray($rowsOut, null, 'A' . $tableStart);
+            $sheet->fromArray($rowsOut, null, 'A'.$tableStart);
             $lastRow = $tableStart + count($rowsOut) - 1;
-            $sheet->getStyle('A' . $tableStart . ':I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('A' . $tableStart . ':I' . $lastRow)->getAlignment()->setWrapText(true);
-            $sheet->getStyle('A' . $tableStart . ':I' . $lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getFont()->setBold(true);
-            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-            $sheet->getStyle('A' . $tableStart . ':I' . $tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
-            $sheet->getStyle('A' . ($tableStart + 1) . ':A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('D' . ($tableStart + 1) . ':D' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('E' . ($tableStart + 1) . ':H' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $sheet->getStyle('A' . ($tableStart + 1) . ':C' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle('A'.$tableStart.':I'.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.$tableStart.':I'.$lastRow)->getAlignment()->setWrapText(true);
+            $sheet->getStyle('A'.$tableStart.':I'.$lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getFont()->setBold(true);
+            $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
+            $sheet->getStyle('A'.($tableStart + 1).':A'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D'.($tableStart + 1).':D'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E'.($tableStart + 1).':H'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('A'.($tableStart + 1).':C'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             $totalRow = $tableStart + count($rowsOut) - 1;
-            $sheet->getStyle('A' . $totalRow . ':I' . $totalRow)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-            $sheet->getStyle('A' . $totalRow . ':I' . $totalRow)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
-            $sheet->getStyle('E' . $totalRow . ':H' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $sheet->getStyle('B' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle('A'.$totalRow.':I'.$totalRow)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle('A'.$totalRow.':I'.$totalRow)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
+            $sheet->getStyle('E'.$totalRow.':H'.$totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('B'.$totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
             for ($rowIndex = $tableStart + 1; $rowIndex < $totalRow; $rowIndex++) {
-                if (strtoupper((string) $sheet->getCell('I' . $rowIndex)->getValue()) === 'LUNAS') {
-                    $sheet->getStyle('I' . $rowIndex)->getFont()->getColor()->setARGB('FFD60000');
-                    $sheet->getStyle('I' . $rowIndex)->getFont()->setBold(true);
-                    $sheet->getStyle('I' . $rowIndex)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                if (strtoupper((string) $sheet->getCell('I'.$rowIndex)->getValue()) === 'LUNAS') {
+                    $sheet->getStyle('I'.$rowIndex)->getFont()->getColor()->setARGB('FFD60000');
+                    $sheet->getStyle('I'.$rowIndex)->getFont()->setBold(true);
+                    $sheet->getStyle('I'.$rowIndex)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 } else {
-                    $sheet->getStyle('I' . $rowIndex)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle('I'.$rowIndex)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 }
             }
 
@@ -443,11 +443,11 @@ class ReceivablePageController extends Controller
         $semesterCodes = collect($data['semesterCodes'] ?? []);
         $selectedCustomer = $data['selectedCustomer'] ?? null;
         $filename = $selectedCustomer instanceof Customer
-            ? 'invoice-piutang-' . Str::slug((string) $selectedCustomer->name) . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx'
-            : 'piutang-global-' . $this->nowWib()->format('Ymd-His') . '.xlsx';
+            ? 'invoice-piutang-'.Str::slug((string) $selectedCustomer->name).'-'.$this->nowWib()->format('Ymd-His').'.xlsx'
+            : 'piutang-global-'.$this->nowWib()->format('Ymd-His').'.xlsx';
 
         return response()->streamDownload(function () use ($rows, $data, $semesterHeaders, $semesterCodes, $selectedCustomer): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle($selectedCustomer instanceof Customer ? 'Invoice Piutang' : 'Piutang Global');
 
@@ -464,9 +464,9 @@ class ReceivablePageController extends Controller
                 $companyLogoPath = trim((string) ($data['companyLogoPath'] ?? ''));
 
                 if ($companyLogoPath !== '') {
-                    $absoluteLogoPath = public_path('storage/' . $companyLogoPath);
+                    $absoluteLogoPath = public_path('storage/'.$companyLogoPath);
                     if (is_file($absoluteLogoPath)) {
-                        $drawing = new Drawing();
+                        $drawing = new Drawing;
                         $drawing->setPath($absoluteLogoPath);
                         $drawing->setHeight(74);
                         $drawing->setCoordinates('A1');
@@ -486,7 +486,7 @@ class ReceivablePageController extends Controller
                 $sheet->getStyle('E1:G2')->getFont()->setBold(true)->setSize(24);
                 $sheet->getStyle('E1:G2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
                 $sheet->mergeCells('I1:J1');
-                $sheet->setCellValue('I1', 'Update : ' . now()->translatedFormat('j F Y'));
+                $sheet->setCellValue('I1', 'Update : '.now()->translatedFormat('j F Y'));
                 $sheet->getStyle('I1:J1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $sheet->getStyle('I1:J1')->getFont()->setItalic(true)->setBold(true);
 
@@ -499,61 +499,61 @@ class ReceivablePageController extends Controller
                 $sheet->getStyle('A6:C7')->getAlignment()->setWrapText(true);
 
                 $tableStart = 9;
-                $sheet->fromArray([['No.', 'Deskripsi', 'Nominal']], null, 'A' . $tableStart);
-                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getFont()->setBold(true);
-                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFE5E7EB');
-                $sheet->getStyle('A' . $tableStart . ':C' . $tableStart)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->fromArray([['No.', 'Deskripsi', 'Nominal']], null, 'A'.$tableStart);
+                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getFont()->setBold(true);
+                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFE5E7EB');
+                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 
                 $cursor = $tableStart + 1;
                 foreach ($invoiceRows as $index => $invoiceRow) {
-                    $sheet->setCellValue('A' . $cursor, (int) $index + 1);
-                    $sheet->setCellValue('B' . $cursor, strtoupper((string) ($invoiceRow['description'] ?? '')));
-                    $sheet->setCellValue('C' . $cursor, 'Rp ' . number_format((int) ($invoiceRow['nominal'] ?? 0), 0, ',', '.'));
+                    $sheet->setCellValue('A'.$cursor, (int) $index + 1);
+                    $sheet->setCellValue('B'.$cursor, strtoupper((string) ($invoiceRow['description'] ?? '')));
+                    $sheet->setCellValue('C'.$cursor, 'Rp '.number_format((int) ($invoiceRow['nominal'] ?? 0), 0, ',', '.'));
                     $cursor++;
                 }
                 for ($i = $invoiceRows->count(); $i < 7; $i++) {
-                    $sheet->setCellValue('A' . $cursor, $i + 1);
+                    $sheet->setCellValue('A'.$cursor, $i + 1);
                     $cursor++;
                 }
                 $dataEnd = $cursor - 1;
-                $sheet->getStyle('A' . ($tableStart + 1) . ':C' . $dataEnd)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-                $sheet->getStyle('A' . ($tableStart + 1) . ':A' . $dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('C' . ($tableStart + 1) . ':C' . $dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('A'.($tableStart + 1).':C'.$dataEnd)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A'.($tableStart + 1).':A'.$dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('C'.($tableStart + 1).':C'.$dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-                $sheet->mergeCells('A' . ($cursor + 1) . ':B' . ($cursor + 1));
-                $sheet->setCellValue('A' . ($cursor + 1), 'TOTAL');
-                $sheet->setCellValue('C' . ($cursor + 1), 'Rp ' . number_format($invoiceTotal, 0, ',', '.'));
-                $sheet->getStyle('A' . ($cursor + 1) . ':C' . ($cursor + 1))->getFont()->setBold(true);
-                $sheet->getStyle('A' . ($cursor + 1) . ':C' . ($cursor + 1))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-                $sheet->getStyle('A' . ($cursor + 1) . ':B' . ($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('C' . ($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->mergeCells('A'.($cursor + 1).':B'.($cursor + 1));
+                $sheet->setCellValue('A'.($cursor + 1), 'TOTAL');
+                $sheet->setCellValue('C'.($cursor + 1), 'Rp '.number_format($invoiceTotal, 0, ',', '.'));
+                $sheet->getStyle('A'.($cursor + 1).':C'.($cursor + 1))->getFont()->setBold(true);
+                $sheet->getStyle('A'.($cursor + 1).':C'.($cursor + 1))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A'.($cursor + 1).':B'.($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('C'.($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
                 $cursor += 4;
                 if ($notesText !== '') {
-                    $sheet->setCellValue('A' . $cursor, 'Note :');
-                    $sheet->getStyle('A' . $cursor)->getFont()->setBold(true);
+                    $sheet->setCellValue('A'.$cursor, 'Note :');
+                    $sheet->getStyle('A'.$cursor)->getFont()->setBold(true);
                     foreach (preg_split('/\r\n|\r|\n/', $notesText) ?: [] as $line) {
                         if (trim($line) === '') {
                             continue;
                         }
                         $cursor++;
-                        $sheet->mergeCells('A' . $cursor . ':F' . $cursor);
-                        $sheet->setCellValue('A' . $cursor, $line);
+                        $sheet->mergeCells('A'.$cursor.':F'.$cursor);
+                        $sheet->setCellValue('A'.$cursor, $line);
                     }
                     $cursor += 2;
                 }
 
                 if ($transferText !== '') {
-                    $sheet->setCellValue('A' . $cursor, 'Transfer via :');
-                    $sheet->getStyle('A' . $cursor)->getFont()->setBold(true);
+                    $sheet->setCellValue('A'.$cursor, 'Transfer via :');
+                    $sheet->getStyle('A'.$cursor)->getFont()->setBold(true);
                     foreach (preg_split('/\r\n|\r|\n/', $transferText) ?: [] as $line) {
                         if (trim($line) === '') {
                             continue;
                         }
                         $cursor++;
-                        $sheet->mergeCells('A' . $cursor . ':F' . $cursor);
-                        $sheet->setCellValue('A' . $cursor, $line);
+                        $sheet->mergeCells('A'.$cursor.':F'.$cursor);
+                        $sheet->setCellValue('A'.$cursor, $line);
                     }
                 }
 
@@ -572,84 +572,84 @@ class ReceivablePageController extends Controller
             $columnCount = 4 + $semesterHeaders->count() + 1;
             $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
 
-            $sheet->mergeCells('A1:' . $lastColumn . '1');
+            $sheet->mergeCells('A1:'.$lastColumn.'1');
             $sheet->setCellValue('A1', (string) ($data['printTitle'] ?? $data['title']));
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            $sheet->mergeCells(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A') . '2:' . $lastColumn . '2');
-            $sheet->setCellValue(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A') . '2', 'Update : ' . now()->translatedFormat('j F Y'));
-            $sheet->getStyle('A2:' . $lastColumn . '2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $sheet->getStyle('A2:' . $lastColumn . '2')->getFont()->setItalic(true)->setBold(true);
+            $sheet->mergeCells(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A').'2:'.$lastColumn.'2');
+            $sheet->setCellValue(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A').'2', 'Update : '.now()->translatedFormat('j F Y'));
+            $sheet->getStyle('A2:'.$lastColumn.'2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('A2:'.$lastColumn.'2')->getFont()->setItalic(true)->setBold(true);
 
             $tableStart = 4;
-            $sheet->setCellValue('A' . $tableStart, 'NO');
-            $sheet->setCellValue('B' . $tableStart, 'NAMA PELANGGAN');
-            $sheet->setCellValue('C' . $tableStart, 'KOTA');
-            $sheet->setCellValue('D' . $tableStart, 'ALAMAT');
+            $sheet->setCellValue('A'.$tableStart, 'NO');
+            $sheet->setCellValue('B'.$tableStart, 'NAMA PELANGGAN');
+            $sheet->setCellValue('C'.$tableStart, 'KOTA');
+            $sheet->setCellValue('D'.$tableStart, 'ALAMAT');
 
             if ($semesterHeaders->isNotEmpty()) {
                 $semesterStartColumn = 5;
                 $semesterEndColumn = $semesterStartColumn + $semesterHeaders->count() - 1;
                 $semesterStartLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterStartColumn);
                 $semesterEndLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterEndColumn);
-                $sheet->mergeCells($semesterStartLetter . $tableStart . ':' . $semesterEndLetter . $tableStart);
-                $sheet->setCellValue($semesterStartLetter . $tableStart, 'PIUTANG');
+                $sheet->mergeCells($semesterStartLetter.$tableStart.':'.$semesterEndLetter.$tableStart);
+                $sheet->setCellValue($semesterStartLetter.$tableStart, 'PIUTANG');
                 foreach ($semesterHeaders->values() as $index => $header) {
                     $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterStartColumn + $index);
-                    $sheet->setCellValue($columnLetter . ($tableStart + 1), (string) $header);
+                    $sheet->setCellValue($columnLetter.($tableStart + 1), (string) $header);
                 }
             }
 
             $totalColumnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
-            $sheet->mergeCells($totalColumnLetter . $tableStart . ':' . $totalColumnLetter . ($tableStart + 1));
-            $sheet->setCellValue($totalColumnLetter . $tableStart, 'TOTAL PIUTANG');
+            $sheet->mergeCells($totalColumnLetter.$tableStart.':'.$totalColumnLetter.($tableStart + 1));
+            $sheet->setCellValue($totalColumnLetter.$tableStart, 'TOTAL PIUTANG');
 
-            $sheet->mergeCells('A' . $tableStart . ':A' . ($tableStart + 1));
-            $sheet->mergeCells('B' . $tableStart . ':B' . ($tableStart + 1));
-            $sheet->mergeCells('C' . $tableStart . ':C' . ($tableStart + 1));
-            $sheet->mergeCells('D' . $tableStart . ':D' . ($tableStart + 1));
+            $sheet->mergeCells('A'.$tableStart.':A'.($tableStart + 1));
+            $sheet->mergeCells('B'.$tableStart.':B'.($tableStart + 1));
+            $sheet->mergeCells('C'.$tableStart.':C'.($tableStart + 1));
+            $sheet->mergeCells('D'.$tableStart.':D'.($tableStart + 1));
 
             $dataStartRow = $tableStart + 2;
             $rowCursor = $dataStartRow;
 
             foreach ($rows as $index => $row) {
-                $sheet->setCellValue('A' . $rowCursor, (int) $index + 1);
-                $sheet->setCellValue('B' . $rowCursor, strtoupper((string) ($row['name'] ?? '')));
-                $sheet->setCellValue('C' . $rowCursor, (string) ($row['city'] ?? '-'));
-                $sheet->setCellValue('D' . $rowCursor, (string) ($row['address'] ?? '-'));
+                $sheet->setCellValue('A'.$rowCursor, (int) $index + 1);
+                $sheet->setCellValue('B'.$rowCursor, strtoupper((string) ($row['name'] ?? '')));
+                $sheet->setCellValue('C'.$rowCursor, (string) ($row['city'] ?? '-'));
+                $sheet->setCellValue('D'.$rowCursor, (string) ($row['address'] ?? '-'));
 
                 foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
                     $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex);
                     $value = (int) ($row['semester_totals'][$semesterCode] ?? 0);
-                    $sheet->setCellValue($columnLetter . $rowCursor, 'Rp ' . number_format($value, 0, ',', '.'));
-                    $sheet->getStyle($columnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->setCellValue($columnLetter.$rowCursor, 'Rp '.number_format($value, 0, ',', '.'));
+                    $sheet->getStyle($columnLetter.$rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 }
 
-                $sheet->setCellValue($totalColumnLetter . $rowCursor, 'Rp ' . number_format((int) ($row['total_outstanding'] ?? 0), 0, ',', '.'));
-                $sheet->getStyle($totalColumnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->setCellValue($totalColumnLetter.$rowCursor, 'Rp '.number_format((int) ($row['total_outstanding'] ?? 0), 0, ',', '.'));
+                $sheet->getStyle($totalColumnLetter.$rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $rowCursor++;
             }
 
-            $sheet->mergeCells('A' . $rowCursor . ':D' . $rowCursor);
-            $sheet->setCellValue('A' . $rowCursor, __('receivable.semester_total'));
+            $sheet->mergeCells('A'.$rowCursor.':D'.$rowCursor);
+            $sheet->setCellValue('A'.$rowCursor, __('receivable.semester_total'));
             foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
                 $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex);
-                $sheet->setCellValue($columnLetter . $rowCursor, 'Rp ' . number_format((int) ($data['totals']['per_semester'][$semesterCode] ?? 0), 0, ',', '.'));
-                $sheet->getStyle($columnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->setCellValue($columnLetter.$rowCursor, 'Rp '.number_format((int) ($data['totals']['per_semester'][$semesterCode] ?? 0), 0, ',', '.'));
+                $sheet->getStyle($columnLetter.$rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             }
-            $sheet->setCellValue($totalColumnLetter . $rowCursor, 'Rp ' . number_format((int) ($data['totals']['grand_total'] ?? 0), 0, ',', '.'));
-            $sheet->getStyle($totalColumnLetter . $rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->setCellValue($totalColumnLetter.$rowCursor, 'Rp '.number_format((int) ($data['totals']['grand_total'] ?? 0), 0, ',', '.'));
+            $sheet->getStyle($totalColumnLetter.$rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getFont()->setBold(true);
-            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . ($tableStart + 1))->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFEFF3F8');
-            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $rowCursor)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $rowCursor)->getAlignment()->setWrapText(true);
-            $sheet->getStyle('A' . $rowCursor . ':' . $lastColumn . $rowCursor)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-            $sheet->getStyle('A' . $rowCursor . ':' . $lastColumn . $rowCursor)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
-            $sheet->getStyle('A' . $dataStartRow . ':A' . ($rowCursor - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getFont()->setBold(true);
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFEFF3F8');
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.$rowCursor)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.$rowCursor)->getAlignment()->setWrapText(true);
+            $sheet->getStyle('A'.$rowCursor.':'.$lastColumn.$rowCursor)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle('A'.$rowCursor.':'.$lastColumn.$rowCursor)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
+            $sheet->getStyle('A'.$dataStartRow.':A'.($rowCursor - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             foreach (['A' => 5, 'B' => 20, 'C' => 14, 'D' => 34] as $column => $width) {
                 $sheet->getColumnDimension($column)->setWidth($width);
@@ -672,7 +672,7 @@ class ReceivablePageController extends Controller
     {
         $normalizedSemester = trim($semester) !== '' ? strtolower(trim($semester)) : 'semua-customer';
 
-        return 'daftar-piutang-' . $normalizedSemester . '-' . $this->nowWib()->format('Ymd-His') . '.' . $extension;
+        return 'daftar-piutang-'.$normalizedSemester.'-'.$this->nowWib()->format('Ymd-His').'.'.$extension;
     }
 
     /**
@@ -694,7 +694,7 @@ class ReceivablePageController extends Controller
         $baseSemesterOptions = Cache::remember(
             AppCache::lookupCacheKey('receivables.global_page.options'),
             now()->addSeconds(60),
-            fn() => $this->semesterBookService->buildSemesterOptionCollection(
+            fn () => $this->semesterBookService->buildSemesterOptionCollection(
                 ReceivableLedger::query()
                     ->whereNotNull('period_code')
                     ->where('period_code', '!=', '')
@@ -719,13 +719,13 @@ class ReceivablePageController extends Controller
         $customerOptions = Cache::remember(
             AppCache::lookupCacheKey('receivables.global_page.customer_options'),
             now()->addSeconds(60),
-            fn() => Customer::query()
+            fn () => Customer::query()
                 ->select(['id', 'name', 'city'])
                 ->orderBy('name')
                 ->get()
                 ->map(fn (Customer $customer): array => [
                     'id' => (int) $customer->id,
-                    'label' => trim((string) $customer->name) . ((string) ($customer->city ?? '') !== '' ? ' (' . trim((string) $customer->city) . ')' : ''),
+                    'label' => trim((string) $customer->name).((string) ($customer->city ?? '') !== '' ? ' ('.trim((string) $customer->city).')' : ''),
                 ])
                 ->all()
         );
@@ -776,9 +776,9 @@ class ReceivablePageController extends Controller
             ])
             ->when($search !== '', function ($builder) use ($search): void {
                 $builder->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('customers.name', 'like', '%' . $search . '%')
-                        ->orWhere('customers.city', 'like', '%' . $search . '%')
-                        ->orWhere('customers.address', 'like', '%' . $search . '%');
+                    $subQuery->where('customers.name', 'like', '%'.$search.'%')
+                        ->orWhere('customers.city', 'like', '%'.$search.'%')
+                        ->orWhere('customers.address', 'like', '%'.$search.'%');
                 });
             })
             ->when($selectedCustomerId > 0, function ($builder) use ($selectedCustomerId): void {
@@ -855,7 +855,7 @@ class ReceivablePageController extends Controller
                     return [
                         'semester_code' => (string) ($row->period_code ?? ''),
                         'transaction_type' => $transactionType !== '' ? $transactionType : null,
-                        'description' => $this->semesterDescriptionLabel((string) ($row->period_code ?? '')) . ($transactionType !== '' ? ' - ' . strtoupper($typeLabel) : ''),
+                        'description' => $this->semesterDescriptionLabel((string) ($row->period_code ?? '')).($transactionType !== '' ? ' - '.strtoupper($typeLabel) : ''),
                         'nominal' => (int) round((float) ($row->outstanding_total ?? 0)),
                     ];
                 })
@@ -870,7 +870,7 @@ class ReceivablePageController extends Controller
             'title' => __('receivable.global_page_title'),
             'printTitle' => $selectedCustomer instanceof Customer
                 ? 'Invoice'
-                : strtoupper(__('receivable.global_page_title')) . ($selectedTransactionType !== '' ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType)) : ''),
+                : strtoupper(__('receivable.global_page_title')).($selectedTransactionType !== '' ? ' - '.strtoupper($this->transactionTypeLabel($selectedTransactionType)) : ''),
             'rows' => $rows,
             'paginator' => $paginate ? $customers : null,
             'totalItems' => $paginate ? $customers->total() : $rows->count(),
@@ -901,9 +901,9 @@ class ReceivablePageController extends Controller
     public function closeCustomerSemester(Request $request, Customer $customer): RedirectResponse
     {
         $data = $request->validate([
-            'semester' => ['required', 'string', 'max:30'],
-            'search' => ['nullable', 'string'],
-            'customer_id' => ['nullable', 'integer'],
+            'semester' => FluentRule::string()->required()->max(30),
+            'search' => FluentRule::string()->nullable(),
+            'customer_id' => FluentRule::integer()->nullable(),
         ]);
 
         $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester'] ?? ''));
@@ -930,9 +930,9 @@ class ReceivablePageController extends Controller
     public function openCustomerSemester(Request $request, Customer $customer): RedirectResponse
     {
         $data = $request->validate([
-            'semester' => ['required', 'string', 'max:30'],
-            'search' => ['nullable', 'string'],
-            'customer_id' => ['nullable', 'integer'],
+            'semester' => FluentRule::string()->required()->max(30),
+            'search' => FluentRule::string()->nullable(),
+            'customer_id' => FluentRule::integer()->nullable(),
         ]);
 
         $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester'] ?? ''));
@@ -959,11 +959,11 @@ class ReceivablePageController extends Controller
     public function customerWriteoff(Request $request, Customer $customer): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
-            'amount' => ['required', 'integer', 'min:1'],
-            'payment_date' => ['nullable', 'date'],
-            'search' => ['nullable', 'string'],
-            'semester' => ['nullable', 'string', 'max:30'],
-            'customer_id' => ['nullable', 'integer'],
+            'amount' => FluentRule::integer()->required()->min(1),
+            'payment_date' => FluentRule::date()->nullable(),
+            'search' => FluentRule::string()->nullable(),
+            'semester' => FluentRule::string()->nullable()->max(30),
+            'customer_id' => FluentRule::integer()->nullable(),
         ]);
 
         $this->processCustomerAdjustment($customer, $data, 'writeoff');
@@ -992,11 +992,11 @@ class ReceivablePageController extends Controller
     public function customerDiscount(Request $request, Customer $customer): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
-            'amount' => ['required', 'integer', 'min:1'],
-            'payment_date' => ['nullable', 'date'],
-            'search' => ['nullable', 'string'],
-            'semester' => ['nullable', 'string', 'max:30'],
-            'customer_id' => ['nullable', 'integer'],
+            'amount' => FluentRule::integer()->required()->min(1),
+            'payment_date' => FluentRule::date()->nullable(),
+            'search' => FluentRule::string()->nullable(),
+            'semester' => FluentRule::string()->nullable()->max(30),
+            'customer_id' => FluentRule::integer()->nullable(),
         ]);
 
         $this->processCustomerAdjustment($customer, $data, 'discount');
@@ -1031,7 +1031,7 @@ class ReceivablePageController extends Controller
     {
         $data = $this->customerBillViewData($request, $customer);
         $data['isPdf'] = true;
-        $filename = 'tagihan-' . $customer->id . '-' . $this->nowWib()->format('Ymd-His') . '.pdf';
+        $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.pdf';
 
         return Pdf::loadView('receivables.print_customer_bill', $data)
             ->setPaper('a4', 'portrait')
@@ -1043,10 +1043,10 @@ class ReceivablePageController extends Controller
         $data = $this->customerBillViewData($request, $customer);
         $rows = collect($data['rows'] ?? []);
         $schoolBreakdown = collect($data['schoolBreakdown'] ?? []);
-        $filename = 'tagihan-' . $customer->id . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx';
+        $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.xlsx';
 
         return response()->streamDownload(function () use ($rows, $data, $schoolBreakdown): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Tagihan');
             $companyName = trim((string) ($data['companyName'] ?? 'CV. PUSTAKA GRAFIKA'));
@@ -1077,18 +1077,18 @@ class ReceivablePageController extends Controller
             ];
             $metaRowIndex = 2;
             foreach ($metaRows as [$label, $value]) {
-                $sheet->setCellValue('E' . $metaRowIndex, $label);
-                $sheet->setCellValue('F' . $metaRowIndex, $value);
+                $sheet->setCellValue('E'.$metaRowIndex, $label);
+                $sheet->setCellValue('F'.$metaRowIndex, $value);
                 $metaRowIndex++;
             }
             $sheet->getStyle('E2:E7')->getFont()->setBold(true);
             $sheet->getStyle('F2:F7')->getAlignment()->setWrapText(true);
 
-        $rowsOut = [[
+            $rowsOut = [[
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
-                    __('receivable.transaction_type'),
-                    __('receivable.transaction_subtype'),
+                __('receivable.transaction_type'),
+                __('receivable.transaction_subtype'),
                 __('receivable.bill_credit_sales'),
                 __('receivable.bill_installment_payment'),
                 __('receivable.bill_sales_return'),
@@ -1140,17 +1140,17 @@ class ReceivablePageController extends Controller
             ];
 
             $tableStartRow = 10;
-            $sheet->fromArray($rowsOut, null, 'A' . $tableStartRow);
+            $sheet->fromArray($rowsOut, null, 'A'.$tableStartRow);
             ExcelExportStyler::styleTable($sheet, $tableStartRow, 8, count($rowsOut) - 1, true);
-            $sheet->getStyle('A' . $tableStartRow . ':H' . ($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
-            $sheet->getStyle('E' . ($tableStartRow + 1) . ':H' . ($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('A'.$tableStartRow.':H'.($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
+            $sheet->getStyle('E'.($tableStartRow + 1).':H'.($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             $rowCursor = $tableStartRow + count($rowsOut) + 2;
 
             if ($schoolBreakdown->isNotEmpty()) {
-                $sheet->mergeCells('A' . $rowCursor . ':G' . $rowCursor);
-                $sheet->setCellValue('A' . $rowCursor, __('receivable.school_breakdown_title'));
-                $sheet->getStyle('A' . $rowCursor)->getFont()->setBold(true);
+                $sheet->mergeCells('A'.$rowCursor.':G'.$rowCursor);
+                $sheet->setCellValue('A'.$rowCursor, __('receivable.school_breakdown_title'));
+                $sheet->getStyle('A'.$rowCursor)->getFont()->setBold(true);
                 $rowCursor++;
                 $schoolHeader = [
                     __('receivable.school_name'),
@@ -1162,7 +1162,7 @@ class ReceivablePageController extends Controller
                     __('receivable.school_balance_total'),
                 ];
                 $sectionStart = $rowCursor;
-                $sheet->fromArray([$schoolHeader], null, 'A' . $rowCursor);
+                $sheet->fromArray([$schoolHeader], null, 'A'.$rowCursor);
                 $rowCursor++;
                 $schoolDataCount = 0;
 
@@ -1180,7 +1180,7 @@ class ReceivablePageController extends Controller
                             number_format((int) round((float) ($groupRow['invoice_total'] ?? 0)), 0, ',', '.'),
                             number_format((int) round((float) ($groupRow['paid_total'] ?? 0)), 0, ',', '.'),
                             number_format((int) round((float) ($groupRow['balance_total'] ?? 0)), 0, ',', '.'),
-                        ]], null, 'A' . $rowCursor);
+                        ]], null, 'A'.$rowCursor);
                         $rowCursor++;
                         $schoolDataCount++;
                     }
@@ -1194,25 +1194,25 @@ class ReceivablePageController extends Controller
                         number_format((int) round((float) ($totalsPerSchool['invoice_total'] ?? 0)), 0, ',', '.'),
                         number_format((int) round((float) ($totalsPerSchool['paid_total'] ?? 0)), 0, ',', '.'),
                         number_format((int) round((float) ($totalsPerSchool['balance_total'] ?? 0)), 0, ',', '.'),
-                    ]], null, 'A' . $rowCursor);
+                    ]], null, 'A'.$rowCursor);
                     $rowCursor++;
                     $schoolDataCount++;
                 }
 
                 if ($schoolDataCount > 0) {
                     ExcelExportStyler::styleTable($sheet, $sectionStart, 7, $schoolDataCount, false);
-                    $sheet->getStyle('A' . $sectionStart . ':G' . ($rowCursor - 1))->getAlignment()->setWrapText(true);
+                    $sheet->getStyle('A'.$sectionStart.':G'.($rowCursor - 1))->getAlignment()->setWrapText(true);
                 }
                 $rowCursor++;
             }
 
             if ($notesText !== '') {
-                $sheet->setCellValue('A' . $rowCursor, __('receivable.note_label'));
-                $sheet->getStyle('A' . $rowCursor)->getFont()->setBold(true);
-                $sheet->mergeCells('B' . $rowCursor . ':G' . ($rowCursor + 2));
-                $sheet->setCellValue('B' . $rowCursor, $notesText);
-                $sheet->getStyle('B' . $rowCursor . ':G' . ($rowCursor + 2))->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
-                $sheet->getStyle('A' . $rowCursor . ':G' . ($rowCursor + 2))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->setCellValue('A'.$rowCursor, __('receivable.note_label'));
+                $sheet->getStyle('A'.$rowCursor)->getFont()->setBold(true);
+                $sheet->mergeCells('B'.$rowCursor.':G'.($rowCursor + 2));
+                $sheet->setCellValue('B'.$rowCursor, $notesText);
+                $sheet->getStyle('B'.$rowCursor.':G'.($rowCursor + 2))->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->getStyle('A'.$rowCursor.':G'.($rowCursor + 2))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
                 $rowCursor += 4;
             }
 
@@ -1229,7 +1229,7 @@ class ReceivablePageController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function processCustomerAdjustment(Customer $customer, array $data, string $method): void
     {
@@ -1404,9 +1404,9 @@ class ReceivablePageController extends Controller
             ->leftJoin('customer_levels', 'customer_levels.id', '=', 'customers.customer_level_id')
             ->when($search !== '', function ($builder) use ($search): void {
                 $builder->where(function ($subQuery) use ($search): void {
-                    $subQuery->where('customers.name', 'like', '%' . $search . '%')
-                        ->orWhere('customers.city', 'like', '%' . $search . '%')
-                        ->orWhere('customers.address', 'like', '%' . $search . '%');
+                    $subQuery->where('customers.name', 'like', '%'.$search.'%')
+                        ->orWhere('customers.city', 'like', '%'.$search.'%')
+                        ->orWhere('customers.address', 'like', '%'.$search.'%');
                 });
             })
             ->when($status === 'outstanding', function ($builder): void {
@@ -1485,7 +1485,7 @@ class ReceivablePageController extends Controller
                 'return_total' => (int) round((float) ($totalsRow->return_total ?? 0)),
                 'outstanding_total' => (int) round((float) ($totalsRow->outstanding_total ?? 0)),
             ],
-            'printTitle' => 'DAFTAR PIUTANG ' . strtoupper($this->semesterDescriptionLabel($selectedSemester)) . ($selectedTransactionType !== '' ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType)) : ''),
+            'printTitle' => 'DAFTAR PIUTANG '.strtoupper($this->semesterDescriptionLabel($selectedSemester)).($selectedTransactionType !== '' ? ' - '.strtoupper($this->transactionTypeLabel($selectedTransactionType)) : ''),
             'totalItems' => $paginate ? (int) $rows->total() : (int) $rowCollection->count(),
         ];
     }
@@ -1499,6 +1499,7 @@ class ReceivablePageController extends Controller
 
             return "SMT {$semester} ({$startYear}-{$endYear})";
         }
+
         return $periodCode !== '' ? $periodCode : __('txn.semester_period');
     }
 
@@ -1579,7 +1580,7 @@ class ReceivablePageController extends Controller
     private function customerBillReportTitle(Customer $customer, ?string $selectedSemester, ?string $selectedTransactionType = null): string
     {
         $typeSuffix = $selectedTransactionType !== null && trim($selectedTransactionType) !== ''
-            ? ' - ' . strtoupper($this->transactionTypeLabel($selectedTransactionType))
+            ? ' - '.strtoupper($this->transactionTypeLabel($selectedTransactionType))
             : '';
 
         return sprintf('Rekap Piutang%s', $typeSuffix);
@@ -1620,7 +1621,7 @@ class ReceivablePageController extends Controller
                 'version' => 'v2',
             ]),
             now()->addSeconds(45),
-            fn() => $this->buildCustomerBillStatement($customerId, $normalizedSemester, $normalizedTransactionType)
+            fn () => $this->buildCustomerBillStatement($customerId, $normalizedSemester, $normalizedTransactionType)
         );
     }
 
@@ -1719,7 +1720,7 @@ class ReceivablePageController extends Controller
             ->orderBy('payment_date')
             ->orderBy('id')
             ->get(['id', 'payment_number', 'payment_date', 'amount'])
-            ->groupBy(fn (ReceivablePayment $payment): string => $payment->payment_date?->toDateString() . '|' . (int) $payment->amount)
+            ->groupBy(fn (ReceivablePayment $payment): string => $payment->payment_date?->toDateString().'|'.(int) $payment->amount)
             ->map(function (Collection $group): ?array {
                 if ($group->count() !== 1) {
                     return null;
@@ -1799,7 +1800,7 @@ class ReceivablePageController extends Controller
             }
             $paymentNumber = $this->extractDocumentReference($rawDescription, ['KWT', 'PYT']);
             if ($paymentNumber === '' && $entryType === 'payment') {
-                $legacyPaymentKey = $ledgerRow->entry_date?->toDateString() . '|' . $installment;
+                $legacyPaymentKey = $ledgerRow->entry_date?->toDateString().'|'.$installment;
                 $legacyPayment = $legacyPaymentLookup->get($legacyPaymentKey);
                 if (is_array($legacyPayment)) {
                     $paymentNumber = (string) ($legacyPayment['payment_number'] ?? '');
@@ -1810,7 +1811,7 @@ class ReceivablePageController extends Controller
             if ($paymentNumber !== '') {
                 $paymentId = (int) ($paymentIdMap[$paymentNumber] ?? 0);
                 if ($paymentId === 0 && $entryType === 'payment') {
-                    $legacyPaymentKey = $ledgerRow->entry_date?->toDateString() . '|' . $installment;
+                    $legacyPaymentKey = $ledgerRow->entry_date?->toDateString().'|'.$installment;
                     $legacyPayment = $legacyPaymentLookup->get($legacyPaymentKey);
                     if (is_array($legacyPayment) && (string) ($legacyPayment['payment_number'] ?? '') === $paymentNumber) {
                         $paymentId = (int) ($legacyPayment['id'] ?? 0);
@@ -1824,8 +1825,8 @@ class ReceivablePageController extends Controller
                 default => $invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-'),
             };
             $proofNumber = match ($entryType) {
-                'writeoff' => $baseProofNumber . ' - ' . __('receivable.method_writeoff'),
-                'discount' => $baseProofNumber . ' - ' . __('receivable.method_discount'),
+                'writeoff' => $baseProofNumber.' - '.__('receivable.method_writeoff'),
+                'discount' => $baseProofNumber.' - '.__('receivable.method_discount'),
                 'adjustment' => $rawDescription !== ''
                     ? $rawDescription
                     : $baseProofNumber,
@@ -1838,15 +1839,15 @@ class ReceivablePageController extends Controller
             $typeKey = $transactionType ?? 'none';
             $subtypeKey = $printingSubtypeName !== '' ? mb_strtolower($printingSubtypeName, 'UTF-8') : 'none';
             $groupKey = $isAdminInvoiceAdjustment
-                ? 'ledger:' . (int) $ledgerRow->id . ':adjustment:' . $typeKey . ':' . $subtypeKey
+                ? 'ledger:'.(int) $ledgerRow->id.':adjustment:'.$typeKey.':'.$subtypeKey
                 : ($invoiceId !== null
-                ? 'invoice:' . $invoiceId . ':' . $entryType . ':' . $typeKey . ':' . $subtypeKey
-                : 'text:' . $baseProofNumber . ':' . $entryType . ':' . $typeKey . ':' . $subtypeKey);
+                ? 'invoice:'.$invoiceId.':'.$entryType.':'.$typeKey.':'.$subtypeKey
+                : 'text:'.$baseProofNumber.':'.$entryType.':'.$typeKey.':'.$subtypeKey);
             $dateValue = $debit > 0
                 ? ($ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date)
                 : $ledgerRow->entry_date;
 
-            if (!isset($groupedRows[$groupKey])) {
+            if (! isset($groupedRows[$groupKey])) {
                 $groupedRows[$groupKey] = [
                     'date_value' => $dateValue,
                     'date_ts' => $this->toTimestamp($dateValue),
@@ -1942,8 +1943,7 @@ class ReceivablePageController extends Controller
         int $adjustmentAmount,
         ?int $invoiceId = null,
         array $adjustmentActorsByInvoiceId = []
-    ): string
-    {
+    ): string {
         $proofNumber = trim($proofNumber);
         if (! in_array($entryType, ['adjustment', 'cancel'], true)) {
             return $proofNumber !== '' ? $proofNumber : '-';
@@ -2118,7 +2118,7 @@ class ReceivablePageController extends Controller
     }
 
     /**
-     * @param array<int, string> $prefixes
+     * @param  array<int, string>  $prefixes
      */
     private function extractDocumentReference(string $text, array $prefixes): string
     {
@@ -2127,7 +2127,7 @@ class ReceivablePageController extends Controller
             return '';
         }
 
-        $pattern = '/\b(?:' . implode('|', array_map('preg_quote', $prefixes)) . ')-[0-9A-Z]+(?:-[0-9A-Z]+)+\b/i';
+        $pattern = '/\b(?:'.implode('|', array_map('preg_quote', $prefixes)).')-[0-9A-Z]+(?:-[0-9A-Z]+)+\b/i';
         if (preg_match($pattern, $normalized, $match) !== 1) {
             return '';
         }
@@ -2203,7 +2203,7 @@ class ReceivablePageController extends Controller
         }
 
         return $rows
-            ->groupBy(fn(array $row): string => mb_strtolower(($row['school_name'] ?? '-') . '|' . ($row['school_city'] ?? '-')))
+            ->groupBy(fn (array $row): string => mb_strtolower(($row['school_name'] ?? '-').'|'.($row['school_city'] ?? '-')))
             ->map(function (Collection $group): array {
                 $first = (array) $group->first();
 
@@ -2212,19 +2212,19 @@ class ReceivablePageController extends Controller
                     'school_city' => (string) ($first['school_city'] ?? '-'),
                     'rows' => $group->values(),
                     'totals' => [
-                        'invoice_total' => (int) $group->sum(fn(array $row): int => (int) ($row['invoice_total'] ?? 0)),
-                        'paid_total' => (int) $group->sum(fn(array $row): int => (int) ($row['paid_total'] ?? 0)),
-                        'balance_total' => (int) $group->sum(fn(array $row): int => (int) ($row['balance_total'] ?? 0)),
+                        'invoice_total' => (int) $group->sum(fn (array $row): int => (int) ($row['invoice_total'] ?? 0)),
+                        'paid_total' => (int) $group->sum(fn (array $row): int => (int) ($row['paid_total'] ?? 0)),
+                        'balance_total' => (int) $group->sum(fn (array $row): int => (int) ($row['balance_total'] ?? 0)),
                     ],
                 ];
             })
-            ->sortBy(fn(array $group): string => mb_strtolower((string) ($group['school_name'] ?? '-')))
+            ->sortBy(fn (array $group): string => mb_strtolower((string) ($group['school_name'] ?? '-')))
             ->values();
     }
 
     private function formatBillDate(mixed $value): string
     {
-        if (!$value) {
+        if (! $value) {
             return '-';
         }
 
@@ -2239,7 +2239,7 @@ class ReceivablePageController extends Controller
 
     private function toTimestamp(mixed $value): int
     {
-        if (!$value) {
+        if (! $value) {
             return 0;
         }
 
@@ -2257,7 +2257,7 @@ class ReceivablePageController extends Controller
      * Priority: keep summary row; if only allocation rows exist, keep one row
      * and normalize its description to a summary label.
      *
-     * @param Collection<int, ReceivableLedger> $rows
+     * @param  Collection<int, ReceivableLedger>  $rows
      * @return Collection<int, ReceivableLedger>
      */
     private function filterRedundantPaymentSummaryRows(Collection $rows): Collection
@@ -2275,11 +2275,11 @@ class ReceivablePageController extends Controller
                 continue;
             }
 
-            if (!isset($firstIndexByPaymentRef[$paymentRef])) {
+            if (! isset($firstIndexByPaymentRef[$paymentRef])) {
                 $firstIndexByPaymentRef[$paymentRef] = $index;
             }
 
-            if (! $this->isAllocationPaymentRow($row, $description) && !isset($summaryByPaymentRef[$paymentRef])) {
+            if (! $this->isAllocationPaymentRow($row, $description) && ! isset($summaryByPaymentRef[$paymentRef])) {
                 $summaryByPaymentRef[$paymentRef] = $row;
             }
         }
@@ -2295,6 +2295,7 @@ class ReceivablePageController extends Controller
             $paymentRef = $this->extractPaymentRef($description);
             if ($paymentRef === null) {
                 $result->push($row);
+
                 continue;
             }
 
@@ -2306,6 +2307,7 @@ class ReceivablePageController extends Controller
             if ($canonicalRow instanceof ReceivableLedger) {
                 $result->push($canonicalRow);
                 $pushedPaymentRef[$paymentRef] = true;
+
                 continue;
             }
 
@@ -2322,7 +2324,7 @@ class ReceivablePageController extends Controller
     }
 
     /**
-     * @param Collection<int, ReceivableLedger> $rows
+     * @param  Collection<int, ReceivableLedger>  $rows
      * @return array<string, bool>
      */
     private function paymentRefsWithAlloc(Collection $rows): array

@@ -37,4 +37,3 @@ class DeliveryTripMember extends Model
         return $this->belongsTo(User::class);
     }
 }
-

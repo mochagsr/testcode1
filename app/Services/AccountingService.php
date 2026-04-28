@@ -7,13 +7,12 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\JournalEntry;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 final class AccountingService
 {
     /**
-     * @param array<int, array{code:string,debit?:int|float,credit?:int|float,memo?:string|null}> $lines
+     * @param  array<int, array{code:string,debit?:int|float,credit?:int|float,memo?:string|null}>  $lines
      */
     public function postEntry(
         string $entryType,

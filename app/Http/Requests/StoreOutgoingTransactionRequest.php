@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
 class StoreOutgoingTransactionRequest extends FormRequest
 {
+    use HasFluentRules;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -22,11 +26,11 @@ class StoreOutgoingTransactionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'supplier_id' => ['required', 'exists:suppliers,id'],
-            'transaction_date' => ['required', 'date_format:Y-m-d'],
-            'semester_period' => ['required', 'string', 'max:20'],
-            'description' => ['nullable', 'string', 'max:500'],
-            'total' => ['required', 'numeric', 'min:0'],
+            'supplier_id' => FluentRule::field()->required()->rule('exists:suppliers,id'),
+            'transaction_date' => FluentRule::field()->required()->rule('date_format:Y-m-d'),
+            'semester_period' => FluentRule::string()->required()->max(20),
+            'description' => FluentRule::string()->nullable()->max(500),
+            'total' => FluentRule::numeric()->required()->min(0),
         ];
     }
 

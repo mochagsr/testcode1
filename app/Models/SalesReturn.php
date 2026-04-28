@@ -103,9 +103,6 @@ class SalesReturn extends Model
 
     /**
      * Scope to filter active sales returns (not canceled).
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -114,9 +111,6 @@ class SalesReturn extends Model
 
     /**
      * Scope to eager load the associated customer.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeWithCustomerInfo(Builder $query): Builder
     {
@@ -125,9 +119,6 @@ class SalesReturn extends Model
 
     /**
      * Scope to eager load the associated sales invoice.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeWithInvoiceInfo(Builder $query): Builder
     {
@@ -136,9 +127,6 @@ class SalesReturn extends Model
 
     /**
      * Scope to apply keyword search.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeSearchKeyword(Builder $query, string $keyword): Builder
     {
@@ -169,9 +157,6 @@ class SalesReturn extends Model
 
     /**
      * Scope to filter canceled sales returns only.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeCanceled(Builder $query): Builder
     {
@@ -180,9 +165,6 @@ class SalesReturn extends Model
 
     /**
      * Scope to order sales returns by return date descending.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeOrderByDate(Builder $query): Builder
     {

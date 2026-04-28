@@ -8,13 +8,14 @@ use App\Models\IntegrityCheckLog;
 use App\Support\DataArchiveRegistry;
 use App\Support\DataArchiveService;
 use App\Support\SemesterBookService;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use SanderMuller\FluentValidation\FluentRule;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ArchiveDataPageController extends Controller
 {
@@ -339,12 +340,12 @@ class ArchiveDataPageController extends Controller
     private function validatedInput(Request $request, DataArchiveService $archiveService): array
     {
         $validated = $request->validate([
-            'archive_scope_type' => ['required', 'string', 'in:year,semester'],
-            'archive_year' => ['nullable', 'string', 'regex:/^\d{4}$/'],
-            'archive_semester' => ['nullable', 'string', 'max:30'],
-            'dataset_key' => ['nullable', 'string'],
-            'datasets' => ['nullable', 'array', 'min:1'],
-            'datasets.*' => ['required', 'string'],
+            'archive_scope_type' => FluentRule::string()->required()->in(['year', 'semester']),
+            'archive_year' => FluentRule::string()->nullable()->regex('/^\d{4}$/'),
+            'archive_semester' => FluentRule::string()->nullable()->max(30),
+            'dataset_key' => FluentRule::string()->nullable(),
+            'datasets' => FluentRule::array()->nullable()->min(1),
+            'datasets.*' => FluentRule::string()->required(),
         ]);
 
         $scopeType = (string) ($validated['archive_scope_type'] ?? 'year');

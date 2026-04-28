@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
 class UpdateSalesInvoiceRequest extends FormRequest
 {
+    use HasFluentRules;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -22,12 +26,12 @@ class UpdateSalesInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id' => ['required', 'exists:customers,id'],
-            'invoice_date' => ['required', 'date_format:Y-m-d'],
-            'total' => ['required', 'numeric', 'min:0'],
-            'subtotal' => ['nullable', 'numeric', 'min:0'],
-            'payment_status' => ['in:unpaid,partial,paid'],
-            'semester_period' => ['required', 'string', 'max:20'],
+            'customer_id' => FluentRule::field()->required()->rule('exists:customers,id'),
+            'invoice_date' => FluentRule::field()->required()->rule('date_format:Y-m-d'),
+            'total' => FluentRule::numeric()->required()->min(0),
+            'subtotal' => FluentRule::numeric()->nullable()->min(0),
+            'payment_status' => FluentRule::field()->rule('in:unpaid,partial,paid'),
+            'semester_period' => FluentRule::string()->required()->max(20),
         ];
     }
 

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\OutgoingTransaction;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use App\Models\SupplierPayment;
-use App\Models\OutgoingTransaction;
-use App\Services\AuditLogService;
 use App\Services\AccountingService;
+use App\Services\AuditLogService;
 use App\Services\SupplierLedgerService;
 use App\Support\AppCache;
 use App\Support\AppSetting;
@@ -20,16 +20,17 @@ use App\Support\SemesterBookService;
 use App\Support\UploadedImageCompressor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupplierPayablePageController extends Controller
@@ -86,14 +87,14 @@ class SupplierPayablePageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'payment_date' => ['required', 'date'],
-            'proof_number' => ['nullable', 'string', 'max:80'],
-            'payment_proof_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-            'amount' => ['required', 'integer', 'min:1'],
-            'supplier_signature' => ['nullable', 'string', 'max:120'],
-            'user_signature' => ['nullable', 'string', 'max:120'],
-            'notes' => ['nullable', 'string'],
+            'supplier_id' => FluentRule::integer()->required()->exists('suppliers', 'id'),
+            'payment_date' => FluentRule::date()->required(),
+            'proof_number' => FluentRule::string()->nullable()->max(80),
+            'payment_proof_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
+            'amount' => FluentRule::integer()->required()->min(1),
+            'supplier_signature' => FluentRule::string()->nullable()->max(120),
+            'user_signature' => FluentRule::string()->nullable()->max(120),
+            'notes' => FluentRule::string()->nullable(),
         ]);
 
         $supplierYear = $this->semesterBookService->yearFromDate((string) $data['payment_date']);
@@ -172,10 +173,10 @@ class SupplierPayablePageController extends Controller
     public function closeYear(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'year' => ['required', 'digits:4'],
-            'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'search' => ['nullable', 'string'],
+            'supplier_id' => FluentRule::integer()->required()->exists('suppliers', 'id'),
+            'year' => FluentRule::field()->required()->rule('digits:4'),
+            'month' => FluentRule::integer()->required()->min(1)->max(12),
+            'search' => FluentRule::string()->nullable(),
         ]);
 
         $normalizedYear = $this->semesterBookService->normalizeYear((string) $data['year']);
@@ -202,10 +203,10 @@ class SupplierPayablePageController extends Controller
     public function openYear(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'year' => ['required', 'digits:4'],
-            'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'search' => ['nullable', 'string'],
+            'supplier_id' => FluentRule::integer()->required()->exists('suppliers', 'id'),
+            'year' => FluentRule::field()->required()->rule('digits:4'),
+            'month' => FluentRule::integer()->required()->min(1)->max(12),
+            'search' => FluentRule::string()->nullable(),
         ]);
 
         $normalizedYear = $this->semesterBookService->normalizeYear((string) $data['year']);
@@ -248,7 +249,7 @@ class SupplierPayablePageController extends Controller
         $filename = $this->buildReportFileName($data).'.xlsx';
 
         return response()->streamDownload(function () use ($data): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Hutang Supplier');
 
@@ -266,10 +267,10 @@ class SupplierPayablePageController extends Controller
             $metaStartRow = 3;
             foreach ($metaRows as $offset => [$label, $value]) {
                 $row = $metaStartRow + $offset;
-            $sheet->setCellValue('A'.$row, $label);
-            $sheet->setCellValue('B'.$row, $value);
-        }
-        $sheet->getStyle('A'.$metaStartRow.':A'.($metaStartRow + count($metaRows) - 1))->getFont()->setBold(true);
+                $sheet->setCellValue('A'.$row, $label);
+                $sheet->setCellValue('B'.$row, $value);
+            }
+            $sheet->getStyle('A'.$metaStartRow.':A'.($metaStartRow + count($metaRows) - 1))->getFont()->setBold(true);
 
             $summaryHeaderRow = 8;
             $sheet->fromArray([[
@@ -353,13 +354,13 @@ class SupplierPayablePageController extends Controller
     public function adminUpdate(Request $request, SupplierPayment $supplierPayment): RedirectResponse
     {
         $data = $request->validate([
-            'payment_date' => ['required', 'date'],
-            'proof_number' => ['nullable', 'string', 'max:80'],
-            'amount' => ['required', 'integer', 'min:1'],
-            'supplier_signature' => ['nullable', 'string', 'max:120'],
-            'user_signature' => ['nullable', 'string', 'max:120'],
-            'notes' => ['nullable', 'string'],
-            'payment_proof_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'payment_date' => FluentRule::date()->required(),
+            'proof_number' => FluentRule::string()->nullable()->max(80),
+            'amount' => FluentRule::integer()->required()->min(1),
+            'supplier_signature' => FluentRule::string()->nullable()->max(120),
+            'user_signature' => FluentRule::string()->nullable()->max(120),
+            'notes' => FluentRule::string()->nullable(),
+            'payment_proof_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
         ]);
 
         DB::transaction(function () use ($supplierPayment, $data, $request): void {
@@ -456,16 +457,16 @@ class SupplierPayablePageController extends Controller
             'isPdf' => true,
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download($supplierPayment->payment_number . '.pdf');
+        return $pdf->download($supplierPayment->payment_number.'.pdf');
     }
 
     public function exportPaymentExcel(SupplierPayment $supplierPayment): StreamedResponse
     {
         $supplierPayment->load('supplier:id,name,company_name,address,phone');
-        $filename = $supplierPayment->payment_number . '.xlsx';
+        $filename = $supplierPayment->payment_number.'.xlsx';
 
         return response()->streamDownload(function () use ($supplierPayment): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Kwitansi');
 
@@ -499,7 +500,7 @@ class SupplierPayablePageController extends Controller
             $sheet->getStyle('A3:B5')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
             $sheet->mergeCells('C2:D2');
-            $sheet->setCellValue('C2', __('txn.no') . ': ' . $supplierPayment->payment_number);
+            $sheet->setCellValue('C2', __('txn.no').': '.$supplierPayment->payment_number);
             $sheet->getStyle('C2')->getFont()->setBold(true);
             $sheet->getStyle('C2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -511,8 +512,8 @@ class SupplierPayablePageController extends Controller
             ];
             $metaRowIndex = 2;
             foreach ($metaRows as [$label, $value]) {
-                $sheet->setCellValue('E' . $metaRowIndex, $label);
-                $sheet->setCellValue('F' . $metaRowIndex, $value);
+                $sheet->setCellValue('E'.$metaRowIndex, $label);
+                $sheet->setCellValue('F'.$metaRowIndex, $value);
                 $metaRowIndex++;
             }
             $sheet->getStyle('E2:E5')->getFont()->setBold(true);
@@ -522,30 +523,30 @@ class SupplierPayablePageController extends Controller
             $detailRows = [
                 [__('txn.supplier'), (string) ($supplierPayment->supplier?->name ?? '-')],
                 [__('supplier_payable.proof_number'), (string) ($supplierPayment->proof_number ?: '-')],
-                [__('txn.amount'), 'Rp ' . number_format((int) round((float) $supplierPayment->amount), 0, ',', '.')],
+                [__('txn.amount'), 'Rp '.number_format((int) round((float) $supplierPayment->amount), 0, ',', '.')],
                 [__('supplier_payable.amount_in_words'), (string) ($supplierPayment->amount_in_words ?: '-')],
                 [__('txn.notes'), $paymentNotes !== '' ? $paymentNotes : '-'],
             ];
-            $sheet->fromArray([['Keterangan', 'Nilai']], null, 'A' . $detailHeaderRow);
-            $sheet->fromArray($detailRows, null, 'A' . ($detailHeaderRow + 1));
+            $sheet->fromArray([['Keterangan', 'Nilai']], null, 'A'.$detailHeaderRow);
+            $sheet->fromArray($detailRows, null, 'A'.($detailHeaderRow + 1));
             ExcelExportStyler::styleTable($sheet, $detailHeaderRow, 2, count($detailRows), true);
-            $sheet->getStyle('A' . $detailHeaderRow . ':B' . ($detailHeaderRow + count($detailRows)))
+            $sheet->getStyle('A'.$detailHeaderRow.':B'.($detailHeaderRow + count($detailRows)))
                 ->getAlignment()
                 ->setWrapText(true);
 
             $signatureRow = $detailHeaderRow + count($detailRows) + 3;
-            $sheet->mergeCells('A' . $signatureRow . ':B' . $signatureRow);
-            $sheet->mergeCells('E' . $signatureRow . ':F' . $signatureRow);
-            $sheet->setCellValue('A' . $signatureRow, __('supplier_payable.supplier_signature'));
-            $sheet->setCellValue('E' . $signatureRow, __('supplier_payable.user_signature'));
-            $sheet->getStyle('A' . $signatureRow . ':F' . $signatureRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->mergeCells('A' . ($signatureRow + 2) . ':B' . ($signatureRow + 2));
-            $sheet->mergeCells('E' . ($signatureRow + 2) . ':F' . ($signatureRow + 2));
-            $sheet->setCellValue('A' . ($signatureRow + 2), (string) ($supplierPayment->supplier_signature ?: '-'));
-            $sheet->setCellValue('E' . ($signatureRow + 2), (string) ($supplierPayment->user_signature ?: '-'));
-            $sheet->getStyle('A' . ($signatureRow + 2) . ':F' . ($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A' . ($signatureRow + 1) . ':B' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('E' . ($signatureRow + 1) . ':F' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->mergeCells('A'.$signatureRow.':B'.$signatureRow);
+            $sheet->mergeCells('E'.$signatureRow.':F'.$signatureRow);
+            $sheet->setCellValue('A'.$signatureRow, __('supplier_payable.supplier_signature'));
+            $sheet->setCellValue('E'.$signatureRow, __('supplier_payable.user_signature'));
+            $sheet->getStyle('A'.$signatureRow.':F'.$signatureRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->mergeCells('A'.($signatureRow + 2).':B'.($signatureRow + 2));
+            $sheet->mergeCells('E'.($signatureRow + 2).':F'.($signatureRow + 2));
+            $sheet->setCellValue('A'.($signatureRow + 2), (string) ($supplierPayment->supplier_signature ?: '-'));
+            $sheet->setCellValue('E'.($signatureRow + 2), (string) ($supplierPayment->user_signature ?: '-'));
+            $sheet->getStyle('A'.($signatureRow + 2).':F'.($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 
             foreach (range('A', 'F') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
@@ -562,7 +563,7 @@ class SupplierPayablePageController extends Controller
 
     private function generatePaymentNumber(string $date): string
     {
-        $prefix = 'KWTS-' . date('dmY', strtotime($date));
+        $prefix = 'KWTS-'.date('dmY', strtotime($date));
         $count = SupplierPayment::query()
             ->whereDate('payment_date', $date)
             ->lockForUpdate()
@@ -573,7 +574,7 @@ class SupplierPayablePageController extends Controller
 
     private function toIndonesianWords(int $amount): string
     {
-        return ucfirst(trim($this->spellNumber($amount))) . ' rupiah';
+        return ucfirst(trim($this->spellNumber($amount))).' rupiah';
     }
 
     private function spellNumber(int $number): string
@@ -584,28 +585,28 @@ class SupplierPayablePageController extends Controller
             return $words[$number];
         }
         if ($number < 20) {
-            return $this->spellNumber($number - 10) . ' belas';
+            return $this->spellNumber($number - 10).' belas';
         }
         if ($number < 100) {
-            return $this->spellNumber((int) floor($number / 10)) . ' puluh ' . $this->spellNumber($number % 10);
+            return $this->spellNumber((int) floor($number / 10)).' puluh '.$this->spellNumber($number % 10);
         }
         if ($number < 200) {
-            return 'seratus ' . $this->spellNumber($number - 100);
+            return 'seratus '.$this->spellNumber($number - 100);
         }
         if ($number < 1000) {
-            return $this->spellNumber((int) floor($number / 100)) . ' ratus ' . $this->spellNumber($number % 100);
+            return $this->spellNumber((int) floor($number / 100)).' ratus '.$this->spellNumber($number % 100);
         }
         if ($number < 2000) {
-            return 'seribu ' . $this->spellNumber($number - 1000);
+            return 'seribu '.$this->spellNumber($number - 1000);
         }
         if ($number < 1000000) {
-            return $this->spellNumber((int) floor($number / 1000)) . ' ribu ' . $this->spellNumber($number % 1000);
+            return $this->spellNumber((int) floor($number / 1000)).' ribu '.$this->spellNumber($number % 1000);
         }
         if ($number < 1000000000) {
-            return $this->spellNumber((int) floor($number / 1000000)) . ' juta ' . $this->spellNumber($number % 1000000);
+            return $this->spellNumber((int) floor($number / 1000000)).' juta '.$this->spellNumber($number % 1000000);
         }
 
-        return $this->spellNumber((int) floor($number / 1000000000)) . ' miliar ' . $this->spellNumber($number % 1000000000);
+        return $this->spellNumber((int) floor($number / 1000000000)).' miliar '.$this->spellNumber($number % 1000000000);
     }
 
     /**
@@ -672,8 +673,8 @@ class SupplierPayablePageController extends Controller
         if ($selectedSupplier !== null) {
             $ledgerRows = SupplierLedger::query()
                 ->forSupplier((int) $selectedSupplier->id)
-                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
-                ->when($selectedMonth !== null, fn($query) => $query->whereMonth('entry_date', $selectedMonth))
+                ->when($selectedYear !== null, fn ($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->when($selectedMonth !== null, fn ($query) => $query->whereMonth('entry_date', $selectedMonth))
                 ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
                 ->orderByDate()
                 ->limit(500)
@@ -689,8 +690,8 @@ class SupplierPayablePageController extends Controller
 
             $supplierPaymentIds = $ledgerRows
                 ->pluck('supplier_payment_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values();
             if ($supplierPaymentIds->isNotEmpty()) {
@@ -712,8 +713,8 @@ class SupplierPayablePageController extends Controller
 
             $outgoingTransactionIds = $ledgerRows
                 ->pluck('outgoing_transaction_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values();
             if ($outgoingTransactionIds->isNotEmpty()) {
@@ -778,7 +779,7 @@ class SupplierPayablePageController extends Controller
         $summarySuppliers = Supplier::query()
             ->onlyListColumns()
             ->searchKeyword($search)
-            ->when($selectedSupplierId, fn($query) => $query->whereKey($selectedSupplierId))
+            ->when($selectedSupplierId, fn ($query) => $query->whereKey($selectedSupplierId))
             ->orderBy('name')
             ->get();
 
@@ -786,13 +787,13 @@ class SupplierPayablePageController extends Controller
             ? $summarySuppliers->firstWhere('id', $selectedSupplierId)
             : null;
 
-        $supplierIds = $summarySuppliers->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $supplierIds = $summarySuppliers->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $ledgerAggregateRows = collect();
         if ($supplierIds !== []) {
             $ledgerAggregateRows = SupplierLedger::query()
                 ->whereIn('supplier_id', $supplierIds)
-                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
-                ->when($selectedMonth !== null, fn($query) => $query->whereMonth('entry_date', $selectedMonth))
+                ->when($selectedYear !== null, fn ($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->when($selectedMonth !== null, fn ($query) => $query->whereMonth('entry_date', $selectedMonth))
                 ->selectRaw('supplier_id, COALESCE(SUM(debit), 0) as total_debit, COALESCE(SUM(credit), 0) as total_credit')
                 ->groupBy('supplier_id')
                 ->get();
@@ -812,14 +813,14 @@ class SupplierPayablePageController extends Controller
 
         $totalOutstanding = $selectedYear !== null
             ? (int) array_sum($summaryBalanceMap)
-            : (int) $summarySuppliers->sum(fn(Supplier $supplier): int => (int) ($supplier->outstanding_payable ?? 0));
+            : (int) $summarySuppliers->sum(fn (Supplier $supplier): int => (int) ($supplier->outstanding_payable ?? 0));
 
         $ledgerRows = collect();
         if ($selectedSupplier !== null) {
             $ledgerRows = SupplierLedger::query()
                 ->forSupplier((int) $selectedSupplier->id)
-                ->when($selectedYear !== null, fn($query) => $query->whereYear('entry_date', (int) $selectedYear))
-                ->when($selectedMonth !== null, fn($query) => $query->whereMonth('entry_date', $selectedMonth))
+                ->when($selectedYear !== null, fn ($query) => $query->whereYear('entry_date', (int) $selectedYear))
+                ->when($selectedMonth !== null, fn ($query) => $query->whereMonth('entry_date', $selectedMonth))
                 ->with(['outgoingTransaction:id,transaction_number', 'supplierPayment:id,payment_number'])
                 ->orderByDate()
                 ->limit(500)
@@ -845,7 +846,7 @@ class SupplierPayablePageController extends Controller
     }
 
     /**
-     * @param array{selectedSupplier:?Supplier,selectedYear:?string} $data
+     * @param  array{selectedSupplier:?Supplier,selectedYear:?string}  $data
      */
     private function buildReportFileName(array $data): string
     {
@@ -884,6 +885,7 @@ class SupplierPayablePageController extends Controller
     private function normalizeMonth(string $value): ?int
     {
         $month = (int) trim($value);
+
         return $month >= 1 && $month <= 12 ? $month : null;
     }
 }

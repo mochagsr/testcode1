@@ -103,11 +103,11 @@ class GenerateReportExportTaskJob implements ShouldQueue
     }
 
     /**
-     * @param array<string, mixed> $report
+     * @param  array<string, mixed>  $report
      */
     private function buildExcelBinary(array $report, Carbon $printedAt): string
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Report');
         $phoneHeaderKey = strtolower(__('report.columns.phone'));
@@ -191,22 +191,25 @@ class GenerateReportExportTaskJob implements ShouldQueue
     private function toNullableInt(mixed $value): ?int
     {
         $intValue = (int) $value;
+
         return $intValue > 0 ? $intValue : null;
     }
 
     private function toNullableString(mixed $value): ?string
     {
         $stringValue = trim((string) $value);
+
         return $stringValue !== '' ? $stringValue : null;
     }
 
     /**
-     * @param array<int, mixed>|mixed $value
+     * @param  array<int, mixed>|mixed  $value
      * @return array<int, int>
      */
     private function toIntArray(mixed $value): array
     {
         $items = is_array($value) ? $value : [];
+
         return collect($items)
             ->map(fn ($item): int => (int) $item)
             ->filter(fn (int $item): bool => $item > 0)

@@ -199,7 +199,6 @@ class Product extends Model
      * Scope: Filter by category ID.
      *
      * @param  Builder<Product>  $query
-     * @param  int  $categoryId
      * @return Builder<Product>
      */
     public function scopeInCategory(Builder $query, int $categoryId): Builder
@@ -233,7 +232,6 @@ class Product extends Model
      * Scope: Filter by low stock (stock <= threshold).
      *
      * @param  Builder<Product>  $query
-     * @param  int  $threshold
      * @return Builder<Product>
      */
     public function scopeLowStock(Builder $query, int $threshold = 0): Builder

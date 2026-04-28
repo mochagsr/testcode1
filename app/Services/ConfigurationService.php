@@ -35,10 +35,6 @@ final class ConfigurationService
 
     /**
      * Set a setting value and clear cache.
-     *
-     * @param  string  $key
-     * @param  string|null  $value
-     * @return void
      */
     public static function set(string $key, ?string $value): void
     {
@@ -55,8 +51,8 @@ final class ConfigurationService
         $raw = (string) self::get('semester_period_options', '');
 
         return collect(preg_split('/[\r\n,]+/', $raw) ?: [])
-            ->map(fn(string $item): string => trim($item))
-            ->filter(fn(string $item): bool => $item !== '')
+            ->map(fn (string $item): string => trim($item))
+            ->filter(fn (string $item): bool => $item !== '')
             ->unique();
     }
 
@@ -114,8 +110,6 @@ final class ConfigurationService
 
     /**
      * Clear all cached settings.
-     *
-     * @return void
      */
     public static function clearCache(): void
     {

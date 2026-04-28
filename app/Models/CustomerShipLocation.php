@@ -89,4 +89,3 @@ class CustomerShipLocation extends Model
         });
     }
 }
-

@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesProductUnits;
+use App\Models\AppSetting;
 use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
 use App\Models\ProductUnit;
-use App\Models\AppSetting;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\StockMutation;
@@ -27,9 +27,9 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductPageController extends Controller
@@ -65,19 +65,19 @@ class ProductPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $printedAt = $this->nowWib();
-        $filename = 'products-' . $printedAt->format('Ymd-His') . '.xlsx';
+        $filename = 'products-'.$printedAt->format('Ymd-His').'.xlsx';
 
         $productQuery = $this->reportProductQuery($search);
 
         $productCount = (clone $productQuery)->count();
 
         return response()->streamDownload(function () use ($productQuery, $productCount, $printedAt): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Barang');
 
             $sheet->setCellValue('A1', __('ui.products_title'));
-            $sheet->setCellValue('A2', __('report.printed') . ': ' . $printedAt->format('d-m-Y H:i:s') . ' WIB');
+            $sheet->setCellValue('A2', __('report.printed').': '.$printedAt->format('d-m-Y H:i:s').' WIB');
             $sheet->setCellValue('A4', 'No');
             $sheet->setCellValue('B4', __('ui.code'));
             $sheet->setCellValue('C4', __('ui.name'));
@@ -87,10 +87,10 @@ class ProductPageController extends Controller
             $number = 1;
             $productQuery->chunkById(500, function ($products) use ($sheet, &$row, &$number): void {
                 foreach ($products as $product) {
-                    $sheet->setCellValue('A' . $row, $number++);
-                    $sheet->setCellValue('B' . $row, (string) ($product->code ?: '-'));
-                    $sheet->setCellValue('C' . $row, (string) $product->name);
-                    $sheet->setCellValue('D' . $row, (int) round((float) $product->stock));
+                    $sheet->setCellValue('A'.$row, $number++);
+                    $sheet->setCellValue('B'.$row, (string) ($product->code ?: '-'));
+                    $sheet->setCellValue('C'.$row, (string) $product->name);
+                    $sheet->setCellValue('D'.$row, (int) round((float) $product->stock));
                     $row++;
                 }
             }, 'id', 'id');
@@ -322,7 +322,7 @@ class ProductPageController extends Controller
     public function quickUpdateStock(Request $request, Product $product): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
-            'stock' => ['required', 'integer', 'min:0'],
+            'stock' => FluentRule::integer()->required()->min(0),
         ]);
         $flashMeta = [
             'type' => 'edit',
@@ -340,6 +340,7 @@ class ProductPageController extends Controller
             $newStock = (int) $data['stock'];
             if ($newStock === $oldStock) {
                 $flashMeta = $this->buildProductStockFlashMeta($lockedProduct, $oldStock, $newStock);
+
                 return;
             }
 
@@ -433,19 +434,14 @@ class ProductPageController extends Controller
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
-            'item_category_id' => ['required', 'integer', 'exists:item_categories,id'],
-            'code' => [
-                'nullable',
-                'string',
-                'max:60',
-                Rule::unique('products', 'code')->ignore($ignoreId),
-            ],
-            'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30'],
-            'stock' => ['required', 'integer', 'min:0'],
-            'price_agent' => ['required', 'numeric', 'min:0'],
-            'price_sales' => ['required', 'numeric', 'min:0'],
-            'price_general' => ['required', 'numeric', 'min:0'],
+            'item_category_id' => FluentRule::integer()->required()->exists('item_categories', 'id'),
+            'code' => FluentRule::string()->nullable()->max(60)->unique('products', 'code', fn ($rule) => $rule->ignore($ignoreId)),
+            'name' => FluentRule::string()->required()->max(200),
+            'unit' => FluentRule::string()->required()->max(30),
+            'stock' => FluentRule::integer()->required()->min(0),
+            'price_agent' => FluentRule::numeric()->required()->min(0),
+            'price_sales' => FluentRule::numeric()->required()->min(0),
+            'price_general' => FluentRule::numeric()->required()->min(0),
         ], [
             'code.unique' => __('ui.product_code_unique_error'),
         ]);
@@ -647,7 +643,7 @@ class ProductPageController extends Controller
             return '';
         }
 
-        return ' ' . __('ui.stock_change_price_changes_segment', [
+        return ' '.__('ui.stock_change_price_changes_segment', [
             'segments' => implode(' | ', $parts),
         ]);
     }
@@ -681,6 +677,7 @@ class ProductPageController extends Controller
             if (strcasecmp($code, $name) === 0) {
                 return $name;
             }
+
             return "{$code} - {$name}";
         }
         if ($name !== '') {
@@ -692,5 +689,4 @@ class ProductPageController extends Controller
 
         return '-';
     }
-
 }

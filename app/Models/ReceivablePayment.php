@@ -67,9 +67,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Only columns used by list page.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeOnlyListColumns(Builder $query): Builder
     {
@@ -85,9 +82,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Only active (not canceled) payments.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -96,9 +90,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Only canceled payments.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeCanceled(Builder $query): Builder
     {
@@ -107,9 +98,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Eager load customer with related info.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeWithCustomerInfo(Builder $query): Builder
     {
@@ -118,9 +106,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Eager load creator user info.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeWithCreatorInfo(Builder $query): Builder
     {
@@ -129,10 +114,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Filter by customer.
-     *
-     * @param  Builder  $query
-     * @param  int  $customerId
-     * @return Builder
      */
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
@@ -141,9 +122,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Apply keyword search for payment/customer.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeSearchKeyword(Builder $query, string $keyword): Builder
     {
@@ -164,10 +142,8 @@ class ReceivablePayment extends Model
     /**
      * Scope: Filter by date range.
      *
-     * @param  Builder  $query
      * @param  \Carbon\CarbonInterface  $startDate
      * @param  \Carbon\CarbonInterface  $endDate
-     * @return Builder
      */
     public function scopeBetweenDates(Builder $query, $startDate, $endDate): Builder
     {
@@ -176,10 +152,6 @@ class ReceivablePayment extends Model
 
     /**
      * Scope: Order by payment date (newest first).
-     *
-     * @param  Builder  $query
-     * @param  string  $direction
-     * @return Builder
      */
     public function scopeOrderByDate(Builder $query, string $direction = 'desc'): Builder
     {

@@ -23,7 +23,7 @@ use Illuminate\Http\Request;
 final class InvoiceCorrectionExecutor
 {
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      */
     public function applySalesInvoiceCorrection(int $salesInvoiceId, array $patch, ?Request $request = null): void
     {
@@ -49,7 +49,7 @@ final class InvoiceCorrectionExecutor
     }
 
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      */
     public function applySalesReturnCorrection(int $salesReturnId, array $patch, ?Request $request = null): void
     {
@@ -70,7 +70,7 @@ final class InvoiceCorrectionExecutor
     }
 
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      */
     public function applyDeliveryNoteCorrection(int $deliveryNoteId, array $patch, ?Request $request = null): void
     {
@@ -94,7 +94,7 @@ final class InvoiceCorrectionExecutor
     }
 
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      */
     public function applyOrderNoteCorrection(int $orderNoteId, array $patch, ?Request $request = null): void
     {
@@ -117,7 +117,7 @@ final class InvoiceCorrectionExecutor
     }
 
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      */
     public function applyReceivablePaymentCorrection(int $paymentId, array $patch, ?Request $request = null): void
     {
@@ -139,7 +139,7 @@ final class InvoiceCorrectionExecutor
     }
 
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      */
     public function applyOutgoingTransactionCorrection(int $transactionId, array $patch, ?Request $request = null): void
     {
@@ -162,7 +162,7 @@ final class InvoiceCorrectionExecutor
     }
 
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      */
     public function applySupplierPaymentCorrection(int $paymentId, array $patch, ?Request $request = null): void
     {

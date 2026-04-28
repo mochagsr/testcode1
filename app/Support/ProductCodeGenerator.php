@@ -57,6 +57,7 @@ class ProductCodeGenerator
         $yearSuffix = $this->extractYearSuffix($rawNormalized);
 
         $categoryPrefix = $this->categoryPrefix($categoryName);
+
         return substr($categoryPrefix.$subject.$level.$edition.$semester.$yearSuffix, 0, 60);
     }
 

@@ -21,7 +21,7 @@ use Throwable;
 final class ApprovalWorkflowService
 {
     /**
-     * @param array<string, mixed>|null $payload
+     * @param  array<string, mixed>|null  $payload
      */
     public function create(
         string $module,

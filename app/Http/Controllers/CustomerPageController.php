@@ -7,8 +7,8 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\CustomerLevel;
 use App\Support\AppCache;
-use App\Support\UploadedImageCompressor;
 use App\Support\ExcelExportStyler;
+use App\Support\UploadedImageCompressor;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerPageController extends Controller
@@ -62,7 +63,7 @@ class CustomerPageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $selectedLevelId = max(0, (int) $request->integer('level_id', 0));
         $printedAt = $this->nowWib();
-        $filename = 'customers-' . $printedAt->format('Ymd-His') . '.xlsx';
+        $filename = 'customers-'.$printedAt->format('Ymd-His').'.xlsx';
 
         $customerQuery = Customer::query()
             ->select(['id', 'name', 'phone', 'phone_secondary', 'city', 'address', 'outstanding_receivable'])
@@ -74,12 +75,12 @@ class CustomerPageController extends Controller
         $customerCount = (clone $customerQuery)->count();
 
         return response()->streamDownload(function () use ($customerQuery, $customerCount, $printedAt): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Customer');
 
             $sheet->setCellValue('A1', __('ui.customers_title'));
-            $sheet->setCellValue('A2', __('report.printed') . ': ' . $printedAt->format('d-m-Y H:i:s') . ' WIB');
+            $sheet->setCellValue('A2', __('report.printed').': '.$printedAt->format('d-m-Y H:i:s').' WIB');
             $sheet->setCellValue('A4', 'No');
             $sheet->setCellValue('B4', __('ui.name'));
             $sheet->setCellValue('C4', __('ui.phone'));
@@ -102,16 +103,16 @@ class CustomerPageController extends Controller
                         ->filter()
                         ->implode(' / ');
 
-                    $sheet->setCellValue('A' . $row, $number++);
-                    $sheet->setCellValue('B' . $row, (string) $customer->name);
+                    $sheet->setCellValue('A'.$row, $number++);
+                    $sheet->setCellValue('B'.$row, (string) $customer->name);
                     $sheet->setCellValueExplicit(
-                        'C' . $row,
+                        'C'.$row,
                         $phoneNumber !== '' ? $phoneNumber : '-',
                         DataType::TYPE_STRING
                     );
-                    $sheet->setCellValue('D' . $row, (string) ($customer->city ?: '-'));
-                    $sheet->setCellValue('E' . $row, (string) ($customer->address ?: '-'));
-                    $sheet->setCellValue('F' . $row, (int) round((float) $customer->outstanding_receivable));
+                    $sheet->setCellValue('D'.$row, (string) ($customer->city ?: '-'));
+                    $sheet->setCellValue('E'.$row, (string) ($customer->address ?: '-'));
+                    $sheet->setCellValue('F'.$row, (int) round((float) $customer->outstanding_receivable));
                     $row++;
                 }
             }, 'id', 'id');
@@ -120,7 +121,7 @@ class CustomerPageController extends Controller
             ExcelExportStyler::styleTable($sheet, 4, 6, $itemCount, true);
             if ($itemCount > 0) {
                 ExcelExportStyler::formatNumberColumns($sheet, 5, 4 + $itemCount, [1, 6], '#,##0');
-                $sheet->getStyle('C5:C' . (4 + $itemCount))->getNumberFormat()->setFormatCode('@');
+                $sheet->getStyle('C5:C'.(4 + $itemCount))->getNumberFormat()->setFormatCode('@');
             }
 
             $writer = new Xlsx($spreadsheet);
@@ -238,25 +239,25 @@ class CustomerPageController extends Controller
     private function validatePayload(Request $request): array
     {
         return $request->validate([
-            'customer_level_id' => ['required', 'integer', 'exists:customer_levels,id'],
-            'name' => ['required', 'string', 'max:150'],
-            'phone' => ['required', 'string', 'max:30'],
-            'phone_secondary' => ['nullable', 'string', 'max:30'],
-            'city' => ['required', 'string', 'max:100'],
-            'address' => ['required', 'string'],
-            'id_card_photo' => ['nullable', 'image', 'max:3072'],
-            'outstanding_receivable' => ['nullable', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string'],
-            'remove_id_card_photo' => ['nullable', 'boolean'],
+            'customer_level_id' => FluentRule::integer()->required()->exists('customer_levels', 'id'),
+            'name' => FluentRule::string()->required()->max(150),
+            'phone' => FluentRule::string()->required()->max(30),
+            'phone_secondary' => FluentRule::string()->nullable()->max(30),
+            'city' => FluentRule::string()->required()->max(100),
+            'address' => FluentRule::string()->required(),
+            'id_card_photo' => FluentRule::image()->nullable()->max(3072),
+            'outstanding_receivable' => FluentRule::numeric()->nullable()->min(0),
+            'notes' => FluentRule::string()->nullable(),
+            'remove_id_card_photo' => FluentRule::boolean()->nullable(),
         ]);
     }
 
     private function generateCustomerCode(): string
     {
-        $prefix = 'CUS-' . now()->format('Ymd');
+        $prefix = 'CUS-'.now()->format('Ymd');
 
         do {
-            $code = $prefix . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            $code = $prefix.'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
         } while (Customer::query()->where('code', $code)->exists());
 
         return $code;

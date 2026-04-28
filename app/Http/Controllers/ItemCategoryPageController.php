@@ -9,7 +9,7 @@ use App\Support\AppCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use SanderMuller\FluentValidation\FluentRule;
 
 class ItemCategoryPageController extends Controller
 {
@@ -72,9 +72,9 @@ class ItemCategoryPageController extends Controller
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'code' => ['nullable', 'string', 'max:50'],
-            'description' => ['nullable', 'string'],
+            'name' => FluentRule::string()->required()->max(100),
+            'code' => FluentRule::string()->nullable()->max(50),
+            'description' => FluentRule::string()->nullable(),
         ]);
 
         $data['name'] = trim((string) $data['name']);

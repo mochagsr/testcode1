@@ -8,12 +8,13 @@ use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Support\AppCache;
 use App\Support\SemesterBookService;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use SanderMuller\FluentValidation\FluentRule;
 
 class SettingsController extends Controller
 {
@@ -44,18 +45,18 @@ class SettingsController extends Controller
 
         $rawSemesterOptions = (string) ($settings['semester_period_options'] ?? '');
         $semesterPeriodCollection = collect(preg_split('/[\r\n,]+/', $rawSemesterOptions) ?: [])
-            ->map(fn(string $item): string => trim($item))
-            ->filter(fn(string $item): bool => $item !== '')
+            ->map(fn (string $item): string => trim($item))
+            ->filter(fn (string $item): bool => $item !== '')
             ->unique();
         $currentSemester = $this->semesterBookService->currentSemester();
         $previousSemester = $this->semesterBookService->previousSemester($currentSemester);
         $closedSemesters = collect($this->semesterBookService->closedSemesters());
         $semesterBookOptions = $this->semesterBookService->sortSemesterCollection(
             $semesterPeriodCollection
-            ->merge([$currentSemester, $previousSemester])
-            ->merge($closedSemesters)
-            ->unique()
-            ->values()
+                ->merge([$currentSemester, $previousSemester])
+                ->merge($closedSemesters)
+                ->unique()
+                ->values()
         );
         $semesterBookPage = max(1, (int) $request->integer('semester_book_page', 1));
         $semesterBookPerPage = 10;
@@ -81,8 +82,8 @@ class SettingsController extends Controller
         $unitCodeSuggestions = $unitOptionRows
             ->pluck('code')
             ->merge(['exp', 'pcs', 'pack', 'rim', 'box', 'set', 'lusin'])
-            ->map(fn(string $item): string => strtolower(trim($item)))
-            ->filter(fn(string $item): bool => $item !== '')
+            ->map(fn (string $item): string => strtolower(trim($item)))
+            ->filter(fn (string $item): bool => $item !== '')
             ->unique()
             ->values();
         $rawOutgoingUnitOptions = (string) ($settings['outgoing_unit_options'] ?? 'exp|Exemplar');
@@ -90,8 +91,8 @@ class SettingsController extends Controller
         $outgoingUnitCodeSuggestions = $outgoingUnitOptionRows
             ->pluck('code')
             ->merge(['exp', 'pcs', 'pack', 'rim', 'box', 'set', 'lusin'])
-            ->map(fn(string $item): string => strtolower(trim($item)))
-            ->filter(fn(string $item): bool => $item !== '')
+            ->map(fn (string $item): string => strtolower(trim($item)))
+            ->filter(fn (string $item): bool => $item !== '')
             ->unique()
             ->values();
 
@@ -134,41 +135,41 @@ class SettingsController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'locale' => ['required', 'in:id,en'],
-            'theme' => ['required', 'in:light,dark'],
-            'password' => ['nullable', 'string', 'min:6'],
-            'company_logo' => ['nullable', 'image', 'max:2048'],
-            'remove_company_logo' => ['nullable', 'boolean'],
-            'company_name' => ['nullable', 'string', 'max:150'],
-            'company_address' => ['nullable', 'string', 'max:255'],
-            'company_phone' => ['nullable', 'string', 'max:120'],
-            'company_email' => ['nullable', 'string', 'max:120'],
-            'company_notes' => ['nullable', 'string', 'max:4000'],
-            'company_invoice_notes' => ['nullable', 'string', 'max:2000'],
-            'company_billing_note' => ['nullable', 'string', 'max:4000'],
-            'company_transfer_accounts' => ['nullable', 'string', 'max:4000'],
-            'report_header_text' => ['nullable', 'string', 'max:2000'],
-            'print_workflow_mode' => ['nullable', 'in:browser,qz'],
-            'print_paper_preset' => ['nullable', 'in:auto,9.5x5.5,9.5x11'],
-            'print_small_rows_threshold' => ['nullable', 'integer', 'min:5', 'max:200'],
-            'semester_period_options' => ['nullable', 'string', 'max:4000'],
-            'semester_period_codes' => ['nullable', 'array'],
-            'semester_period_codes.*' => ['nullable', 'string', 'max:30'],
-            'semester_active_periods' => ['nullable', 'array'],
-            'semester_active_periods.*' => ['nullable', 'string', 'max:30'],
-            'semester_active_period_codes' => ['nullable', 'array'],
-            'semester_active_period_codes.*' => ['nullable', 'string', 'max:30'],
-            'product_unit_options' => ['nullable', 'string', 'max:2000'],
-            'product_unit_codes' => ['nullable', 'array'],
-            'product_unit_codes.*' => ['nullable', 'string', 'max:30'],
-            'product_unit_labels' => ['nullable', 'array'],
-            'product_unit_labels.*' => ['nullable', 'string', 'max:120'],
-            'outgoing_unit_codes' => ['nullable', 'array'],
-            'outgoing_unit_codes.*' => ['nullable', 'string', 'max:30'],
-            'outgoing_unit_labels' => ['nullable', 'array'],
-            'outgoing_unit_labels.*' => ['nullable', 'string', 'max:120'],
-            'outgoing_unit_options' => ['nullable', 'string', 'max:2000'],
+            'name' => FluentRule::string()->required()->max(255),
+            'locale' => FluentRule::field()->required()->rule('in:id,en'),
+            'theme' => FluentRule::field()->required()->rule('in:light,dark'),
+            'password' => FluentRule::string()->nullable()->min(6),
+            'company_logo' => FluentRule::image()->nullable()->max(2048),
+            'remove_company_logo' => FluentRule::boolean()->nullable(),
+            'company_name' => FluentRule::string()->nullable()->max(150),
+            'company_address' => FluentRule::string()->nullable()->max(255),
+            'company_phone' => FluentRule::string()->nullable()->max(120),
+            'company_email' => FluentRule::string()->nullable()->max(120),
+            'company_notes' => FluentRule::string()->nullable()->max(4000),
+            'company_invoice_notes' => FluentRule::string()->nullable()->max(2000),
+            'company_billing_note' => FluentRule::string()->nullable()->max(4000),
+            'company_transfer_accounts' => FluentRule::string()->nullable()->max(4000),
+            'report_header_text' => FluentRule::string()->nullable()->max(2000),
+            'print_workflow_mode' => FluentRule::field()->nullable()->rule('in:browser,qz'),
+            'print_paper_preset' => FluentRule::field()->nullable()->rule('in:auto,9.5x5.5,9.5x11'),
+            'print_small_rows_threshold' => FluentRule::integer()->nullable()->min(5)->max(200),
+            'semester_period_options' => FluentRule::string()->nullable()->max(4000),
+            'semester_period_codes' => FluentRule::array()->nullable(),
+            'semester_period_codes.*' => FluentRule::string()->nullable()->max(30),
+            'semester_active_periods' => FluentRule::array()->nullable(),
+            'semester_active_periods.*' => FluentRule::string()->nullable()->max(30),
+            'semester_active_period_codes' => FluentRule::array()->nullable(),
+            'semester_active_period_codes.*' => FluentRule::string()->nullable()->max(30),
+            'product_unit_options' => FluentRule::string()->nullable()->max(2000),
+            'product_unit_codes' => FluentRule::array()->nullable(),
+            'product_unit_codes.*' => FluentRule::string()->nullable()->max(30),
+            'product_unit_labels' => FluentRule::array()->nullable(),
+            'product_unit_labels.*' => FluentRule::string()->nullable()->max(120),
+            'outgoing_unit_codes' => FluentRule::array()->nullable(),
+            'outgoing_unit_codes.*' => FluentRule::string()->nullable()->max(30),
+            'outgoing_unit_labels' => FluentRule::array()->nullable(),
+            'outgoing_unit_labels.*' => FluentRule::string()->nullable()->max(120),
+            'outgoing_unit_options' => FluentRule::string()->nullable()->max(2000),
         ]);
 
         $user = $request->user();
@@ -201,11 +202,11 @@ class SettingsController extends Controller
         }
         AppSetting::setValues([
             'product_unit_options' => $normalizedUnitOptions
-                ->map(fn(array $item): string => $item['code'] . '|' . $item['label'])
+                ->map(fn (array $item): string => $item['code'].'|'.$item['label'])
                 ->implode(','),
             'product_default_unit' => 'exp',
             'outgoing_unit_options' => $normalizedOutgoingUnitOptions
-                ->map(fn(array $item): string => $item['code'] . '|' . $item['label'])
+                ->map(fn (array $item): string => $item['code'].'|'.$item['label'])
                 ->implode(','),
         ]);
         AppCache::bumpLookupVersion();
@@ -227,20 +228,20 @@ class SettingsController extends Controller
             }
 
             $semesterCodeInputs = collect($request->input('semester_period_codes', []))
-                ->map(fn($item): string => trim((string) $item))
-                ->filter(fn(string $item): bool => $item !== '');
+                ->map(fn ($item): string => trim((string) $item))
+                ->filter(fn (string $item): bool => $item !== '');
             if ($semesterCodeInputs->isEmpty()) {
                 $semesterCodeInputs = collect(preg_split('/[\r\n,]+/', (string) ($data['semester_period_options'] ?? '')) ?: [])
-                    ->map(fn($item): string => trim((string) $item))
-                    ->filter(fn(string $item): bool => $item !== '');
+                    ->map(fn ($item): string => trim((string) $item))
+                    ->filter(fn (string $item): bool => $item !== '');
             }
 
             $normalizedSemesterOptions = $this->semesterBookService->sortSemesterCollection(
                 $semesterCodeInputs
-                ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-                ->filter(fn(?string $item): bool => $item !== null)
-                ->unique()
-                ->values()
+                    ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+                    ->filter(fn (?string $item): bool => $item !== null)
+                    ->unique()
+                    ->values()
             );
             $existingSemesterMetadata = $this->semesterBookService->configuredSemesterMetadata();
             $semesterMetadata = [];
@@ -250,21 +251,21 @@ class SettingsController extends Controller
                 ];
             }
             $activeSemesterInputs = collect($request->input('semester_active_period_codes', []))
-                ->map(fn($item): string => trim((string) $item))
-                ->filter(fn(string $item): bool => $item !== '');
+                ->map(fn ($item): string => trim((string) $item))
+                ->filter(fn (string $item): bool => $item !== '');
             if ($activeSemesterInputs->isEmpty()) {
                 $activeSemesterInputs = collect($request->input('semester_active_periods', []))
-                    ->map(fn($item): string => trim((string) $item))
-                    ->filter(fn(string $item): bool => $item !== '');
+                    ->map(fn ($item): string => trim((string) $item))
+                    ->filter(fn (string $item): bool => $item !== '');
             }
 
             $normalizedActiveSemesters = $this->semesterBookService->sortSemesterCollection(
                 $activeSemesterInputs
-                ->map(fn(string $item): ?string => $this->semesterBookService->normalizeSemester($item))
-                ->filter(fn(?string $item): bool => $item !== null)
-                ->filter(fn(string $item): bool => $normalizedSemesterOptions->contains($item))
-                ->unique()
-                ->values()
+                    ->map(fn (string $item): ?string => $this->semesterBookService->normalizeSemester($item))
+                    ->filter(fn (?string $item): bool => $item !== null)
+                    ->filter(fn (string $item): bool => $normalizedSemesterOptions->contains($item))
+                    ->unique()
+                    ->values()
             )->implode(',');
             AppSetting::setValues([
                 'semester_period_options' => $normalizedSemesterOptions->implode(','),
@@ -292,9 +293,9 @@ class SettingsController extends Controller
     public function closeSemester(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'semester_period' => ['required', 'string', 'max:30'],
-            'semester_book_page' => ['nullable', 'integer', 'min:1'],
-            'return_to' => ['nullable', 'string', 'max:2000'],
+            'semester_period' => FluentRule::string()->required()->max(30),
+            'semester_book_page' => FluentRule::integer()->nullable()->min(1),
+            'return_to' => FluentRule::string()->nullable()->max(2000),
         ]);
 
         $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester_period'] ?? ''));
@@ -321,9 +322,9 @@ class SettingsController extends Controller
     public function openSemester(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'semester_period' => ['required', 'string', 'max:30'],
-            'semester_book_page' => ['nullable', 'integer', 'min:1'],
-            'return_to' => ['nullable', 'string', 'max:2000'],
+            'semester_period' => FluentRule::string()->required()->max(30),
+            'semester_book_page' => FluentRule::integer()->nullable()->min(1),
+            'return_to' => FluentRule::string()->nullable()->max(2000),
         ]);
 
         $semester = $this->semesterBookService->normalizeSemester((string) ($data['semester_period'] ?? ''));
@@ -362,8 +363,8 @@ class SettingsController extends Controller
     private function normalizeUnitOptions(string $raw): \Illuminate\Support\Collection
     {
         $options = collect(preg_split('/[\r\n,]+/', $raw) ?: [])
-            ->map(fn(string $item): string => trim($item))
-            ->filter(fn(string $item): bool => $item !== '')
+            ->map(fn (string $item): string => trim($item))
+            ->filter(fn (string $item): bool => $item !== '')
             ->map(function (string $item): array {
                 $rawCode = '';
                 $rawLabel = $item;
@@ -384,11 +385,11 @@ class SettingsController extends Controller
                     'label' => $normalizedLabel,
                 ];
             })
-            ->filter(fn(array $item): bool => $item['code'] !== '' && $item['label'] !== '')
+            ->filter(fn (array $item): bool => $item['code'] !== '' && $item['label'] !== '')
             ->unique('code')
             ->values();
 
-        $withoutExp = $options->filter(fn(array $item): bool => $item['code'] !== 'exp')->values();
+        $withoutExp = $options->filter(fn (array $item): bool => $item['code'] !== 'exp')->values();
 
         $withDefault = collect([[
             'code' => 'exp',
@@ -425,11 +426,11 @@ class SettingsController extends Controller
                     'label' => $normalizedLabel,
                 ];
             })
-            ->filter(fn(array $item): bool => $item['code'] !== '' && $item['label'] !== '')
+            ->filter(fn (array $item): bool => $item['code'] !== '' && $item['label'] !== '')
             ->unique('code')
             ->values();
 
-        $withoutExp = $rows->filter(fn(array $item): bool => $item['code'] !== 'exp')->values();
+        $withoutExp = $rows->filter(fn (array $item): bool => $item['code'] !== 'exp')->values();
 
         return collect([[
             'code' => 'exp',

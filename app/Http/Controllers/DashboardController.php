@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Customer;
 use App\Models\ApprovalRequest;
+use App\Models\Customer;
 use App\Models\IntegrityCheckLog;
 use App\Models\OrderNote;
 use App\Models\OutgoingTransaction;
@@ -55,20 +55,20 @@ class DashboardController extends Controller
                     'total_products' => 0,
                     'total_customers' => 0,
                     'total_receivable' => 0,
-                'total_supplier_payable' => 0,
-                'invoice_this_month' => 0,
-                'outgoing_this_month' => 0,
-                'pending_approvals' => 0,
-                'pending_report_tasks' => 0,
-                'active_semesters' => 0,
-                'closed_semesters' => 0,
-                'locked_customer_semesters' => 0,
-                'locked_supplier_years' => 0,
-                'backup_files' => 0,
-                'database_size_bytes' => 0,
-                'backup_total_bytes' => 0,
-                'archive_total_bytes' => 0,
-            ],
+                    'total_supplier_payable' => 0,
+                    'invoice_this_month' => 0,
+                    'outgoing_this_month' => 0,
+                    'pending_approvals' => 0,
+                    'pending_report_tasks' => 0,
+                    'active_semesters' => 0,
+                    'closed_semesters' => 0,
+                    'locked_customer_semesters' => 0,
+                    'locked_supplier_years' => 0,
+                    'backup_files' => 0,
+                    'database_size_bytes' => 0,
+                    'backup_total_bytes' => 0,
+                    'archive_total_bytes' => 0,
+                ],
                 'opsSnapshot' => $this->defaultOpsSnapshot(),
                 'archiveSnapshot' => $this->defaultArchiveSnapshot(),
                 'archiveHistory' => [],
@@ -105,9 +105,9 @@ class DashboardController extends Controller
                     ->sum('total'),
                 'outgoing_this_month' => $hasOutgoingTable
                     ? OutgoingTransaction::query()
-                    ->whereYear('transaction_date', $now->year)
-                    ->whereMonth('transaction_date', $now->month)
-                    ->sum('total')
+                        ->whereYear('transaction_date', $now->year)
+                        ->whereMonth('transaction_date', $now->month)
+                        ->sum('total')
                     : 0,
                 'pending_approvals' => ApprovalRequest::query()->pending()->count(),
                 'pending_report_tasks' => ReportExportTask::query()
@@ -602,7 +602,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $query
+     * @param  array<string, mixed>  $query
      */
     private function emptyPaginator(int $perPage, string $path, array $query, string $pageName = 'page'): LengthAwarePaginator
     {

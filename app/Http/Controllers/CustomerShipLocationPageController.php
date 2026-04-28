@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use SanderMuller\FluentValidation\FluentRule;
 
 class CustomerShipLocationPageController extends Controller
 {
@@ -36,7 +37,7 @@ class CustomerShipLocationPageController extends Controller
                 'updated_at',
             ])
             ->with('customer:id,name,city')
-            ->when($customerId > 0, fn(Builder $query) => $query->where('customer_id', $customerId))
+            ->when($customerId > 0, fn (Builder $query) => $query->where('customer_id', $customerId))
             ->searchKeyword($search)
             ->orderBy('school_name')
             ->orderBy('id')
@@ -134,7 +135,7 @@ class CustomerShipLocationPageController extends Controller
                 ->select(['id', 'customer_id', 'school_name', 'recipient_phone', 'city', 'address'])
                 ->where('customer_id', $customerId)
                 ->where('is_active', true)
-                ->when($hasSearch, fn(Builder $query) => $query->searchKeyword($search))
+                ->when($hasSearch, fn (Builder $query) => $query->searchKeyword($search))
                 ->orderBy('school_name')
                 ->orderBy('id')
                 ->paginate($perPage)
@@ -150,13 +151,13 @@ class CustomerShipLocationPageController extends Controller
     private function validatePayload(Request $request): array
     {
         return $request->validate([
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'school_name' => ['required', 'string', 'max:150'],
-            'recipient_phone' => ['nullable', 'string', 'max:30'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'is_active' => ['nullable', 'boolean'],
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'school_name' => FluentRule::string()->required()->max(150),
+            'recipient_phone' => FluentRule::string()->nullable()->max(30),
+            'city' => FluentRule::string()->nullable()->max(100),
+            'address' => FluentRule::string()->nullable(),
+            'notes' => FluentRule::string()->nullable(),
+            'is_active' => FluentRule::boolean()->nullable(),
         ]);
     }
 }

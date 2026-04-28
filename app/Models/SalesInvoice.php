@@ -192,7 +192,6 @@ class SalesInvoice extends Model
      * Scope: Filter by semester period.
      *
      * @param  Builder<SalesInvoice>  $query
-     * @param  string  $semester
      * @return Builder<SalesInvoice>
      */
     public function scopeForSemester(Builder $query, string $semester): Builder
@@ -248,7 +247,6 @@ class SalesInvoice extends Model
      * Scope: Order by invoice date then id.
      *
      * @param  Builder<SalesInvoice>  $query
-     * @param  string  $direction
      * @return Builder<SalesInvoice>
      */
     public function scopeOrderByDate(Builder $query, string $direction = 'desc'): Builder

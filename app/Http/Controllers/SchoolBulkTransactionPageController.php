@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SchoolBulkTransactionPageController extends Controller
@@ -57,7 +58,7 @@ class SchoolBulkTransactionPageController extends Controller
                 'total_items',
             ])
             ->with('customer:id,name,city')
-            ->when($customerId > 0, fn(Builder $query) => $query->where('customer_id', $customerId))
+            ->when($customerId > 0, fn (Builder $query) => $query->where('customer_id', $customerId))
             ->searchKeyword($search)
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
@@ -86,7 +87,7 @@ class SchoolBulkTransactionPageController extends Controller
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.school_bulk.customers', ['limit' => 200]),
             now()->addSeconds(60),
-            fn() => Customer::query()
+            fn () => Customer::query()
                 ->onlyOptionColumns()
                 ->orderBy('name')
                 ->limit(200)
@@ -106,7 +107,7 @@ class SchoolBulkTransactionPageController extends Controller
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.school_bulk.products', ['limit' => 100, 'active_only' => 1]),
             now()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlyDeliveryFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -136,25 +137,25 @@ class SchoolBulkTransactionPageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'transaction_date' => ['required', 'date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'notes' => ['nullable', 'string'],
-            'locations' => ['required', 'array', 'min:1'],
-            'locations.*.uid' => ['required', 'string', 'max:50'],
-            'locations.*.customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
-            'locations.*.school_name' => ['required', 'string', 'max:150'],
-            'locations.*.recipient_phone' => ['nullable', 'string', 'max:30'],
-            'locations.*.city' => ['nullable', 'string', 'max:100'],
-            'locations.*.address' => ['nullable', 'string'],
-            'location_items' => ['required', 'array', 'min:1'],
-            'location_items.*' => ['required', 'array', 'min:1'],
-            'location_items.*.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'location_items.*.*.product_name' => ['required', 'string', 'max:200'],
-            'location_items.*.*.unit' => ['nullable', 'string', 'max:30'],
-            'location_items.*.*.quantity' => ['required', 'integer', 'min:1'],
-            'location_items.*.*.unit_price' => ['nullable', 'numeric', 'min:0'],
-            'location_items.*.*.notes' => ['nullable', 'string'],
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'transaction_date' => FluentRule::date()->required(),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'notes' => FluentRule::string()->nullable(),
+            'locations' => FluentRule::array()->required()->min(1),
+            'locations.*.uid' => FluentRule::string()->required()->max(50),
+            'locations.*.customer_ship_location_id' => FluentRule::integer()->nullable()->exists('customer_ship_locations', 'id'),
+            'locations.*.school_name' => FluentRule::string()->required()->max(150),
+            'locations.*.recipient_phone' => FluentRule::string()->nullable()->max(30),
+            'locations.*.city' => FluentRule::string()->nullable()->max(100),
+            'locations.*.address' => FluentRule::string()->nullable(),
+            'location_items' => FluentRule::array()->required()->min(1),
+            'location_items.*' => FluentRule::array()->required()->min(1),
+            'location_items.*.*.product_id' => FluentRule::integer()->nullable()->exists('products', 'id'),
+            'location_items.*.*.product_name' => FluentRule::string()->required()->max(200),
+            'location_items.*.*.unit' => FluentRule::string()->nullable()->max(30),
+            'location_items.*.*.quantity' => FluentRule::integer()->required()->min(1),
+            'location_items.*.*.unit_price' => FluentRule::numeric()->nullable()->min(0),
+            'location_items.*.*.notes' => FluentRule::string()->nullable(),
         ]);
 
         $transaction = DB::transaction(function () use ($data): SchoolBulkTransaction {
@@ -174,8 +175,8 @@ class SchoolBulkTransactionPageController extends Controller
 
             $shipLocationIds = $locationRows
                 ->pluck('customer_ship_location_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values();
             $shipLocations = CustomerShipLocation::query()
@@ -191,8 +192,8 @@ class SchoolBulkTransactionPageController extends Controller
 
             $productIds = $allItemRows
                 ->pluck('product_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values();
             $products = Product::query()
@@ -311,8 +312,8 @@ class SchoolBulkTransactionPageController extends Controller
     public function generateInvoices(Request $request, SchoolBulkTransaction $schoolBulkTransaction): RedirectResponse
     {
         $data = $request->validate([
-            'invoice_date' => ['nullable', 'date'],
-            'due_date' => ['nullable', 'date'],
+            'invoice_date' => FluentRule::date()->nullable(),
+            'due_date' => FluentRule::date()->nullable(),
         ]);
 
         $result = DB::transaction(function () use ($schoolBulkTransaction, $data): array {
@@ -354,13 +355,13 @@ class SchoolBulkTransactionPageController extends Controller
                 ->where('school_bulk_transaction_id', $transaction->id)
                 ->whereNotNull('school_bulk_location_id')
                 ->pluck('school_bulk_location_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values();
 
             $targetLocations = $transaction->locations
-                ->reject(fn(SchoolBulkTransactionLocation $location): bool => $existingLocationIds->contains((int) $location->id))
+                ->reject(fn (SchoolBulkTransactionLocation $location): bool => $existingLocationIds->contains((int) $location->id))
                 ->values();
 
             if ($targetLocations->isEmpty()) {
@@ -372,7 +373,7 @@ class SchoolBulkTransactionPageController extends Controller
             }
 
             $itemsByLocation = $transaction->items
-                ->groupBy(fn(SchoolBulkTransactionItem $item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
+                ->groupBy(fn (SchoolBulkTransactionItem $item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
             /** @var Collection<int, SchoolBulkTransactionItem> $globalItems */
             $globalItems = $itemsByLocation->get(0, collect());
 
@@ -393,14 +394,14 @@ class SchoolBulkTransactionPageController extends Controller
             $allLocationItems = collect();
             foreach ($targetLocations as $location) {
                 $locationItems = $resolveItemsForLocation($location)
-                    ->filter(fn(SchoolBulkTransactionItem $item): bool => max(1, (int) $item->quantity) > 0)
+                    ->filter(fn (SchoolBulkTransactionItem $item): bool => max(1, (int) $item->quantity) > 0)
                     ->values();
                 if ($locationItems->isEmpty()) {
                     throw ValidationException::withMessages([
                         'invoice_date' => __('school_bulk.no_items_to_generate'),
                     ]);
                 }
-                if ($locationItems->contains(fn(SchoolBulkTransactionItem $item): bool => (int) ($item->product_id ?? 0) <= 0)) {
+                if ($locationItems->contains(fn (SchoolBulkTransactionItem $item): bool => (int) ($item->product_id ?? 0) <= 0)) {
                     throw ValidationException::withMessages([
                         'invoice_date' => __('school_bulk.bulk_items_require_master_products'),
                     ]);
@@ -414,8 +415,8 @@ class SchoolBulkTransactionPageController extends Controller
             }
             $productIds = $allLocationItems
                 ->pluck('product_id')
-                ->map(fn($id): int => (int) $id)
-                ->filter(fn(int $id): bool => $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values();
             $products = Product::query()
@@ -525,7 +526,7 @@ class SchoolBulkTransactionPageController extends Controller
                     entryDate: $invoiceDate,
                     amount: (float) $subtotal,
                     periodCode: $invoice->semester_period,
-                    description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number
+                    description: __('receivable.invoice_label').' '.$invoice->invoice_number
                 );
 
                 $this->accountingService->postSalesInvoice(
@@ -587,7 +588,7 @@ class SchoolBulkTransactionPageController extends Controller
             'locations',
             'items',
         ]);
-        $filename = 'bulk-' . $schoolBulkTransaction->transaction_number . '.pdf';
+        $filename = 'bulk-'.$schoolBulkTransaction->transaction_number.'.pdf';
 
         return Pdf::loadView('school_bulk_transactions.print', [
             'transaction' => $schoolBulkTransaction,
@@ -603,10 +604,10 @@ class SchoolBulkTransactionPageController extends Controller
             'locations',
             'items',
         ]);
-        $filename = 'bulk-' . $schoolBulkTransaction->transaction_number . '.xlsx';
+        $filename = 'bulk-'.$schoolBulkTransaction->transaction_number.'.xlsx';
 
         return response()->streamDownload(function () use ($schoolBulkTransaction): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Transaksi Sebar');
             $rows = [];
@@ -617,7 +618,7 @@ class SchoolBulkTransactionPageController extends Controller
             $rows[] = [__('txn.semester_period'), $schoolBulkTransaction->semester_period ?: '-'];
             $rows[] = [__('school_bulk.total_schools'), (int) $schoolBulkTransaction->locations->count()];
             $itemsByLocation = $schoolBulkTransaction->items
-                ->groupBy(fn($item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
+                ->groupBy(fn ($item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
             $rows[] = [];
             $rows[] = [__('school_bulk.school_breakdown_title')];
             $rows[] = [__('school_bulk.school_name'), __('txn.city'), __('txn.address'), __('school_bulk.total_per_school')];
@@ -638,7 +639,7 @@ class SchoolBulkTransactionPageController extends Controller
 
                 $rows[] = [];
                 $rows[] = [
-                    __('txn.items') . ' - ' . ($location->school_name ?: '-'),
+                    __('txn.items').' - '.($location->school_name ?: '-'),
                 ];
                 $rows[] = [__('txn.name'), __('txn.unit'), __('txn.qty'), __('txn.price'), __('txn.subtotal')];
                 foreach ($locationItems as $item) {
@@ -668,10 +669,10 @@ class SchoolBulkTransactionPageController extends Controller
 
     private function generateTransactionNumber(Carbon $transactionDate): string
     {
-        $prefix = 'BLK-' . $transactionDate->format('dmY');
+        $prefix = 'BLK-'.$transactionDate->format('dmY');
         $lastNumber = SchoolBulkTransaction::query()
             ->whereDate('transaction_date', $transactionDate->toDateString())
-            ->where('transaction_number', 'like', $prefix . '-%')
+            ->where('transaction_number', 'like', $prefix.'-%')
             ->lockForUpdate()
             ->max('transaction_number');
 
@@ -686,10 +687,10 @@ class SchoolBulkTransactionPageController extends Controller
     private function generateInvoiceNumber(string $invoiceDate): string
     {
         $date = Carbon::parse($invoiceDate);
-        $prefix = 'INV-' . $date->format('dmY');
+        $prefix = 'INV-'.$date->format('dmY');
         $lastNumber = SalesInvoice::query()
             ->whereDate('invoice_date', $date->toDateString())
-            ->where('invoice_number', 'like', $prefix . '-%')
+            ->where('invoice_number', 'like', $prefix.'-%')
             ->lockForUpdate()
             ->max('invoice_number');
 

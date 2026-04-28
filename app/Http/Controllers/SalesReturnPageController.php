@@ -12,8 +12,8 @@ use App\Models\Product;
 use App\Models\SalesReturn;
 use App\Models\SalesReturnItem;
 use App\Models\StockMutation;
-use App\Services\AuditLogService;
 use App\Services\AccountingService;
+use App\Services\AuditLogService;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\CustomerPrintingSubtypeResolver;
@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SalesReturnPageController extends Controller
@@ -73,8 +74,8 @@ class SalesReturnPageController extends Controller
             ->withCustomerInfo()
             ->withInvoiceInfo()
             ->searchKeyword($search)
-            ->when($selectedStatus === 'active', fn($q) => $q->active())
-            ->when($selectedStatus === 'canceled', fn($q) => $q->canceled())
+            ->when($selectedStatus === 'active', fn ($q) => $q->active())
+            ->when($selectedStatus === 'canceled', fn ($q) => $q->canceled())
             ->when($selectedSemester !== null, function ($query) use ($selectedSemester): void {
                 $query->forSemester($selectedSemester);
             })
@@ -108,7 +109,7 @@ class SalesReturnPageController extends Controller
                     'semester' => trim((string) $salesReturn->semester_period),
                 ];
             })
-            ->filter(fn(array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
+            ->filter(fn (array $pair): bool => (int) ($pair['customer_id'] ?? 0) > 0 && (string) ($pair['semester'] ?? '') !== '')
             ->values();
         $customerSemesterLockMap = [];
         if ($lockPairs->isNotEmpty()) {
@@ -125,8 +126,8 @@ class SalesReturnPageController extends Controller
             }
         }
         $returnIds = collect($returns->items())
-            ->map(fn(SalesReturn $salesReturn): int => (int) $salesReturn->id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn (SalesReturn $salesReturn): int => (int) $salesReturn->id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $returnAdminActionMap = [];
         if ($returnIds->isNotEmpty()) {
@@ -194,7 +195,7 @@ class SalesReturnPageController extends Controller
         $initialCustomers = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_returns.customers', ['limit' => 20]),
             now()->addSeconds(60),
-            fn() => Customer::query()
+            fn () => Customer::query()
                 ->onlySalesFormColumns()
                 ->with('level:id,code,name')
                 ->orderBy('name')
@@ -215,13 +216,13 @@ class SalesReturnPageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $initialProducts = Cache::remember(
             AppCache::lookupCacheKey('forms.sales_returns.products', ['limit' => 20, 'active_only' => 1]),
             now()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlySalesFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -247,15 +248,15 @@ class SalesReturnPageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'return_date' => ['required', 'date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'reason' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'return_date' => FluentRule::date()->required(),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'reason' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
         ]);
         $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
         $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['return_date']);
@@ -340,7 +341,7 @@ class SalesReturnPageController extends Controller
                     'reference_id' => $salesReturn->id,
                     'mutation_type' => 'in',
                     'quantity' => $row['quantity'],
-                    'notes' => __('txn.return') . ' ' . $salesReturn->return_number,
+                    'notes' => __('txn.return').' '.$salesReturn->return_number,
                     'created_by_user_id' => null,
                 ]);
             }
@@ -351,7 +352,7 @@ class SalesReturnPageController extends Controller
                 entryDate: $returnDate,
                 amount: $total,
                 periodCode: $salesReturn->semester_period,
-                description: __('txn.return') . ' ' . $salesReturn->return_number,
+                description: __('txn.return').' '.$salesReturn->return_number,
                 transactionType: (string) $salesReturn->transaction_type,
                 printingSubtypeId: $salesReturn->customer_printing_subtype_id ? (int) $salesReturn->customer_printing_subtype_id : null,
                 printingSubtypeName: $salesReturn->printing_subtype_name,
@@ -404,8 +405,8 @@ class SalesReturnPageController extends Controller
         }
         $itemProductIds = $salesReturn->items
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $products = Product::query()
             ->onlySalesFormColumns()
@@ -432,15 +433,15 @@ class SalesReturnPageController extends Controller
     public function adminUpdate(Request $request, SalesReturn $salesReturn): RedirectResponse
     {
         $data = $request->validate([
-            'return_date' => ['required', 'date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'reason' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'return_date' => FluentRule::date()->required(),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'reason' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.unit_price' => FluentRule::numeric()->required()->min(0),
         ]);
 
         $auditBefore = '';
@@ -468,7 +469,7 @@ class SalesReturnPageController extends Controller
                 subtypeId: isset($data['customer_printing_subtype_id']) ? (int) $data['customer_printing_subtype_id'] : null,
             );
             $auditBefore = $return->items
-                ->map(fn(SalesReturnItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
+                ->map(fn (SalesReturnItem $item): string => "{$item->product_name}:qty{$item->quantity}:price".(int) round((float) $item->unit_price))
                 ->implode(' | ');
 
             $oldQtyByProduct = [];
@@ -540,8 +541,8 @@ class SalesReturnPageController extends Controller
                         'reference_id' => $return->id,
                         'mutation_type' => 'out',
                         'quantity' => $delta,
-                        'notes' => '[ADMIN EDIT ' . strtoupper(__('txn.return')) . '] '
-                            . __('txn.return') . ' ' . $return->return_number,
+                        'notes' => '[ADMIN EDIT '.strtoupper(__('txn.return')).'] '
+                            .__('txn.return').' '.$return->return_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 } else {
@@ -553,8 +554,8 @@ class SalesReturnPageController extends Controller
                         'reference_id' => $return->id,
                         'mutation_type' => 'in',
                         'quantity' => $inQty,
-                        'notes' => '[ADMIN EDIT ' . strtoupper(__('txn.return')) . '] '
-                            . __('txn.return') . ' ' . $return->return_number,
+                        'notes' => '[ADMIN EDIT '.strtoupper(__('txn.return')).'] '
+                            .__('txn.return').' '.$return->return_number,
                         'created_by_user_id' => auth()->id(),
                     ]);
                 }
@@ -616,8 +617,8 @@ class SalesReturnPageController extends Controller
                     entryDate: Carbon::parse((string) $data['return_date']),
                     amount: $difference,
                     periodCode: $return->semester_period,
-                    description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " +] "
-                        . __('txn.return') . ' ' . $return->return_number,
+                    description: '[ADMIN EDIT '.strtoupper(__('txn.return')).' +] '
+                        .__('txn.return').' '.$return->return_number,
                     transactionType: (string) $return->transaction_type,
                     printingSubtypeId: $return->customer_printing_subtype_id ? (int) $return->customer_printing_subtype_id : null,
                     printingSubtypeName: $return->printing_subtype_name,
@@ -629,8 +630,8 @@ class SalesReturnPageController extends Controller
                     entryDate: Carbon::parse((string) $data['return_date']),
                     amount: abs($difference),
                     periodCode: $return->semester_period,
-                    description: '[ADMIN EDIT ' . strtoupper(__('txn.return')) . " -] "
-                        . __('txn.return') . ' ' . $return->return_number,
+                    description: '[ADMIN EDIT '.strtoupper(__('txn.return')).' -] '
+                        .__('txn.return').' '.$return->return_number,
                     transactionType: (string) $return->transaction_type,
                     printingSubtypeId: $return->customer_printing_subtype_id ? (int) $return->customer_printing_subtype_id : null,
                     printingSubtypeName: $return->printing_subtype_name,
@@ -659,7 +660,7 @@ class SalesReturnPageController extends Controller
     public function cancel(Request $request, SalesReturn $salesReturn): RedirectResponse
     {
         $data = $request->validate([
-            'cancel_reason' => ['required', 'string', 'max:1000'],
+            'cancel_reason' => FluentRule::string()->required()->max(1000),
         ]);
 
         DB::transaction(function () use ($salesReturn, $data): void {
@@ -701,7 +702,7 @@ class SalesReturnPageController extends Controller
                     'reference_id' => $return->id,
                     'mutation_type' => 'out',
                     'quantity' => (int) $item->quantity,
-                    'notes' => __('txn.cancel') . ' ' . __('txn.return') . ' ' . $return->return_number,
+                    'notes' => __('txn.cancel').' '.__('txn.return').' '.$return->return_number,
                     'created_by_user_id' => auth()->id(),
                 ]);
             }
@@ -761,7 +762,7 @@ class SalesReturnPageController extends Controller
             'items',
         ]);
 
-        $filename = $salesReturn->return_number . '.pdf';
+        $filename = $salesReturn->return_number.'.pdf';
         $pdf = Pdf::loadView('sales_returns.print', [
             'salesReturn' => $salesReturn,
             'isPdf' => true,
@@ -777,10 +778,10 @@ class SalesReturnPageController extends Controller
             'items',
         ]);
 
-        $filename = $salesReturn->return_number . '.xlsx';
+        $filename = $salesReturn->return_number.'.xlsx';
 
         return response()->streamDownload(function () use ($salesReturn): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Retur');
             $address = \App\Support\PrintTextFormatter::wrapWords((string) ($salesReturn->customer?->address ?: ''), 5);
@@ -789,7 +790,7 @@ class SalesReturnPageController extends Controller
                 4
             );
             $rows = [];
-            $rows[] = [__('txn.return') . ' ' . __('txn.note_number'), $salesReturn->return_number];
+            $rows[] = [__('txn.return').' '.__('txn.note_number'), $salesReturn->return_number];
             $rows[] = [__('txn.date'), $salesReturn->return_date?->format('d-m-Y')];
             $rows[] = ['Semester', $salesReturn->semester_period ?: '-'];
             $rows[] = [__('txn.name'), $salesReturn->customer?->name ?: '-'];
@@ -835,7 +836,7 @@ class SalesReturnPageController extends Controller
 
     private function generateReturnNumber(string $date): string
     {
-        $prefix = 'RTR-' . date('dmY', strtotime($date));
+        $prefix = 'RTR-'.date('dmY', strtotime($date));
         $count = SalesReturn::query()
             ->whereDate('return_date', $date)
             ->lockForUpdate()
@@ -863,7 +864,7 @@ class SalesReturnPageController extends Controller
     {
         $levelCode = strtolower(trim((string) ($customer->level?->code ?? '')));
         $levelName = strtolower(trim((string) ($customer->level?->name ?? '')));
-        $combined = trim($levelCode . ' ' . $levelName);
+        $combined = trim($levelCode.' '.$levelName);
 
         if (str_contains($combined, 'agent') || str_contains($combined, 'agen')) {
             return (float) round((float) ($product->price_agent ?? $product->price_general ?? 0));

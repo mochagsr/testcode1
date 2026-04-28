@@ -25,7 +25,7 @@ abstract class BaseModelAuditObserver
     protected function logUpdated(Model $model): void
     {
         $changes = $model->getChanges();
-        if (!empty($changes)) {
+        if (! empty($changes)) {
             $this->auditLogService->log(
                 'updated',
                 $model,

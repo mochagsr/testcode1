@@ -6,7 +6,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
-use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
@@ -14,8 +13,8 @@ use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\StockMutation;
 use App\Models\Supplier;
-use App\Services\AuditLogService;
 use App\Services\AccountingService;
+use App\Services\AuditLogService;
 use App\Services\SupplierLedgerService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
@@ -32,6 +31,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OutgoingTransactionPageController extends Controller
@@ -123,8 +123,8 @@ class OutgoingTransactionPageController extends Controller
             ->sum('weight');
         $transactionAdminActionMap = [];
         $transactionIds = collect($transactions->items())
-            ->map(fn(OutgoingTransaction $transaction): int => (int) $transaction->id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn (OutgoingTransaction $transaction): int => (int) $transaction->id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         if ($transactionIds->isNotEmpty()) {
             $actionRows = AuditLog::query()
@@ -180,7 +180,7 @@ class OutgoingTransactionPageController extends Controller
             'supplierOptions' => Cache::remember(
                 AppCache::lookupCacheKey('outgoing_transactions.index.supplier_options'),
                 $now->copy()->addSeconds(60),
-                fn() => Supplier::query()->onlyLookupColumns()->orderBy('name')->get()
+                fn () => Supplier::query()->onlyLookupColumns()->orderBy('name')->get()
             ),
             'currentSemester' => $defaultSemester,
             'previousSemester' => $previousSemester,
@@ -209,7 +209,7 @@ class OutgoingTransactionPageController extends Controller
         $initialSuppliers = Cache::remember(
             AppCache::lookupCacheKey('forms.outgoing_transactions.suppliers', ['limit' => 20]),
             $now->copy()->addSeconds(60),
-            fn() => Supplier::query()
+            fn () => Supplier::query()
                 ->onlyLookupColumns()
                 ->orderBy('name')
                 ->limit(20)
@@ -228,13 +228,13 @@ class OutgoingTransactionPageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $initialProducts = Cache::remember(
             AppCache::lookupCacheKey('forms.outgoing_transactions.products', ['limit' => 20, 'active_only' => 1]),
             $now->copy()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlyOutgoingFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -251,7 +251,7 @@ class OutgoingTransactionPageController extends Controller
         $initialCategories = Cache::remember(
             AppCache::lookupCacheKey('forms.outgoing_transactions.item_categories', ['limit' => 200]),
             $now->copy()->addSeconds(60),
-            fn() => ItemCategory::query()
+            fn () => ItemCategory::query()
                 ->onlyListColumns()
                 ->orderBy('code')
                 ->limit(200)
@@ -271,24 +271,24 @@ class OutgoingTransactionPageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'transaction_date' => ['required', 'date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'note_number' => ['nullable', 'string', 'max:80'],
-            'supplier_invoice_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'items.*.product_name' => ['required', 'string', 'max:200'],
-            'items.*.item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
-            'items.*.unit' => ['nullable', 'string', 'max:30'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.weight' => ['nullable', 'numeric', 'min:0'],
-            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
-            'items.*.tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'items.*.tax_amount' => ['nullable', 'numeric', 'min:0'],
-            'items.*.tax_input_mode' => ['nullable', 'string', 'in:percent,amount'],
-            'items.*.notes' => ['nullable', 'string'],
+            'supplier_id' => FluentRule::integer()->required()->exists('suppliers', 'id'),
+            'transaction_date' => FluentRule::date()->required(),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'note_number' => FluentRule::string()->nullable()->max(80),
+            'supplier_invoice_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->nullable()->exists('products', 'id'),
+            'items.*.product_name' => FluentRule::string()->required()->max(200),
+            'items.*.item_category_id' => FluentRule::integer()->nullable()->exists('item_categories', 'id'),
+            'items.*.unit' => FluentRule::string()->nullable()->max(30),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.weight' => FluentRule::numeric()->nullable()->min(0),
+            'items.*.unit_cost' => FluentRule::numeric()->nullable()->min(0),
+            'items.*.tax_percent' => FluentRule::numeric()->nullable()->min(0)->max(100),
+            'items.*.tax_amount' => FluentRule::numeric()->nullable()->min(0),
+            'items.*.tax_input_mode' => FluentRule::string()->nullable()->in(['percent', 'amount']),
+            'items.*.notes' => FluentRule::string()->nullable(),
         ]);
         $selectedSemester = $this->normalizeSemesterPeriod(
             (string) ($data['semester_period'] ?? ''),
@@ -466,7 +466,7 @@ class OutgoingTransactionPageController extends Controller
 
             return $transaction;
         });
-        
+
         AppCache::forgetAfterFinancialMutation([(string) $transaction->transaction_date]);
 
         return redirect()
@@ -477,23 +477,23 @@ class OutgoingTransactionPageController extends Controller
     public function adminUpdate(Request $request, OutgoingTransaction $outgoingTransaction): RedirectResponse
     {
         $data = $request->validate([
-            'transaction_date' => ['required', 'date'],
-            'semester_period' => ['nullable', 'string', 'max:30'],
-            'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
-            'note_number' => ['nullable', 'string', 'max:80'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'items.*.product_name' => ['required', 'string', 'max:200'],
-            'items.*.item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
-            'items.*.unit' => ['nullable', 'string', 'max:30'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.weight' => ['nullable', 'numeric', 'min:0'],
-            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
-            'items.*.tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'items.*.tax_amount' => ['nullable', 'numeric', 'min:0'],
-            'items.*.tax_input_mode' => ['nullable', 'string', 'in:percent,amount'],
-            'items.*.notes' => ['nullable', 'string'],
+            'transaction_date' => FluentRule::date()->required(),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'supplier_id' => FluentRule::integer()->nullable()->exists('suppliers', 'id'),
+            'note_number' => FluentRule::string()->nullable()->max(80),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->nullable()->exists('products', 'id'),
+            'items.*.product_name' => FluentRule::string()->required()->max(200),
+            'items.*.item_category_id' => FluentRule::integer()->nullable()->exists('item_categories', 'id'),
+            'items.*.unit' => FluentRule::string()->nullable()->max(30),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.weight' => FluentRule::numeric()->nullable()->min(0),
+            'items.*.unit_cost' => FluentRule::numeric()->nullable()->min(0),
+            'items.*.tax_percent' => FluentRule::numeric()->nullable()->min(0)->max(100),
+            'items.*.tax_amount' => FluentRule::numeric()->nullable()->min(0),
+            'items.*.tax_input_mode' => FluentRule::string()->nullable()->in(['percent', 'amount']),
+            'items.*.notes' => FluentRule::string()->nullable(),
         ]);
 
         $auditBefore = '';
@@ -527,7 +527,7 @@ class OutgoingTransactionPageController extends Controller
                     $weightLabel = $weight !== null ? ":w{$weight}" : '';
                     $tax = (float) ($item->tax_percent ?? 0);
 
-                    return "{$item->product_name}:qty{$item->quantity}{$weightLabel}:cost" . (int) round((float) $item->unit_cost) . ":ppn{$tax}";
+                    return "{$item->product_name}:qty{$item->quantity}{$weightLabel}:cost".(int) round((float) $item->unit_cost).":ppn{$tax}";
                 })
                 ->implode(' | ');
 
@@ -786,12 +786,12 @@ class OutgoingTransactionPageController extends Controller
     public function closeSupplierSemester(Request $request, Supplier $supplier): RedirectResponse
     {
         $data = $request->validate([
-            'year' => ['required', 'string', 'size:4'],
-            'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'search' => ['nullable', 'string'],
-            'supplier_id' => ['nullable', 'integer'],
-            'transaction_date' => ['nullable', 'date'],
-            'semester' => ['nullable', 'string'],
+            'year' => FluentRule::string()->required()->rule('size:4'),
+            'month' => FluentRule::integer()->required()->min(1)->max(12),
+            'search' => FluentRule::string()->nullable(),
+            'supplier_id' => FluentRule::integer()->nullable(),
+            'transaction_date' => FluentRule::date()->nullable(),
+            'semester' => FluentRule::string()->nullable(),
         ]);
 
         $year = $this->semesterBookService->normalizeYear((string) ($data['year'] ?? ''));
@@ -822,12 +822,12 @@ class OutgoingTransactionPageController extends Controller
     public function openSupplierSemester(Request $request, Supplier $supplier): RedirectResponse
     {
         $data = $request->validate([
-            'year' => ['required', 'string', 'size:4'],
-            'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'search' => ['nullable', 'string'],
-            'supplier_id' => ['nullable', 'integer'],
-            'transaction_date' => ['nullable', 'date'],
-            'semester' => ['nullable', 'string'],
+            'year' => FluentRule::string()->required()->rule('size:4'),
+            'month' => FluentRule::integer()->required()->min(1)->max(12),
+            'search' => FluentRule::string()->nullable(),
+            'supplier_id' => FluentRule::integer()->nullable(),
+            'transaction_date' => FluentRule::date()->nullable(),
+            'semester' => FluentRule::string()->nullable(),
         ]);
 
         $year = $this->semesterBookService->normalizeYear((string) ($data['year'] ?? ''));
@@ -864,8 +864,8 @@ class OutgoingTransactionPageController extends Controller
         ]);
         $itemProductIds = $outgoingTransaction->items
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $products = Product::query()
             ->onlyOutgoingFormColumns()
@@ -913,7 +913,7 @@ class OutgoingTransactionPageController extends Controller
             'isPdf' => true,
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download($outgoingTransaction->transaction_number . '-' . $this->nowWib()->format('Ymd-His') . '.pdf');
+        return $pdf->download($outgoingTransaction->transaction_number.'-'.$this->nowWib()->format('Ymd-His').'.pdf');
     }
 
     public function exportExcel(OutgoingTransaction $outgoingTransaction): StreamedResponse
@@ -924,13 +924,13 @@ class OutgoingTransactionPageController extends Controller
             'items.product:id,code,name,unit',
         ]);
 
-        $filename = $outgoingTransaction->transaction_number . '-' . $this->nowWib()->format('Ymd-His') . '.xlsx';
+        $filename = $outgoingTransaction->transaction_number.'-'.$this->nowWib()->format('Ymd-His').'.xlsx';
 
         return response()->streamDownload(function () use ($outgoingTransaction): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Tanda Terima Barang');
-            $totalWeight = (float) $outgoingTransaction->items->sum(fn($item) => (float) ($item->weight ?? 0));
+            $totalWeight = (float) $outgoingTransaction->items->sum(fn ($item) => (float) ($item->weight ?? 0));
             $address = \App\Support\PrintTextFormatter::wrapWords((string) ($outgoingTransaction->supplier?->address ?: ''), 5);
             $notes = \App\Support\PrintTextFormatter::wrapWords(
                 trim((string) ($outgoingTransaction->notes ?: \App\Models\AppSetting::getValue('company_invoice_notes', ''))),
@@ -1027,10 +1027,10 @@ class OutgoingTransactionPageController extends Controller
     private function generateTransactionNumber(string $date): string
     {
         $formattedDate = Carbon::parse($date)->format('dmY');
-        $prefix = 'TRXK-' . $formattedDate . '-';
+        $prefix = 'TRXK-'.$formattedDate.'-';
 
         $lastNumber = OutgoingTransaction::query()
-            ->where('transaction_number', 'like', $prefix . '%')
+            ->where('transaction_number', 'like', $prefix.'%')
             ->max('transaction_number');
 
         $sequence = 1;
@@ -1039,7 +1039,7 @@ class OutgoingTransactionPageController extends Controller
             $sequence = $suffix + 1;
         }
 
-        return $prefix . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
     }
 
     private function semesterBookService(): SemesterBookService
@@ -1162,8 +1162,7 @@ class OutgoingTransactionPageController extends Controller
         float $taxPercent,
         mixed $taxAmount = null,
         string $taxInputMode = 'percent'
-    ): array
-    {
+    ): array {
         $resolvedUnitCost = max(0, (int) round($unitCost));
         $lineSubtotal = max(0, $quantity) * $resolvedUnitCost;
         $resolvedTaxPercent = round(max(0, min(100, $taxPercent)), 2);

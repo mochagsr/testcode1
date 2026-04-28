@@ -5,10 +5,10 @@ namespace App\Http\Middleware;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\OrderNote;
+use App\Models\OutgoingTransaction;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
-use App\Models\OutgoingTransaction;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
 use App\Support\SemesterBookService;
@@ -21,8 +21,7 @@ class EnsureSemesterOpen
 {
     public function __construct(
         private readonly SemesterBookService $semesterBookService
-    ) {
-    }
+    ) {}
 
     /**
      * Handle an incoming request.

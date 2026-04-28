@@ -13,8 +13,6 @@ enum InvoicePaymentStatus: string
 
     /**
      * Get a human-readable label for the status.
-     *
-     * @return string
      */
     public function label(): string
     {

@@ -769,10 +769,10 @@ class SemesterBookService
 
         $this->closedSemestersCache = $this->sortSemesterCollection(
             collect(preg_split('/[\r\n,]+/', (string) AppSetting::getValue('closed_semester_periods', '')) ?: [])
-            ->map(fn (string $item): string => trim($item))
-            ->map(fn (string $item): ?string => $this->normalizeSemester($item))
-            ->filter(fn (?string $item): bool => $item !== null)
-            ->values()
+                ->map(fn (string $item): string => trim($item))
+                ->map(fn (string $item): ?string => $this->normalizeSemester($item))
+                ->filter(fn (?string $item): bool => $item !== null)
+                ->values()
         )->all();
 
         return $this->closedSemestersCache;
@@ -905,14 +905,17 @@ class SemesterBookService
             $expectedEndYear = ($startYear2D + 1) % 100;
             if ($endYear2D !== $expectedEndYear) {
                 $this->normalizeSemesterCache[$value] = null;
+
                 return $this->normalizeSemesterCache[$value];
             }
 
             $this->normalizeSemesterCache[$value] = sprintf('S%d-%02d%02d', $semesterNo, $startYear2D, $endYear2D);
+
             return $this->normalizeSemesterCache[$value];
         }
 
         $this->normalizeSemesterCache[$value] = null;
+
         return $this->normalizeSemesterCache[$value];
     }
 
@@ -931,6 +934,7 @@ class SemesterBookService
             $parsed = Carbon::parse($value);
         } catch (\Throwable) {
             $this->semesterFromDateCache[$value] = null;
+
             return $this->semesterFromDateCache[$value];
         }
 
@@ -943,6 +947,7 @@ class SemesterBookService
             $startYear = $year;
             $endYear = $year + 1;
             $this->semesterFromDateCache[$value] = sprintf('S1-%02d%02d', $startYear % 100, $endYear % 100);
+
             return $this->semesterFromDateCache[$value];
         }
 
@@ -950,6 +955,7 @@ class SemesterBookService
             $startYear = $year;
             $endYear = $year + 1;
             $this->semesterFromDateCache[$value] = sprintf('S2-%02d%02d', $startYear % 100, $endYear % 100);
+
             return $this->semesterFromDateCache[$value];
         }
 
@@ -957,6 +963,7 @@ class SemesterBookService
         $startYear = $year - 1;
         $endYear = $year;
         $this->semesterFromDateCache[$value] = sprintf('S2-%02d%02d', $startYear % 100, $endYear % 100);
+
         return $this->semesterFromDateCache[$value];
     }
 
@@ -978,6 +985,7 @@ class SemesterBookService
 
             $prevStartYear = $startYear - 1;
             $prevEndYear = $endYear - 1;
+
             return sprintf('S2-%02d%02d', $prevStartYear % 100, $prevEndYear % 100);
         }
 

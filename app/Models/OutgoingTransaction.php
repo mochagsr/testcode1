@@ -119,7 +119,6 @@ class OutgoingTransaction extends Model
      * Scope: Filter by semester period.
      *
      * @param  Builder<OutgoingTransaction>  $query
-     * @param  string  $semester
      * @return Builder<OutgoingTransaction>
      */
     public function scopeForSemester(Builder $query, string $semester): Builder

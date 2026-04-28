@@ -9,10 +9,8 @@ use App\Models\Product;
 use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Services\AuditLogService;
-use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
 use App\Support\ProductCodeGenerator;
-use App\Support\PrintTextFormatter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -22,9 +20,10 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupplierStockCardPageController extends Controller
@@ -58,7 +57,7 @@ class SupplierStockCardPageController extends Controller
         $filename = $this->buildReportFileName($data).'.xlsx';
 
         return response()->streamDownload(function () use ($data): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Kartu Stok Supplier');
 
@@ -91,7 +90,7 @@ class SupplierStockCardPageController extends Controller
                 __('supplier_stock.total_out'),
                 __('supplier_stock.total_balance'),
             ]], null, 'A'.$summaryHeaderRow);
-            $summaryRows = $data['summaryRows']->map(fn(array $row): array => [
+            $summaryRows = $data['summaryRows']->map(fn (array $row): array => [
                 (string) ($row['supplier_name'] ?? '-'),
                 (string) ($row['category_name'] ?? '-'),
                 (string) ($row['product_name'] ?? '-'),
@@ -129,7 +128,7 @@ class SupplierStockCardPageController extends Controller
                     __('supplier_stock.out'),
                     __('supplier_stock.balance'),
                 ]], null, 'A'.$movementHeaderRow);
-                $movementRows = $data['movements']->map(fn(array $row): array => [
+                $movementRows = $data['movements']->map(fn (array $row): array => [
                     date('d-m-Y', strtotime((string) $row['event_date'])),
                     (string) ($row['category_name'] ?? '-'),
                     trim(((string) ($row['product_code'] ?? '')) !== '' ? ((string) $row['product_code'].' - '.(string) $row['product_name']) : (string) ($row['product_name'] ?? '-')),
@@ -156,7 +155,7 @@ class SupplierStockCardPageController extends Controller
     }
 
     /**
-     * @param Collection<int, array<string, mixed>> $summaryRows
+     * @param  Collection<int, array<string, mixed>>  $summaryRows
      * @return Collection<int, array<string, mixed>>
      */
     private function attachEditableProductIds(Collection $summaryRows): Collection
@@ -167,13 +166,13 @@ class SupplierStockCardPageController extends Controller
         }
 
         $codeKeys = $rows
-            ->filter(fn(array $row): bool => (int) ($row['product_id'] ?? 0) <= 0 && trim((string) ($row['product_code'] ?? '')) !== '')
-            ->map(fn(array $row): string => mb_strtolower(trim((string) ($row['product_code'] ?? ''))))
+            ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) <= 0 && trim((string) ($row['product_code'] ?? '')) !== '')
+            ->map(fn (array $row): string => mb_strtolower(trim((string) ($row['product_code'] ?? ''))))
             ->unique()
             ->values();
         $nameKeys = $rows
-            ->filter(fn(array $row): bool => (int) ($row['product_id'] ?? 0) <= 0 && trim((string) ($row['product_name'] ?? '')) !== '')
-            ->map(fn(array $row): string => mb_strtolower(trim((string) ($row['product_name'] ?? ''))))
+            ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) <= 0 && trim((string) ($row['product_name'] ?? '')) !== '')
+            ->map(fn (array $row): string => mb_strtolower(trim((string) ($row['product_name'] ?? ''))))
             ->unique()
             ->values();
 
@@ -198,11 +197,11 @@ class SupplierStockCardPageController extends Controller
             ->get();
 
         $productByCode = $products
-            ->filter(fn(Product $product): bool => trim((string) $product->code) !== '')
-            ->groupBy(fn(Product $product): string => mb_strtolower(trim((string) $product->code)));
+            ->filter(fn (Product $product): bool => trim((string) $product->code) !== '')
+            ->groupBy(fn (Product $product): string => mb_strtolower(trim((string) $product->code)));
         $productByName = $products
-            ->filter(fn(Product $product): bool => trim((string) $product->name) !== '')
-            ->groupBy(fn(Product $product): string => mb_strtolower(trim((string) $product->name)));
+            ->filter(fn (Product $product): bool => trim((string) $product->name) !== '')
+            ->groupBy(fn (Product $product): string => mb_strtolower(trim((string) $product->name)));
 
         return $rows->map(function (array $row) use ($productByCode, $productByName): array {
             $baseProductId = (int) ($row['product_id'] ?? 0);
@@ -235,8 +234,8 @@ class SupplierStockCardPageController extends Controller
     }
 
     /**
-     * @param Collection<int, array<string, mixed>> $summaryRows
-     * @param Collection<int, array<string, mixed>> $movements
+     * @param  Collection<int, array<string, mixed>>  $summaryRows
+     * @param  Collection<int, array<string, mixed>>  $movements
      * @return array{0: Collection<int, array<string, mixed>>, 1: Collection<int, array<string, mixed>>}
      */
     private function attachCategoryLabels(Collection $summaryRows, Collection $movements): array
@@ -251,10 +250,10 @@ class SupplierStockCardPageController extends Controller
                 return (int) ($row['product_id'] ?? 0);
             });
         $movementProductIds = $movements
-            ->map(fn(array $row): int => (int) ($row['product_id'] ?? 0));
+            ->map(fn (array $row): int => (int) ($row['product_id'] ?? 0));
         $productIds = $summaryProductIds
             ->merge($movementProductIds)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values();
 
@@ -295,14 +294,14 @@ class SupplierStockCardPageController extends Controller
     public function updateStock(Request $request): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
-            'product_id' => ['nullable', 'integer'],
-            'product_code' => ['nullable', 'string', 'max:60'],
-            'product_name' => ['required', 'string', 'max:200'],
-            'stock' => ['required', 'integer', 'min:0'],
-            'supplier_id' => ['nullable', 'integer'],
-            'search' => ['nullable', 'string'],
-            'date_from' => ['nullable', 'string'],
-            'date_to' => ['nullable', 'string'],
+            'product_id' => FluentRule::integer()->nullable(),
+            'product_code' => FluentRule::string()->nullable()->max(60),
+            'product_name' => FluentRule::string()->required()->max(200),
+            'stock' => FluentRule::integer()->required()->min(0),
+            'supplier_id' => FluentRule::integer()->nullable(),
+            'search' => FluentRule::string()->nullable(),
+            'date_from' => FluentRule::string()->nullable(),
+            'date_to' => FluentRule::string()->nullable(),
         ]);
         $flashMeta = [
             'type' => 'edit',
@@ -320,6 +319,7 @@ class SupplierStockCardPageController extends Controller
                 $supplierDelta = $targetStock - $displayStockBefore;
                 if ($supplierDelta === 0) {
                     $flashMeta = $this->buildSupplierStockFlashMeta($product, $displayStockBefore, $targetStock);
+
                     return [
                         'product' => $product,
                         'display_stock' => $displayStockBefore,
@@ -361,6 +361,7 @@ class SupplierStockCardPageController extends Controller
 
             if ($oldStock === $targetStock) {
                 $flashMeta = $this->buildSupplierStockFlashMeta($product, $oldStock, $targetStock);
+
                 return [
                     'product' => $product,
                     'display_stock' => $oldStock,
@@ -425,7 +426,7 @@ class SupplierStockCardPageController extends Controller
         }
 
         return redirect()
-            ->route('supplier-stock-cards.index', array_filter($query, fn($value): bool => $value !== null && $value !== ''))
+            ->route('supplier-stock-cards.index', array_filter($query, fn ($value): bool => $value !== null && $value !== ''))
             ->with('success', (string) ($flashMeta['message'] ?? __('supplier_stock.stock_updated_success', ['product' => $product->name])))
             ->with('success_type', (string) ($flashMeta['type'] ?? 'edit'));
     }
@@ -495,6 +496,7 @@ class SupplierStockCardPageController extends Controller
             if (strcasecmp($code, $name) === 0) {
                 return $name;
             }
+
             return "{$code} - {$name}";
         }
         if ($name !== '') {
@@ -508,7 +510,7 @@ class SupplierStockCardPageController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function resolveProductForStockUpdate(array $data): Product
     {
@@ -688,7 +690,7 @@ class SupplierStockCardPageController extends Controller
             ->map(function (array $row) use ($supplierNameMap): array {
                 $supplierId = (int) ($row['supplier_id'] ?? 0);
                 $row['supplier_name'] = (string) ($supplierNameMap->get($supplierId) ?? '-');
-                $row['sort_key'] = mb_strtolower($row['supplier_name'] . '|' . (string) ($row['product_name'] ?? ''));
+                $row['sort_key'] = mb_strtolower($row['supplier_name'].'|'.(string) ($row['product_name'] ?? ''));
 
                 return $row;
             })
@@ -711,7 +713,7 @@ class SupplierStockCardPageController extends Controller
 
         $movementPaginator = $selectedSupplierIdOrNull !== null
             ? $this->paginateCollection(
-                $movements->sortByDesc(fn(array $row): string => $row['sort_key']),
+                $movements->sortByDesc(fn (array $row): string => $row['sort_key']),
                 (int) config('pagination.default_per_page', 20),
                 'movement_page',
                 $request
@@ -765,14 +767,14 @@ class SupplierStockCardPageController extends Controller
             'dateFrom' => $pageData['dateFrom'],
             'dateTo' => $pageData['dateTo'],
             'search' => $pageData['search'],
-            'movements' => $pageData['movements']->sortByDesc(fn(array $row): string => $row['sort_key'])->values(),
+            'movements' => $pageData['movements']->sortByDesc(fn (array $row): string => $row['sort_key'])->values(),
             'summaryRows' => $pageData['summaryRows']->sortBy('sort_key')->values(),
             'totals' => $pageData['totals'],
         ];
     }
 
     /**
-     * @param array{selectedSupplier:?Supplier,selectedProductLabel:string,dateFrom:?string,dateTo:?string} $data
+     * @param  array{selectedSupplier:?Supplier,selectedProductLabel:string,dateFrom:?string,dateTo:?string}  $data
      */
     private function buildReportFileName(array $data): string
     {
@@ -826,7 +828,7 @@ class SupplierStockCardPageController extends Controller
     }
 
     /**
-     * @param array{byCode: array<string, array{id:int, code:string, name:string}>, byName: array<string, array{id:int, code:string, name:string}>} $lookup
+     * @param  array{byCode: array<string, array{id:int, code:string, name:string}>, byName: array<string, array{id:int, code:string, name:string}>}  $lookup
      * @return array{product_id: ?int, product_code: string, product_name: string, product_key: string}
      */
     private function mapEventProductIdentity(
@@ -882,7 +884,7 @@ class SupplierStockCardPageController extends Controller
         }
 
         [, $summaryRows] = $this->buildStockCardData($supplierId, null, '', null, null);
-        $matchedById = $summaryRows->first(fn(array $row): bool => (int) ($row['product_id'] ?? 0) === (int) $product->id);
+        $matchedById = $summaryRows->first(fn (array $row): bool => (int) ($row['product_id'] ?? 0) === (int) $product->id);
         if (is_array($matchedById)) {
             return max(0, (int) ($matchedById['balance'] ?? 0));
         }
@@ -921,10 +923,10 @@ class SupplierStockCardPageController extends Controller
         $manualSupplierEvents = DB::table('stock_mutations as sm')
             ->join('products as p', 'p.id', '=', 'sm.product_id')
             ->where('sm.reference_type', Supplier::class)
-            ->when($selectedSupplierId !== null, fn($query) => $query->where('sm.reference_id', $selectedSupplierId))
-            ->when($selectedProductId !== null, fn($query) => $query->where('sm.product_id', $selectedProductId))
-            ->when($dateFrom !== null, fn($query) => $query->whereDate('sm.created_at', '>=', $dateFrom))
-            ->when($dateTo !== null, fn($query) => $query->whereDate('sm.created_at', '<=', $dateTo))
+            ->when($selectedSupplierId !== null, fn ($query) => $query->where('sm.reference_id', $selectedSupplierId))
+            ->when($selectedProductId !== null, fn ($query) => $query->where('sm.product_id', $selectedProductId))
+            ->when($dateFrom !== null, fn ($query) => $query->whereDate('sm.created_at', '>=', $dateFrom))
+            ->when($dateTo !== null, fn ($query) => $query->whereDate('sm.created_at', '<=', $dateTo))
             ->select([
                 DB::raw('DATE(sm.created_at) as event_date'),
                 DB::raw('sm.id as reference_id'),
@@ -944,8 +946,8 @@ class SupplierStockCardPageController extends Controller
         $incomingEvents = DB::table('outgoing_transaction_items as oti')
             ->join('outgoing_transactions as ot', 'ot.id', '=', 'oti.outgoing_transaction_id')
             ->whereNull('ot.deleted_at')
-            ->when($selectedProductId !== null, fn($query) => $query->where('oti.product_id', $selectedProductId))
-            ->when($dateTo !== null, fn($query) => $query->whereDate('ot.transaction_date', '<=', $dateTo))
+            ->when($selectedProductId !== null, fn ($query) => $query->where('oti.product_id', $selectedProductId))
+            ->when($dateTo !== null, fn ($query) => $query->whereDate('ot.transaction_date', '<=', $dateTo))
             ->select([
                 'ot.transaction_date as event_date',
                 'ot.id as reference_id',
@@ -966,8 +968,8 @@ class SupplierStockCardPageController extends Controller
             ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
             ->whereNull('si.deleted_at')
             ->where('si.is_canceled', false)
-            ->when($selectedProductId !== null, fn($query) => $query->where('sii.product_id', $selectedProductId))
-            ->when($dateTo !== null, fn($query) => $query->whereDate('si.invoice_date', '<=', $dateTo))
+            ->when($selectedProductId !== null, fn ($query) => $query->where('sii.product_id', $selectedProductId))
+            ->when($dateTo !== null, fn ($query) => $query->whereDate('si.invoice_date', '<=', $dateTo))
             ->select([
                 'si.invoice_date as event_date',
                 'si.id as reference_id',
@@ -986,8 +988,8 @@ class SupplierStockCardPageController extends Controller
             ->join('sales_returns as sr', 'sr.id', '=', 'sri.sales_return_id')
             ->whereNull('sr.deleted_at')
             ->where('sr.is_canceled', false)
-            ->when($selectedProductId !== null, fn($query) => $query->where('sri.product_id', $selectedProductId))
-            ->when($dateTo !== null, fn($query) => $query->whereDate('sr.return_date', '<=', $dateTo))
+            ->when($selectedProductId !== null, fn ($query) => $query->where('sri.product_id', $selectedProductId))
+            ->when($dateTo !== null, fn ($query) => $query->whereDate('sr.return_date', '<=', $dateTo))
             ->select([
                 'sr.return_date as event_date',
                 'sr.id as reference_id',
@@ -1105,7 +1107,7 @@ class SupplierStockCardPageController extends Controller
         }
 
         $events = $events
-            ->sortBy(fn(array $event): string => sprintf(
+            ->sortBy(fn (array $event): string => sprintf(
                 '%s|%d|%010d',
                 $event['event_date'],
                 $event['priority'],
@@ -1180,6 +1182,7 @@ class SupplierStockCardPageController extends Controller
                     balanceAfter: (int) $runningBalances[$supplierId][$productKey],
                     sequence: $sequence++
                 ));
+
                 continue;
             }
 
@@ -1232,6 +1235,7 @@ class SupplierStockCardPageController extends Controller
                     balanceAfter: (int) $runningBalances[$supplierId][$productKey],
                     sequence: $sequence++
                 ));
+
                 continue;
             }
 
@@ -1252,6 +1256,7 @@ class SupplierStockCardPageController extends Controller
                     if ($poolRemaining <= 0) {
                         $poolOffsetByProduct[$productKey] = $offset + 1;
                         unset($pool);
+
                         continue;
                     }
 
@@ -1261,6 +1266,7 @@ class SupplierStockCardPageController extends Controller
                     $supplierId = (int) ($pool['supplier_id'] ?? 0);
                     if ($supplierId <= 0) {
                         unset($pool);
+
                         continue;
                     }
 
@@ -1313,6 +1319,7 @@ class SupplierStockCardPageController extends Controller
                     }
                     unset($pool);
                 }
+
                 continue;
             }
 
@@ -1326,6 +1333,7 @@ class SupplierStockCardPageController extends Controller
                     $stackQty = (int) ($stackRow['quantity'] ?? 0);
                     if ($stackQty <= 0) {
                         array_pop($consumedStacks[$productKey]);
+
                         continue;
                     }
 
@@ -1386,13 +1394,13 @@ class SupplierStockCardPageController extends Controller
 
         if ($selectedProductId !== null) {
             $movements = $movements
-                ->filter(fn(array $row): bool => (int) ($row['product_id'] ?? 0) === $selectedProductId)
+                ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) === $selectedProductId)
                 ->values();
         }
 
         if ($dateFrom !== null) {
             $movements = $movements
-                ->filter(fn(array $row): bool => (string) $row['event_date'] >= $dateFrom)
+                ->filter(fn (array $row): bool => (string) $row['event_date'] >= $dateFrom)
                 ->values();
         }
 
@@ -1428,7 +1436,7 @@ class SupplierStockCardPageController extends Controller
         }
         if ($selectedProductId !== null) {
             $summaryRows = $summaryRows
-                ->filter(fn(array $row): bool => (int) ($row['product_id'] ?? 0) === $selectedProductId)
+                ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) === $selectedProductId)
                 ->values();
         }
         if ($search !== '') {
@@ -1486,18 +1494,18 @@ class SupplierStockCardPageController extends Controller
     private function resolveProductKey(?int $productId, string $productCode, string $productName): string
     {
         if ($productId !== null && $productId > 0) {
-            return 'id:' . $productId;
+            return 'id:'.$productId;
         }
 
         $code = mb_strtolower(trim($productCode));
         $name = mb_strtolower(trim($productName));
-        $base = trim($code . '|' . $name, '|');
+        $base = trim($code.'|'.$name, '|');
 
-        return $base !== '' ? 'manual:' . $base : '';
+        return $base !== '' ? 'manual:'.$base : '';
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, array<string, mixed>> $items
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $items
      */
     private function paginateCollection(
         $items,

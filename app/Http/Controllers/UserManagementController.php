@@ -9,7 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
+use SanderMuller\FluentValidation\FluentRule;
 
 class UserManagementController extends Controller
 {
@@ -40,16 +40,16 @@ class UserManagementController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,user'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', Rule::in($this->availablePermissions())],
-            'locale' => ['required', 'in:id,en'],
-            'theme' => ['required', 'in:light,dark'],
-            'finance_locked' => ['nullable', 'boolean'],
+            'name' => FluentRule::string()->required()->max(255),
+            'username' => FluentRule::string()->required()->min(3)->max(50)->regex('/^[A-Za-z0-9._-]+$/')->unique('users', 'username'),
+            'email' => FluentRule::email()->required()->max(255)->unique('users', 'email'),
+            'password' => FluentRule::string()->required()->min(6),
+            'role' => FluentRule::field()->required()->rule('in:admin,user'),
+            'permissions' => FluentRule::array()->nullable(),
+            'permissions.*' => FluentRule::string()->in($this->availablePermissions()),
+            'locale' => FluentRule::field()->required()->rule('in:id,en'),
+            'theme' => FluentRule::field()->required()->rule('in:light,dark'),
+            'finance_locked' => FluentRule::boolean()->nullable(),
         ]);
 
         User::create([
@@ -78,16 +78,16 @@ class UserManagementController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['nullable', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,user'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', Rule::in($this->availablePermissions())],
-            'locale' => ['required', 'in:id,en'],
-            'theme' => ['required', 'in:light,dark'],
-            'finance_locked' => ['nullable', 'boolean'],
+            'name' => FluentRule::string()->required()->max(255),
+            'username' => FluentRule::string()->required()->min(3)->max(50)->regex('/^[A-Za-z0-9._-]+$/')->unique('users', 'username', fn ($rule) => $rule->ignore($user->id)),
+            'email' => FluentRule::email()->required()->max(255)->unique('users', 'email', fn ($rule) => $rule->ignore($user->id)),
+            'password' => FluentRule::string()->nullable()->min(6),
+            'role' => FluentRule::field()->required()->rule('in:admin,user'),
+            'permissions' => FluentRule::array()->nullable(),
+            'permissions.*' => FluentRule::string()->in($this->availablePermissions()),
+            'locale' => FluentRule::field()->required()->rule('in:id,en'),
+            'theme' => FluentRule::field()->required()->rule('in:light,dark'),
+            'finance_locked' => FluentRule::boolean()->nullable(),
         ]);
 
         $payload = [

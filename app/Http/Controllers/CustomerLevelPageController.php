@@ -8,7 +8,7 @@ use App\Models\CustomerLevel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use SanderMuller\FluentValidation\FluentRule;
 
 class CustomerLevelPageController extends Controller
 {
@@ -68,14 +68,8 @@ class CustomerLevelPageController extends Controller
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         $data = $request->validate([
-            'code' => [
-                'required',
-                'string',
-                'max:30',
-                Rule::unique('customer_levels', 'code')->ignore($ignoreId),
-                Rule::unique('customer_levels', 'name')->ignore($ignoreId),
-            ],
-            'description' => ['nullable', 'string'],
+            'code' => FluentRule::string()->required()->max(30)->unique('customer_levels', 'code', fn ($rule) => $rule->ignore($ignoreId))->unique('customer_levels', 'name', fn ($rule) => $rule->ignore($ignoreId)),
+            'description' => FluentRule::string()->nullable(),
         ]);
 
         // Keep compatibility with existing schema that still has `name`.

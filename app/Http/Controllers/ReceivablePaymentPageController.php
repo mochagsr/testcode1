@@ -8,8 +8,8 @@ use App\Models\Customer;
 use App\Models\InvoicePayment;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
-use App\Services\ReceivableLedgerService;
 use App\Services\AccountingService;
+use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
@@ -21,9 +21,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceivablePaymentPageController extends Controller
@@ -52,9 +53,9 @@ class ReceivablePaymentPageController extends Controller
             ->onlyListColumns()
             ->withCustomerInfo()
             ->searchKeyword($search)
-            ->when($selectedStatus === 'active', fn($query) => $query->active())
-            ->when($selectedStatus === 'canceled', fn($query) => $query->canceled())
-            ->when($selectedPaymentDateRange !== null, fn($query) => $query->betweenDates(
+            ->when($selectedStatus === 'active', fn ($query) => $query->active())
+            ->when($selectedStatus === 'canceled', fn ($query) => $query->canceled())
+            ->when($selectedPaymentDateRange !== null, fn ($query) => $query->betweenDates(
                 $selectedPaymentDateRange[0],
                 $selectedPaymentDateRange[1]
             ))
@@ -93,7 +94,7 @@ class ReceivablePaymentPageController extends Controller
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.receivable_payments.customers', ['limit' => 20]),
             $now->copy()->addSeconds(60),
-            fn() => Customer::query()
+            fn () => Customer::query()
                 ->onlyReceivableFormColumns()
                 ->orderBy('name')
                 ->limit(20)
@@ -123,15 +124,15 @@ class ReceivablePaymentPageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'payment_date' => ['required', 'date'],
-            'customer_address' => ['nullable', 'string', 'max:255'],
-            'amount' => ['required', 'integer', 'min:1'],
-            'preferred_invoice_id' => ['nullable', 'integer', 'exists:sales_invoices,id'],
-            'return_to' => ['nullable', 'string', 'max:500'],
-            'customer_signature' => ['required', 'string', 'max:120'],
-            'user_signature' => ['required', 'string', 'max:120'],
-            'notes' => ['nullable', 'string'],
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'payment_date' => FluentRule::date()->required(),
+            'customer_address' => FluentRule::string()->nullable()->max(255),
+            'amount' => FluentRule::integer()->required()->min(1),
+            'preferred_invoice_id' => FluentRule::integer()->nullable()->exists('sales_invoices', 'id'),
+            'return_to' => FluentRule::string()->nullable()->max(500),
+            'customer_signature' => FluentRule::string()->required()->max(120),
+            'user_signature' => FluentRule::string()->required()->max(120),
+            'notes' => FluentRule::string()->nullable(),
         ]);
 
         $payment = DB::transaction(function () use ($data): ReceivablePayment {
@@ -170,7 +171,7 @@ class ReceivablePaymentPageController extends Controller
                 $preferred = $invoices->firstWhere('id', $preferredInvoiceId);
                 if ($preferred) {
                     $invoices = collect([$preferred])->concat(
-                        $invoices->reject(fn(SalesInvoice $invoice): bool => (int) $invoice->id === $preferredInvoiceId)
+                        $invoices->reject(fn (SalesInvoice $invoice): bool => (int) $invoice->id === $preferredInvoiceId)
                     )->values();
                 }
             }
@@ -272,11 +273,11 @@ class ReceivablePaymentPageController extends Controller
     public function adminUpdate(Request $request, ReceivablePayment $receivablePayment): RedirectResponse
     {
         $data = $request->validate([
-            'payment_date' => ['required', 'date'],
-            'customer_address' => ['nullable', 'string', 'max:255'],
-            'customer_signature' => ['required', 'string', 'max:120'],
-            'user_signature' => ['required', 'string', 'max:120'],
-            'notes' => ['nullable', 'string'],
+            'payment_date' => FluentRule::date()->required(),
+            'customer_address' => FluentRule::string()->nullable()->max(255),
+            'customer_signature' => FluentRule::string()->required()->max(120),
+            'user_signature' => FluentRule::string()->required()->max(120),
+            'notes' => FluentRule::string()->nullable(),
         ]);
 
         $receivablePayment->update([
@@ -296,7 +297,7 @@ class ReceivablePaymentPageController extends Controller
     public function cancel(Request $request, ReceivablePayment $receivablePayment): RedirectResponse
     {
         $data = $request->validate([
-            'cancel_reason' => ['required', 'string', 'max:1000'],
+            'cancel_reason' => FluentRule::string()->required()->max(1000),
         ]);
 
         DB::transaction(function () use ($receivablePayment, $data): void {
@@ -408,7 +409,7 @@ class ReceivablePaymentPageController extends Controller
     {
         $receivablePayment->load('customer:id,name,city,address,phone');
 
-        $filename = $receivablePayment->payment_number . '.pdf';
+        $filename = $receivablePayment->payment_number.'.pdf';
         $pdf = Pdf::loadView('receivable_payments.print', [
             'payment' => $receivablePayment,
             'isPdf' => true,
@@ -420,10 +421,10 @@ class ReceivablePaymentPageController extends Controller
     public function exportExcel(ReceivablePayment $receivablePayment): StreamedResponse
     {
         $receivablePayment->load('customer:id,name,city,address,phone');
-        $filename = $receivablePayment->payment_number . '.xlsx';
+        $filename = $receivablePayment->payment_number.'.xlsx';
 
         return response()->streamDownload(function () use ($receivablePayment): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Kwitansi');
 
@@ -459,7 +460,7 @@ class ReceivablePaymentPageController extends Controller
             $sheet->getStyle('A3:B5')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
             $sheet->mergeCells('C2:D2');
-            $sheet->setCellValue('C2', __('txn.no') . ': ' . $receivablePayment->payment_number);
+            $sheet->setCellValue('C2', __('txn.no').': '.$receivablePayment->payment_number);
             $sheet->getStyle('C2')->getFont()->setBold(true);
             $sheet->getStyle('C2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -472,8 +473,8 @@ class ReceivablePaymentPageController extends Controller
             ];
             $metaRowIndex = 2;
             foreach ($metaRows as [$label, $value]) {
-                $sheet->setCellValue('E' . $metaRowIndex, $label);
-                $sheet->setCellValue('F' . $metaRowIndex, $value);
+                $sheet->setCellValue('E'.$metaRowIndex, $label);
+                $sheet->setCellValue('F'.$metaRowIndex, $value);
                 $metaRowIndex++;
             }
             $sheet->getStyle('E2:E6')->getFont()->setBold(true);
@@ -485,29 +486,29 @@ class ReceivablePaymentPageController extends Controller
                 [__('txn.city'), (string) ($receivablePayment->customer?->city ?? '-')],
                 [__('txn.address'), $customerAddress !== '' ? $customerAddress : '-'],
                 [__('receivable.amount_in_words'), (string) ($receivablePayment->amount_in_words ?? '-')],
-                [__('receivable.amount_paid'), 'Rp ' . number_format((int) round((float) $receivablePayment->amount), 0, ',', '.')],
+                [__('receivable.amount_paid'), 'Rp '.number_format((int) round((float) $receivablePayment->amount), 0, ',', '.')],
                 [__('txn.notes'), $printNotes !== '' ? $printNotes : '-'],
             ];
-            $sheet->fromArray([['Keterangan', 'Nilai']], null, 'A' . $detailHeaderRow);
-            $sheet->fromArray($detailRows, null, 'A' . ($detailHeaderRow + 1));
+            $sheet->fromArray([['Keterangan', 'Nilai']], null, 'A'.$detailHeaderRow);
+            $sheet->fromArray($detailRows, null, 'A'.($detailHeaderRow + 1));
             ExcelExportStyler::styleTable($sheet, $detailHeaderRow, 2, count($detailRows), true);
-            $sheet->getStyle('A' . $detailHeaderRow . ':B' . ($detailHeaderRow + count($detailRows)))
+            $sheet->getStyle('A'.$detailHeaderRow.':B'.($detailHeaderRow + count($detailRows)))
                 ->getAlignment()
                 ->setWrapText(true);
 
             $signatureRow = $detailHeaderRow + count($detailRows) + 3;
-            $sheet->mergeCells('A' . $signatureRow . ':B' . $signatureRow);
-            $sheet->mergeCells('E' . $signatureRow . ':F' . $signatureRow);
-            $sheet->setCellValue('A' . $signatureRow, __('receivable.customer_signature'));
-            $sheet->setCellValue('E' . $signatureRow, __('txn.signature'));
-            $sheet->getStyle('A' . $signatureRow . ':F' . $signatureRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->mergeCells('A' . ($signatureRow + 2) . ':B' . ($signatureRow + 2));
-            $sheet->mergeCells('E' . ($signatureRow + 2) . ':F' . ($signatureRow + 2));
-            $sheet->setCellValue('A' . ($signatureRow + 2), (string) ($receivablePayment->customer_signature ?? '-'));
-            $sheet->setCellValue('E' . ($signatureRow + 2), (string) ($receivablePayment->user_signature ?? '-'));
-            $sheet->getStyle('A' . ($signatureRow + 2) . ':F' . ($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A' . ($signatureRow + 1) . ':B' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('E' . ($signatureRow + 1) . ':F' . ($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->mergeCells('A'.$signatureRow.':B'.$signatureRow);
+            $sheet->mergeCells('E'.$signatureRow.':F'.$signatureRow);
+            $sheet->setCellValue('A'.$signatureRow, __('receivable.customer_signature'));
+            $sheet->setCellValue('E'.$signatureRow, __('txn.signature'));
+            $sheet->getStyle('A'.$signatureRow.':F'.$signatureRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->mergeCells('A'.($signatureRow + 2).':B'.($signatureRow + 2));
+            $sheet->mergeCells('E'.($signatureRow + 2).':F'.($signatureRow + 2));
+            $sheet->setCellValue('A'.($signatureRow + 2), (string) ($receivablePayment->customer_signature ?? '-'));
+            $sheet->setCellValue('E'.($signatureRow + 2), (string) ($receivablePayment->user_signature ?? '-'));
+            $sheet->getStyle('A'.($signatureRow + 2).':F'.($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 
             foreach (range('A', 'F') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
@@ -524,7 +525,7 @@ class ReceivablePaymentPageController extends Controller
 
     private function generatePaymentNumber(string $date): string
     {
-        $prefix = 'KWT-' . date('dmY', strtotime($date));
+        $prefix = 'KWT-'.date('dmY', strtotime($date));
         $count = ReceivablePayment::query()
             ->whereDate('payment_date', $date)
             ->lockForUpdate()
@@ -536,7 +537,7 @@ class ReceivablePaymentPageController extends Controller
     private function toIndonesianWords(float $amount): string
     {
         $integerPart = (int) round($amount);
-        $result = trim($this->spellNumber($integerPart)) . ' rupiah';
+        $result = trim($this->spellNumber($integerPart)).' rupiah';
 
         return ucfirst(trim($result));
     }
@@ -563,31 +564,31 @@ class ReceivablePaymentPageController extends Controller
             return $words[$number];
         }
         if ($number < 20) {
-            return $this->spellNumber($number - 10) . ' belas';
+            return $this->spellNumber($number - 10).' belas';
         }
         if ($number < 100) {
-            return $this->spellNumber((int) floor($number / 10)) . ' puluh ' . $this->spellNumber($number % 10);
+            return $this->spellNumber((int) floor($number / 10)).' puluh '.$this->spellNumber($number % 10);
         }
         if ($number < 200) {
-            return 'seratus ' . $this->spellNumber($number - 100);
+            return 'seratus '.$this->spellNumber($number - 100);
         }
         if ($number < 1000) {
-            return $this->spellNumber((int) floor($number / 100)) . ' ratus ' . $this->spellNumber($number % 100);
+            return $this->spellNumber((int) floor($number / 100)).' ratus '.$this->spellNumber($number % 100);
         }
         if ($number < 2000) {
-            return 'seribu ' . $this->spellNumber($number - 1000);
+            return 'seribu '.$this->spellNumber($number - 1000);
         }
         if ($number < 1000000) {
-            return $this->spellNumber((int) floor($number / 1000)) . ' ribu ' . $this->spellNumber($number % 1000);
+            return $this->spellNumber((int) floor($number / 1000)).' ribu '.$this->spellNumber($number % 1000);
         }
         if ($number < 1000000000) {
-            return $this->spellNumber((int) floor($number / 1000000)) . ' juta ' . $this->spellNumber($number % 1000000);
+            return $this->spellNumber((int) floor($number / 1000000)).' juta '.$this->spellNumber($number % 1000000);
         }
         if ($number < 1000000000000) {
-            return $this->spellNumber((int) floor($number / 1000000000)) . ' miliar ' . $this->spellNumber($number % 1000000000);
+            return $this->spellNumber((int) floor($number / 1000000000)).' miliar '.$this->spellNumber($number % 1000000000);
         }
 
-        return $this->spellNumber((int) floor($number / 1000000000000)) . ' triliun ' . $this->spellNumber($number % 1000000000000);
+        return $this->spellNumber((int) floor($number / 1000000000000)).' triliun '.$this->spellNumber($number % 1000000000000);
     }
 
     private function sanitizeReturnPath(string $path): ?string

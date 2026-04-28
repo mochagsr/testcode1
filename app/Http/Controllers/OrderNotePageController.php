@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderNotePageController extends Controller
@@ -74,8 +75,8 @@ class OrderNotePageController extends Controller
             ->when($semesterRange !== null, function ($query) use ($semesterRange): void {
                 $query->betweenDates($semesterRange['start'], $semesterRange['end']);
             })
-            ->when($selectedStatus === 'active', fn($query) => $query->active())
-            ->when($selectedStatus === 'canceled', fn($query) => $query->canceled())
+            ->when($selectedStatus === 'active', fn ($query) => $query->active())
+            ->when($selectedStatus === 'canceled', fn ($query) => $query->canceled())
             ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
                 $query->betweenDates($selectedNoteDateRange[0], $selectedNoteDateRange[1]);
             })
@@ -109,8 +110,8 @@ class OrderNotePageController extends Controller
             }
         );
         $noteIds = collect($notes->items())
-            ->map(fn(OrderNote $note): int => (int) $note->id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn (OrderNote $note): int => (int) $note->id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values()
             ->all();
         $noteProgressMap = $this->buildOrderNoteProgressMap($noteIds);
@@ -136,7 +137,7 @@ class OrderNotePageController extends Controller
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.customers', ['limit' => 100]),
             $now->copy()->addSeconds(60),
-            fn() => Customer::query()
+            fn () => Customer::query()
                 ->onlyOrderFormColumns()
                 ->orderBy('name')
                 ->limit(100)
@@ -155,13 +156,13 @@ class OrderNotePageController extends Controller
 
         $oldProductIds = collect(old('items', []))
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 100, 'active_only' => 1]),
             $now->copy()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlyOrderFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -185,9 +186,9 @@ class OrderNotePageController extends Controller
     public function lookup(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'search' => ['nullable', 'string', 'max:100'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'search' => FluentRule::string()->nullable()->max(100),
+            'per_page' => FluentRule::integer()->nullable()->min(1)->max(200),
         ]);
 
         $customerId = (int) $data['customer_id'];
@@ -223,7 +224,7 @@ class OrderNotePageController extends Controller
             ]);
         }
 
-        $noteIds = $notes->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $noteIds = $notes->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $noteItems = OrderNoteItem::query()
             ->whereIn('order_note_id', $noteIds)
             ->orderBy('order_note_id')
@@ -238,11 +239,11 @@ class OrderNotePageController extends Controller
                 'notes',
             ]);
 
-        $itemIds = $noteItems->pluck('id')->map(fn($id): int => (int) $id)->all();
+        $itemIds = $noteItems->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $productIds = $noteItems
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values()
             ->all();
@@ -262,7 +263,7 @@ class OrderNotePageController extends Controller
                 ->groupBy('dni.order_note_item_id')
                 ->get()
                 ->pluck('fulfilled_qty', 'order_note_item_id')
-                ->map(fn($qty): int => (int) round((float) $qty))
+                ->map(fn ($qty): int => (int) round((float) $qty))
                 ->all();
         }
 
@@ -384,7 +385,7 @@ class OrderNotePageController extends Controller
                     'items' => $items,
                 ];
             })
-            ->filter(fn(array $row): bool => (int) ($row['remaining_total'] ?? 0) > 0)
+            ->filter(fn (array $row): bool => (int) ($row['remaining_total'] ?? 0) > 0)
             ->values();
 
         return response()->json([
@@ -396,21 +397,21 @@ class OrderNotePageController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'note_date' => ['required', 'date'],
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'customer_name' => ['required', 'string', 'max:150'],
-            'customer_phone' => ['nullable', 'string', 'max:30'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'address' => ['nullable', 'string'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.product_code' => ['nullable', 'string', 'max:60'],
-            'items.*.product_name' => ['required', 'string', 'max:200'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.notes' => ['nullable', 'string'],
+            'note_date' => FluentRule::date()->required(),
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'customer_name' => FluentRule::string()->required()->max(150),
+            'customer_phone' => FluentRule::string()->nullable()->max(30),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'address' => FluentRule::string()->nullable(),
+            'city' => FluentRule::string()->nullable()->max(100),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.product_code' => FluentRule::string()->nullable()->max(60),
+            'items.*.product_name' => FluentRule::string()->required()->max(200),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.notes' => FluentRule::string()->nullable(),
         ]);
 
         $customer = Customer::query()
@@ -495,13 +496,13 @@ class OrderNotePageController extends Controller
         $fulfillmentDetails = $this->buildOrderNoteFulfillmentDetails($orderNote);
         $itemProductIds = $orderNote->items
             ->pluck('product_id')
-            ->map(fn($id): int => (int) $id)
-            ->filter(fn(int $id): bool => $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->values();
         $products = Cache::remember(
             AppCache::lookupCacheKey('forms.order_notes.products', ['limit' => 100, 'active_only' => 1]),
             $now->copy()->addSeconds(60),
-            fn() => Product::query()
+            fn () => Product::query()
                 ->onlyOrderFormColumns()
                 ->active()
                 ->orderBy('name')
@@ -527,19 +528,19 @@ class OrderNotePageController extends Controller
     public function adminUpdate(Request $request, OrderNote $orderNote): RedirectResponse
     {
         $data = $request->validate([
-            'note_date' => ['required', 'date'],
-            'customer_name' => ['required', 'string', 'max:150'],
-            'customer_phone' => ['nullable', 'string', 'max:30'],
-            'transaction_type' => ['nullable', 'in:product,printing'],
-            'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
-            'address' => ['nullable', 'string'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.product_name' => ['required', 'string', 'max:200'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.notes' => ['nullable', 'string'],
+            'note_date' => FluentRule::date()->required(),
+            'customer_name' => FluentRule::string()->required()->max(150),
+            'customer_phone' => FluentRule::string()->nullable()->max(30),
+            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
+            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
+            'address' => FluentRule::string()->nullable(),
+            'city' => FluentRule::string()->nullable()->max(100),
+            'notes' => FluentRule::string()->nullable(),
+            'items' => FluentRule::array()->required()->min(1),
+            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
+            'items.*.product_name' => FluentRule::string()->required()->max(200),
+            'items.*.quantity' => FluentRule::integer()->required()->min(1),
+            'items.*.notes' => FluentRule::string()->nullable(),
         ]);
 
         DB::transaction(function () use ($orderNote, $data): void {
@@ -607,7 +608,7 @@ class OrderNotePageController extends Controller
     public function cancel(Request $request, OrderNote $orderNote): RedirectResponse
     {
         $data = $request->validate([
-            'cancel_reason' => ['required', 'string', 'max:1000'],
+            'cancel_reason' => FluentRule::string()->required()->max(1000),
         ]);
 
         $orderNote->update([
@@ -644,7 +645,7 @@ class OrderNotePageController extends Controller
     {
         $orderNote->load(['customer:id,name,city,phone,address', 'items']);
 
-        $filename = $orderNote->note_number . '.pdf';
+        $filename = $orderNote->note_number.'.pdf';
         $pdf = Pdf::loadView('order_notes.print', [
             'note' => $orderNote,
             'fulfillmentDetails' => $this->buildOrderNoteFulfillmentDetails($orderNote),
@@ -657,10 +658,10 @@ class OrderNotePageController extends Controller
     public function exportExcel(OrderNote $orderNote): StreamedResponse
     {
         $orderNote->load(['customer:id,name,city,phone,address', 'items']);
-        $filename = $orderNote->note_number . '.xlsx';
+        $filename = $orderNote->note_number.'.xlsx';
 
         return response()->streamDownload(function () use ($orderNote): void {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Surat Pesanan');
             $customerName = (string) ($orderNote->customer?->name ?: preg_replace('/\s*\([^)]+\)\s*$/', '', (string) $orderNote->customer_name));
@@ -670,7 +671,7 @@ class OrderNotePageController extends Controller
                 4
             );
             $rows = [];
-            $rows[] = [__('txn.order_notes_title') . ' ' . __('txn.note_number'), $orderNote->note_number];
+            $rows[] = [__('txn.order_notes_title').' '.__('txn.note_number'), $orderNote->note_number];
             $rows[] = [__('txn.date'), $orderNote->note_date?->format('d-m-Y')];
             $rows[] = [__('txn.name'), $customerName !== '' ? $customerName : '-'];
             $rows[] = [__('txn.phone'), $orderNote->customer_phone];
@@ -714,7 +715,7 @@ class OrderNotePageController extends Controller
      */
     private function buildOrderNoteProgressMap(array $noteIds): array
     {
-        $cleanIds = array_values(array_filter(array_map(static fn($id): int => (int) $id, $noteIds), static fn(int $id): bool => $id > 0));
+        $cleanIds = array_values(array_filter(array_map(static fn ($id): int => (int) $id, $noteIds), static fn (int $id): bool => $id > 0));
         if ($cleanIds === []) {
             return [];
         }
@@ -906,7 +907,7 @@ class OrderNotePageController extends Controller
     }
 
     /**
-     * @param array<int, array<string, mixed>> $items
+     * @param  array<int, array<string, mixed>>  $items
      */
     private function applyOrderNoteDeliveryAllocation(
         array &$items,
@@ -942,7 +943,7 @@ class OrderNotePageController extends Controller
 
     private function generateNoteNumber(string $date): string
     {
-        $prefix = 'PO-' . date('dmY', strtotime($date));
+        $prefix = 'PO-'.date('dmY', strtotime($date));
         $count = OrderNote::query()
             ->whereDate('note_date', $date)
             ->lockForUpdate()
@@ -969,6 +970,7 @@ class OrderNotePageController extends Controller
     private function semesterPeriodFromDate(Carbon|string|null $date): string
     {
         $rawDate = $date instanceof Carbon ? $date->format('Y-m-d') : (string) $date;
+
         return $this->semesterBookService->semesterFromDate($rawDate) ?? $this->currentSemesterPeriod();
     }
 }

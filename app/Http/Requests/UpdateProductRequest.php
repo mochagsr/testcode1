@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
 class UpdateProductRequest extends FormRequest
 {
+    use HasFluentRules;
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -17,19 +20,14 @@ class UpdateProductRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'item_category_id' => ['required', 'integer', 'exists:item_categories,id'],
-            'code' => [
-                'nullable',
-                'string',
-                'max:60',
-                Rule::unique('products', 'code')->ignore($this->route('product')),
-            ],
-            'name' => ['required', 'string', 'max:200'],
-            'unit' => ['required', 'string', 'max:30'],
-            'stock' => ['nullable', 'integer', 'min:0'],
-            'price_agent' => ['nullable', 'numeric', 'min:0'],
-            'price_sales' => ['nullable', 'numeric', 'min:0'],
-            'price_general' => ['nullable', 'numeric', 'min:0'],
+            'item_category_id' => FluentRule::integer()->required()->exists('item_categories', 'id'),
+            'code' => FluentRule::string()->nullable()->max(60)->unique('products', 'code', fn ($rule) => $rule->ignore($this->route('product'))),
+            'name' => FluentRule::string()->required()->max(200),
+            'unit' => FluentRule::string()->required()->max(30),
+            'stock' => FluentRule::integer()->nullable()->min(0),
+            'price_agent' => FluentRule::numeric()->nullable()->min(0),
+            'price_sales' => FluentRule::numeric()->nullable()->min(0),
+            'price_general' => FluentRule::numeric()->nullable()->min(0),
         ];
     }
 
@@ -49,8 +47,6 @@ class UpdateProductRequest extends FormRequest
 
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {

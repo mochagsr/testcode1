@@ -110,9 +110,6 @@ class DeliveryNote extends Model
 
     /**
      * Scope to filter active delivery notes (not canceled).
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -121,9 +118,6 @@ class DeliveryNote extends Model
 
     /**
      * Scope to eager load the associated customer.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeWithCustomerInfo(Builder $query): Builder
     {
@@ -132,9 +126,6 @@ class DeliveryNote extends Model
 
     /**
      * Scope to apply keyword search.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeSearchKeyword(Builder $query, string $keyword): Builder
     {
@@ -152,9 +143,6 @@ class DeliveryNote extends Model
 
     /**
      * Scope to filter canceled delivery notes only.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeCanceled(Builder $query): Builder
     {
@@ -163,9 +151,6 @@ class DeliveryNote extends Model
 
     /**
      * Scope to order delivery notes by delivery date descending.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeOrderByDate(Builder $query): Builder
     {
@@ -176,8 +161,6 @@ class DeliveryNote extends Model
      * Scope: filter note date by range.
      *
      * @param  Builder<DeliveryNote>  $query
-     * @param  mixed  $startDate
-     * @param  mixed  $endDate
      * @return Builder<DeliveryNote>
      */
     public function scopeBetweenDates(Builder $query, mixed $startDate, mixed $endDate): Builder

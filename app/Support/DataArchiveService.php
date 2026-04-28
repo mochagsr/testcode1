@@ -11,8 +11,8 @@ use App\Models\SalesReturn;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
@@ -22,8 +22,7 @@ class DataArchiveService
 {
     public function __construct(
         private readonly SemesterBookService $semesterBookService
-    ) {
-    }
+    ) {}
 
     /**
      * @param  list<string>  $requestedDatasets
@@ -88,6 +87,7 @@ class DataArchiveService
                         'table' => $tableDefinition['table'],
                         'rows' => 0,
                     ];
+
                     continue;
                 }
 
@@ -199,14 +199,14 @@ class DataArchiveService
 
         $timestamp = now('Asia/Jakarta')->format('Ymd-His');
         $baseDir = $directory ?: storage_path('app/archives');
-        $sqlDir = $baseDir . DIRECTORY_SEPARATOR . 'sql';
-        $manifestDir = $baseDir . DIRECTORY_SEPARATOR . 'manifests';
+        $sqlDir = $baseDir.DIRECTORY_SEPARATOR.'sql';
+        $manifestDir = $baseDir.DIRECTORY_SEPARATOR.'manifests';
         File::ensureDirectoryExists($sqlDir);
         File::ensureDirectoryExists($manifestDir);
 
         $scopeSlug = $this->scopeSlug($scope);
-        $sqlFile = $sqlDir . DIRECTORY_SEPARATOR . sprintf('archive-%s-%s-%s.sql', $scopeSlug, $slug, $timestamp);
-        $manifestFile = $manifestDir . DIRECTORY_SEPARATOR . sprintf('archive-%s-%s-%s.json', $scopeSlug, $slug, $timestamp);
+        $sqlFile = $sqlDir.DIRECTORY_SEPARATOR.sprintf('archive-%s-%s-%s.sql', $scopeSlug, $slug, $timestamp);
+        $manifestFile = $manifestDir.DIRECTORY_SEPARATOR.sprintf('archive-%s-%s-%s.json', $scopeSlug, $slug, $timestamp);
 
         $handle = fopen($sqlFile, 'wb');
         if ($handle === false) {
@@ -352,10 +352,12 @@ class DataArchiveService
             $mode = (string) ($definitions[$datasetKey]['purge_mode'] ?? 'locked');
             if ($mode === 'locked') {
                 $locked[] = $datasetKey;
+
                 continue;
             }
             if ($mode === 'financial_guarded') {
                 $financialGuarded[] = $datasetKey;
+
                 continue;
             }
             $standard[] = $datasetKey;
@@ -828,6 +830,7 @@ class DataArchiveService
         $scope = is_int($scope) ? $this->yearScope($scope) : $scope;
         if (isset($tableDefinition['date_column'])) {
             $query = DB::table($tableDefinition['table']);
+
             return $this->applyScopeToDateQuery($query, $tableDefinition, $scope);
         }
 

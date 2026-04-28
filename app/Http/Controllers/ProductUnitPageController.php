@@ -11,8 +11,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use SanderMuller\FluentValidation\FluentRule;
 
 class ProductUnitPageController extends Controller
 {
@@ -85,14 +85,9 @@ class ProductUnitPageController extends Controller
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         $data = $request->validate([
-            'code' => [
-                'required',
-                'string',
-                'max:30',
-                Rule::unique('product_units', 'code')->ignore($ignoreId),
-            ],
-            'name' => ['required', 'string', 'max:120'],
-            'description' => ['nullable', 'string'],
+            'code' => FluentRule::string()->required()->max(30)->unique('product_units', 'code', fn ($rule) => $rule->ignore($ignoreId)),
+            'name' => FluentRule::string()->required()->max(120),
+            'description' => FluentRule::string()->nullable(),
         ]);
 
         $data['code'] = ProductUnit::normalizeCode((string) $data['code']);

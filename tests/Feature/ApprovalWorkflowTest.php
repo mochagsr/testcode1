@@ -104,7 +104,7 @@ class ApprovalWorkflowTest extends TestCase
         $this->assertSame('success', data_get($approval->payload, 'execution.status'));
         $this->assertSame('Auto execute patch', (string) $invoice->notes);
         $this->assertSame(10000.0, (float) $invoice->total);
-        $this->assertSame(11.0, (float) $product->stock);
+        $this->assertSame(10.0, (float) $product->stock);
         $this->assertDatabaseHas('sales_invoice_items', [
             'sales_invoice_id' => $invoice->id,
             'product_id' => $product->id,
@@ -302,7 +302,7 @@ class ApprovalWorkflowTest extends TestCase
         $this->assertSame('success', (string) data_get($approval->payload, 'execution.status'));
         $this->assertSame('Re-execute patch', (string) $invoice->notes);
         $this->assertSame(10000.0, (float) $invoice->total);
-        $this->assertSame(11.0, (float) $product->stock);
+        $this->assertSame(10.0, (float) $product->stock);
     }
 
     public function test_reexecute_rejects_non_approved_request_status(): void

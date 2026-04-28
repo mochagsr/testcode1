@@ -30,7 +30,6 @@ final class OptimizedCache
     /**
      * Get or compute customer summary stats (outstanding receivable, invoice count).
      *
-     * @param  int  $customerId
      * @return array<string, mixed>
      */
     public static function customerSummary(int $customerId): array
@@ -42,7 +41,7 @@ final class OptimizedCache
                 ->select(['id', 'outstanding_receivable', 'credit_balance'])
                 ->find($customerId);
 
-            if (!$customer) {
+            if (! $customer) {
                 return [];
             }
 
@@ -62,7 +61,6 @@ final class OptimizedCache
     /**
      * Get or compute product inventory stats.
      *
-     * @param  int  $productId
      * @return array<string, mixed>
      */
     public static function productInventory(int $productId): array
@@ -74,7 +72,7 @@ final class OptimizedCache
                 ->select(['id', 'stock', 'price_agent', 'price_sales', 'price_general'])
                 ->find($productId);
 
-            if (!$product) {
+            if (! $product) {
                 return [];
             }
 
@@ -89,9 +87,6 @@ final class OptimizedCache
 
     /**
      * Forget customer summary cache when customer is modified.
-     *
-     * @param  int  $customerId
-     * @return void
      */
     public static function forgetCustomerSummary(int $customerId): void
     {
@@ -100,9 +95,6 @@ final class OptimizedCache
 
     /**
      * Forget product inventory cache when product is modified.
-     *
-     * @param  int  $productId
-     * @return void
      */
     public static function forgetProductInventory(int $productId): void
     {
@@ -111,8 +103,6 @@ final class OptimizedCache
 
     /**
      * Clear all application caches (use sparingly).
-     *
-     * @return void
      */
     public static function clearAllCaches(): void
     {

@@ -66,10 +66,6 @@ class ReceivableLedger extends Model
 
     /**
      * Scope: Order by date (newest first by default).
-     *
-     * @param  Builder  $query
-     * @param  string  $direction
-     * @return Builder
      */
     public function scopeOrderByDate(Builder $query, string $direction = 'desc'): Builder
     {
@@ -78,9 +74,6 @@ class ReceivableLedger extends Model
 
     /**
      * Scope: Eager load customer information.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeWithCustomerInfo(Builder $query): Builder
     {
@@ -89,9 +82,6 @@ class ReceivableLedger extends Model
 
     /**
      * Scope: Eager load invoice information.
-     *
-     * @param  Builder  $query
-     * @return Builder
      */
     public function scopeWithInvoiceInfo(Builder $query): Builder
     {
@@ -100,10 +90,6 @@ class ReceivableLedger extends Model
 
     /**
      * Scope: Filter by customer.
-     *
-     * @param  Builder  $query
-     * @param  int  $customerId
-     * @return Builder
      */
     public function scopeForCustomer(Builder $query, int $customerId): Builder
     {
@@ -112,10 +98,6 @@ class ReceivableLedger extends Model
 
     /**
      * Scope: Filter by semester/period code.
-     *
-     * @param  Builder  $query
-     * @param  string  $semester
-     * @return Builder
      */
     public function scopeForSemester(Builder $query, string $semester): Builder
     {
@@ -125,10 +107,8 @@ class ReceivableLedger extends Model
     /**
      * Scope: Filter by date range.
      *
-     * @param  Builder  $query
      * @param  \Carbon\CarbonInterface  $startDate
      * @param  \Carbon\CarbonInterface  $endDate
-     * @return Builder
      */
     public function scopeBetweenDates(Builder $query, $startDate, $endDate): Builder
     {

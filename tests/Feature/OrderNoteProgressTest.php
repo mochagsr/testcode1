@@ -3,12 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\DeliveryNote;
+use App\Models\DeliveryNoteItem;
 use App\Models\ItemCategory;
 use App\Models\OrderNote;
 use App\Models\OrderNoteItem;
 use App\Models\Product;
-use App\Models\SalesInvoice;
-use App\Models\SalesInvoiceItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -57,28 +57,23 @@ class OrderNoteProgressTest extends TestCase
             'quantity' => 10,
         ]);
 
-        $invoice = SalesInvoice::query()->create([
-            'invoice_number' => 'INV-ON-001',
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-ON-001',
+            'note_date' => '2026-02-28',
             'customer_id' => $customer->id,
             'order_note_id' => $note->id,
-            'invoice_date' => '2026-02-28',
-            'semester_period' => 'S2-2526',
-            'subtotal' => 40000,
-            'total' => 40000,
-            'total_paid' => 0,
-            'balance' => 40000,
-            'payment_status' => 'unpaid',
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'created_by_name' => 'Tester',
+            'is_canceled' => false,
         ]);
 
-        SalesInvoiceItem::query()->create([
-            'sales_invoice_id' => $invoice->id,
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
             'product_id' => $product->id,
             'product_code' => $product->code,
             'product_name' => 'Produk A',
             'quantity' => 4,
-            'unit_price' => 10000,
-            'line_total' => 40000,
-            'discount' => 0,
         ]);
 
         $indexResponse = $this->actingAs($user)->get(route('order-notes.index'));
@@ -136,28 +131,23 @@ class OrderNoteProgressTest extends TestCase
             'quantity' => 5,
         ]);
 
-        $invoice = SalesInvoice::query()->create([
-            'invoice_number' => 'INV-ON-002',
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-ON-002',
+            'note_date' => '2026-02-28',
             'customer_id' => $customer->id,
             'order_note_id' => $note->id,
-            'invoice_date' => '2026-02-28',
-            'semester_period' => 'S2-2526',
-            'subtotal' => 60000,
-            'total' => 60000,
-            'total_paid' => 0,
-            'balance' => 60000,
-            'payment_status' => 'unpaid',
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'created_by_name' => 'Tester',
+            'is_canceled' => false,
         ]);
 
-        SalesInvoiceItem::query()->create([
-            'sales_invoice_id' => $invoice->id,
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
             'product_id' => $product->id,
             'product_code' => $product->code,
             'product_name' => 'Produk B',
             'quantity' => 5,
-            'unit_price' => 12000,
-            'line_total' => 60000,
-            'discount' => 0,
         ]);
 
         $response = $this->actingAs($user)->get(route('order-notes.show', $note));
@@ -221,35 +211,30 @@ class OrderNoteProgressTest extends TestCase
             'quantity' => 8,
         ]);
 
-        $invoice = SalesInvoice::query()->create([
-            'invoice_number' => 'INV-ON-004',
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-ON-004',
+            'note_date' => '2026-02-28',
             'customer_id' => $customer->id,
             'order_note_id' => $note->id,
-            'invoice_date' => '2026-02-28',
-            'semester_period' => 'S2-2526',
-            'subtotal' => 50000,
-            'total' => 50000,
-            'total_paid' => 0,
-            'balance' => 50000,
-            'payment_status' => 'unpaid',
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'created_by_name' => 'Tester',
+            'is_canceled' => false,
         ]);
 
-        SalesInvoiceItem::query()->create([
-            'sales_invoice_id' => $invoice->id,
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
             'order_note_item_id' => $itemA->id,
             'product_id' => $productA->id,
             'product_code' => $productA->code,
             'product_name' => $productA->name,
             'quantity' => 5,
-            'unit_price' => 10000,
-            'line_total' => 50000,
-            'discount' => 0,
         ]);
 
         $response = $this->actingAs($user)->get(route('order-notes.show', $note));
         $response->assertOk();
         $response->assertSee(__('txn.order_note_delivery_history_title'));
-        $response->assertSee('INV-ON-004');
+        $response->assertSee('SJ-ON-004');
         $response->assertSee('Produk E');
         $response->assertSee('Produk F');
         $response->assertSee(__('txn.order_note_status_partial'));
@@ -296,35 +281,30 @@ class OrderNoteProgressTest extends TestCase
             'quantity' => 10,
         ]);
 
-        $invoice = SalesInvoice::query()->create([
-            'invoice_number' => 'INV-ON-005',
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-ON-005',
+            'note_date' => '2026-02-28',
             'customer_id' => $customer->id,
             'order_note_id' => $note->id,
-            'invoice_date' => '2026-02-28',
-            'semester_period' => 'S2-2526',
-            'subtotal' => 50000,
-            'total' => 50000,
-            'total_paid' => 0,
-            'balance' => 50000,
-            'payment_status' => 'unpaid',
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'created_by_name' => 'Tester',
+            'is_canceled' => false,
         ]);
 
-        SalesInvoiceItem::query()->create([
-            'sales_invoice_id' => $invoice->id,
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
             'order_note_item_id' => $item->id,
             'product_id' => $product->id,
             'product_code' => $product->code,
             'product_name' => $product->name,
             'quantity' => 6,
-            'unit_price' => 10000,
-            'line_total' => 60000,
-            'discount' => 0,
         ]);
 
         $response = $this->actingAs($user)->get(route('order-notes.print', $note));
         $response->assertOk();
         $response->assertSee(__('txn.order_note_delivery_history_title'));
-        $response->assertSee('INV-ON-005');
+        $response->assertSee('SJ-ON-005');
         $response->assertSee('6');
         $response->assertSee('4');
     }
@@ -384,40 +364,32 @@ class OrderNoteProgressTest extends TestCase
             'quantity' => 10,
         ]);
 
-        $invoice = SalesInvoice::query()->create([
-            'invoice_number' => 'INV-ON-003',
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-ON-003',
+            'note_date' => '2026-02-28',
             'customer_id' => $customer->id,
             'order_note_id' => $note->id,
-            'invoice_date' => '2026-02-28',
-            'semester_period' => 'S2-2526',
-            'subtotal' => 160000,
-            'total' => 160000,
-            'total_paid' => 0,
-            'balance' => 160000,
-            'payment_status' => 'unpaid',
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'created_by_name' => 'Tester',
+            'is_canceled' => false,
         ]);
 
-        SalesInvoiceItem::query()->create([
-            'sales_invoice_id' => $invoice->id,
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
             'order_note_item_id' => $itemA->id,
             'product_id' => $productA->id,
             'product_code' => $productA->code,
             'product_name' => $productA->name,
             'quantity' => 10,
-            'unit_price' => 10000,
-            'line_total' => 100000,
-            'discount' => 0,
         ]);
-        SalesInvoiceItem::query()->create([
-            'sales_invoice_id' => $invoice->id,
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
             'order_note_item_id' => $itemB->id,
             'product_id' => $productB->id,
             'product_code' => $productB->code,
             'product_name' => $productB->name,
             'quantity' => 5,
-            'unit_price' => 12000,
-            'line_total' => 60000,
-            'discount' => 0,
         ]);
 
         $response = $this->actingAs($user)->getJson(route('api.order-notes.lookup', [

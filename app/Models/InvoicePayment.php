@@ -45,9 +45,6 @@ class InvoicePayment extends Model
 
     /**
      * Scope to filter active payments (not canceled).
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -56,9 +53,6 @@ class InvoicePayment extends Model
 
     /**
      * Scope to eager load the associated sales invoice.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeWithInvoiceInfo(Builder $query): Builder
     {
@@ -67,9 +61,6 @@ class InvoicePayment extends Model
 
     /**
      * Scope to order payments by payment date descending.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeOrderByDate(Builder $query): Builder
     {

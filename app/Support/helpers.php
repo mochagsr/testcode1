@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Get customer summary with caching.
  *
- * @param  int  $customerId
  * @return array<string, mixed>
  */
 function getCustomerSummary(int $customerId): array
@@ -25,7 +24,6 @@ function getCustomerSummary(int $customerId): array
 /**
  * Get product inventory with caching.
  *
- * @param  int  $productId
  * @return array<string, mixed>
  */
 function getProductInventory(int $productId): array
@@ -35,9 +33,6 @@ function getProductInventory(int $productId): array
 
 /**
  * Invalidate customer cache when customer is modified.
- *
- * @param  int  $customerId
- * @return void
  */
 function invalidateCustomerCache(int $customerId): void
 {
@@ -46,9 +41,6 @@ function invalidateCustomerCache(int $customerId): void
 
 /**
  * Invalidate product cache when product is modified.
- *
- * @param  int  $productId
- * @return void
  */
 function invalidateProductCache(int $productId): void
 {
@@ -57,9 +49,6 @@ function invalidateProductCache(int $productId): void
 
 /**
  * Log memory usage for debugging (development only).
- *
- * @param  string  $label
- * @return void
  */
 function logMemory(string $label): void
 {
@@ -68,8 +57,6 @@ function logMemory(string $label): void
 
 /**
  * Get current memory usage in MB.
- *
- * @return float
  */
 function getMemoryUsage(): float
 {
@@ -78,13 +65,10 @@ function getMemoryUsage(): float
 
 /**
  * Format memory usage for display.
- *
- * @param  float  $mb
- * @return string
  */
 function formatMemory(float $mb): string
 {
-    return round($mb, 2) . ' MB';
+    return round($mb, 2).' MB';
 }
 
 /**
@@ -104,20 +88,19 @@ function applyListOptimization($query)
  * Safely fetch a model by ID with caching.
  *
  * @param  class-string<T>  $modelClass
- * @param  int  $id
- * @param  int  $cacheTtl Cache duration in seconds
+ * @param  int  $cacheTtl  Cache duration in seconds
  * @return T|null
  *
  * @template T of Model
  */
 function getCachedModel(string $modelClass, int $id, int $cacheTtl = 3600): ?Model
 {
-    $cacheKey = strtolower(class_basename($modelClass)) . ".{$id}";
+    $cacheKey = strtolower(class_basename($modelClass)).".{$id}";
 
     return \Illuminate\Support\Facades\Cache::remember(
         $cacheKey,
         $cacheTtl,
-        fn() => $modelClass::find($id)
+        fn () => $modelClass::find($id)
     );
 }
 
@@ -125,11 +108,9 @@ function getCachedModel(string $modelClass, int $id, int $cacheTtl = 3600): ?Mod
  * Forget a specific model from cache.
  *
  * @param  class-string  $modelClass
- * @param  int  $id
- * @return void
  */
 function forgetCachedModel(string $modelClass, int $id): void
 {
-    $cacheKey = strtolower(class_basename($modelClass)) . ".{$id}";
+    $cacheKey = strtolower(class_basename($modelClass)).".{$id}";
     \Illuminate\Support\Facades\Cache::forget($cacheKey);
 }
