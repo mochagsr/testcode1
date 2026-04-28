@@ -3,6 +3,43 @@
 @section('title', __('txn.create_invoice_from_delivery_notes').' - '.config('app.name', 'Laravel'))
 
 @section('content')
+    <style>
+        #items-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        #items-table .delivery-col {
+            width: 14%;
+        }
+        #items-table .product-col {
+            width: 40%;
+        }
+        #items-table .remaining-col {
+            width: 8%;
+        }
+        #items-table .qty-col {
+            width: 7%;
+        }
+        #items-table .price-col {
+            width: 11%;
+        }
+        #items-table .discount-col {
+            width: 8%;
+        }
+        #items-table .total-col {
+            width: 12%;
+        }
+        #items-table input.qty,
+        #items-table input.discount {
+            max-width: 62px;
+            min-width: 0;
+        }
+        #items-table input.price {
+            max-width: 92px;
+            min-width: 0;
+        }
+    </style>
+
     <h1 class="page-title">{{ __('txn.create_invoice_from_delivery_notes') }}</h1>
 
     <form method="post" action="{{ route('sales-invoices.store-from-delivery-notes') }}">
@@ -58,13 +95,13 @@
                 <table id="items-table">
                     <thead>
                     <tr>
-                        <th>{{ __('txn.delivery_notes_title') }}</th>
-                        <th>{{ __('txn.product') }}</th>
-                        <th class="num">{{ __('txn.remaining_qty') }}</th>
-                        <th>{{ __('txn.qty') }}</th>
-                        <th>{{ __('txn.price') }}</th>
-                        <th>{{ __('txn.discount') }} (%)</th>
-                        <th class="num">{{ __('txn.line_total') }}</th>
+                        <th class="delivery-col">{{ __('txn.delivery_notes_title') }}</th>
+                        <th class="product-col">{{ __('txn.product') }}</th>
+                        <th class="num remaining-col">{{ __('txn.remaining_qty') }}</th>
+                        <th class="qty-col">{{ __('txn.qty') }}</th>
+                        <th class="price-col">{{ __('txn.price') }}</th>
+                        <th class="discount-col">{{ __('txn.discount') }} (%)</th>
+                        <th class="num total-col">{{ __('txn.line_total') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -79,25 +116,25 @@
                             $discount = old($oldPrefix.'discount', 0);
                         @endphp
                         <tr>
-                            <td>
+                            <td class="delivery-col">
                                 {{ $note->note_number }}
                                 <input type="hidden" name="items[{{ $index }}][delivery_note_item_id]" value="{{ $item->id }}">
                             </td>
-                            <td>
+                            <td class="product-col">
                                 <strong>{{ $item->product_name }}</strong>
                                 <div class="muted">{{ $item->product_code }}</div>
                             </td>
-                            <td class="num">{{ number_format($remaining, 0, ',', '.') }}</td>
-                            <td>
-                                <input class="qty" type="number" name="items[{{ $index }}][quantity]" value="{{ $qty }}" min="1" max="{{ $remaining }}" required style="max-width:90px;">
+                            <td class="num remaining-col">{{ number_format($remaining, 0, ',', '.') }}</td>
+                            <td class="qty-col">
+                                <input class="qty" type="number" name="items[{{ $index }}][quantity]" value="{{ $qty }}" min="1" max="{{ $remaining }}" required>
                             </td>
-                            <td>
-                                <input class="price" type="number" name="items[{{ $index }}][unit_price]" value="{{ $price }}" min="0" step="1" required style="max-width:120px;">
+                            <td class="price-col">
+                                <input class="price" type="number" name="items[{{ $index }}][unit_price]" value="{{ $price }}" min="0" step="1" required>
                             </td>
-                            <td>
-                                <input class="discount" type="number" name="items[{{ $index }}][discount]" value="{{ $discount }}" min="0" max="100" step="1" style="max-width:80px;">
+                            <td class="discount-col">
+                                <input class="discount" type="number" name="items[{{ $index }}][discount]" value="{{ $discount }}" min="0" max="100" step="1">
                             </td>
-                            <td class="num">Rp <span class="line-total">0</span></td>
+                            <td class="num total-col">Rp <span class="line-total">0</span></td>
                         </tr>
                     @endforeach
                     </tbody>
