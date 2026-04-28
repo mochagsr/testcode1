@@ -187,6 +187,11 @@ class SalesInvoicePageController extends Controller
         $rows = $this->pendingDeliveryNoteRows($search)
             ->paginate((int) config('pagination.default_per_page', 20))
             ->withQueryString();
+        $rows->setCollection($rows->getCollection()
+            ->unique(fn (DeliveryNote $note): string => $note->note_number !== ''
+                ? 'number:'.mb_strtolower(trim($note->note_number))
+                : 'id:'.$note->id)
+            ->values());
 
         return view('sales_invoices.pending_delivery_notes', [
             'rows' => $rows,
@@ -258,7 +263,9 @@ class SalesInvoicePageController extends Controller
             $invoiceDate = Carbon::parse((string) $data['invoice_date']);
             $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
             $customerId = (int) $data['customer_id'];
-            $rows = collect($data['items']);
+            $rows = collect($data['items'])
+                ->unique(fn (array $row): int => (int) ($row['delivery_note_item_id'] ?? 0))
+                ->values();
 
             $itemIds = $rows->pluck('delivery_note_item_id')->map(fn ($id): int => (int) $id)->unique()->values()->all();
             $deliveryItems = DeliveryNoteItem::query()
@@ -1373,7 +1380,11 @@ class SalesInvoicePageController extends Controller
             ->where('is_canceled', false)
             ->orderBy('note_date')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->unique(fn (DeliveryNote $note): string => $note->note_number !== ''
+                ? 'number:'.mb_strtolower(trim($note->note_number))
+                : 'id:'.$note->id)
+            ->values();
 
         if ($deliveryNotes->isEmpty()) {
             throw ValidationException::withMessages([

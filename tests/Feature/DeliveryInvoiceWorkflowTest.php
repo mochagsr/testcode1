@@ -155,4 +155,77 @@ class DeliveryInvoiceWorkflowTest extends TestCase
 
         $this->assertDatabaseCount('sales_invoices', 0);
     }
+
+    public function test_duplicate_delivery_note_selection_and_items_are_processed_once_for_invoicing(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-ERP-003',
+            'name' => 'Customer Dobel',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-ERP-003',
+            'name' => 'Buku',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'BK-ERP-003',
+            'name' => 'Buku Dobel',
+            'unit' => 'exp',
+            'stock' => 50,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-DUP-ID-001',
+            'note_date' => '2026-04-28',
+            'customer_id' => $customer->id,
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'transaction_type' => 'product',
+            'created_by_name' => 'Gudang',
+        ]);
+        $deliveryItem = DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'unit' => $product->unit,
+            'quantity' => 5,
+        ]);
+        $createResponse = $this->actingAs($user)
+            ->get(route('sales-invoices.create-from-delivery-notes', [
+                'delivery_note_ids' => [$deliveryNote->id, $deliveryNote->id],
+            ]))
+            ->assertOk();
+        $this->assertSame(2, substr_count($createResponse->getContent(), 'SJ-DUP-ID-001'));
+
+        $this->actingAs($user)
+            ->post(route('sales-invoices.store-from-delivery-notes'), [
+                'customer_id' => $customer->id,
+                'invoice_date' => '2026-04-28',
+                'semester_period' => 'S2-2526',
+                'payment_method' => 'kredit',
+                'items' => [
+                    [
+                        'delivery_note_item_id' => $deliveryItem->id,
+                        'quantity' => 5,
+                        'unit_price' => 12000,
+                        'discount' => 0,
+                    ],
+                    [
+                        'delivery_note_item_id' => $deliveryItem->id,
+                        'quantity' => 5,
+                        'unit_price' => 12000,
+                        'discount' => 0,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $invoice = SalesInvoice::query()->firstOrFail();
+        $this->assertSame(1, $invoice->items()->count());
+        $this->assertSame(60000.0, (float) $invoice->total);
+    }
 }
