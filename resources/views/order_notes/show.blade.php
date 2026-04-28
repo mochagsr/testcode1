@@ -265,6 +265,9 @@
                 @endforeach
                 </tbody>
             </table>
+            <div style="margin-top:10px; text-align:right; font-size:16px;">
+                <strong>{{ __('txn.summary_total_qty') }}: {{ number_format((int) ($noteProgress['ordered_total'] ?? $note->items->sum('quantity')), 0, ',', '.') }}</strong>
+            </div>
         </div>
     </div>
 

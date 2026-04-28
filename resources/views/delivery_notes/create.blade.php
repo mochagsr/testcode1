@@ -15,6 +15,11 @@
             -moz-appearance: textfield;
             appearance: textfield;
         }
+        .items-total-box {
+            margin-top: 10px;
+            text-align: right;
+            font-size: 16px;
+        }
     </style>
 
     <form method="post" action="{{ route('delivery-notes.store') }}">
@@ -130,6 +135,9 @@
                     <tbody></tbody>
                 </table>
             </div>
+            <div class="items-total-box">
+                <strong>{{ __('txn.summary_total_qty') }}: <span id="items-total-qty">0</span></strong>
+            </div>
         </div>
 
         <button class="btn" type="submit">{{ __('txn.save_delivery_note') }}</button>
@@ -158,6 +166,7 @@
         const customersList = document.getElementById('customers-list');
         const shipLocationsList = document.getElementById('ship-locations-list');
         const addBtn = document.getElementById('add-item');
+        const itemsTotalQty = document.getElementById('items-total-qty');
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
         const customerSearchError = document.getElementById('customer-search-error');
@@ -661,6 +670,14 @@
             return;
         }
 
+        function recalcItemsTotal() {
+            const total = Array.from(tbody.querySelectorAll('.qty-input'))
+                .reduce((sum, input) => sum + Math.max(0, Number(input.value || 0)), 0);
+            if (itemsTotalQty) {
+                itemsTotalQty.textContent = total.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            }
+        }
+
         function addRow(prefill = null) {
             const index = tbody.children.length;
             const productText = prefill?.product_code ? `${prefill.product_code} - ${prefill.product_name || ''}` : (prefill?.product_name || '');
@@ -678,6 +695,7 @@
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
+            tr.querySelector('.qty-input')?.addEventListener('input', recalcItemsTotal);
 
             const onProductInput = debounce(async (event) => {
                 setProductFieldError(tr, '');
@@ -724,7 +742,11 @@
                     setProductFieldError(tr, @json(__('txn.product_not_registered')));
                 }
             });
-            tr.querySelector('.remove').addEventListener('click', () => tr.remove());
+            tr.querySelector('.remove').addEventListener('click', () => {
+                tr.remove();
+                recalcItemsTotal();
+            });
+            recalcItemsTotal();
         }
 
         if (customerSearch) {
@@ -869,6 +891,7 @@
         } else {
             addRow();
         }
+        recalcItemsTotal();
     </script>
 
     <datalist id="products-list">
