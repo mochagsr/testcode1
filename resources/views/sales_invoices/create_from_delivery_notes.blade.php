@@ -8,26 +8,29 @@
             table-layout: fixed;
             width: 100%;
         }
+        #items-table .date-col {
+            width: 9%;
+        }
         #items-table .delivery-col {
-            width: 14%;
+            width: 13%;
         }
         #items-table .product-col {
-            width: 40%;
+            width: 37%;
         }
         #items-table .remaining-col {
-            width: 8%;
-        }
-        #items-table .qty-col {
             width: 7%;
         }
+        #items-table .qty-col {
+            width: 6%;
+        }
         #items-table .price-col {
-            width: 11%;
+            width: 10%;
         }
         #items-table .discount-col {
-            width: 8%;
+            width: 7%;
         }
         #items-table .total-col {
-            width: 12%;
+            width: 11%;
         }
         #items-table input.qty,
         #items-table input.discount {
@@ -92,9 +95,16 @@
             <h3 style="margin-top:0;">{{ __('txn.invoice_items') }}</h3>
             <p class="muted">{{ __('txn.invoice_from_delivery_items_note') }}</p>
             <div class="table-mobile-scroll">
+                @php
+                    $deliveryRowspans = collect($rows)
+                        ->groupBy(fn ($row) => (int) $row['delivery_note']->id)
+                        ->map(fn ($group) => $group->count());
+                    $renderedDeliveryNotes = [];
+                @endphp
                 <table id="items-table">
                     <thead>
                     <tr>
+                        <th class="date-col">{{ __('txn.date') }}</th>
                         <th class="delivery-col">{{ __('txn.delivery_notes_title') }}</th>
                         <th class="product-col">{{ __('txn.product') }}</th>
                         <th class="num remaining-col">{{ __('txn.remaining_qty') }}</th>
@@ -109,6 +119,8 @@
                         @php
                             $item = $row['item'];
                             $note = $row['delivery_note'];
+                            $noteId = (int) $note->id;
+                            $shouldRenderDeliveryNote = ! isset($renderedDeliveryNotes[$noteId]);
                             $remaining = (int) ($row['remaining_qty'] ?? 0);
                             $oldPrefix = 'items.'.$index.'.';
                             $price = old($oldPrefix.'unit_price', $row['default_price'] ?? 0);
@@ -116,11 +128,18 @@
                             $discount = old($oldPrefix.'discount', 0);
                         @endphp
                         <tr>
-                            <td class="delivery-col">
-                                {{ $note->note_number }}
-                                <input type="hidden" name="items[{{ $index }}][delivery_note_item_id]" value="{{ $item->id }}">
-                            </td>
+                            @if($shouldRenderDeliveryNote)
+                                @php
+                                    $renderedDeliveryNotes[$noteId] = true;
+                                    $rowspan = (int) ($deliveryRowspans[$noteId] ?? 1);
+                                @endphp
+                                <td class="date-col" rowspan="{{ $rowspan }}">{{ $note->note_date?->format('d-m-Y') ?: '-' }}</td>
+                                <td class="delivery-col" rowspan="{{ $rowspan }}">
+                                    {{ $note->note_number }}
+                                </td>
+                            @endif
                             <td class="product-col">
+                                <input type="hidden" name="items[{{ $index }}][delivery_note_item_id]" value="{{ $item->id }}">
                                 <strong>{{ $item->product_name }}</strong>
                                 <div class="muted">{{ $item->product_code }}</div>
                             </td>

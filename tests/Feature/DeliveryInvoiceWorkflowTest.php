@@ -194,11 +194,20 @@ class DeliveryInvoiceWorkflowTest extends TestCase
             'unit' => $product->unit,
             'quantity' => 5,
         ]);
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
+            'product_id' => $product->id,
+            'product_code' => 'BK-ERP-003-B',
+            'product_name' => 'Buku Dobel B',
+            'unit' => $product->unit,
+            'quantity' => 3,
+        ]);
         $createResponse = $this->actingAs($user)
             ->get(route('sales-invoices.create-from-delivery-notes', [
                 'delivery_note_ids' => [$deliveryNote->id, $deliveryNote->id],
             ]))
             ->assertOk();
+        $createResponse->assertSee('28-04-2026');
         $this->assertSame(2, substr_count($createResponse->getContent(), 'SJ-DUP-ID-001'));
 
         $this->actingAs($user)
