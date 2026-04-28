@@ -107,8 +107,8 @@
                         <th class="date-col">{{ __('txn.date') }}</th>
                         <th class="delivery-col">{{ __('txn.delivery_notes_title') }}</th>
                         <th class="product-col">{{ __('txn.product') }}</th>
-                        <th class="num remaining-col">{{ __('txn.remaining_qty') }}</th>
-                        <th class="qty-col">{{ __('txn.qty') }}</th>
+                        <th class="num remaining-col">{{ __('txn.uninvoiced_quantity') }}</th>
+                        <th class="qty-col">{{ __('txn.invoice_quantity') }}</th>
                         <th class="price-col">{{ __('txn.price') }}</th>
                         <th class="discount-col">{{ __('txn.discount') }} (%)</th>
                         <th class="num total-col">{{ __('txn.line_total') }}</th>

@@ -184,7 +184,12 @@ class SalesInvoicePageController extends Controller
     public function pendingDeliveryNotes(Request $request): View
     {
         $search = trim((string) $request->string('search', ''));
-        $rows = $this->pendingDeliveryNoteRows($search)
+        $sort = in_array((string) $request->string('sort', 'date'), ['date', 'customer', 'city'], true)
+            ? (string) $request->string('sort', 'date')
+            : 'date';
+        $direction = strtolower((string) $request->string('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $rows = $this->pendingDeliveryNoteRows($search, $sort, $direction)
             ->paginate((int) config('pagination.default_per_page', 20))
             ->withQueryString();
         $rows->setCollection($rows->getCollection()
@@ -196,6 +201,8 @@ class SalesInvoicePageController extends Controller
         return view('sales_invoices.pending_delivery_notes', [
             'rows' => $rows,
             'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -1328,8 +1335,9 @@ class SalesInvoicePageController extends Controller
     /**
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
-    private function pendingDeliveryNoteRows(string $search): \Illuminate\Database\Eloquent\Builder
+    private function pendingDeliveryNoteRows(string $search, string $sort = 'date', string $direction = 'desc'): \Illuminate\Database\Eloquent\Builder
     {
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
         $invoicedSubquery = DB::table('sales_invoice_items as sii')
             ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
             ->whereNull('si.deleted_at')
@@ -1354,6 +1362,7 @@ class SalesInvoicePageController extends Controller
             ->joinSub($deliveryTotalsSubquery, 'delivery_totals', function ($join): void {
                 $join->on('delivery_totals.delivery_note_id', '=', 'delivery_notes.id');
             })
+            ->leftJoin('customers as sort_customers', 'sort_customers.id', '=', 'delivery_notes.customer_id')
             ->with(['customer:id,name,city', 'orderNote:id,note_number'])
             ->where('delivery_notes.is_canceled', false)
             ->when($search !== '', function ($query) use ($search): void {
@@ -1364,8 +1373,16 @@ class SalesInvoicePageController extends Controller
                 });
             })
             ->whereRaw('delivery_totals.delivered_qty > delivery_totals.invoiced_qty')
-            ->orderByDesc('delivery_notes.note_date')
-            ->orderByDesc('delivery_notes.id');
+            ->when($sort === 'customer', function ($query) use ($direction): void {
+                $query->orderByRaw("COALESCE(NULLIF(sort_customers.name, ''), delivery_notes.recipient_name, '') {$direction}");
+            })
+            ->when($sort === 'city', function ($query) use ($direction): void {
+                $query->orderByRaw("COALESCE(NULLIF(delivery_notes.city, ''), sort_customers.city, '') {$direction}");
+            })
+            ->when($sort === 'date', function ($query) use ($direction): void {
+                $query->orderBy('delivery_notes.note_date', $direction);
+            })
+            ->orderBy('delivery_notes.id', $direction);
     }
 
     /**

@@ -10,6 +10,7 @@ return [
     'suppliers' => 'Supplier',
     'supplier_payables' => 'Hutang Supplier',
     'supplier_stock_cards' => 'Kartu Stok Supplier',
+    'pending_delivery_notes_invoice' => 'Belum Dibuat Faktur',
     'sales_invoices' => 'Faktur Penjualan',
     'sales_returns' => 'Retur Penjualan',
     'delivery_notes' => 'Surat Jalan',

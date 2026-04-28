@@ -10,6 +10,7 @@ return [
     'suppliers' => 'Suppliers',
     'supplier_payables' => 'Supplier Payables',
     'supplier_stock_cards' => 'Supplier Stock Card',
+    'pending_delivery_notes_invoice' => 'Not Yet Invoiced',
     'sales_invoices' => 'Sales Invoices',
     'sales_returns' => 'Sales Returns',
     'delivery_notes' => 'Delivery Notes',

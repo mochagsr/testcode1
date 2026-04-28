@@ -1252,14 +1252,23 @@
                 @endif
             @endauth
             @if($showTransactionsGroup)
+                @php
+                    $isPendingDeliveryInvoiceRoute = request()->routeIs('sales-invoices.pending-delivery-notes')
+                        || request()->routeIs('sales-invoices.create-from-delivery-notes')
+                        || request()->routeIs('sales-invoices.store-from-delivery-notes');
+                    $isSalesInvoiceRoute = request()->routeIs('sales-invoices.*') && ! $isPendingDeliveryInvoiceRoute;
+                @endphp
                 <div class="nav-group {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-group>
                     <button type="button" class="nav-group-title {{ request()->routeIs('sales-invoices.*') || request()->routeIs('sales-returns.*') || request()->routeIs('delivery-notes.*') || request()->routeIs('delivery-trips.*') || request()->routeIs('order-notes.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_transactions') }}</button>
                     <div class="nav-sub">
-                        <a href="{{ route('sales-invoices.index') }}" class="{{ request()->routeIs('sales-invoices.*') ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
-                        <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
-                        <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
-                        <a href="{{ route('delivery-trips.index') }}" class="{{ request()->routeIs('delivery-trips.*') ? 'active' : '' }}">{{ __('menu.delivery_trip_logs') }}</a>
                         <a href="{{ route('order-notes.index') }}" class="{{ request()->routeIs('order-notes.*') ? 'active' : '' }}">{{ __('menu.order_notes') }}</a>
+                        <a href="{{ route('delivery-notes.index') }}" class="{{ request()->routeIs('delivery-notes.*') ? 'active' : '' }}">{{ __('menu.delivery_notes') }}</a>
+                        @if($canSalesInvoiceCreate)
+                            <a href="{{ route('sales-invoices.pending-delivery-notes') }}" class="{{ $isPendingDeliveryInvoiceRoute ? 'active' : '' }}">{{ __('menu.pending_delivery_notes_invoice') }}</a>
+                        @endif
+                        <a href="{{ route('sales-invoices.index') }}" class="{{ $isSalesInvoiceRoute ? 'active' : '' }}">{{ __('menu.sales_invoices') }}</a>
+                        <a href="{{ route('sales-returns.index') }}" class="{{ request()->routeIs('sales-returns.*') ? 'active' : '' }}">{{ __('menu.sales_returns') }}</a>
+                        <a href="{{ route('delivery-trips.index') }}" class="{{ request()->routeIs('delivery-trips.*') ? 'active' : '' }}">{{ __('menu.delivery_trip_logs') }}</a>
                     </div>
                 </div>
             @endif

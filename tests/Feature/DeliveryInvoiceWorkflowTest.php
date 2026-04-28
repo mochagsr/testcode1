@@ -59,7 +59,10 @@ class DeliveryInvoiceWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('sales-invoices.pending-delivery-notes'))
             ->assertOk()
-            ->assertSee('SJ-28042026-0001');
+            ->assertSee('SJ-28042026-0001')
+            ->assertSee(__('txn.uninvoiced_quantity'))
+            ->assertSee('sort=customer', false)
+            ->assertSee('sort=city', false);
 
         $this->actingAs($user)
             ->post(route('sales-invoices.store-from-delivery-notes'), [
@@ -208,6 +211,8 @@ class DeliveryInvoiceWorkflowTest extends TestCase
             ]))
             ->assertOk();
         $createResponse->assertSee('28-04-2026');
+        $createResponse->assertSee(__('txn.uninvoiced_quantity'));
+        $createResponse->assertSee(__('txn.invoice_quantity'));
         $this->assertSame(2, substr_count($createResponse->getContent(), 'SJ-DUP-ID-001'));
 
         $this->actingAs($user)

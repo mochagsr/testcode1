@@ -3,6 +3,38 @@
 @section('title', __('txn.pending_delivery_notes_invoice').' - '.config('app.name', 'Laravel'))
 
 @section('content')
+    @php
+        $sortUrl = function (string $field) use ($search, $sort, $direction): string {
+            $nextDirection = $sort === $field && $direction === 'asc' ? 'desc' : 'asc';
+
+            return route('sales-invoices.pending-delivery-notes', array_filter([
+                'search' => $search !== '' ? $search : null,
+                'sort' => $field,
+                'direction' => $nextDirection,
+            ], fn ($value) => $value !== null && $value !== ''));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) {
+                return '↕';
+            }
+
+            return $direction === 'asc' ? '↑' : '↓';
+        };
+    @endphp
+    <style>
+        .sort-link {
+            color: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+        .sort-mark {
+            color: var(--muted);
+            font-size: 0.86em;
+        }
+    </style>
+
     <div class="page-header-actions">
         <h1 class="page-title">{{ __('txn.pending_delivery_notes_invoice') }}</h1>
         <div class="actions">
@@ -29,12 +61,24 @@
                     <tr>
                         <th style="width:42px;"></th>
                         <th>{{ __('txn.note_number') }}</th>
-                        <th>{{ __('txn.date') }}</th>
-                        <th>{{ __('txn.customer') }}</th>
-                        <th>{{ __('txn.city') }}</th>
+                        <th>
+                            <a class="sort-link" href="{{ $sortUrl('date') }}">
+                                {{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span>
+                            </a>
+                        </th>
+                        <th>
+                            <a class="sort-link" href="{{ $sortUrl('customer') }}">
+                                {{ __('txn.customer') }} <span class="sort-mark">{{ $sortMark('customer') }}</span>
+                            </a>
+                        </th>
+                        <th>
+                            <a class="sort-link" href="{{ $sortUrl('city') }}">
+                                {{ __('txn.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span>
+                            </a>
+                        </th>
                         <th class="num">{{ __('txn.delivery_qty') }}</th>
                         <th class="num">{{ __('txn.invoiced_qty') }}</th>
-                        <th class="num">{{ __('txn.remaining_qty') }}</th>
+                        <th class="num">{{ __('txn.uninvoiced_quantity') }}</th>
                     </tr>
                     </thead>
                     <tbody>
