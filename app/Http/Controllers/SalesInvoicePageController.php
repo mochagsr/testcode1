@@ -246,7 +246,7 @@ class SalesInvoicePageController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.delivery_note_item_id' => ['required', 'integer', 'exists:delivery_note_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:1'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 

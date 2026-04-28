@@ -129,7 +129,7 @@
                                 <input class="qty" type="number" name="items[{{ $index }}][quantity]" value="{{ $qty }}" min="1" max="{{ $remaining }}" required>
                             </td>
                             <td class="price-col">
-                                <input class="price" type="number" name="items[{{ $index }}][unit_price]" value="{{ $price }}" min="0" step="1" required>
+                                <input class="price" type="number" name="items[{{ $index }}][unit_price]" value="{{ $price }}" min="1" step="1" required>
                             </td>
                             <td class="discount-col">
                                 <input class="discount" type="number" name="items[{{ $index }}][discount]" value="{{ $discount }}" min="0" max="100" step="1">
