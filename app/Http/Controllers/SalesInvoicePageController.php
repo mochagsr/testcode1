@@ -8,13 +8,14 @@ use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
 use App\Models\Customer;
 use App\Models\AuditLog;
+use App\Models\DeliveryNote;
+use App\Models\DeliveryNoteItem;
 use App\Models\InvoicePayment;
 use App\Models\OrderNote;
 use App\Models\OrderNoteItem;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
-use App\Models\StockMutation;
 use App\Services\ReceivableLedgerService;
 use App\Services\AuditLogService;
 use App\Services\AccountingService;
@@ -178,6 +179,216 @@ class SalesInvoicePageController extends Controller
             'customerSemesterLockMap' => $customerSemesterLockMap,
             'invoiceAdminActionMap' => $invoiceAdminActionMap,
         ]);
+    }
+
+    public function pendingDeliveryNotes(Request $request): View
+    {
+        $search = trim((string) $request->string('search', ''));
+        $rows = $this->pendingDeliveryNoteRows($search)
+            ->paginate((int) config('pagination.default_per_page', 20))
+            ->withQueryString();
+
+        return view('sales_invoices.pending_delivery_notes', [
+            'rows' => $rows,
+            'search' => $search,
+        ]);
+    }
+
+    public function createFromDeliveryNotes(Request $request): View|RedirectResponse
+    {
+        $deliveryNoteIds = collect((array) $request->input('delivery_note_ids', []))
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($deliveryNoteIds->isEmpty()) {
+            return redirect()
+                ->route('sales-invoices.pending-delivery-notes')
+                ->withErrors(['delivery_note_ids' => __('txn.select_delivery_note_first')]);
+        }
+
+        $context = $this->deliveryNoteInvoiceContext($deliveryNoteIds->all());
+        if ($context['rows']->isEmpty()) {
+            return redirect()
+                ->route('sales-invoices.pending-delivery-notes')
+                ->withErrors(['delivery_note_ids' => __('txn.no_delivery_note_ready_for_invoice')]);
+        }
+
+        $defaultSemester = $this->semesterBookService()->semesterFromDate(now()->toDateString()) ?? $this->defaultSemesterPeriod();
+        $semesterOptionsBase = $this->cachedSemesterOptionsFromPeriodColumn(
+            'sales_invoices.index.semester_options.base',
+            SalesInvoice::class
+        );
+        $semesterOptions = $this->semesterOptionsForForm($semesterOptionsBase);
+        if (! $semesterOptions->contains($defaultSemester)) {
+            $semesterOptions->prepend($defaultSemester);
+        }
+
+        return view('sales_invoices.create_from_delivery_notes', [
+            'customer' => $context['customer'],
+            'deliveryNotes' => $context['delivery_notes'],
+            'rows' => $context['rows'],
+            'defaultSemesterPeriod' => $defaultSemester,
+            'semesterOptions' => $semesterOptions,
+        ]);
+    }
+
+    public function storeFromDeliveryNotes(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
+            'semester_period' => ['nullable', 'string', 'max:30'],
+            'payment_method' => ['required', 'in:tunai,kredit'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.delivery_note_item_id' => ['required', 'integer', 'exists:delivery_note_items,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
+        $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['invoice_date']);
+        $selectedSemester = $normalizedSemester ?? $semesterFromDate ?? $this->defaultSemesterPeriod();
+
+        $invoice = DB::transaction(function () use ($data, $selectedSemester): SalesInvoice {
+            $invoiceDate = Carbon::parse((string) $data['invoice_date']);
+            $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
+            $customerId = (int) $data['customer_id'];
+            $rows = collect($data['items']);
+
+            $itemIds = $rows->pluck('delivery_note_item_id')->map(fn ($id): int => (int) $id)->unique()->values()->all();
+            $deliveryItems = DeliveryNoteItem::query()
+                ->with(['deliveryNote:id,note_number,note_date,customer_id,order_note_id,transaction_type,customer_printing_subtype_id,printing_subtype_name,is_canceled', 'product:id,code,name'])
+                ->whereIn('id', $itemIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $invoicedByItem = DB::table('sales_invoice_items as sii')
+                ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+                ->whereNull('si.deleted_at')
+                ->where('si.is_canceled', false)
+                ->whereIn('sii.delivery_note_item_id', $itemIds)
+                ->selectRaw('sii.delivery_note_item_id, COALESCE(SUM(sii.quantity), 0) as invoiced_qty')
+                ->groupBy('sii.delivery_note_item_id')
+                ->pluck('invoiced_qty', 'sii.delivery_note_item_id');
+
+            $computedRows = [];
+            $subtotal = 0.0;
+            $deliveryNoteIds = [];
+            $orderNoteIds = [];
+            $transactionType = TransactionType::PRODUCT;
+            $printingSubtypeId = null;
+            $printingSubtypeName = null;
+
+            foreach ($rows as $index => $row) {
+                $deliveryItemId = (int) ($row['delivery_note_item_id'] ?? 0);
+                /** @var DeliveryNoteItem|null $deliveryItem */
+                $deliveryItem = $deliveryItems->get($deliveryItemId);
+                if (! $deliveryItem || ! $deliveryItem->deliveryNote || (bool) $deliveryItem->deliveryNote->is_canceled) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}.delivery_note_item_id" => __('txn.delivery_note_item_invalid'),
+                    ]);
+                }
+                if ((int) $deliveryItem->deliveryNote->customer_id !== $customerId) {
+                    throw ValidationException::withMessages([
+                        'customer_id' => __('txn.delivery_note_customer_mismatch'),
+                    ]);
+                }
+
+                $remaining = max(0, (int) $deliveryItem->quantity - (int) round((float) ($invoicedByItem[$deliveryItemId] ?? 0)));
+                $quantity = (int) $row['quantity'];
+                if ($quantity > $remaining) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}.quantity" => __('txn.delivery_note_invoice_qty_exceeds_remaining'),
+                    ]);
+                }
+
+                $unitPrice = (float) round((float) $row['unit_price']);
+                $discountPercent = max(0.0, min(100.0, (float) ($row['discount'] ?? 0)));
+                $gross = $quantity * $unitPrice;
+                $discount = (float) round($gross * ($discountPercent / 100));
+                $lineTotal = max(0, $gross - $discount);
+                $subtotal += $lineTotal;
+
+                $deliveryNoteIds[(int) $deliveryItem->delivery_note_id] = true;
+                if ((int) ($deliveryItem->deliveryNote->order_note_id ?? 0) > 0) {
+                    $orderNoteIds[(int) $deliveryItem->deliveryNote->order_note_id] = true;
+                }
+                $transactionType = TransactionType::normalize((string) ($deliveryItem->deliveryNote->transaction_type ?: $transactionType));
+                $printingSubtypeId = $printingSubtypeId ?? ($deliveryItem->deliveryNote->customer_printing_subtype_id ? (int) $deliveryItem->deliveryNote->customer_printing_subtype_id : null);
+                $printingSubtypeName = $printingSubtypeName ?? $deliveryItem->deliveryNote->printing_subtype_name;
+
+                $computedRows[] = [
+                    'delivery_item' => $deliveryItem,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'discount' => $discount,
+                    'line_total' => $lineTotal,
+                ];
+            }
+
+            $linkedOrderNoteId = count($orderNoteIds) === 1 ? (int) array_key_first($orderNoteIds) : null;
+            $invoice = SalesInvoice::create([
+                'invoice_number' => $invoiceNumber,
+                'customer_id' => $customerId,
+                'customer_ship_location_id' => null,
+                'order_note_id' => $linkedOrderNoteId,
+                'invoice_date' => $invoiceDate->toDateString(),
+                'due_date' => $data['due_date'] ?? null,
+                'semester_period' => $selectedSemester,
+                'transaction_type' => $transactionType,
+                'customer_printing_subtype_id' => $printingSubtypeId,
+                'printing_subtype_name' => $printingSubtypeName,
+                'subtotal' => $subtotal,
+                'total' => $subtotal,
+                'total_paid' => 0,
+                'balance' => $subtotal,
+                'payment_status' => 'unpaid',
+                'ship_to_name' => null,
+                'ship_to_phone' => null,
+                'ship_to_city' => null,
+                'ship_to_address' => null,
+                'notes' => $this->invoiceNotesFromDeliveryNotes($data['notes'] ?? null, array_keys($deliveryNoteIds)),
+            ]);
+
+            foreach ($computedRows as $row) {
+                /** @var DeliveryNoteItem $deliveryItem */
+                $deliveryItem = $row['delivery_item'];
+                SalesInvoiceItem::create([
+                    'sales_invoice_id' => $invoice->id,
+                    'order_note_item_id' => $deliveryItem->order_note_item_id ?: null,
+                    'delivery_note_item_id' => $deliveryItem->id,
+                    'product_id' => (int) $deliveryItem->product_id,
+                    'product_code' => (string) ($deliveryItem->product_code ?: $deliveryItem->product?->code),
+                    'product_name' => (string) $deliveryItem->product_name,
+                    'quantity' => $row['quantity'],
+                    'unit_price' => $row['unit_price'],
+                    'discount' => $row['discount'],
+                    'line_total' => $row['line_total'],
+                ]);
+            }
+
+            $this->postInvoiceReceivableAndPayment($invoice, $invoiceDate, $subtotal, (string) $data['payment_method']);
+
+            return $invoice;
+        });
+
+        $this->auditLogService->log(
+            'sales.invoice.create_from_delivery_notes',
+            $invoice,
+            __('txn.audit_invoice_created_from_delivery_notes', ['number' => $invoice->invoice_number]),
+            $request
+        );
+        AppCache::forgetAfterFinancialMutation([(string) $invoice->invoice_date]);
+
+        return redirect()
+            ->route('sales-invoices.show', $invoice)
+            ->with('success', __('txn.invoice_created_success', ['number' => $invoice->invoice_number]));
     }
 
     public function create(): View
@@ -350,12 +561,6 @@ class SalesInvoicePageController extends Controller
                 }
 
                 $quantity = (int) $row['quantity'];
-                if ($product->stock < $quantity) {
-                    throw ValidationException::withMessages([
-                        "items.{$index}.quantity" => __('txn.insufficient_stock_for', ['product' => $product->name]),
-                    ]);
-                }
-
                 $unitPrice = (float) round((float) $row['unit_price']);
                 $discountPercent = max(0.0, min(100.0, (float) ($row['discount'] ?? 0)));
                 $gross = $quantity * $unitPrice;
@@ -435,17 +640,6 @@ class SalesInvoicePageController extends Controller
                     'line_total' => $row['line_total'],
                 ]);
 
-                $product->decrement('stock', $row['quantity']);
-
-                StockMutation::create([
-                    'product_id' => $product->id,
-                    'reference_type' => SalesInvoice::class,
-                    'reference_id' => $invoice->id,
-                    'mutation_type' => 'out',
-                    'quantity' => $row['quantity'],
-                    'notes' => "Sales invoice {$invoice->invoice_number}",
-                    'created_by_user_id' => null,
-                ]);
             }
 
             $this->receivableLedgerService->addDebit(
@@ -666,6 +860,11 @@ class SalesInvoicePageController extends Controller
                     'items' => __('txn.canceled_info'),
                 ]);
             }
+            if ($invoice->items->contains(fn (SalesInvoiceItem $item): bool => (int) ($item->delivery_note_item_id ?? 0) > 0)) {
+                throw ValidationException::withMessages([
+                    'items' => __('txn.delivery_invoice_edit_locked'),
+                ]);
+            }
 
             $rows = collect($data['items'] ?? []);
             $invoiceDateValue = Carbon::parse((string) $data['invoice_date'])->toDateString();
@@ -707,25 +906,10 @@ class SalesInvoicePageController extends Controller
                 ->map(fn(SalesInvoiceItem $item): string => "{$item->product_name}:qty{$item->quantity}:price" . (int) round((float) $item->unit_price))
                 ->implode(' | ');
 
-            $oldQtyByProduct = [];
-            foreach ($invoice->items as $existingItem) {
-                $productId = (int) ($existingItem->product_id ?? 0);
-                if ($productId <= 0) {
-                    continue;
-                }
-                $oldQtyByProduct[$productId] = ($oldQtyByProduct[$productId] ?? 0) + (int) $existingItem->quantity;
-            }
-
-            $newQtyByProduct = [];
-            foreach ($rows as $row) {
-                $productId = (int) ($row['product_id'] ?? 0);
-                if ($productId <= 0) {
-                    continue;
-                }
-                $newQtyByProduct[$productId] = ($newQtyByProduct[$productId] ?? 0) + (int) ($row['quantity'] ?? 0);
-            }
-
-            $productIds = collect(array_merge(array_keys($oldQtyByProduct), array_keys($newQtyByProduct)))
+            $productIds = $rows
+                ->pluck('product_id')
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values()
                 ->all();
@@ -741,58 +925,6 @@ class SalesInvoicePageController extends Controller
                 if (! $product) {
                     throw ValidationException::withMessages([
                         'items' => __('txn.product_not_found'),
-                    ]);
-                }
-
-                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
-                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
-                $delta = $oldQty - $newQty;
-
-                if ($delta < 0) {
-                    $need = abs($delta);
-                    if ((int) $product->stock < $need) {
-                        throw ValidationException::withMessages([
-                            'items' => __('txn.insufficient_stock_for', ['product' => $product->name]),
-                        ]);
-                    }
-                }
-            }
-
-            foreach ($productIds as $productId) {
-                $product = $products->get((int) $productId);
-                if (! $product) {
-                    continue;
-                }
-
-                $oldQty = (int) ($oldQtyByProduct[(int) $productId] ?? 0);
-                $newQty = (int) ($newQtyByProduct[(int) $productId] ?? 0);
-                $delta = $oldQty - $newQty;
-                if ($delta === 0) {
-                    continue;
-                }
-
-                if ($delta > 0) {
-                    $product->increment('stock', $delta);
-                    StockMutation::create([
-                        'product_id' => $product->id,
-                        'reference_type' => SalesInvoice::class,
-                        'reference_id' => $invoice->id,
-                        'mutation_type' => 'in',
-                        'quantity' => $delta,
-                        'notes' => "Admin edit invoice {$invoice->invoice_number}",
-                        'created_by_user_id' => Auth::id(),
-                    ]);
-                } else {
-                    $outQty = abs($delta);
-                    $product->decrement('stock', $outQty);
-                    StockMutation::create([
-                        'product_id' => $product->id,
-                        'reference_type' => SalesInvoice::class,
-                        'reference_id' => $invoice->id,
-                        'mutation_type' => 'out',
-                        'quantity' => $outQty,
-                        'notes' => "Admin edit invoice {$invoice->invoice_number}",
-                        'created_by_user_id' => Auth::id(),
                     ]);
                 }
             }
@@ -1039,33 +1171,6 @@ class SalesInvoicePageController extends Controller
                 return;
             }
 
-            foreach ($invoice->items as $item) {
-                if (! $item->product_id || (int) $item->quantity <= 0) {
-                    continue;
-                }
-
-                $product = Product::query()
-                    ->whereKey($item->product_id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $product) {
-                    continue;
-                }
-
-                $product->increment('stock', (int) $item->quantity);
-
-                StockMutation::create([
-                    'product_id' => $product->id,
-                    'reference_type' => SalesInvoice::class,
-                    'reference_id' => $invoice->id,
-                    'mutation_type' => 'in',
-                    'quantity' => (int) $item->quantity,
-                    'notes' => "Cancel invoice {$invoice->invoice_number}",
-                    'created_by_user_id' => Auth::id(),
-                ]);
-            }
-
             $openBalance = max(0, (float) $invoice->balance);
                 if ($openBalance > 0) {
                 $this->receivableLedgerService->addCredit(
@@ -1211,6 +1316,230 @@ class SalesInvoicePageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function pendingDeliveryNoteRows(string $search): \Illuminate\Database\Eloquent\Builder
+    {
+        $invoicedSubquery = DB::table('sales_invoice_items as sii')
+            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+            ->whereNull('si.deleted_at')
+            ->where('si.is_canceled', false)
+            ->whereNotNull('sii.delivery_note_item_id')
+            ->selectRaw('sii.delivery_note_item_id, COALESCE(SUM(sii.quantity), 0) as invoiced_qty')
+            ->groupBy('sii.delivery_note_item_id');
+
+        return DeliveryNote::query()
+            ->select('delivery_notes.*')
+            ->selectRaw('COALESCE(SUM(delivery_note_items.quantity), 0) as delivered_qty')
+            ->selectRaw('COALESCE(SUM(COALESCE(invoiced_items.invoiced_qty, 0)), 0) as invoiced_qty')
+            ->leftJoin('delivery_note_items', 'delivery_note_items.delivery_note_id', '=', 'delivery_notes.id')
+            ->leftJoinSub($invoicedSubquery, 'invoiced_items', function ($join): void {
+                $join->on('invoiced_items.delivery_note_item_id', '=', 'delivery_note_items.id');
+            })
+            ->with(['customer:id,name,city', 'orderNote:id,note_number'])
+            ->where('delivery_notes.is_canceled', false)
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($subQuery) use ($search): void {
+                    $subQuery->where('delivery_notes.note_number', 'like', "%{$search}%")
+                        ->orWhere('delivery_notes.recipient_name', 'like', "%{$search}%")
+                        ->orWhere('delivery_notes.city', 'like', "%{$search}%");
+                });
+            })
+            ->groupBy('delivery_notes.id')
+            ->havingRaw('COALESCE(SUM(delivery_note_items.quantity), 0) > COALESCE(SUM(COALESCE(invoiced_items.invoiced_qty, 0)), 0)')
+            ->orderByDesc('delivery_notes.note_date')
+            ->orderByDesc('delivery_notes.id');
+    }
+
+    /**
+     * @param  list<int>  $deliveryNoteIds
+     * @return array{customer: Customer, delivery_notes: \Illuminate\Support\Collection<int, DeliveryNote>, rows: \Illuminate\Support\Collection<int, array<string, mixed>>}
+     */
+    private function deliveryNoteInvoiceContext(array $deliveryNoteIds): array
+    {
+        $deliveryNotes = DeliveryNote::query()
+            ->with(['customer:id,name,city,phone,address', 'orderNote:id,note_number', 'items.product:id,code,name,price_agent,price_sales,price_general'])
+            ->whereIn('id', $deliveryNoteIds)
+            ->where('is_canceled', false)
+            ->orderBy('note_date')
+            ->orderBy('id')
+            ->get();
+
+        if ($deliveryNotes->isEmpty()) {
+            throw ValidationException::withMessages([
+                'delivery_note_ids' => __('txn.no_delivery_note_ready_for_invoice'),
+            ]);
+        }
+
+        $customerIds = $deliveryNotes->pluck('customer_id')->map(fn ($id): int => (int) $id)->unique()->values();
+        if ($customerIds->count() !== 1) {
+            throw ValidationException::withMessages([
+                'delivery_note_ids' => __('txn.delivery_notes_must_same_customer'),
+            ]);
+        }
+
+        $itemIds = $deliveryNotes
+            ->flatMap(fn (DeliveryNote $note) => $note->items->pluck('id'))
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+        $invoicedByItem = DB::table('sales_invoice_items as sii')
+            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
+            ->whereNull('si.deleted_at')
+            ->where('si.is_canceled', false)
+            ->whereIn('sii.delivery_note_item_id', $itemIds)
+            ->selectRaw('sii.delivery_note_item_id, COALESCE(SUM(sii.quantity), 0) as invoiced_qty')
+            ->groupBy('sii.delivery_note_item_id')
+            ->pluck('invoiced_qty', 'sii.delivery_note_item_id');
+
+        $rows = $deliveryNotes
+            ->flatMap(function (DeliveryNote $note) use ($invoicedByItem): array {
+                return $note->items
+                    ->map(function (DeliveryNoteItem $item) use ($note, $invoicedByItem): ?array {
+                        $remaining = max(0, (int) $item->quantity - (int) round((float) ($invoicedByItem[(int) $item->id] ?? 0)));
+                        if ($remaining <= 0) {
+                            return null;
+                        }
+                        $product = $item->product;
+
+                        return [
+                            'delivery_note' => $note,
+                            'item' => $item,
+                            'remaining_qty' => $remaining,
+                            'default_price' => (int) round((float) ($product?->price_general ?? 0)),
+                        ];
+                    })
+                    ->filter()
+                    ->values()
+                    ->all();
+            })
+            ->values();
+
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages([
+                'delivery_note_ids' => __('txn.no_delivery_note_ready_for_invoice'),
+            ]);
+        }
+
+        $customer = Customer::query()->findOrFail((int) $customerIds->first());
+
+        return [
+            'customer' => $customer,
+            'delivery_notes' => $deliveryNotes,
+            'rows' => $rows,
+        ];
+    }
+
+    private function invoiceNotesFromDeliveryNotes(?string $notes, array $deliveryNoteIds): ?string
+    {
+        $numbers = DeliveryNote::query()
+            ->whereIn('id', $deliveryNoteIds)
+            ->orderBy('note_date')
+            ->pluck('note_number')
+            ->filter()
+            ->values()
+            ->implode(', ');
+        $prefix = $numbers !== '' ? __('txn.invoice_from_delivery_notes', ['numbers' => $numbers]) : '';
+        $body = trim((string) ($notes ?? ''));
+
+        return trim($prefix.($prefix !== '' && $body !== '' ? "\n" : '').$body) ?: null;
+    }
+
+    private function postInvoiceReceivableAndPayment(SalesInvoice $invoice, Carbon $invoiceDate, float $subtotal, string $paymentMethod): void
+    {
+        $this->receivableLedgerService->addDebit(
+            customerId: (int) $invoice->customer_id,
+            invoiceId: (int) $invoice->id,
+            entryDate: $invoiceDate,
+            amount: $subtotal,
+            periodCode: $invoice->semester_period,
+            description: __('receivable.invoice_label') . ' ' . $invoice->invoice_number,
+            transactionType: (string) $invoice->transaction_type,
+            printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+            printingSubtypeName: $invoice->printing_subtype_name,
+        );
+
+        $initialPayment = $paymentMethod === 'tunai' ? (float) $invoice->total : 0.0;
+        if ($initialPayment > 0) {
+            InvoicePayment::create([
+                'sales_invoice_id' => $invoice->id,
+                'payment_date' => $invoiceDate->toDateString(),
+                'amount' => $initialPayment,
+                'method' => 'cash',
+                'notes' => __('txn.full_payment_on_create'),
+            ]);
+
+            $invoice->update([
+                'total_paid' => $initialPayment,
+                'balance' => 0,
+                'payment_status' => 'paid',
+            ]);
+
+            $this->receivableLedgerService->addCredit(
+                customerId: (int) $invoice->customer_id,
+                invoiceId: (int) $invoice->id,
+                entryDate: $invoiceDate,
+                amount: $initialPayment,
+                periodCode: $invoice->semester_period,
+                description: __('receivable.payment_for_invoice', [
+                    'invoice' => $invoice->invoice_number,
+                ]),
+                transactionType: (string) $invoice->transaction_type,
+                printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                printingSubtypeName: $invoice->printing_subtype_name,
+            );
+        }
+
+        $customer = Customer::query()
+            ->lockForUpdate()
+            ->findOrFail((int) $invoice->customer_id);
+        $availableCustomerBalance = (float) $customer->credit_balance;
+        $invoiceBalance = (float) $invoice->balance;
+        $appliedFromBalance = min($availableCustomerBalance, $invoiceBalance);
+        if ($appliedFromBalance > 0) {
+            InvoicePayment::create([
+                'sales_invoice_id' => $invoice->id,
+                'payment_date' => $invoiceDate->toDateString(),
+                'amount' => $appliedFromBalance,
+                'method' => 'customer_balance',
+                'notes' => __('txn.used_customer_balance'),
+            ]);
+
+            $newTotalPaid = (float) $invoice->total_paid + $appliedFromBalance;
+            $newBalance = max(0, (float) $invoice->total - $newTotalPaid);
+            $invoice->update([
+                'total_paid' => $newTotalPaid,
+                'balance' => $newBalance,
+                'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+            ]);
+            $customer->update([
+                'credit_balance' => max(0, $availableCustomerBalance - $appliedFromBalance),
+            ]);
+
+            $this->receivableLedgerService->addCredit(
+                customerId: (int) $invoice->customer_id,
+                invoiceId: (int) $invoice->id,
+                entryDate: $invoiceDate,
+                amount: $appliedFromBalance,
+                periodCode: $invoice->semester_period,
+                description: __('txn.customer_balance_applied_for_invoice', [
+                    'invoice' => $invoice->invoice_number,
+                ]),
+                transactionType: (string) $invoice->transaction_type,
+                printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
+                printingSubtypeName: $invoice->printing_subtype_name,
+            );
+        }
+
+        $this->accountingService->postSalesInvoice(
+            invoiceId: (int) $invoice->id,
+            date: $invoiceDate,
+            amount: (int) round($subtotal),
+            paymentMethod: $paymentMethod
+        );
     }
 
     /**

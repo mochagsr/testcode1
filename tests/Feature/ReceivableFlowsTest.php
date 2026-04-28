@@ -467,7 +467,7 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('Rp 52.500');
     }
 
-    public function test_admin_can_cancel_sales_invoice_and_stock_is_reverted(): void
+    public function test_admin_can_cancel_sales_invoice_without_changing_stock(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = Customer::query()->create([
@@ -523,18 +523,15 @@ class ReceivableFlowsTest extends TestCase
 
         $this->assertTrue((bool) $invoice->is_canceled);
         $this->assertSame(0.0, (float) $invoice->balance);
-        $this->assertSame(7.0, (float) $product->stock);
-
-        $this->assertDatabaseHas('stock_mutations', [
+        $this->assertSame(5.0, (float) $product->stock);
+        $this->assertDatabaseMissing('stock_mutations', [
             'product_id' => $product->id,
             'reference_type' => SalesInvoice::class,
             'reference_id' => $invoice->id,
-            'mutation_type' => 'in',
-            'quantity' => 2,
         ]);
     }
 
-    public function test_admin_can_edit_invoice_items_and_stock_is_rebalanced(): void
+    public function test_admin_can_edit_invoice_items_without_changing_stock(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = Customer::query()->create([
@@ -616,8 +613,8 @@ class ReceivableFlowsTest extends TestCase
 
         $this->assertSame(55000.0, (float) $invoice->total);
         $this->assertSame(55000.0, (float) $invoice->balance);
-        $this->assertSame(11.0, (float) $productA->stock);
-        $this->assertSame(17.0, (float) $productB->stock);
+        $this->assertSame(10.0, (float) $productA->stock);
+        $this->assertSame(20.0, (float) $productB->stock);
         $this->assertCount(2, $invoice->items()->get());
     }
 

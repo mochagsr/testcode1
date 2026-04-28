@@ -19,6 +19,7 @@
 
     <form method="post" action="{{ route('delivery-notes.store') }}">
         @csrf
+        <input type="hidden" name="order_note_id" value="{{ old('order_note_id', $selectedOrderNote?->id) }}">
 
         <div class="card">
             <div class="form-section">
@@ -55,6 +56,12 @@
                             @endforeach
                         </datalist>
                     </div>
+                    @if($selectedOrderNote)
+                        <div class="col-4">
+                            <label>{{ __('txn.linked_order_note') }}</label>
+                            <input type="text" value="{{ $selectedOrderNote->note_number }}" disabled>
+                        </div>
+                    @endif
                     <div class="col-4">
                         <label>{{ __('school_bulk.ship_to_school') }}</label>
                         <input type="text"
@@ -133,6 +140,7 @@
         let customers = @json($customers->values());
         let shipLocations = @json($shipLocations->values());
         let products = @json($products);
+        const bootItems = @json($bootItems ?? []);
         let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
         let customerByLabel = new Map();
         let customerByName = new Map();
@@ -653,18 +661,20 @@
             return;
         }
 
-        function addRow() {
+        function addRow(prefill = null) {
             const index = tbody.children.length;
+            const productText = prefill?.product_code ? `${prefill.product_code} - ${prefill.product_name || ''}` : (prefill?.product_name || '');
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" required>
-                    <input type="hidden" name="items[${index}][product_id]" class="product-id">
+                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" value="${escapeAttribute(productText)}" required>
+                    <input type="hidden" name="items[${index}][product_id]" class="product-id" value="${escapeAttribute(String(prefill?.product_id || ''))}">
+                    <input type="hidden" name="items[${index}][order_note_item_id]" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
-                <td><input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required style="max-width: 104px;"></td>
-                <td><input name="items[${index}][unit]" class="unit" style="max-width: 72px;"></td>
-                <td><input name="items[${index}][notes]"></td>
+                <td><input name="items[${index}][quantity]" type="number" min="1" value="${escapeAttribute(String(prefill?.quantity || 1))}" class="qty-input" required style="max-width: 104px;"></td>
+                <td><input name="items[${index}][unit]" class="unit" value="${escapeAttribute(String(prefill?.unit || ''))}" style="max-width: 72px;"></td>
+                <td><input name="items[${index}][notes]" value="${escapeAttribute(String(prefill?.notes || ''))}"></td>
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
@@ -854,7 +864,11 @@
                 form.submit();
             });
         }
-        addRow();
+        if (Array.isArray(bootItems) && bootItems.length > 0) {
+            bootItems.forEach((item) => addRow(item));
+        } else {
+            addRow();
+        }
     </script>
 
     <datalist id="products-list">

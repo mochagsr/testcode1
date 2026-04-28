@@ -77,6 +77,11 @@ class OrderNote extends Model
         return $this->hasMany(SalesInvoice::class, 'order_note_id');
     }
 
+    public function deliveryNotes(): HasMany
+    {
+        return $this->hasMany(DeliveryNote::class, 'order_note_id');
+    }
+
     /**
      * Scope: Only select essential columns for list views.
      *

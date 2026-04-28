@@ -67,6 +67,9 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     ->name('api.customers.printing-subtypes.store');
 
     Route::get('/sales-invoices', [SalesInvoicePageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-invoices.index');
+    Route::get('/sales-invoices/pending-delivery-notes', [SalesInvoicePageController::class, 'pendingDeliveryNotes'])->middleware('perm:sales_invoices.create')->name('sales-invoices.pending-delivery-notes');
+    Route::get('/sales-invoices/from-delivery-notes', [SalesInvoicePageController::class, 'createFromDeliveryNotes'])->middleware('perm:sales_invoices.create')->name('sales-invoices.create-from-delivery-notes');
+    Route::post('/sales-invoices/from-delivery-notes', [SalesInvoicePageController::class, 'storeFromDeliveryNotes'])->middleware(['finance.unlocked', 'semester.open', 'idempotent', 'perm:sales_invoices.create'])->name('sales-invoices.store-from-delivery-notes');
     Route::get('/sales-invoices/create', [SalesInvoicePageController::class, 'create'])->middleware('perm:sales_invoices.create')->name('sales-invoices.create');
     Route::post('/sales-invoices', [SalesInvoicePageController::class, 'store'])->middleware(['finance.unlocked', 'semester.open', 'idempotent', 'perm:sales_invoices.create'])->name('sales-invoices.store');
     Route::get('/sales-invoices/{salesInvoice}', [SalesInvoicePageController::class, 'show'])->middleware('perm:transactions.view')->name('sales-invoices.show');

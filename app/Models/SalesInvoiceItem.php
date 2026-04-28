@@ -19,6 +19,7 @@ class SalesInvoiceItem extends Model
     protected $fillable = [
         'sales_invoice_id',
         'order_note_item_id',
+        'delivery_note_item_id',
         'product_id',
         'product_code',
         'product_name',
@@ -63,6 +64,11 @@ class SalesInvoiceItem extends Model
     public function orderNoteItem(): BelongsTo
     {
         return $this->belongsTo(OrderNoteItem::class, 'order_note_item_id');
+    }
+
+    public function deliveryNoteItem(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryNoteItem::class, 'delivery_note_item_id');
     }
 
     /**

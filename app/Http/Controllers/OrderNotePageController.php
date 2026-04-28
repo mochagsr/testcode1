@@ -254,13 +254,12 @@ class OrderNotePageController extends Controller
 
         $fulfilledByItem = [];
         if ($itemIds !== []) {
-            $fulfilledByItem = DB::table('sales_invoice_items as sii')
-                ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
-                ->whereNull('si.deleted_at')
-                ->where('si.is_canceled', false)
-                ->whereIn('sii.order_note_item_id', $itemIds)
-                ->selectRaw('sii.order_note_item_id, COALESCE(SUM(sii.quantity), 0) as fulfilled_qty')
-                ->groupBy('sii.order_note_item_id')
+            $fulfilledByItem = DB::table('delivery_note_items as dni')
+                ->join('delivery_notes as dn', 'dn.id', '=', 'dni.delivery_note_id')
+                ->where('dn.is_canceled', false)
+                ->whereIn('dni.order_note_item_id', $itemIds)
+                ->selectRaw('dni.order_note_item_id, COALESCE(SUM(dni.quantity), 0) as fulfilled_qty')
+                ->groupBy('dni.order_note_item_id')
                 ->get()
                 ->pluck('fulfilled_qty', 'order_note_item_id')
                 ->map(fn($qty): int => (int) round((float) $qty))
@@ -268,14 +267,13 @@ class OrderNotePageController extends Controller
         }
 
         $fallbackByNoteProduct = [];
-        $fallbackRows = DB::table('sales_invoice_items as sii')
-            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
-            ->whereNull('si.deleted_at')
-            ->where('si.is_canceled', false)
-            ->whereIn('si.order_note_id', $noteIds)
-            ->whereNull('sii.order_note_item_id')
-            ->selectRaw('si.order_note_id as note_id, sii.product_id, COALESCE(SUM(sii.quantity), 0) as fulfilled_qty')
-            ->groupBy('si.order_note_id', 'sii.product_id')
+        $fallbackRows = DB::table('delivery_note_items as dni')
+            ->join('delivery_notes as dn', 'dn.id', '=', 'dni.delivery_note_id')
+            ->where('dn.is_canceled', false)
+            ->whereIn('dn.order_note_id', $noteIds)
+            ->whereNull('dni.order_note_item_id')
+            ->selectRaw('dn.order_note_id as note_id, dni.product_id, COALESCE(SUM(dni.quantity), 0) as fulfilled_qty')
+            ->groupBy('dn.order_note_id', 'dni.product_id')
             ->get();
         foreach ($fallbackRows as $row) {
             $noteId = (int) ($row->note_id ?? 0);
@@ -727,14 +725,13 @@ class OrderNotePageController extends Controller
             ->groupBy('order_note_id')
             ->pluck('ordered_total', 'order_note_id');
 
-        $fulfilledByNote = DB::table('sales_invoice_items as sii')
-            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
-            ->whereNull('si.deleted_at')
-            ->where('si.is_canceled', false)
-            ->whereIn('si.order_note_id', $cleanIds)
-            ->selectRaw('si.order_note_id, COALESCE(SUM(sii.quantity), 0) as fulfilled_total')
-            ->groupBy('si.order_note_id')
-            ->pluck('fulfilled_total', 'si.order_note_id');
+        $fulfilledByNote = DB::table('delivery_note_items as dni')
+            ->join('delivery_notes as dn', 'dn.id', '=', 'dni.delivery_note_id')
+            ->where('dn.is_canceled', false)
+            ->whereIn('dn.order_note_id', $cleanIds)
+            ->selectRaw('dn.order_note_id, COALESCE(SUM(dni.quantity), 0) as fulfilled_total')
+            ->groupBy('dn.order_note_id')
+            ->pluck('fulfilled_total', 'dn.order_note_id');
 
         $result = [];
         foreach ($cleanIds as $noteId) {
@@ -801,22 +798,21 @@ class OrderNotePageController extends Controller
             }
         }
 
-        $invoiceRows = DB::table('sales_invoice_items as sii')
-            ->join('sales_invoices as si', 'si.id', '=', 'sii.sales_invoice_id')
-            ->where('si.order_note_id', (int) $orderNote->id)
-            ->whereNull('si.deleted_at')
-            ->where('si.is_canceled', false)
-            ->orderBy('si.invoice_date')
-            ->orderBy('si.id')
-            ->orderBy('sii.id')
+        $invoiceRows = DB::table('delivery_note_items as dni')
+            ->join('delivery_notes as dn', 'dn.id', '=', 'dni.delivery_note_id')
+            ->where('dn.order_note_id', (int) $orderNote->id)
+            ->where('dn.is_canceled', false)
+            ->orderBy('dn.note_date')
+            ->orderBy('dn.id')
+            ->orderBy('dni.id')
             ->get([
-                'sii.id',
-                'sii.order_note_item_id',
-                'sii.product_id',
-                'sii.quantity',
-                'si.id as invoice_id',
-                'si.invoice_number',
-                'si.invoice_date',
+                'dni.id',
+                'dni.order_note_item_id',
+                'dni.product_id',
+                'dni.quantity',
+                'dn.id as invoice_id',
+                'dn.note_number as invoice_number',
+                'dn.note_date as invoice_date',
             ]);
 
         foreach ($invoiceRows as $row) {

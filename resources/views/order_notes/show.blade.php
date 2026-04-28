@@ -184,6 +184,9 @@
         <h1 class="page-title" style="margin: 0;">{{ __('txn.order_notes_title') }} {{ $note->note_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.back') }}</a>
+            @if(!$note->is_canceled && (auth()->user()?->canAccess('delivery_notes.create') ?? false))
+                <a class="btn process-btn" href="{{ route('delivery-notes.create', ['order_note_id' => $note->id]) }}">{{ __('txn.create_delivery_note') }}</a>
+            @endif
             @if($canEditTransactions || ($canCancelTransactions && !$note->is_canceled))
                 <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @endif
@@ -292,7 +295,7 @@
                                     @foreach($item['deliveries'] as $delivery)
                                         <div class="delivery-history-row">
                                             <strong>
-                                                <a href="{{ route('sales-invoices.show', $delivery['invoice_id']) }}" class="delivery-history-link">
+                                                <a href="{{ route('delivery-notes.show', $delivery['invoice_id']) }}" class="delivery-history-link">
                                                     {{ $delivery['invoice_number'] }}
                                                 </a>
                                             </strong>

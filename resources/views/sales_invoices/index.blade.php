@@ -26,7 +26,8 @@
                 </form>
             @endif
             @if(auth()->user()?->canAccess('sales_invoices.create'))
-                <a class="btn create-transaction-btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice') }}</a>
+                <a class="btn process-btn" href="{{ route('sales-invoices.pending-delivery-notes') }}">{{ __('txn.pending_delivery_notes_invoice') }}</a>
+                <a class="btn create-transaction-btn" href="{{ route('sales-invoices.create') }}">{{ __('txn.create_invoice_manual') }}</a>
             @endif
         </div>
     </div>

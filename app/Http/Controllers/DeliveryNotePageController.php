@@ -10,6 +10,8 @@ use App\Models\Customer;
 use App\Models\CustomerShipLocation;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
+use App\Models\OrderNote;
+use App\Models\OrderNoteItem;
 use App\Models\Product;
 use App\Models\StockMutation;
 use App\Services\AuditLogService;
@@ -124,10 +126,50 @@ class DeliveryNotePageController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $now = now();
-        $oldCustomerId = (int) old('customer_id', 0);
+        $selectedOrderNoteId = (int) old('order_note_id', (int) $request->integer('order_note_id'));
+        $selectedOrderNote = null;
+        $bootItems = collect(old('items', []));
+        if ($selectedOrderNoteId > 0) {
+            $selectedOrderNote = OrderNote::query()
+                ->with(['items.product:id,code,name,unit,stock'])
+                ->whereKey($selectedOrderNoteId)
+                ->where('is_canceled', false)
+                ->first();
+            if ($selectedOrderNote !== null && $bootItems->isEmpty()) {
+                $orderItemIds = $selectedOrderNote->items->pluck('id')->map(fn ($id): int => (int) $id)->all();
+                $deliveredByItem = $orderItemIds === []
+                    ? collect()
+                    : DB::table('delivery_note_items as dni')
+                        ->join('delivery_notes as dn', 'dn.id', '=', 'dni.delivery_note_id')
+                        ->where('dn.is_canceled', false)
+                        ->whereIn('dni.order_note_item_id', $orderItemIds)
+                        ->selectRaw('dni.order_note_item_id, COALESCE(SUM(dni.quantity), 0) as delivered_qty')
+                        ->groupBy('dni.order_note_item_id')
+                        ->pluck('delivered_qty', 'dni.order_note_item_id');
+                $bootItems = $selectedOrderNote->items
+                    ->map(function (OrderNoteItem $item) use ($deliveredByItem): ?array {
+                        $remaining = max(0, (int) $item->quantity - (int) round((float) ($deliveredByItem[(int) $item->id] ?? 0)));
+                        if ($remaining <= 0) {
+                            return null;
+                        }
+
+                        return [
+                            'order_note_item_id' => (int) $item->id,
+                            'product_id' => (int) ($item->product_id ?? 0),
+                            'product_code' => (string) ($item->product_code ?? $item->product?->code ?? ''),
+                            'product_name' => (string) ($item->product_name ?? $item->product?->name ?? ''),
+                            'unit' => (string) ($item->product?->unit ?? ''),
+                            'quantity' => $remaining,
+                            'notes' => (string) ($item->notes ?? ''),
+                        ];
+                    })
+                    ->filter();
+            }
+        }
+        $oldCustomerId = (int) old('customer_id', (int) ($selectedOrderNote?->customer_id ?? 0));
         $customers = Cache::remember(
             AppCache::lookupCacheKey('forms.delivery_notes.customers', ['limit' => 20]),
             $now->copy()->addSeconds(60),
@@ -188,6 +230,8 @@ class DeliveryNotePageController extends Controller
             'customers' => $customers,
             'products' => $products,
             'shipLocations' => $shipLocations,
+            'selectedOrderNote' => $selectedOrderNote,
+            'bootItems' => $bootItems->values(),
         ]);
     }
 
@@ -196,6 +240,7 @@ class DeliveryNotePageController extends Controller
         $data = $request->validate([
             'note_date' => ['required', 'date'],
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'order_note_id' => ['nullable', 'integer', 'exists:order_notes,id'],
             'customer_ship_location_id' => ['nullable', 'integer', 'exists:customer_ship_locations,id'],
             'transaction_type' => ['nullable', 'in:product,printing'],
             'customer_printing_subtype_id' => ['nullable', 'integer', 'exists:customer_printing_subtypes,id'],
@@ -206,6 +251,7 @@ class DeliveryNotePageController extends Controller
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.order_note_item_id' => ['nullable', 'integer', 'exists:order_note_items,id'],
             'items.*.product_code' => ['nullable', 'string', 'max:60'],
             'items.*.product_name' => ['required', 'string', 'max:200'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
@@ -224,6 +270,33 @@ class DeliveryNotePageController extends Controller
             $noteDate = $data['note_date'];
             $noteNumber = $this->generateNoteNumber($noteDate);
             $customerId = (int) $data['customer_id'];
+            $selectedOrderNoteId = (int) ($data['order_note_id'] ?? 0);
+            $selectedOrderNote = null;
+            $orderNoteItemsById = collect();
+            if ($selectedOrderNoteId > 0) {
+                $selectedOrderNote = OrderNote::query()
+                    ->with('items:id,order_note_id,product_id,quantity')
+                    ->whereKey($selectedOrderNoteId)
+                    ->where('is_canceled', false)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                if ((int) ($selectedOrderNote->customer_id ?? 0) !== $customerId) {
+                    throw ValidationException::withMessages([
+                        'order_note_id' => __('txn.order_note_customer_mismatch'),
+                    ]);
+                }
+                $orderNoteItemsById = $selectedOrderNote->items->keyBy('id');
+            }
+            $deliveredByOrderItem = $selectedOrderNote === null
+                ? collect()
+                : DB::table('delivery_note_items as dni')
+                    ->join('delivery_notes as dn', 'dn.id', '=', 'dni.delivery_note_id')
+                    ->where('dn.is_canceled', false)
+                    ->where('dn.order_note_id', (int) $selectedOrderNote->id)
+                    ->whereNotNull('dni.order_note_item_id')
+                    ->selectRaw('dni.order_note_item_id, COALESCE(SUM(dni.quantity), 0) as delivered_qty')
+                    ->groupBy('dni.order_note_item_id')
+                    ->pluck('delivered_qty', 'dni.order_note_item_id');
             $shipLocationId = (int) ($data['customer_ship_location_id'] ?? 0);
             $shipLocation = null;
             if ($shipLocationId > 0) {
@@ -276,6 +349,7 @@ class DeliveryNotePageController extends Controller
                 'note_date' => $noteDate,
                 'customer_id' => $customerId,
                 'customer_ship_location_id' => $shipLocation?->id,
+                'order_note_id' => $selectedOrderNote?->id,
                 'transaction_type' => $selectedTransactionType,
                 'customer_printing_subtype_id' => $printingSubtype['id'],
                 'printing_subtype_name' => $printingSubtype['name'],
@@ -294,6 +368,21 @@ class DeliveryNotePageController extends Controller
                 $productName = $row['product_name'];
                 $unit = $row['unit'] ?? null;
                 $quantity = (int) ($row['quantity'] ?? 0);
+                $orderNoteItemId = max(0, (int) ($row['order_note_item_id'] ?? 0));
+                if ($selectedOrderNote !== null && $orderNoteItemId > 0) {
+                    $linkedItem = $orderNoteItemsById->get($orderNoteItemId);
+                    if (! $linkedItem || (int) ($linkedItem->order_note_id ?? 0) !== (int) $selectedOrderNote->id) {
+                        throw ValidationException::withMessages([
+                            'items' => __('txn.order_note_item_invalid'),
+                        ]);
+                    }
+                    $remaining = max(0, (int) $linkedItem->quantity - (int) round((float) ($deliveredByOrderItem[$orderNoteItemId] ?? 0)));
+                    if ($quantity > $remaining) {
+                        throw ValidationException::withMessages([
+                            'items' => __('txn.order_note_delivery_qty_exceeds_remaining'),
+                        ]);
+                    }
+                }
 
                 $product = $this->resolveProductFromInput($productId, $productName);
                 if ($product) {
@@ -317,6 +406,7 @@ class DeliveryNotePageController extends Controller
 
                 DeliveryNoteItem::create([
                     'delivery_note_id' => $note->id,
+                    'order_note_item_id' => $orderNoteItemId > 0 ? $orderNoteItemId : null,
                     'product_id' => $productId > 0 ? $productId : null,
                     'product_code' => $productCode,
                     'product_name' => $productName,

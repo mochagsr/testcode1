@@ -58,4 +58,9 @@ class OrderNoteItem extends Model
     {
         return $this->hasMany(SalesInvoiceItem::class, 'order_note_item_id');
     }
+
+    public function deliveryNoteItems(): HasMany
+    {
+        return $this->hasMany(DeliveryNoteItem::class, 'order_note_item_id');
+    }
 }
