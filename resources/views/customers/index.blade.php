@@ -82,6 +82,31 @@
         }
         .customers-table {
             min-width: 1180px;
+            table-layout: auto;
+        }
+        .customers-table th.ktp-col,
+        .customers-table td.ktp-col {
+            width: 150px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .customers-table th.action-col,
+        .customers-table td.action-col {
+            width: 150px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .customers-table .compact-actions {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            flex-wrap: nowrap;
+        }
+        .customers-table .compact-actions .btn {
+            min-height: 30px;
+            padding: 5px 11px;
+            line-height: 1.2;
         }
         @media (max-width: 1400px) {
             .customers-toolbar .toolbar-left,
@@ -180,8 +205,8 @@
                 <th>{{ __('ui.city') }}</th>
                 <th>{{ __('ui.address') }}</th>
                 <th>{{ __('ui.receivable') }}</th>
-                <th>{{ __('ui.id_card') }}</th>
-                <th>{{ __('ui.actions') }}</th>
+                <th class="ktp-col">{{ __('ui.id_card') }}</th>
+                <th class="action-col">{{ __('ui.actions') }}</th>
             </tr>
             </thead>
             <tbody>
@@ -212,9 +237,9 @@
                     <td>{{ $customer->city ?: '-' }}</td>
                     <td>{{ $customer->address ?: '-' }}</td>
                     <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
-                    <td>
+                    <td class="ktp-col">
                         @if($customer->id_card_photo_path)
-                            <div class="flex">
+                            <div class="compact-actions">
                                 <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$customer->id_card_photo_path) }}">{{ __('ui.view') }}</a>
                                 <a class="btn info-btn" href="{{ route('customers-web.id-card-photo.print', $customer) }}" target="_blank">{{ __('txn.print') }}</a>
                             </div>
@@ -222,9 +247,9 @@
                             -
                         @endif
                     </td>
-                    <td>
+                    <td class="action-col">
                         @if($canManageCustomers)
-                            <div class="flex">
+                            <div class="compact-actions">
                                 <a class="btn edit-btn" href="{{ route('customers-web.edit', $customer) }}">{{ __('ui.edit') }}</a>
                                 <form method="post" action="{{ route('customers-web.destroy', $customer) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_customer') }}">
                                     @csrf
