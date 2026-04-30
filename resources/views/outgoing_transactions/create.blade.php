@@ -1135,7 +1135,7 @@
                         || cost < 0;
                 });
                 if (!hasSupplier || !hasRows || invalidRows || hasInvalidProduct) {
-                    alert(hasInvalidProduct ? fixInvalidProductsMessage : selectSupplierAndProductMessage);
+                    window.PgposDialog.showMessage(hasInvalidProduct ? fixInvalidProductsMessage : selectSupplierAndProductMessage);
                     if (!hasSupplier) {
                         setSupplierFieldError(@json(__('txn.supplier_not_registered')));
                         supplierSearch.focus();

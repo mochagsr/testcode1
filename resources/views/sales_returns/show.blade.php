@@ -530,7 +530,7 @@
                     const rows = Array.from(tbody.querySelectorAll('tr'));
                     if (rows.length === 0) {
                         event.preventDefault();
-                        alert(@js(__('txn.add_item_first')));
+                        window.PgposDialog.showMessage(@js(__('txn.add_item_first')));
                         return;
                     }
                     const invalid = rows.some((row) => {
@@ -546,7 +546,7 @@
                     });
                     if (invalid) {
                         event.preventDefault();
-                        alert(@js(__('txn.fix_invalid_products')));
+                        window.PgposDialog.showMessage(@js(__('txn.fix_invalid_products')));
                     }
                 });
         })();

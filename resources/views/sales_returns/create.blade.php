@@ -627,7 +627,7 @@
                     .some(input => !input.value);
                 if (missing || hasMissingProduct || !customerIdField.value) {
                     event.preventDefault();
-                    alert(@json(__('txn.select_customer_and_product')));
+                    window.PgposDialog.showMessage(@json(__('txn.select_customer_and_product')));
                 }
             });
         }

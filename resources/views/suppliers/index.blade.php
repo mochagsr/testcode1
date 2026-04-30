@@ -176,7 +176,7 @@
                     <td>
                         @if($canManageSuppliers)
                             <a class="btn edit-btn" href="{{ route('suppliers.edit', $supplier) }}">{{ __('ui.edit') }}</a>
-                            <form method="post" action="{{ route('suppliers.destroy', $supplier) }}" style="display:inline;" onsubmit="return confirm('{{ __('ui.confirm_delete_supplier') }}')">
+                            <form method="post" action="{{ route('suppliers.destroy', $supplier) }}" style="display:inline;" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_supplier') }}">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>

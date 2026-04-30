@@ -916,13 +916,13 @@
             fillFromMasterBtn?.addEventListener('click', async () => {
                 const customerId = Number(customerIdField?.value || 0);
                 if (customerId <= 0) {
-                    alert(@json(__('school_bulk.select_customer_first')));
+                    window.PgposDialog.showMessage(@json(__('school_bulk.select_customer_first')));
                     return;
                 }
                 const count = Math.max(1, Number(locationsTbody.querySelectorAll('tr').length || 1));
                 await ensureMasterShipLocations(customerId, count);
                 if (shipLocations.length === 0) {
-                    alert(@json(__('school_bulk.no_master_locations')));
+                    window.PgposDialog.showMessage(@json(__('school_bulk.no_master_locations')));
                     return;
                 }
                 const picked = shipLocations.slice(0, count);
@@ -963,7 +963,7 @@
                 const locationRows = Array.from(locationsTbody.querySelectorAll('tr'));
                 if (locationRows.length === 0 || locationRows.some((row) => !(row.querySelector('.school-name')?.value || '').trim())) {
                     event.preventDefault();
-                    alert(@json(__('school_bulk.fill_school_locations')));
+                    window.PgposDialog.showMessage(@json(__('school_bulk.fill_school_locations')));
                     return;
                 }
                 let hasInvalidProductLookup = false;
@@ -1009,7 +1009,7 @@
                 });
                 if (hasInvalidItemRows || hasInvalidProductLookup) {
                     event.preventDefault();
-                    alert(hasInvalidProductLookup ? fixInvalidProductsMessage : fillItemsMessage);
+                    window.PgposDialog.showMessage(hasInvalidProductLookup ? fixInvalidProductsMessage : fillItemsMessage);
                 }
             });
 

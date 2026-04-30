@@ -72,7 +72,7 @@
                     <td>
                         <div class="flex">
                             <a class="btn edit-btn" href="{{ route('customer-levels-web.edit', $level) }}">{{ __('ui.edit') }}</a>
-                            <form method="post" action="{{ route('customer-levels-web.destroy', $level) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_level') }}');">
+                            <form method="post" action="{{ route('customer-levels-web.destroy', $level) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_level') }}">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>

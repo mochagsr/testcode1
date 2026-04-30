@@ -579,7 +579,7 @@
             if (hasMissingProduct) {
                 event.preventDefault();
                 if (shouldAlert) {
-                    alert(@json(__('txn.fix_invalid_products')));
+                    window.PgposDialog.showMessage(@json(__('txn.fix_invalid_products')));
                 }
             }
         });

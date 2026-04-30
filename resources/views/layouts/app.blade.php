@@ -1366,9 +1366,114 @@
                 </ul>
             </div>
         @endif
+        <div id="pgpos-dialog-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:3000;"></div>
+        <div id="pgpos-dialog" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:3001;">
+            <div class="flex" style="justify-content:space-between; margin-bottom:10px;">
+                <strong id="pgpos-dialog-title">{{ __('ui.dialog_notice_title') }}</strong>
+                <button type="button" id="pgpos-dialog-close" class="btn info-btn" style="min-height:30px; padding:4px 10px;">&times;</button>
+            </div>
+            <div id="pgpos-dialog-message" style="white-space:pre-wrap; line-height:1.45;"></div>
+            <div class="flex" style="gap:8px; justify-content:flex-end; margin-top:14px;">
+                <button type="button" id="pgpos-dialog-cancel" class="btn secondary">{{ __('ui.cancel') }}</button>
+                <button type="button" id="pgpos-dialog-ok" class="btn">{{ __('ui.ok') }}</button>
+            </div>
+        </div>
+        <script>
+            (function () {
+                const overlay = document.getElementById('pgpos-dialog-overlay');
+                const modal = document.getElementById('pgpos-dialog');
+                const title = document.getElementById('pgpos-dialog-title');
+                const message = document.getElementById('pgpos-dialog-message');
+                const closeBtn = document.getElementById('pgpos-dialog-close');
+                const cancelBtn = document.getElementById('pgpos-dialog-cancel');
+                const okBtn = document.getElementById('pgpos-dialog-ok');
+
+                if (!overlay || !modal || !title || !message || !closeBtn || !cancelBtn || !okBtn) {
+                    return;
+                }
+
+                let confirmCallback = null;
+
+                const defaultNoticeTitle = @json(__('ui.dialog_notice_title'));
+                const defaultConfirmTitle = @json(__('ui.dialog_confirm_title'));
+
+                const closeDialog = () => {
+                    modal.style.display = 'none';
+                    overlay.style.display = 'none';
+                    confirmCallback = null;
+                };
+
+                const openDialog = (options) => {
+                    const type = String(options.type || 'message');
+                    title.textContent = String(options.title || (type === 'confirm' ? defaultConfirmTitle : defaultNoticeTitle));
+                    message.textContent = String(options.message || '');
+                    cancelBtn.style.display = type === 'confirm' ? 'inline-flex' : 'none';
+                    okBtn.textContent = String(options.okText || @json(__('ui.ok')));
+                    modal.style.display = 'block';
+                    overlay.style.display = 'block';
+                    setTimeout(() => okBtn.focus(), 50);
+                };
+
+                window.PgposDialog = Object.assign({}, window.PgposDialog || {}, {
+                    showMessage(dialogMessage, dialogTitle = defaultNoticeTitle) {
+                        confirmCallback = null;
+                        openDialog({
+                            message: dialogMessage,
+                            title: dialogTitle,
+                            type: 'message',
+                        });
+                    },
+                    showConfirm(dialogMessage, onConfirm, dialogTitle = defaultConfirmTitle) {
+                        confirmCallback = typeof onConfirm === 'function' ? onConfirm : null;
+                        openDialog({
+                            message: dialogMessage,
+                            title: dialogTitle,
+                            type: 'confirm',
+                            okText: @json(__('ui.continue')),
+                        });
+                    },
+                });
+
+                okBtn.addEventListener('click', () => {
+                    const callback = confirmCallback;
+                    closeDialog();
+                    if (callback) {
+                        callback();
+                    }
+                });
+                closeBtn.addEventListener('click', closeDialog);
+                cancelBtn.addEventListener('click', closeDialog);
+                overlay.addEventListener('click', closeDialog);
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && modal.style.display === 'block') {
+                        closeDialog();
+                    }
+                });
+
+                document.addEventListener('submit', (event) => {
+                    const form = event.target;
+                    if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm-modal')) {
+                        return;
+                    }
+                    if (form.dataset.confirmApproved === '1') {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    window.PgposDialog.showConfirm(
+                        form.getAttribute('data-confirm-message') || defaultConfirmTitle,
+                        () => {
+                            form.dataset.confirmApproved = '1';
+                            form.submit();
+                        },
+                        form.getAttribute('data-confirm-title') || defaultConfirmTitle
+                    );
+                }, true);
+            })();
+        </script>
         @if (session('error_popup'))
             <script>
-                alert(@json((string) session('error_popup')));
+                window.PgposDialog.showMessage(@json((string) session('error_popup')));
             </script>
         @endif
         @yield('content')

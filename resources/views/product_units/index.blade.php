@@ -107,7 +107,7 @@
                         <td class="action-col">
                             <div class="unit-actions">
                                 <a class="btn edit-btn" href="{{ route('product-units.edit', $unit) }}">{{ __('ui.edit') }}</a>
-                                <form method="post" action="{{ route('product-units.destroy', $unit) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_product_unit') }}');">
+                                <form method="post" action="{{ route('product-units.destroy', $unit) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_product_unit') }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>

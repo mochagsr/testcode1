@@ -73,7 +73,7 @@
             @if($canEditTransactions)
                 <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
             @elseif($requiresAdminToEdit)
-                <button type="button" class="btn warning-btn" onclick="alert(@js(__('txn.contact_admin_to_edit_locked')))">{{ __('txn.edit_transaction') }}</button>
+                <button type="button" class="btn warning-btn" onclick="window.PgposDialog.showMessage(@js(__('txn.contact_admin_to_edit_locked')))">{{ __('txn.edit_transaction') }}</button>
             @endif
             <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
@@ -646,7 +646,7 @@
                     const rows = Array.from(tbody.querySelectorAll('tr'));
                     if (rows.length === 0) {
                         event.preventDefault();
-                        alert(@js(__('txn.add_item_first')));
+                        window.PgposDialog.showMessage(@js(__('txn.add_item_first')));
                         return;
                     }
                     const invalid = rows.some((row) => {
@@ -662,7 +662,7 @@
                     });
                     if (invalid) {
                         event.preventDefault();
-                        alert(@js(__('txn.fix_invalid_products')));
+                        window.PgposDialog.showMessage(@js(__('txn.fix_invalid_products')));
                     }
                 });
             })();

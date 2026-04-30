@@ -48,7 +48,7 @@
                     <td data-label="{{ __('ui.actions') }}" class="action">
                         <div class="flex">
                             <a class="btn edit-btn" href="{{ route('users.edit', $user) }}">{{ __('ui.edit') }}</a>
-                            <form method="post" action="{{ route('users.destroy', $user) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_user') }}');">
+                            <form method="post" action="{{ route('users.destroy', $user) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_user') }}">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>

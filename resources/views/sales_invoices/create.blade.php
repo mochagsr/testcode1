@@ -1095,7 +1095,7 @@
                     if (!customerIdField.value && customerSearch?.value) {
                         setCustomerFieldError(@json(__('txn.customer_not_registered')));
                     }
-                    alert(@json(__('txn.select_customer_and_product')));
+                    window.PgposDialog.showMessage(@json(__('txn.select_customer_and_product')));
                     return;
                 }
                 isSubmitting = true;

@@ -226,7 +226,7 @@
                         @if($canManageCustomers)
                             <div class="flex">
                                 <a class="btn edit-btn" href="{{ route('customers-web.edit', $customer) }}">{{ __('ui.edit') }}</a>
-                                <form method="post" action="{{ route('customers-web.destroy', $customer) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_customer') }}');">
+                                <form method="post" action="{{ route('customers-web.destroy', $customer) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_customer') }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>

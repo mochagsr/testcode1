@@ -177,7 +177,7 @@
                     <td class="action-col">
                         <div class="category-actions">
                             <a class="btn edit-btn" href="{{ route('item-categories.edit', $category) }}">{{ __('ui.edit') }}</a>
-                            <form method="post" action="{{ route('item-categories.destroy', $category) }}" onsubmit="return confirm('{{ __('ui.confirm_delete_category') }}');">
+                            <form method="post" action="{{ route('item-categories.destroy', $category) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_category') }}">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
