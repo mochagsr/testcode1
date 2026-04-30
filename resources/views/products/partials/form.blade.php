@@ -241,7 +241,7 @@
             }
 
             let subject = '';
-            const languageMatch = cleaned.match(/\bbahasa\s+([a-z]+)/);
+            const languageMatch = cleaned.match(/\b(?:bahasa|bhs)\s+([a-z]+)/);
             if (languageMatch) {
                 const language = languageMatch[1] || '';
                 subject = language.replace(/[aeiou]/g, '').slice(0, 2);

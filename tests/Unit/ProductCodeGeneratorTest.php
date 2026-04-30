@@ -87,6 +87,24 @@ class ProductCodeGeneratorTest extends TestCase
         );
     }
 
+    public function test_generate_base_supports_bhs_language_alias(): void
+    {
+        $generator = app(ProductCodeGenerator::class);
+
+        $this->assertSame(
+            'cbnd8e7s156',
+            $generator->generateBase('bhs indonesia 8 ed7 smt1 2526', 'cerdas')
+        );
+        $this->assertSame(
+            'cbng5e556',
+            $generator->generateBase('bhs inggris 5 ed5 2526', 'cerdas')
+        );
+        $this->assertSame(
+            'cbjw7e7s156',
+            $generator->generateBase('bhs jawa 7 ed7 smt1 2526', 'cerdas')
+        );
+    }
+
     public function test_generate_base_adds_prefix_for_paket_categories(): void
     {
         $generator = app(ProductCodeGenerator::class);
