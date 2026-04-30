@@ -279,6 +279,8 @@ return [
     'confirm_delete_customer' => 'Hapus customer ini?',
     'confirm_delete_level' => 'Hapus level ini?',
     'confirm_delete_product' => 'Hapus item ini?',
+    'delete_product_title' => 'Hapus Barang',
+    'delete_product_modal_note' => 'Pastikan barang yang dipilih sudah benar. Jika barang masih punya riwayat transaksi, sistem akan menonaktifkan barang agar data lama tetap aman.',
     'confirm_delete_supplier' => 'Hapus supplier ini?',
     'confirm_delete_user' => 'Hapus user ini?',
     'item_categories_title' => 'Kategori Barang',
@@ -473,5 +475,3 @@ return [
     'product_unit_deleted_success' => 'Satuan barang berhasil dihapus.',
     'product_unit_delete_in_use' => 'Satuan ini masih dipakai oleh data barang, jadi belum bisa dihapus.',
 ];
-
-

@@ -16,6 +16,53 @@ class ProductDeletionTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_product_index_uses_modal_delete_action(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $product = $this->createProduct();
+
+        $this->actingAs($admin)
+            ->get(route('products.index'))
+            ->assertOk()
+            ->assertSee('product-delete-modal', false)
+            ->assertSee('js-open-product-delete-modal', false)
+            ->assertSee(route('products.destroy', $product), false)
+            ->assertDontSee('onsubmit="return confirm', false);
+    }
+
+    public function test_product_edit_uses_modal_delete_action(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $product = $this->createProduct();
+
+        $this->actingAs($admin)
+            ->get(route('products.edit', $product))
+            ->assertOk()
+            ->assertSee('product-delete-modal', false)
+            ->assertSee('js-open-product-delete-modal', false)
+            ->assertSee(route('products.destroy', $product), false)
+            ->assertDontSee('onsubmit="return confirm', false);
+    }
+
+    public function test_product_delete_button_requires_delete_permission(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'dashboard.view',
+                'masters.products.view',
+                'products.edit',
+            ],
+        ]);
+        $this->createProduct();
+
+        $this->actingAs($user)
+            ->get(route('products.index'))
+            ->assertOk()
+            ->assertDontSee('js-open-product-delete-modal', false)
+            ->assertDontSee('product-delete-modal', false);
+    }
+
     public function test_product_with_stock_mutations_only_can_be_deleted(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

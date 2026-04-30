@@ -116,11 +116,13 @@
 <div class="flex" style="gap:8px; align-items:center; margin-top:12px;">
     <button class="btn" type="submit">{{ __('ui.save') }}</button>
     <a class="btn secondary" href="{{ route('products.index') }}">{{ __('ui.cancel') }}</a>
-    @if(($product?->exists ?? false))
+    @if(($product?->exists ?? false) && (auth()->user()?->canAccess('products.delete') ?? false))
         <button
-            class="btn danger-btn"
-            type="submit"
-            form="delete-product-form"
+            class="btn danger-btn js-open-product-delete-modal"
+            type="button"
+            data-product-code="{{ (string) ($product?->code ?? '') }}"
+            data-product-name="{{ (string) ($product?->name ?? '') }}"
+            data-delete-url="{{ route('products.destroy', $product) }}"
         >
             {{ __('ui.delete') }}
         </button>

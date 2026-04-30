@@ -118,7 +118,7 @@
         }
         .products-table th.action-col,
         .products-table td.action-col {
-            width: 360px;
+            width: 430px;
         }
         .products-table td.name-col {
             min-width: 230px;
@@ -192,11 +192,15 @@
         }
     </style>
     @php
-        $canManageProducts = auth()->user()?->canAccessAny(['products.create', 'products.edit', 'products.delete', 'products.import']) ?? false;
+        $currentUser = auth()->user();
+        $canCreateProducts = $currentUser?->canAccess('products.create') ?? false;
+        $canEditProducts = $currentUser?->canAccess('products.edit') ?? false;
+        $canDeleteProducts = $currentUser?->canAccess('products.delete') ?? false;
+        $canImportProducts = $currentUser?->canAccess('products.import') ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.products_title') }}</h1>
-        @if($canManageProducts)
+        @if($canCreateProducts)
             <a class="btn" href="{{ route('products.create') }}">{{ __('ui.add_product') }}</a>
         @endif
     </div>
@@ -210,7 +214,7 @@
                 </form>
             </div>
             <div class="toolbar-right">
-                @if($canManageProducts)
+                @if($canImportProducts)
                     <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="import-form">
                         @csrf
                         <div class="import-file-wrap">
@@ -278,7 +282,7 @@
                     <td class="price-col">Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
                     <td class="action-col">
                         <div class="product-actions">
-                            @if($canManageProducts)
+                            @if($canEditProducts)
                                 <button
                                     type="button"
                                     class="btn process-soft-btn product-action-btn js-open-product-stock-modal"
@@ -292,8 +296,19 @@
                                 </button>
                             @endif
                             <a class="btn process-btn product-action-btn" href="{{ route('products.mutations', $product) }}">{{ __('ui.stock_mutations_title') }}</a>
-                            @if($canManageProducts)
+                            @if($canEditProducts)
                                 <a class="btn edit-btn product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
+                            @endif
+                            @if($canDeleteProducts)
+                                <button
+                                    type="button"
+                                    class="btn danger-btn product-action-btn js-open-product-delete-modal"
+                                    data-product-code="{{ (string) ($product->code ?? '') }}"
+                                    data-product-name="{{ (string) ($product->name ?? '') }}"
+                                    data-delete-url="{{ route('products.destroy', $product) }}"
+                                >
+                                    {{ __('ui.delete') }}
+                                </button>
                             @endif
                         </div>
                     </td>
@@ -339,6 +354,10 @@
             <div class="muted" id="product-stock-edit-status" style="margin-top:6px;">{{ __('ui.auto_save_hint') }}</div>
         </form>
     </div>
+
+    @if($canDeleteProducts)
+        @include('products.partials.delete_modal')
+    @endif
 
     <script>
         (function () {

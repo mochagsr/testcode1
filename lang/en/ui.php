@@ -279,6 +279,8 @@ return [
     'confirm_delete_customer' => 'Delete this customer?',
     'confirm_delete_level' => 'Delete this level?',
     'confirm_delete_product' => 'Delete this item?',
+    'delete_product_title' => 'Delete Product',
+    'delete_product_modal_note' => 'Make sure the selected product is correct. If it already has transaction history, the system will deactivate it so old data stays safe.',
     'confirm_delete_supplier' => 'Delete this supplier?',
     'confirm_delete_user' => 'Delete this user?',
     'item_categories_title' => 'Item Categories',
@@ -473,5 +475,3 @@ return [
     'product_unit_deleted_success' => 'Product unit deleted successfully.',
     'product_unit_delete_in_use' => 'This unit is still used by product data and cannot be deleted yet.',
 ];
-
-
