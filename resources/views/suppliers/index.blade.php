@@ -11,8 +11,7 @@
             gap: 14px;
             flex-wrap: wrap;
         }
-        .suppliers-toolbar .toolbar-left,
-        .suppliers-toolbar .toolbar-right {
+        .suppliers-toolbar .toolbar-left {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -21,12 +20,7 @@
         .suppliers-toolbar .toolbar-left {
             flex: 1 1 320px;
         }
-        .suppliers-toolbar .toolbar-right {
-            justify-content: flex-end;
-            flex: 1 1 620px;
-        }
-        .suppliers-toolbar .search-form,
-        .suppliers-toolbar .import-form {
+        .suppliers-toolbar .search-form {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -42,35 +36,6 @@
             flex: 1 1 260px;
             min-width: 0;
         }
-        .suppliers-toolbar .import-form {
-            justify-content: flex-end;
-            width: 100%;
-            max-width: 100%;
-            gap: 12px;
-        }
-        .suppliers-toolbar .import-file-wrap {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
-            flex: 0 1 320px;
-            min-width: 280px;
-        }
-        .suppliers-toolbar .import-file-wrap input[type="file"] {
-            width: 100%;
-            max-width: 100%;
-            min-width: 0;
-            flex: 1 1 auto;
-        }
-        .suppliers-toolbar .import-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
         .suppliers-table-wrap {
             overflow-x: auto;
         }
@@ -78,41 +43,28 @@
             min-width: 980px;
         }
         @media (max-width: 1400px) {
-            .suppliers-toolbar .toolbar-left,
-            .suppliers-toolbar .toolbar-right {
+            .suppliers-toolbar .toolbar-left {
                 flex: 1 1 100%;
-            }
-            .suppliers-toolbar .toolbar-right {
-                justify-content: flex-start;
-            }
-            .suppliers-toolbar .import-form {
-                justify-content: flex-start;
-            }
-            .suppliers-toolbar .import-file-wrap {
-                flex-basis: 300px;
             }
         }
         @media (max-width: 1280px) {
-            .suppliers-toolbar .search-form,
-            .suppliers-toolbar .import-form {
+            .suppliers-toolbar .search-form {
                 width: 100%;
             }
-            .suppliers-toolbar .search-form input[type="text"],
-            .suppliers-toolbar .import-file-wrap {
+            .suppliers-toolbar .search-form input[type="text"] {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
-            }
-            .suppliers-toolbar .import-actions {
-                flex: 1 1 100%;
             }
         }
     </style>
     @php
-        $canManageSuppliers = auth()->user()?->canAccessAny(['suppliers.create', 'suppliers.edit', 'suppliers.delete', 'suppliers.import']) ?? false;
+        $currentUser = auth()->user();
+        $canCreateSuppliers = $currentUser?->canAccess('suppliers.create') ?? false;
+        $canManageSuppliers = $currentUser?->canAccessAny(['suppliers.edit', 'suppliers.delete']) ?? false;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.suppliers_title') }}</h1>
-        @if($canManageSuppliers)
+        @if($canCreateSuppliers)
             <a class="btn" href="{{ route('suppliers.create') }}">{{ __('ui.add_supplier') }}</a>
         @endif
     </div>
@@ -125,31 +77,7 @@
                     <button type="submit">{{ __('ui.search') }}</button>
                 </form>
             </div>
-            <div class="toolbar-right">
-                @if($canManageSuppliers)
-                    <form method="post" action="{{ route('suppliers.import') }}" enctype="multipart/form-data" class="import-form">
-                        @csrf
-                        <div class="import-file-wrap">
-                            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                        </div>
-                        <div class="import-actions">
-                            <button type="submit" class="btn process-btn">Import</button>
-                            <a class="btn info-btn" href="{{ route('suppliers.import.template') }}">Template Import</a>
-                        </div>
-                    </form>
-                @endif
-            </div>
         </div>
-        @if(session('import_errors'))
-            <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
-                <strong>Error Import:</strong>
-                <ul style="margin:8px 0 0 18px;">
-                    @foreach(array_slice((array) session('import_errors'), 0, 20) as $importError)
-                        <li>{{ $importError }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
     </div>
 
     <div class="card">
