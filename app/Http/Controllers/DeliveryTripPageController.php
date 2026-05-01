@@ -228,7 +228,7 @@ class DeliveryTripPageController extends Controller
         return Pdf::loadView('delivery_trips.print', [
             'trip' => $deliveryTrip,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait')->download($filename);
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11())->download($filename);
     }
 
     public function exportExcel(DeliveryTrip $deliveryTrip): StreamedResponse

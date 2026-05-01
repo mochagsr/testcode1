@@ -593,7 +593,7 @@ class SchoolBulkTransactionPageController extends Controller
         return Pdf::loadView('school_bulk_transactions.print', [
             'transaction' => $schoolBulkTransaction,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait')->download($filename);
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11())->download($filename);
     }
 
     public function exportExcel(SchoolBulkTransaction $schoolBulkTransaction): StreamedResponse

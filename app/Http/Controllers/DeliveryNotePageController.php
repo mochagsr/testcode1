@@ -780,7 +780,7 @@ class DeliveryNotePageController extends Controller
         $pdf = Pdf::loadView('delivery_notes.print', [
             'note' => $deliveryNote,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }

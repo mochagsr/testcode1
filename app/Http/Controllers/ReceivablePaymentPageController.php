@@ -413,7 +413,7 @@ class ReceivablePaymentPageController extends Controller
         $pdf = Pdf::loadView('receivable_payments.print', [
             'payment' => $receivablePayment,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }

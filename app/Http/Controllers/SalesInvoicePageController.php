@@ -1249,7 +1249,7 @@ class SalesInvoicePageController extends Controller
         $pdf = Pdf::loadView('sales_invoices.print', [
             'invoice' => $salesInvoice,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }

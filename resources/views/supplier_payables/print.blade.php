@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>{{ $payment->payment_number }}</title>
     <style>
+        @include('partials.print.paper_size')
         body { font-family: "Courier New", monospace; font-size: 12px; color: #000; font-weight: 600; line-height: 1.28; }
         .wrap { max-width: 760px; margin: 0 auto; }
         table { width: 100%; border-collapse: collapse; }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('txn.print') }} {{ $payment->payment_number }}</title>
     <style>
-        @page { margin: 8mm 8mm 10mm 8mm; }
+        @include('partials.print.paper_size')
         body { font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.25; color: #111; }
         .container { max-width: 900px; margin: 0 auto; }
         .receipt { border: 1px solid #111; padding: 12px; }
@@ -145,12 +145,3 @@
 </div>
 </body>
 </html>
-
-
-
-
-
-
-
-
-

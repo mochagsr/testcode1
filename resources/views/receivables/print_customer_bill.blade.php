@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $reportTitle ?? __('receivable.customer_bill_title') }} - {{ $customer->name }}</title>
     <style>
-        @page { margin: 8mm 8mm 10mm 8mm; }
+        @include('partials.print.paper_size')
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
         .head { display: grid; grid-template-columns: minmax(0, 47%) minmax(210px, 25%) minmax(0, 28%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
@@ -278,4 +278,3 @@
 </div>
 </body>
 </html>
-

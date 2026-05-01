@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title }} - {{ config('app.name', 'Laravel') }}</title>
     <style>
-        @page {
-            size: A4 portrait;
-            margin: 14mm;
-        }
+        @include('partials.print.paper_size')
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -35,8 +32,8 @@
             cursor: pointer;
         }
         .sheet {
-            width: 190mm;
-            min-height: 267mm;
+            width: 225mm;
+            min-height: 261mm;
             margin: 16px auto;
             padding: 10mm;
             background: #fff;

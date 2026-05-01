@@ -374,7 +374,7 @@ class ReportExportController extends Controller
             'receivableCustomerDetail' => $report['receivable_customer_detail'] ?? null,
             'printedAt' => $printedAt,
             'isPdf' => true,
-        ])->setPaper('a4', 'landscape');
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }

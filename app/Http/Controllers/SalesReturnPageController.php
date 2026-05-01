@@ -766,7 +766,7 @@ class SalesReturnPageController extends Controller
         $pdf = Pdf::loadView('sales_returns.print', [
             'salesReturn' => $salesReturn,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }

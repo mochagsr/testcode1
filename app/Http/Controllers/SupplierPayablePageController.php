@@ -238,7 +238,7 @@ class SupplierPayablePageController extends Controller
     public function exportReportPdf(Request $request)
     {
         $data = $this->buildReportData($request);
-        $pdf = Pdf::loadView('supplier_payables.report', $data + ['isPdf' => true])->setPaper('a4', 'portrait');
+        $pdf = Pdf::loadView('supplier_payables.report', $data + ['isPdf' => true])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($this->buildReportFileName($data).'.pdf');
     }
@@ -455,7 +455,7 @@ class SupplierPayablePageController extends Controller
         $pdf = Pdf::loadView('supplier_payables.print', [
             'payment' => $supplierPayment,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($supplierPayment->payment_number.'.pdf');
     }
