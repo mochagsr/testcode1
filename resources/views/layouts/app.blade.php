@@ -2,12 +2,17 @@
 @php
     $applicationName = config('app.name', 'Laravel');
     $isDark = auth()->check() && auth()->user()->theme === 'dark';
+    $faviconPath = \App\Models\AppSetting::getValue('company_logo_path');
 @endphp
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', $applicationName)</title>
+    @if($faviconPath)
+        <link rel="icon" href="{{ asset('storage/'.$faviconPath) }}">
+        <link rel="shortcut icon" href="{{ asset('storage/'.$faviconPath) }}">
+    @endif
     <style>
         :root {
             --bg: #f4f4f4;

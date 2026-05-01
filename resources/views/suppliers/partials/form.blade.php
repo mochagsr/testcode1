@@ -16,7 +16,7 @@
     </div>
     <div class="col-6">
         <label>{{ __('ui.address') }}</label>
-        <input type="text" name="address" value="{{ old('address', $supplier->address ?? '') }}">
+        <textarea name="address" rows="3">{{ old('address', $supplier->address ?? '') }}</textarea>
     </div>
     <div class="col-12">
         <label>{{ __('ui.notes') }}</label>
