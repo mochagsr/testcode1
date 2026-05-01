@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $trip->trip_number }}</title>
     <style>
-        @include('partials.print.paper_size')
+        @include('partials.print.paper_transaction')
         body { font-family: 'Courier New', monospace; color: #111; font-size: 12px; line-height: 1.28; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
         .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }

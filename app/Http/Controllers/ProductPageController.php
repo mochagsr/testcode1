@@ -118,7 +118,7 @@ class ProductPageController extends Controller
     public function exportPdf(Request $request)
     {
         $data = $this->reportViewData($request) + ['isPdf' => true];
-        $pdf = Pdf::loadView('products.report', $data)->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
+        $pdf = Pdf::loadView('products.report', $data)->setPaper('a4', 'portrait');
 
         return $pdf->download('products-'.$data['printedAt']->format('Ymd-His').'.pdf');
     }

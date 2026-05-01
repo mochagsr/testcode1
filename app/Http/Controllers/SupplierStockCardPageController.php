@@ -46,7 +46,7 @@ class SupplierStockCardPageController extends Controller
     public function exportPdf(Request $request)
     {
         $data = $this->buildReportData($request);
-        $pdf = Pdf::loadView('supplier_stock_cards.report', $data + ['isPdf' => true])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
+        $pdf = Pdf::loadView('supplier_stock_cards.report', $data + ['isPdf' => true])->setPaper('a4', 'portrait');
 
         return $pdf->download($this->buildReportFileName($data).'.pdf');
     }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title }} - {{ config('app.name', 'Laravel') }}</title>
     <style>
-        @include('partials.print.paper_size')
+        @include('partials.print.paper_a4')
         body {
             margin: 0;
             font-family: Arial, sans-serif;

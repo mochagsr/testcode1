@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('school_bulk.bulk_transaction_title') }} {{ $transaction->transaction_number }}</title>
     <style>
-        @include('partials.print.paper_size')
+        @include('partials.print.paper_a4')
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
         .school-page { page-break-after: always; break-after: page; padding-bottom: 6px; }

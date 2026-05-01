@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('txn.print') }} {{ $transaction->transaction_number }}</title>
     <style>
-        @include('partials.print.paper_size')
+        @include('partials.print.paper_a4')
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
         .company-head { display: grid; grid-template-columns: minmax(0, 46%) minmax(220px, 26%) minmax(0, 28%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }

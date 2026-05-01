@@ -309,7 +309,7 @@ class ReceivablePageController extends Controller
     {
         $data = array_merge($this->semesterReceivableData($request, false), ['isPdf' => true]);
         $html = view('receivables.semester_print', $data)->render();
-        $pdf = Pdf::loadHTML($html)->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape');
 
         return $pdf->download($this->semesterReportFilename('pdf', (string) ($data['selectedSemester'] ?? '')));
     }
@@ -319,7 +319,7 @@ class ReceivablePageController extends Controller
         $data = array_merge($this->globalReceivableData($request, false), ['isPdf' => true]);
         $html = view('receivables.global_print', $data)->render();
         $selectedCustomer = $data['selectedCustomer'] ?? null;
-        $pdf = Pdf::loadHTML($html)->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', $selectedCustomer instanceof Customer ? 'portrait' : 'landscape');
 
         $filename = $selectedCustomer instanceof Customer
             ? 'invoice-piutang-'.Str::slug((string) $selectedCustomer->name).'-'.$this->nowWib()->format('Ymd-His').'.pdf'
@@ -1034,7 +1034,7 @@ class ReceivablePageController extends Controller
         $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.pdf';
 
         return Pdf::loadView('receivables.print_customer_bill', $data)
-            ->setPaper(\App\Support\PrintPaperSize::continuousForm95x11())
+            ->setPaper('a4', 'portrait')
             ->download($filename);
     }
 

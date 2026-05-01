@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        @include('partials.print.paper_size')
+        @include('partials.print.paper_a4')
         body { font-family: Courier, "Courier New", monospace; font-size: 10px; line-height: 1.2; color: #111; }
         .head { border-bottom: 1px solid #111; margin-bottom: 8px; padding-bottom: 6px; }
         .title { font-size: 15px; font-weight: bold; text-transform: uppercase; }

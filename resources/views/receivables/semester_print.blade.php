@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $printTitle ?? $title }}</title>
     <style>
-        @include('partials.print.paper_size')
+        @include('partials.print.paper_a4')
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 1380px; margin: 0 auto; }
         .no-print { margin-bottom: 10px; }
