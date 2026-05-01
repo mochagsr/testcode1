@@ -70,14 +70,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 190mm;
+            min-height: 165mm;
             border: 1px solid #999;
             padding: 6mm;
             box-sizing: border-box;
         }
         .photo-wrap img {
-            max-width: 100%;
-            max-height: 180mm;
+            max-width: 96%;
+            max-height: 155mm;
             width: auto;
             height: auto;
             object-fit: contain;
@@ -106,14 +106,12 @@
     <main class="sheet">
         <h1>{{ $documentLabel }}</h1>
         <table class="meta">
-            <tr>
-                <th>{{ $subjectLabel }}</th>
-                <td>{{ $subjectName }}</td>
-            </tr>
-            <tr>
-                <th>{{ $referenceLabel }}</th>
-                <td>{{ $referenceValue }}</td>
-            </tr>
+            @foreach(($metadata ?? [$subjectLabel => $subjectName, $referenceLabel => $referenceValue]) as $label => $value)
+                <tr>
+                    <th>{{ $label }}</th>
+                    <td>{{ $value }}</td>
+                </tr>
+            @endforeach
             <tr>
                 <th>Tanggal Print</th>
                 <td>{{ now('Asia/Jakarta')->format('d-m-Y H:i') }}</td>

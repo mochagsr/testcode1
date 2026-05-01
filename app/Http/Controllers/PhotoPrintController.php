@@ -19,10 +19,15 @@ class PhotoPrintController extends Controller
         return view('photos.print', [
             'title' => 'Print Foto KTP Customer',
             'documentLabel' => 'KTP Customer',
-            'subjectLabel' => 'Customer',
-            'subjectName' => $customer->name ?: '-',
-            'referenceLabel' => 'Kota',
-            'referenceValue' => $customer->city ?: '-',
+            'metadata' => [
+                'Customer' => $customer->name ?: '-',
+                'Kota' => $customer->city ?: '-',
+                'No HP' => collect([
+                    (string) ($customer->phone ?? ''),
+                    (string) ($customer->phone_secondary ?? ''),
+                ])->map(fn (string $value): string => trim($value))->filter()->implode(' / ') ?: '-',
+                'Alamat' => $customer->address ?: '-',
+            ],
             'imageUrl' => asset('storage/'.$path),
         ]);
     }
