@@ -70,6 +70,7 @@ return [
     'action' => 'Aksi',
     'action_menu' => 'Pilih Menu',
     'date' => 'Tanggal',
+    'year' => 'Tahun',
     'date_from' => 'Tanggal Dari',
     'date_to' => 'Tanggal Sampai',
     'customer' => 'Customer',
@@ -308,5 +309,3 @@ return [
     'supplier_semester_opened_success' => 'Periode :semester untuk supplier :supplier berhasil dibuka.',
     'supplier_semester_closed_error' => 'Periode :semester untuk supplier ini sedang ditutup. Transaksi keluar baru tidak diizinkan.',
 ];
-
-

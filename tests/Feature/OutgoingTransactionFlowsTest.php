@@ -562,6 +562,19 @@ class OutgoingTransactionFlowsTest extends TestCase
         $response->assertSee(__('txn.admin_badge_edit'));
     }
 
+    public function test_outgoing_index_uses_year_label_and_no_semester_shortcut_buttons(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+
+        $response = $this->actingAs($user)->get(route('outgoing-transactions.index'));
+
+        $response->assertOk();
+        $response->assertSee(__('txn.year'));
+        $response->assertDontSee('txn.year');
+        $response->assertDontSee(__('txn.semester_this'));
+        $response->assertDontSee(__('txn.semester_last'));
+    }
+
     public function test_outgoing_index_shows_total_weight_column_and_value(): void
     {
         $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);

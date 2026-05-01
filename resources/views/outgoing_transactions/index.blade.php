@@ -141,11 +141,6 @@
                 </select>
             </div>
             <button type="submit">{{ __('txn.search') }}</button>
-            <div class="stack-mobile" style="margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border);">
-                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.all') }}</a>
-                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $currentSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.semester_this') }} ({{ $currentSemester }})</a>
-                <a class="btn secondary" href="{{ route('outgoing-transactions.index', ['search' => $search, 'semester' => $previousSemester, 'supplier_id' => $selectedSupplierId, 'transaction_date' => $selectedTransactionDate, 'year' => $selectedYear]) }}">{{ __('txn.semester_last') }} ({{ $previousSemester }})</a>
-            </div>
         </form>
     </div>
 

@@ -70,6 +70,7 @@ return [
     'action' => 'Action',
     'action_menu' => 'Select Menu',
     'date' => 'Date',
+    'year' => 'Year',
     'date_from' => 'Date From',
     'date_to' => 'Date To',
     'customer' => 'Customer',
@@ -308,5 +309,3 @@ return [
     'supplier_semester_opened_success' => 'Period :semester for supplier :supplier has been reopened.',
     'supplier_semester_closed_error' => 'Period :semester for this supplier is closed. New goods receipts are not allowed.',
 ];
-
-
