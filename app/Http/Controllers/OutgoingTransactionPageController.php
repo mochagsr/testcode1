@@ -911,7 +911,7 @@ class OutgoingTransactionPageController extends Controller
         $pdf = Pdf::loadView('outgoing_transactions.print', [
             'transaction' => $outgoingTransaction,
             'isPdf' => true,
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($outgoingTransaction->transaction_number.'-'.$this->nowWib()->format('Ymd-His').'.pdf');
     }

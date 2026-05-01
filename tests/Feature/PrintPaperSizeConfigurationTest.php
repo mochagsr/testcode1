@@ -13,8 +13,10 @@ class PrintPaperSizeConfigurationTest extends TestCase
             resource_path('views/delivery_notes/print.blade.php'),
             resource_path('views/delivery_trips/print.blade.php'),
             resource_path('views/order_notes/print.blade.php'),
+            resource_path('views/outgoing_transactions/print.blade.php'),
             resource_path('views/sales_invoices/print.blade.php'),
             resource_path('views/sales_returns/print.blade.php'),
+            resource_path('views/school_bulk_transactions/print.blade.php'),
         ];
 
         foreach ($printTemplates as $template) {
@@ -47,7 +49,6 @@ class PrintPaperSizeConfigurationTest extends TestCase
     public function test_non_transaction_print_templates_use_a4_paper(): void
     {
         $printTemplates = [
-            resource_path('views/outgoing_transactions/print.blade.php'),
             resource_path('views/photos/print.blade.php'),
             resource_path('views/products/report.blade.php'),
             resource_path('views/receivables/global_print.blade.php'),
@@ -55,7 +56,6 @@ class PrintPaperSizeConfigurationTest extends TestCase
             resource_path('views/receivables/semester_print.blade.php'),
             resource_path('views/reports/pdf.blade.php'),
             resource_path('views/reports/print.blade.php'),
-            resource_path('views/school_bulk_transactions/print.blade.php'),
             resource_path('views/supplier_payables/report.blade.php'),
             resource_path('views/supplier_stock_cards/report.blade.php'),
         ];
@@ -76,8 +76,10 @@ class PrintPaperSizeConfigurationTest extends TestCase
             app_path('Http/Controllers/DeliveryNotePageController.php'),
             app_path('Http/Controllers/DeliveryTripPageController.php'),
             app_path('Http/Controllers/OrderNotePageController.php'),
+            app_path('Http/Controllers/OutgoingTransactionPageController.php'),
             app_path('Http/Controllers/SalesInvoicePageController.php'),
             app_path('Http/Controllers/SalesReturnPageController.php'),
+            app_path('Http/Controllers/SchoolBulkTransactionPageController.php'),
         ];
 
         foreach ($transactionControllerFiles as $controllerFile) {
@@ -94,11 +96,9 @@ class PrintPaperSizeConfigurationTest extends TestCase
         }
 
         $a4ControllerFiles = [
-            app_path('Http/Controllers/OutgoingTransactionPageController.php'),
             app_path('Http/Controllers/ProductPageController.php'),
             app_path('Http/Controllers/ReceivablePageController.php'),
             app_path('Http/Controllers/ReportExportController.php'),
-            app_path('Http/Controllers/SchoolBulkTransactionPageController.php'),
             app_path('Http/Controllers/SupplierPayablePageController.php'),
             app_path('Http/Controllers/SupplierStockCardPageController.php'),
         ];
