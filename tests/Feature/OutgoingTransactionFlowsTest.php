@@ -470,6 +470,57 @@ class OutgoingTransactionFlowsTest extends TestCase
         $this->assertSame(50000.0, (float) $supplier->outstanding_payable);
     }
 
+    public function test_outgoing_transaction_admin_edit_table_uses_compact_columns(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Layout',
+            'company_name' => 'PT Layout',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-ADMIN-VIEW',
+            'name' => 'Kategori Admin View',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'LAY-1',
+            'name' => 'Kertas Web 68gr CD',
+            'unit' => 'roll',
+            'stock' => 10,
+            'price_agent' => 0,
+            'price_sales' => 0,
+            'price_general' => 13000,
+            'is_active' => true,
+        ]);
+        $transaction = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-LAYOUT-0001',
+            'transaction_date' => '2026-02-20',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S2-2526',
+            'total' => 130000,
+            'created_by_user_id' => $admin->id,
+        ]);
+        OutgoingTransactionItem::query()->create([
+            'outgoing_transaction_id' => $transaction->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'unit' => 'roll',
+            'quantity' => 10,
+            'weight' => 20,
+            'unit_cost' => 13000,
+            'line_total' => 130000,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('outgoing-transactions.show', $transaction));
+
+        $response->assertOk();
+        $response->assertSee('admin-outgoing-items-wrap', false);
+        $response->assertSee('class="admin-col-product"', false);
+        $response->assertSee('class="admin-col-unit"', false);
+        $response->assertSee('class="admin-unit"', false);
+    }
+
     public function test_admin_can_update_supplier_payment_and_adjust_outstanding(): void
     {
         $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);

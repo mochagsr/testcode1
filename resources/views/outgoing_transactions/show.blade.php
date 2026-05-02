@@ -27,27 +27,46 @@
     </div>
 
     <style>
+        .admin-outgoing-items-wrap {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+        #admin-outgoing-items-table {
+            table-layout: fixed;
+            min-width: 1120px;
+        }
+        #admin-outgoing-items-table th.admin-col-product,
+        #admin-outgoing-items-table td.admin-col-product {
+            width: 30%;
+        }
+        #admin-outgoing-items-table th.admin-col-unit,
+        #admin-outgoing-items-table td.admin-col-unit {
+            width: 9%;
+            padding-left: 5px;
+            padding-right: 5px;
+        }
         #admin-outgoing-items-table th.admin-col-qty,
         #admin-outgoing-items-table td.admin-col-qty {
-            width: 4.5%;
+            width: 6%;
             padding-left: 4px;
             padding-right: 4px;
         }
         #admin-outgoing-items-table th.admin-col-weight,
         #admin-outgoing-items-table td.admin-col-weight {
-            width: 7%;
+            width: 8%;
             padding-left: 5px;
             padding-right: 5px;
         }
         #admin-outgoing-items-table th.admin-col-price,
         #admin-outgoing-items-table td.admin-col-price {
-            width: 8%;
+            width: 9%;
             padding-left: 5px;
             padding-right: 5px;
         }
         #admin-outgoing-items-table th.admin-col-tax,
         #admin-outgoing-items-table td.admin-col-tax {
-            width: 8%;
+            width: 13%;
             padding-left: 4px;
             padding-right: 4px;
         }
@@ -73,6 +92,9 @@
         #admin-outgoing-items-table .admin-price-input {
             max-width: 96px;
         }
+        #admin-outgoing-items-table .admin-unit {
+            max-width: 108px;
+        }
         #admin-outgoing-items-table .admin-tax-inputs {
             display: grid;
             grid-template-columns: 40px 72px;
@@ -94,9 +116,13 @@
         }
 
         @media (max-width: 900px) {
+            #admin-outgoing-items-table {
+                min-width: 980px;
+            }
             #admin-outgoing-items-table .admin-qty-input,
             #admin-outgoing-items-table .admin-weight-input,
             #admin-outgoing-items-table .admin-price-input,
+            #admin-outgoing-items-table .admin-unit,
             #admin-outgoing-items-table .admin-tax-inputs,
             #admin-outgoing-items-table .admin-notes-input {
                 max-width: 100%;
@@ -240,11 +266,12 @@
                         </div>
                     </div>
 
-                    <table id="admin-outgoing-items-table" style="margin-top: 10px;">
+                    <div class="admin-outgoing-items-wrap">
+                    <table id="admin-outgoing-items-table">
                         <thead>
                         <tr>
-                            <th>{{ __('txn.name') }}</th>
-                            <th>{{ __('txn.unit') }}</th>
+                            <th class="admin-col-product">{{ __('txn.name') }}</th>
+                            <th class="admin-col-unit">{{ __('txn.unit') }}</th>
                             <th class="admin-col-qty">{{ __('txn.qty') }}</th>
                             <th class="admin-col-weight">{{ __('txn.weight') }}</th>
                             <th class="admin-col-price">{{ __('txn.price') }}</th>
@@ -281,11 +308,11 @@
                                     : '';
                             @endphp
                             <tr>
-                                <td>
+                                <td class="admin-col-product">
                                     <input type="text" class="admin-product-name" list="admin-outgoing-products-list" name="items[{{ $idx }}][product_name]" value="{{ $item['product_name'] ?? $productSearchValue }}" placeholder="{{ __('txn.select_product') }}" required>
                                     <input type="hidden" class="admin-product-id" name="items[{{ $idx }}][product_id]" value="{{ (int) ($item['product_id'] ?? 0) }}">
                                 </td>
-                                <td><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
+                                <td class="admin-col-unit"><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
                                 <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
                                 <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
                                 <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (isset($item['unit_cost']) && (float) $item['unit_cost'] > 0) ? (int) $item['unit_cost'] : '' }}" placeholder="0"></td>
@@ -302,6 +329,7 @@
                         @endforeach
                         </tbody>
                     </table>
+                    </div>
 
                     <div class="flex" style="margin-top:10px;">
                         <button type="button" id="admin-add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
@@ -466,8 +494,8 @@
                 const addRow = () => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"><div class="field-inline-error admin-product-error" style="display:block; margin-top:4px;"></div></td>
-                        <td><input type="text" class="admin-unit"></td>
+                        <td class="admin-col-product"><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"><div class="field-inline-error admin-product-error" style="display:block; margin-top:4px;"></div></td>
+                        <td class="admin-col-unit"><input type="text" class="admin-unit"></td>
                         <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" value="1" required></td>
                         <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" value=""></td>
                         <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="" placeholder="0"></td>
