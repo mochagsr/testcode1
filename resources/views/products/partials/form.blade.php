@@ -100,19 +100,19 @@
                     </div>
                     <div class="col-4">
                         <label>{{ __('ui.price_agent') }} <span class="label-required">*</span></label>
-                        @php $priceAgentValue = old('price_agent', $product?->price_agent); @endphp
+                        @php $priceAgentValue = old('price_agent', $product?->price_agent ?? 0); @endphp
                         <input id="product-price-agent-display" type="text" inputmode="numeric" value="{{ $priceAgentValue !== null ? number_format((int) round((float) $priceAgentValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
                         <input id="product-price-agent" type="hidden" name="price_agent" value="{{ $priceAgentValue !== null ? (int) round((float) $priceAgentValue) : '' }}" required>
                     </div>
                     <div class="col-4">
                         <label>{{ __('ui.price_sales') }} <span class="label-required">*</span></label>
-                        @php $priceSalesValue = old('price_sales', $product?->price_sales); @endphp
+                        @php $priceSalesValue = old('price_sales', $product?->price_sales ?? 0); @endphp
                         <input id="product-price-sales-display" type="text" inputmode="numeric" value="{{ $priceSalesValue !== null ? number_format((int) round((float) $priceSalesValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
                         <input id="product-price-sales" type="hidden" name="price_sales" value="{{ $priceSalesValue !== null ? (int) round((float) $priceSalesValue) : '' }}" required>
                     </div>
                     <div class="col-4">
                         <label>{{ __('ui.price_general') }} <span class="label-required">*</span></label>
-                        @php $priceGeneralValue = old('price_general', $product?->price_general); @endphp
+                        @php $priceGeneralValue = old('price_general', $product?->price_general ?? 0); @endphp
                         <input id="product-price-general-display" type="text" inputmode="numeric" value="{{ $priceGeneralValue !== null ? number_format((int) round((float) $priceGeneralValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
                         <input id="product-price-general" type="hidden" name="price_general" value="{{ $priceGeneralValue !== null ? (int) round((float) $priceGeneralValue) : '' }}" required>
                     </div>
