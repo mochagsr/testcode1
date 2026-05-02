@@ -255,6 +255,10 @@
                 return 'item';
             }
 
+            if (!usesAcademicCodePattern(cleaned, rawNormalized)) {
+                return generalProductToken(cleaned).slice(0, 60);
+            }
+
             let subject = '';
             const languageMatch = cleaned.match(/\b(?:bahasa|bhs)\s+([a-z]+)/);
             if (languageMatch) {
@@ -304,6 +308,67 @@
 
             const prefix = categoryPrefix(categoryName);
             return `${prefix}${subject}${level}${edition}${semester}${yearSuffix}`.slice(0, 60);
+        }
+
+        function usesAcademicCodePattern(cleaned, rawNormalized) {
+            if (/\b(?:bahasa|bhs|edisi|ed|semester|smt)\b/.test(cleaned)) {
+                return true;
+            }
+
+            if (/\b(\d{2}|\d{4})\s*[-/]\s*(\d{2}|\d{4})\b/.test(rawNormalized)) {
+                return true;
+            }
+
+            const shortYearMatches = Array.from(rawNormalized.matchAll(/\b(\d{2})(\d{2})\b/g));
+            return shortYearMatches.some((shortYearMatch) => {
+                const start = Number(shortYearMatch[1] || 0);
+                const end = Number(shortYearMatch[2] || 0);
+
+                return ((start + 1) % 100) === end;
+            });
+        }
+
+        function compactSubjectToken(subjectRaw) {
+            const raw = String(subjectRaw || '').toLowerCase();
+            let token = raw.replace(/[aeiou]/g, '').slice(0, 2);
+            if (!token) {
+                token = raw.slice(0, 2);
+            }
+
+            return token || 'it';
+        }
+
+        function isGeneralUnitToken(token) {
+            return ['gr', 'gram', 'gsm', 'kg', 'mm', 'cm', 'm', 'ml', 'ltr', 'liter'].includes(token);
+        }
+
+        function generalProductToken(cleaned) {
+            const segments = [];
+            const tokens = cleaned.split(/\s+/);
+
+            for (const token of tokens) {
+                if (!token) {
+                    continue;
+                }
+
+                if (/^\d+[a-z]+$/.test(token)) {
+                    segments.push(token.replace(/\D+/g, ''));
+                    continue;
+                }
+
+                if (/^\d+$/.test(token)) {
+                    segments.push(token);
+                    continue;
+                }
+
+                if (isGeneralUnitToken(token)) {
+                    continue;
+                }
+
+                segments.push(compactSubjectToken(token));
+            }
+
+            return segments.join('') || 'item';
         }
 
         function categoryLabel(category) {

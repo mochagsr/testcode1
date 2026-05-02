@@ -105,6 +105,16 @@ class ProductCodeGeneratorTest extends TestCase
         );
     }
 
+    public function test_generate_base_builds_detailed_code_for_general_supplier_items(): void
+    {
+        $generator = app(ProductCodeGenerator::class);
+
+        $this->assertSame(
+            'krwb68cd',
+            $generator->generateBase('kertas web 68gr cd', 'roll web')
+        );
+    }
+
     public function test_generate_base_adds_prefix_for_paket_categories(): void
     {
         $generator = app(ProductCodeGenerator::class);

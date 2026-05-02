@@ -43,6 +43,10 @@ class ProductCodeGenerator
             return 'item';
         }
 
+        if (! $this->usesAcademicCodePattern($normalized, $rawNormalized)) {
+            return substr($this->generalProductToken($normalized), 0, 60);
+        }
+
         $subject = $this->subjectToken($normalized);
 
         preg_match('/\b(\d+)\b/', $normalized, $numberMatch);
@@ -59,6 +63,15 @@ class ProductCodeGenerator
         $categoryPrefix = $this->categoryPrefix($categoryName);
 
         return substr($categoryPrefix.$subject.$level.$edition.$semester.$yearSuffix, 0, 60);
+    }
+
+    private function usesAcademicCodePattern(string $normalized, string $rawNormalized): bool
+    {
+        if (preg_match('/\b(?:bahasa|bhs|edisi|ed|semester|smt)\b/', $normalized) === 1) {
+            return true;
+        }
+
+        return $this->extractYearSuffix($rawNormalized) !== '';
     }
 
     private function extractYearSuffix(string $rawNormalized): string
@@ -146,6 +159,46 @@ class ProductCodeGenerator
         }
 
         return $token !== '' ? $token : 'it';
+    }
+
+    private function generalProductToken(string $normalized): string
+    {
+        $tokens = preg_split('/\s+/', $normalized) ?: [];
+        $segments = [];
+
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+            if ($token === '') {
+                continue;
+            }
+
+            if (preg_match('/^\d+[a-z]+$/', $token) === 1) {
+                $segments[] = preg_replace('/\D+/', '', $token) ?? '';
+
+                continue;
+            }
+
+            if (preg_match('/^\d+$/', $token) === 1) {
+                $segments[] = $token;
+
+                continue;
+            }
+
+            if ($this->isGeneralUnitToken($token)) {
+                continue;
+            }
+
+            $segments[] = $this->compactSubjectToken($token);
+        }
+
+        $code = implode('', array_filter($segments, fn (string $segment): bool => $segment !== ''));
+
+        return $code !== '' ? $code : 'item';
+    }
+
+    private function isGeneralUnitToken(string $token): bool
+    {
+        return in_array($token, ['gr', 'gram', 'gsm', 'kg', 'mm', 'cm', 'm', 'ml', 'ltr', 'liter'], true);
     }
 
     private function subjectToken(string $normalized): string
