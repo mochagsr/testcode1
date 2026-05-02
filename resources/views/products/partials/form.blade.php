@@ -62,20 +62,22 @@
                         <label>{{ __('ui.unit') }}</label>
                         @php
                             $resolvedUnit = old('unit', $product?->unit ?? ($defaultUnit ?? 'exp'));
+                            $resolvedUnitExistsInOptions = collect($unitOptions ?? [])
+                                ->contains(fn (array $unitOption): bool => (string) ($unitOption['code'] ?? '') === (string) $resolvedUnit);
                         @endphp
-                        <input
+                        <select
                             id="product-unit"
-                            type="text"
                             name="unit"
-                            list="product-unit-list"
-                            value="{{ $resolvedUnit }}"
-                            placeholder="exp"
                         >
-                        <datalist id="product-unit-list">
+                            @if($resolvedUnit !== '' && ! $resolvedUnitExistsInOptions)
+                                <option value="{{ $resolvedUnit }}">{{ $resolvedUnit }}</option>
+                            @endif
                             @foreach(($unitOptions ?? []) as $unitOption)
-                                <option value="{{ $unitOption['code'] }}" label="{{ $unitOption['label'] }}"></option>
+                                <option value="{{ $unitOption['code'] }}" @selected((string) $resolvedUnit === (string) $unitOption['code'])>
+                                    {{ $unitOption['code'] }} - {{ $unitOption['label'] }}
+                                </option>
                             @endforeach
-                        </datalist>
+                        </select>
                     </div>
                     <div class="col-12">
                         <label>{{ __('ui.name') }} <span class="label-required">*</span></label>
