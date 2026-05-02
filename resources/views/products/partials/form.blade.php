@@ -29,18 +29,7 @@
                             required
                         >
                         <input id="product-category" type="hidden" name="item_category_id" value="{{ $oldCategoryId }}" required>
-                        <datalist id="product-categories-list">
-                            @foreach($categories as $category)
-                                @php
-                                    $categoryCode = trim((string) $category->code);
-                                    $categoryName = trim((string) $category->name);
-                                    $categoryLabel = $categoryCode !== '' && strcasecmp($categoryCode, $categoryName) !== 0
-                                        ? $categoryCode.' - '.$categoryName
-                                        : $categoryName;
-                                @endphp
-                                <option value="{{ $categoryLabel }}"></option>
-                            @endforeach
-                        </datalist>
+                        <datalist id="product-categories-list"></datalist>
                     </div>
                     <div class="col-4">
                         <label>{{ __('ui.code') }}</label>
@@ -158,7 +147,9 @@
         });
         const previewNode = document.getElementById('product-code-preview');
         const resetButton = document.getElementById('product-code-reset');
+        const categoryList = document.getElementById('product-categories-list');
         const categories = @json($categoriesJson);
+        const MIN_CATEGORY_SEARCH_LENGTH = 3;
         const SEARCH_DEBOUNCE_MS = 100;
         const autoPreviewTemplate = @json(__('ui.product_code_auto_preview', ['code' => '__CODE__']));
         const manualPreviewTemplate = @json(__('ui.product_code_auto_preview_manual', ['code' => '__CODE__']));
@@ -220,7 +211,9 @@
                 }
             }
 
-            const byLabel = findCategoryByLabel(categorySearchInput.value);
+            const byLabel = canSearchCategory(categorySearchInput.value)
+                ? findCategoryByLabel(categorySearchInput.value)
+                : null;
             if (byLabel && byLabel.name) {
                 return String(byLabel.name);
             }
@@ -316,6 +309,37 @@
                 || null;
         }
 
+        function canSearchCategory(value) {
+            return normalize(value).length >= MIN_CATEGORY_SEARCH_LENGTH;
+        }
+
+        function renderCategoryOptions(value) {
+            if (!categoryList) {
+                return;
+            }
+
+            categoryList.replaceChildren();
+
+            if (!canSearchCategory(value)) {
+                return;
+            }
+
+            const normalized = normalize(value);
+            const matches = categories
+                .filter((category) => {
+                    return normalize(categoryLabel(category)).includes(normalized)
+                        || normalize(category.code).includes(normalized)
+                        || normalize(category.name).includes(normalized);
+                })
+                .slice(0, 20);
+
+            for (const category of matches) {
+                const option = document.createElement('option');
+                option.value = categoryLabel(category);
+                categoryList.appendChild(option);
+            }
+        }
+
         function syncCode() {
             const generated = generateCode(nameInput.value, activeCategoryName());
             previewNode.textContent = (manualOverride ? manualPreviewTemplate : autoPreviewTemplate)
@@ -382,6 +406,13 @@
 
         nameInput.addEventListener('input', syncCode);
         const onCategoryInput = debounce(function () {
+            renderCategoryOptions(categorySearchInput.value);
+            if (!canSearchCategory(categorySearchInput.value)) {
+                categoryInput.value = '';
+                syncCode();
+                return;
+            }
+
             const category = findCategoryByLabel(categorySearchInput.value);
             categoryInput.value = category ? category.id : '';
             if (category) {
@@ -391,6 +422,13 @@
         });
         categorySearchInput.addEventListener('input', onCategoryInput);
         categorySearchInput.addEventListener('change', function () {
+            renderCategoryOptions(categorySearchInput.value);
+            if (!canSearchCategory(categorySearchInput.value)) {
+                categoryInput.value = '';
+                syncCode();
+                return;
+            }
+
             const category = findCategoryByLabel(categorySearchInput.value);
             categoryInput.value = category ? category.id : '';
             if (category) {
@@ -417,6 +455,7 @@
             syncCode();
         });
 
+        renderCategoryOptions(categorySearchInput.value);
         currencyMappings.forEach(bindCurrencyInput);
 
         if (form) {
