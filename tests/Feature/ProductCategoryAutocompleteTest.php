@@ -15,4 +15,13 @@ class ProductCategoryAutocompleteTest extends TestCase
         $this->assertStringContainsString('if (!canSearchCategory(value))', $contents);
         $this->assertStringContainsString('if (!canSearchCategory(categorySearchInput.value))', $contents);
     }
+
+    public function test_product_category_label_hides_duplicate_code_name_pairs(): void
+    {
+        $contents = (string) file_get_contents(resource_path('views/products/partials/form.blade.php'));
+
+        $this->assertStringContainsString('function categoryPartsLookSame(code, name)', $contents);
+        $this->assertStringContainsString('!categoryPartsLookSame(code, name)', $contents);
+        $this->assertStringContainsString('levenshtein($normalizedCode, $normalizedName) <= 1', $contents);
+    }
 }

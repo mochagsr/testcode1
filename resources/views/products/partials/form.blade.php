@@ -11,11 +11,29 @@
                             $categoryMap = $categories->keyBy('id');
                             $oldCategoryId = old('item_category_id', $product?->item_category_id);
                             $oldCategoryLabel = '';
+                            $compactCategoryLabelPart = static function (string $value): string {
+                                return preg_replace('/[^a-z0-9]/', '', strtolower(\Illuminate\Support\Str::ascii($value))) ?? '';
+                            };
+                            $categoryPartsLookSame = static function (string $code, string $name) use ($compactCategoryLabelPart): bool {
+                                $normalizedCode = $compactCategoryLabelPart($code);
+                                $normalizedName = $compactCategoryLabelPart($name);
+
+                                if ($normalizedCode === '' || $normalizedName === '') {
+                                    return false;
+                                }
+
+                                if ($normalizedCode === $normalizedName) {
+                                    return true;
+                                }
+
+                                return abs(strlen($normalizedCode) - strlen($normalizedName)) <= 1
+                                    && levenshtein($normalizedCode, $normalizedName) <= 1;
+                            };
                             if ($oldCategoryId && $categoryMap->has($oldCategoryId)) {
                                 $selectedCategory = $categoryMap[$oldCategoryId];
                                 $selectedCode = trim((string) $selectedCategory->code);
                                 $selectedName = trim((string) $selectedCategory->name);
-                                $oldCategoryLabel = $selectedCode !== '' && strcasecmp($selectedCode, $selectedName) !== 0
+                                $oldCategoryLabel = $selectedCode !== '' && ! $categoryPartsLookSame($selectedCode, $selectedName)
                                     ? $selectedCode.' - '.$selectedName
                                     : $selectedName;
                             }
@@ -289,10 +307,67 @@
         function categoryLabel(category) {
             const code = String(category.code || '').trim();
             const name = String(category.name || '').trim();
-            if (code !== '' && code.toLowerCase() !== name.toLowerCase()) {
+            if (code !== '' && !categoryPartsLookSame(code, name)) {
                 return `${code} - ${name}`;
             }
-            return name;
+            return name || code;
+        }
+
+        function compactCategoryLabelPart(value) {
+            return normalize(value).replace(/\s+/g, '');
+        }
+
+        function hasOneEditDistanceOrLess(left, right) {
+            if (left === right) {
+                return true;
+            }
+
+            if (Math.abs(left.length - right.length) > 1) {
+                return false;
+            }
+
+            let indexLeft = 0;
+            let indexRight = 0;
+            let edits = 0;
+
+            while (indexLeft < left.length && indexRight < right.length) {
+                if (left[indexLeft] === right[indexRight]) {
+                    indexLeft += 1;
+                    indexRight += 1;
+                    continue;
+                }
+
+                edits += 1;
+                if (edits > 1) {
+                    return false;
+                }
+
+                if (left.length > right.length) {
+                    indexLeft += 1;
+                    continue;
+                }
+
+                if (right.length > left.length) {
+                    indexRight += 1;
+                    continue;
+                }
+
+                indexLeft += 1;
+                indexRight += 1;
+            }
+
+            return edits + (left.length - indexLeft) + (right.length - indexRight) <= 1;
+        }
+
+        function categoryPartsLookSame(code, name) {
+            const normalizedCode = compactCategoryLabelPart(code);
+            const normalizedName = compactCategoryLabelPart(name);
+
+            if (normalizedCode === '' || normalizedName === '') {
+                return false;
+            }
+
+            return hasOneEditDistanceOrLess(normalizedCode, normalizedName);
         }
 
         function findCategoryByLabel(value) {
