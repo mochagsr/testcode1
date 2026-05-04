@@ -1,24 +1,24 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AboutPageController;
-use App\Http\Controllers\AuditLogPageController;
 use App\Http\Controllers\ApprovalRequestController;
+use App\Http\Controllers\ArchiveDataPageController;
+use App\Http\Controllers\AuditLogPageController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\CustomerPrintingSubtypeController;
-use App\Http\Controllers\CustomerPageController;
-use App\Http\Controllers\CustomerShipLocationPageController;
 use App\Http\Controllers\CustomerLevelController;
 use App\Http\Controllers\CustomerLevelPageController;
+use App\Http\Controllers\CustomerPageController;
+use App\Http\Controllers\CustomerPrintingSubtypeController;
+use App\Http\Controllers\CustomerShipLocationPageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryNotePageController;
 use App\Http\Controllers\DeliveryTripPageController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ItemCategoryPageController;
 use App\Http\Controllers\MassImportController;
-use App\Http\Controllers\OrderNotePageController;
 use App\Http\Controllers\OpsHealthController;
-use App\Http\Controllers\ArchiveDataPageController;
+use App\Http\Controllers\OrderNotePageController;
 use App\Http\Controllers\OutgoingTransactionPageController;
 use App\Http\Controllers\PhotoPrintController;
 use App\Http\Controllers\ProductController;
@@ -62,9 +62,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubtypeController::class, 'index'])
         ->middleware('perm:transactions.view')
         ->name('api.customers.printing-subtypes.index');
-Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubtypeController::class, 'store'])
-    ->middleware('perm:transactions.view')
-    ->name('api.customers.printing-subtypes.store');
+    Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubtypeController::class, 'store'])
+        ->middleware('perm:transactions.view')
+        ->name('api.customers.printing-subtypes.store');
 
     Route::get('/sales-invoices', [SalesInvoicePageController::class, 'index'])->middleware('perm:transactions.view')->name('sales-invoices.index');
     Route::get('/sales-invoices/pending-delivery-notes', [SalesInvoicePageController::class, 'pendingDeliveryNotes'])->middleware('perm:sales_invoices.create')->name('sales-invoices.pending-delivery-notes');
@@ -260,6 +260,7 @@ Route::post('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubt
     Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:products.import')->name('item-categories.import');
     Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:products.create')->name('products.create');
     Route::post('/products', [ProductPageController::class, 'store'])->middleware('perm:products.create')->name('products.store');
+    Route::get('/products/{product}', [ProductPageController::class, 'show'])->middleware('perm:masters.products.view')->name('products.show');
     Route::get('/products/{product}/mutations', [ProductPageController::class, 'mutations'])->middleware('perm:masters.products.view')->name('products.mutations');
     Route::get('/products/{product}/edit', [ProductPageController::class, 'edit'])->middleware('perm:products.edit')->name('products.edit');
     Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:products.edit')->name('products.update');

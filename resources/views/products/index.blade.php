@@ -118,7 +118,7 @@
         }
         .products-table th.action-col,
         .products-table td.action-col {
-            width: 430px;
+            width: 500px;
         }
         .products-table td.name-col {
             min-width: 230px;
@@ -295,6 +295,7 @@
                                     {{ __('ui.edit_stock') }}
                                 </button>
                             @endif
+                            <a class="btn info-btn product-action-btn" href="{{ route('products.show', $product) }}">{{ __('txn.detail') }}</a>
                             <a class="btn process-btn product-action-btn" href="{{ route('products.mutations', $product) }}">{{ __('ui.stock_mutations_title') }}</a>
                             @if($canEditProducts)
                                 <a class="btn edit-btn product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>

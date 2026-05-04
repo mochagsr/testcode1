@@ -21,6 +21,7 @@ use App\Support\ProductDeletionService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -123,13 +124,106 @@ class ProductPageController extends Controller
         return $pdf->download('products-'.$data['printedAt']->format('Ymd-His').'.pdf');
     }
 
+    public function show(Product $product): View
+    {
+        $product->load('category:id,code,name');
+
+        return view('products.show', [
+            'product' => $product,
+            'supplierRows' => $this->supplierRowsForProduct($product),
+        ]);
+    }
+
     private function nowWib(): Carbon
     {
         return now('Asia/Jakarta');
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Builder<Product>
+     * @return Collection<int, array{
+     *     supplier_id:int,
+     *     supplier_name:string,
+     *     supplier_company_name:string,
+     *     total_quantity:int,
+     *     transaction_count:int,
+     *     last_transaction_date:string|null,
+     *     last_unit_cost:int,
+     *     last_unit:string,
+     *     last_transaction_id:int,
+     *     last_transaction_number:string
+     * }>
+     */
+    private function supplierRowsForProduct(Product $product): Collection
+    {
+        $summaryRows = DB::table('outgoing_transaction_items as oti')
+            ->join('outgoing_transactions as ot', 'ot.id', '=', 'oti.outgoing_transaction_id')
+            ->join('suppliers as s', 's.id', '=', 'ot.supplier_id')
+            ->where('oti.product_id', (int) $product->id)
+            ->whereNull('ot.deleted_at')
+            ->select([
+                's.id as supplier_id',
+                's.name as supplier_name',
+                's.company_name as supplier_company_name',
+            ])
+            ->selectRaw('COALESCE(SUM(oti.quantity), 0) as total_quantity')
+            ->selectRaw('COUNT(DISTINCT ot.id) as transaction_count')
+            ->selectRaw('MAX(ot.transaction_date) as last_transaction_date')
+            ->groupBy('s.id', 's.name', 's.company_name')
+            ->orderByDesc('last_transaction_date')
+            ->orderBy('s.name')
+            ->get();
+
+        $supplierIds = $summaryRows
+            ->pluck('supplier_id')
+            ->map(fn ($supplierId): int => (int) $supplierId)
+            ->filter(fn (int $supplierId): bool => $supplierId > 0)
+            ->values();
+
+        $latestRows = $supplierIds->isEmpty()
+            ? collect()
+            : DB::table('outgoing_transaction_items as oti')
+                ->join('outgoing_transactions as ot', 'ot.id', '=', 'oti.outgoing_transaction_id')
+                ->where('oti.product_id', (int) $product->id)
+                ->whereIn('ot.supplier_id', $supplierIds->all())
+                ->whereNull('ot.deleted_at')
+                ->select([
+                    'ot.supplier_id',
+                    'ot.id as transaction_id',
+                    'ot.transaction_number',
+                    'ot.transaction_date',
+                    'oti.unit',
+                    'oti.unit_cost',
+                ])
+                ->orderByDesc('ot.transaction_date')
+                ->orderByDesc('ot.id')
+                ->orderByDesc('oti.id')
+                ->get()
+                ->unique('supplier_id')
+                ->keyBy('supplier_id');
+
+        return $summaryRows
+            ->map(function ($row) use ($latestRows): array {
+                $supplierId = (int) ($row->supplier_id ?? 0);
+                $latest = $latestRows->get($supplierId);
+
+                return [
+                    'supplier_id' => $supplierId,
+                    'supplier_name' => (string) ($row->supplier_name ?? '-'),
+                    'supplier_company_name' => (string) ($row->supplier_company_name ?? ''),
+                    'total_quantity' => (int) round((float) ($row->total_quantity ?? 0)),
+                    'transaction_count' => (int) ($row->transaction_count ?? 0),
+                    'last_transaction_date' => $latest !== null ? (string) ($latest->transaction_date ?? '') : (string) ($row->last_transaction_date ?? ''),
+                    'last_unit_cost' => $latest !== null ? (int) round((float) ($latest->unit_cost ?? 0)) : 0,
+                    'last_unit' => $latest !== null ? (string) ($latest->unit ?? '') : '',
+                    'last_transaction_id' => $latest !== null ? (int) ($latest->transaction_id ?? 0) : 0,
+                    'last_transaction_number' => $latest !== null ? (string) ($latest->transaction_number ?? '') : '',
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * @return Builder<Product>
      */
     private function reportProductQuery(string $search)
     {
@@ -142,7 +236,7 @@ class ProductPageController extends Controller
     }
 
     /**
-     * @return array{products:\Illuminate\Support\Collection<int,Product>,printedAt:Carbon,settings:array<string,string>,search:string}
+     * @return array{products:Collection<int,Product>,printedAt:Carbon,settings:array<string,string>,search:string}
      */
     private function reportViewData(Request $request): array
     {
