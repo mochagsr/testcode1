@@ -16,6 +16,35 @@ class SchoolDistributionFlowsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_customer_ship_location_create_form_places_school_and_city_before_phone(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+        Customer::query()->create([
+            'code' => 'CUST-SHIP-FORM',
+            'name' => 'Customer Form',
+            'city' => 'Malang',
+        ]);
+
+        $content = $this
+            ->actingAs($admin)
+            ->get(route('customer-ship-locations.create'))
+            ->assertOk()
+            ->getContent();
+
+        $schoolPosition = strpos($content, 'name="school_name"');
+        $cityPosition = strpos($content, 'name="city"');
+        $phonePosition = strpos($content, 'name="recipient_phone"');
+
+        $this->assertIsInt($schoolPosition);
+        $this->assertIsInt($cityPosition);
+        $this->assertIsInt($phonePosition);
+        $this->assertLessThan($phonePosition, $schoolPosition);
+        $this->assertLessThan($phonePosition, $cityPosition);
+    }
+
     public function test_customer_ship_location_lookup_filters_by_customer_and_active_status(): void
     {
         $user = User::factory()->create(['role' => 'user']);
@@ -302,21 +331,21 @@ class SchoolDistributionFlowsTest extends TestCase
             ->get();
         $this->assertCount(2, $generatedInvoices);
         $this->assertSame(2, $generatedInvoices->pluck('school_bulk_location_id')->filter()->unique()->count());
-        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (int) ($invoice->customer_ship_location_id ?? 0) > 0));
-        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_name ?? '')) !== ''));
-        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_city ?? '')) !== ''));
+        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => (int) ($invoice->customer_ship_location_id ?? 0) > 0));
+        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_name ?? '')) !== ''));
+        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_city ?? '')) !== ''));
         $this->assertEqualsCanonicalizing(
             ['SDN A', 'SDN B'],
-            $generatedInvoices->pluck('ship_to_name')->map(fn($name): string => trim((string) $name))->all()
+            $generatedInvoices->pluck('ship_to_name')->map(fn ($name): string => trim((string) $name))->all()
         );
         $this->assertEqualsCanonicalizing(
             [75000, 105000],
-            $generatedInvoices->map(fn(SalesInvoice $invoice): int => (int) round((float) $invoice->total))->all()
+            $generatedInvoices->map(fn (SalesInvoice $invoice): int => (int) round((float) $invoice->total))->all()
         );
-        $this->assertTrue($generatedInvoices->every(fn(SalesInvoice $invoice): bool => (string) $invoice->payment_status === 'unpaid'));
+        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => (string) $invoice->payment_status === 'unpaid'));
         $this->assertEqualsCanonicalizing(
             [75000, 105000],
-            $generatedInvoices->map(fn(SalesInvoice $invoice): int => (int) round((float) $invoice->balance))->all()
+            $generatedInvoices->map(fn (SalesInvoice $invoice): int => (int) round((float) $invoice->balance))->all()
         );
 
         $product->refresh();
