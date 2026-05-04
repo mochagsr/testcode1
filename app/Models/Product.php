@@ -125,6 +125,7 @@ class Product extends Model
             'id',
             'code',
             'name',
+            'unit',
             'stock',
             'price_agent',
             'price_sales',
@@ -159,7 +160,7 @@ class Product extends Model
      */
     public function scopeOnlyOrderFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'code', 'name']);
+        return $query->select(['id', 'code', 'name', 'unit']);
     }
 
     /**

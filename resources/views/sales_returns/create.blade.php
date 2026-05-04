@@ -5,6 +5,24 @@
 @section('content')
     <h1 class="page-title">{{ __('txn.create_sales_return_title') }}</h1>
 
+    <style>
+        .quantity-with-unit {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 130px;
+        }
+        .quantity-with-unit .qty {
+            flex: 0 0 88px;
+            max-width: 88px;
+        }
+        .qty-unit-label {
+            color: #526173;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+    </style>
+
     <form method="post" action="{{ route('sales-returns.store') }}">
         @csrf
 
@@ -360,6 +378,11 @@
             return `${product.name}`;
         }
 
+        function productUnitLabel(product) {
+            const unit = String(product?.unit || '').trim();
+            return unit !== '' ? unit : '-';
+        }
+
         function renderProductSuggestions(query) {
             if (!productsList) {
                 return;
@@ -457,6 +480,10 @@
 
         function updateRowMeta(row, product) {
             row.querySelector('.stock').textContent = product ? product.stock : '-';
+            const unitLabel = row.querySelector('.qty-unit-label');
+            if (unitLabel) {
+                unitLabel.textContent = productUnitLabel(product);
+            }
             recalc();
         }
 
@@ -470,7 +497,12 @@
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
                 <td class="stock">-</td>
-                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required style="max-width: 88px;"></td>
+                <td>
+                    <div class="quantity-with-unit">
+                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required>
+                        <span class="qty-unit-label">-</span>
+                    </div>
+                </td>
                 <td style="white-space: nowrap; text-align: right;">Rp <span class="line-price">-</span></td>
                 <td style="white-space: nowrap; text-align: right;">Rp <span class="line-total">0</span></td>
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>

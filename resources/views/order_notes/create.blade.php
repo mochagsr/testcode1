@@ -20,6 +20,21 @@
             text-align: right;
             font-size: 16px;
         }
+        .quantity-with-unit {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 130px;
+        }
+        .quantity-with-unit .qty-input {
+            flex: 0 0 88px;
+            max-width: 88px;
+        }
+        .qty-unit-label {
+            color: #526173;
+            font-weight: 700;
+            white-space: nowrap;
+        }
     </style>
 
     <form method="post" action="{{ route('order-notes.store') }}">
@@ -356,6 +371,18 @@
             return `${product.name}`;
         }
 
+        function productUnitLabel(product) {
+            const unit = String(product?.unit || '').trim();
+            return unit !== '' ? unit : '-';
+        }
+
+        function updateRowUnit(row, product) {
+            const unitLabel = row?.querySelector('.qty-unit-label');
+            if (unitLabel) {
+                unitLabel.textContent = productUnitLabel(product);
+            }
+        }
+
         const escapeAttribute = (window.PgposAutoSearch && window.PgposAutoSearch.escapeAttribute)
             ? window.PgposAutoSearch.escapeAttribute
             : (value) => String(value)
@@ -451,7 +478,12 @@
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
-                <td><input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required style="max-width: 88px;"></td>
+                <td>
+                    <div class="quantity-with-unit">
+                        <input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required>
+                        <span class="qty-unit-label">-</span>
+                    </div>
+                </td>
                 <td><input name="items[${index}][notes]"></td>
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
@@ -463,6 +495,7 @@
                 await fetchProductSuggestions(event.currentTarget.value);
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
+                updateRowUnit(tr, product);
             });
             tr.querySelector('.product-search').addEventListener('input', onProductInput);
             tr.querySelector('.product-search').addEventListener('focus', async (event) => {
@@ -473,10 +506,13 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.product-search').value = productLabel(product);
+                    updateRowUnit(tr, product);
                     setProductFieldError(tr, '');
                 } else if (String(event.currentTarget.value || '').trim() !== '') {
+                    updateRowUnit(tr, null);
                     setProductFieldError(tr, @json(__('txn.product_not_registered')));
                 } else {
+                    updateRowUnit(tr, null);
                     setProductFieldError(tr, '');
                 }
             });
@@ -484,6 +520,7 @@
                 const value = String(event.currentTarget.value || '').trim();
                 if (value === '') {
                     tr.querySelector('.product-id').value = '';
+                    updateRowUnit(tr, null);
                     setProductFieldError(tr, '');
                     return;
                 }
@@ -491,8 +528,10 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.product-search').value = productLabel(product);
+                    updateRowUnit(tr, product);
                     setProductFieldError(tr, '');
                 } else {
+                    updateRowUnit(tr, null);
                     setProductFieldError(tr, @json(__('txn.product_not_registered')));
                 }
             });
@@ -573,6 +612,7 @@
                 }
                 productIdField.value = product.id;
                 productSearchField.value = productLabel(product);
+                updateRowUnit(row, product);
                 setProductFieldError(row, '');
             }
 

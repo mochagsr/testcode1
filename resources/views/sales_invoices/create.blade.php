@@ -5,6 +5,24 @@
 @section('content')
     <h1 class="page-title">{{ __('txn.create_sales_invoice_title') }}</h1>
 
+    <style>
+        .quantity-with-unit {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 130px;
+        }
+        .quantity-with-unit .qty {
+            flex: 0 0 88px;
+            max-width: 88px;
+        }
+        .qty-unit-label {
+            color: #526173;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+    </style>
+
     <form method="post" action="{{ route('sales-invoices.store') }}">
         @csrf
 
@@ -506,6 +524,7 @@
                     product_id: item.product_id,
                     product_code: item.product_code || '',
                     product_name: item.product_name || '',
+                    unit: item.unit || '',
                     quantity: Number(item.remaining_qty || item.ordered_qty || 1),
                     order_note_item_id: item.id || '',
                     stock: Number(item.stock || 0),
@@ -559,6 +578,7 @@
                         id: Number(item.product_id || 0),
                         code: String(item.product_code || ''),
                         name: String(item.product_name || ''),
+                        unit: String(item.unit || ''),
                         stock: Number(item.stock || 0),
                         price_agent: Number(item.price_agent || 0),
                         price_sales: Number(item.price_sales || 0),
@@ -602,6 +622,11 @@
                 return `${code} - ${product.name}`;
             }
             return `${product.name}`;
+        }
+
+        function productUnitLabel(product) {
+            const unit = String(product?.unit || '').trim();
+            return unit !== '' ? unit : '-';
         }
 
         const escapeAttribute = (window.PgposAutoSearch && window.PgposAutoSearch.escapeAttribute)
@@ -763,6 +788,10 @@
 
         function updateRowMeta(row, product) {
             row.querySelector('.stock').textContent = product ? product.stock : '-';
+            const unitLabel = row.querySelector('.qty-unit-label');
+            if (unitLabel) {
+                unitLabel.textContent = productUnitLabel(product);
+            }
             const priceInput = row.querySelector('.price');
             priceInput.value = resolveProductPrice(product);
             priceInput.dataset.manual = '0';
@@ -785,7 +814,12 @@
                       <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                   </td>
                 <td class="stock">-</td>
-                <td><input class="qty" type="number" min="1" name="items[${index}][quantity]" value="${initialQty}" required style="max-width: 88px;"></td>
+                <td>
+                    <div class="quantity-with-unit">
+                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="${initialQty}" required>
+                        <span class="qty-unit-label">-</span>
+                    </div>
+                </td>
                 <td><input class="price" type="number" min="0" step="1" name="items[${index}][unit_price]" value="0" required style="max-width: 88px;"></td>
                 <td>
                     <div style="display:flex; align-items:center; gap:4px;">
@@ -879,6 +913,7 @@
                         id: productId,
                         code: prefill.product_code || '',
                         name: prefill.product_name || '',
+                        unit: prefill.unit || '',
                         stock: Number(prefill.stock || 0),
                         price_agent: Number(prefill.price_agent || 0),
                         price_sales: Number(prefill.price_sales || 0),

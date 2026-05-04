@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
+use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\OrderNote;
 use App\Models\OrderNoteItem;
@@ -14,6 +15,8 @@ use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\CustomerPrintingSubtypeResolver;
 use App\Support\ExcelExportStyler;
+use App\Support\PrintPaperSize;
+use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
 use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -250,7 +253,7 @@ class OrderNotePageController extends Controller
 
         $productMap = Product::query()
             ->whereIn('id', $productIds)
-            ->get(['id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general'])
+            ->get(['id', 'code', 'name', 'unit', 'stock', 'price_agent', 'price_sales', 'price_general'])
             ->keyBy('id');
 
         $fulfilledByItem = [];
@@ -355,11 +358,13 @@ class OrderNotePageController extends Controller
                         if ($product !== null) {
                             $row['product_code'] = (string) ($product->code ?? $row['product_code'] ?? '');
                             $row['product_name'] = (string) ($product->name ?? $row['product_name'] ?? '');
+                            $row['unit'] = (string) ($product->unit ?? '');
                             $row['stock'] = (int) round((float) ($product->stock ?? 0));
                             $row['price_agent'] = (int) round((float) ($product->price_agent ?? 0));
                             $row['price_sales'] = (int) round((float) ($product->price_sales ?? 0));
                             $row['price_general'] = (int) round((float) ($product->price_general ?? 0));
                         } else {
+                            $row['unit'] = '';
                             $row['stock'] = 0;
                             $row['price_agent'] = 0;
                             $row['price_sales'] = 0;
@@ -650,7 +655,7 @@ class OrderNotePageController extends Controller
             'note' => $orderNote,
             'fulfillmentDetails' => $this->buildOrderNoteFulfillmentDetails($orderNote),
             'isPdf' => true,
-        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
+        ])->setPaper(PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }
@@ -665,9 +670,9 @@ class OrderNotePageController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Surat Pesanan');
             $customerName = (string) ($orderNote->customer?->name ?: preg_replace('/\s*\([^)]+\)\s*$/', '', (string) $orderNote->customer_name));
-            $address = \App\Support\PrintTextFormatter::wrapWords((string) ($orderNote->address ?: $orderNote->customer?->address ?: ''), 5);
-            $notes = \App\Support\PrintTextFormatter::wrapWords(
-                trim((string) ($orderNote->notes ?: \App\Models\AppSetting::getValue('company_invoice_notes', ''))),
+            $address = PrintTextFormatter::wrapWords((string) ($orderNote->address ?: $orderNote->customer?->address ?: ''), 5);
+            $notes = PrintTextFormatter::wrapWords(
+                trim((string) ($orderNote->notes ?: AppSetting::getValue('company_invoice_notes', ''))),
                 4
             );
             $rows = [];

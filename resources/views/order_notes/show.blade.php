@@ -68,6 +68,21 @@
             min-width: 80px;
             max-width: 110px;
         }
+        #admin-order-items-table .quantity-with-unit {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 130px;
+        }
+        #admin-order-items-table .quantity-with-unit .admin-order-item-qty {
+            flex: 0 0 88px;
+            max-width: 88px;
+        }
+        #admin-order-items-table .qty-unit-label {
+            color: #526173;
+            font-weight: 700;
+            white-space: nowrap;
+        }
         #admin-order-items-table .admin-order-item-notes {
             width: 100%;
             min-width: 210px;
@@ -382,13 +397,21 @@
                                 </tr>
                                 </thead>
                                 <tbody>
+                                @php
+                                    $productUnitsById = $products->keyBy('id')->map(fn ($productOption): string => (string) ($productOption->unit ?? ''));
+                                @endphp
                                 @foreach($note->items as $index => $item)
                                     <tr>
                                         <td>
                                             <input type="text" name="items[{{ $index }}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="{{ $item->product_name }}" required>
                                             <input type="hidden" class="admin-order-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
                                         </td>
-                                        <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" required></td>
+                                        <td>
+                                            <div class="quantity-with-unit">
+                                                <input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" required>
+                                                <span class="qty-unit-label">{{ $productUnitsById->get((int) $item->product_id) ?: '-' }}</span>
+                                            </div>
+                                        </td>
                                         <td><input type="text" name="items[{{ $index }}][notes]" class="admin-order-item-notes" value="{{ $item->notes }}"></td>
                                         <td><button type="button" class="btn danger-btn admin-remove-order-item">{{ __('txn.remove') }}</button></td>
                                     </tr>
@@ -474,6 +497,7 @@
                             'id' => (int) $product->id,
                             'code' => (string) ($product->code ?? ''),
                             'name' => (string) $product->name,
+                            'unit' => (string) ($product->unit ?? ''),
                         ];
                     })->values()->all();
                 @endphp
@@ -513,6 +537,18 @@
                         return `${code} - ${product.name}`;
                     }
                     return String(product.name || '');
+                }
+
+                function productUnitLabel(product) {
+                    const unit = String(product?.unit || '').trim();
+                    return unit !== '' ? unit : '-';
+                }
+
+                function updateRowUnit(row, product) {
+                    const unitLabel = row?.querySelector('.qty-unit-label');
+                    if (unitLabel) {
+                        unitLabel.textContent = productUnitLabel(product);
+                    }
                 }
 
                 function upsertProducts(rows) {
@@ -648,9 +684,11 @@
                         const selected = findProductByLabel(event.currentTarget.value);
                         if (selected) {
                             productIdInput.value = selected.id;
+                            updateRowUnit(row, selected);
                             return;
                         }
                         productIdInput.value = '';
+                        updateRowUnit(row, null);
                     });
                     searchInput?.addEventListener('input', onSearchInput);
                     searchInput?.addEventListener('focus', async (event) => {
@@ -660,6 +698,7 @@
                         const selected = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
                         if (!selected) {
                             productIdInput.value = '';
+                            updateRowUnit(row, null);
                             if (String(event.currentTarget.value || '').trim() !== '') {
                                 setProductFieldError(row, @js(__('txn.product_not_registered')));
                             }
@@ -667,6 +706,7 @@
                         }
                         productIdInput.value = selected.id;
                         searchInput.value = productLabel(selected);
+                        updateRowUnit(row, selected);
                         setProductFieldError(row, '');
                     });
                     row.querySelector('.admin-remove-order-item')?.addEventListener('click', () => {
@@ -686,7 +726,12 @@
                             <input type="text" name="items[${index}][product_name]" class="admin-order-item-search" list="admin-order-products-list" value="" required>
                             <input type="hidden" class="admin-order-item-product-id" name="items[${index}][product_id]" value="">
                         </td>
-                        <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="1" required></td>
+                        <td>
+                            <div class="quantity-with-unit">
+                                <input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="1" required>
+                                <span class="qty-unit-label">-</span>
+                            </div>
+                        </td>
                         <td><input type="text" name="items[${index}][notes]" class="admin-order-item-notes" value=""></td>
                         <td><button type="button" class="btn danger-btn admin-remove-order-item">{{ __('txn.remove') }}</button></td>
                     `;
