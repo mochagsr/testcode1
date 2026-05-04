@@ -96,6 +96,11 @@ class DeliveryInvoiceWorkflowTest extends TestCase
             'debit' => 120000,
         ]);
         $this->assertSame(120000.0, (float) ReceivableLedger::query()->where('sales_invoice_id', $invoice->id)->sum('debit'));
+
+        $this->actingAs($user)
+            ->get(route('sales-invoices.pending-delivery-notes'))
+            ->assertOk()
+            ->assertDontSee('SJ-28042026-0001');
     }
 
     public function test_invoice_from_delivery_note_requires_positive_price(): void
