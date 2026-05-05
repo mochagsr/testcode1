@@ -59,6 +59,7 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertIsInt($phonePosition);
         $this->assertLessThan($phonePosition, $schoolPosition);
         $this->assertLessThan($phonePosition, $cityPosition);
+        $this->assertMatchesRegularExpression('/<option value="1"[^>]*selected[^>]*>/', $content);
     }
 
     public function test_customer_ship_location_lookup_filters_by_customer_and_active_status(): void

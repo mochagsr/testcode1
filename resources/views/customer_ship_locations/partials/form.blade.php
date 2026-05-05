@@ -26,8 +26,8 @@
         <div class="col-12">
             <label>{{ __('txn.status') }}</label>
             <select name="is_active">
-                <option value="1" @selected((string) old('is_active', $location?->is_active ? '1' : '0') === '1')>{{ __('txn.status_active') }}</option>
-                <option value="0" @selected((string) old('is_active', $location?->is_active ? '1' : '0') === '0')>{{ __('school_bulk.status_inactive') }}</option>
+                <option value="1" @selected((string) old('is_active', $location ? ($location->is_active ? '1' : '0') : '1') === '1')>{{ __('txn.status_active') }}</option>
+                <option value="0" @selected((string) old('is_active', $location ? ($location->is_active ? '1' : '0') : '1') === '0')>{{ __('school_bulk.status_inactive') }}</option>
             </select>
         </div>
         <div class="col-12">
