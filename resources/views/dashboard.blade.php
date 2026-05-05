@@ -10,21 +10,30 @@
     <style>
         .dashboard-quick-links {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
         }
         .dashboard-quick-link {
             display: block;
-            padding: 12px;
+            padding: 14px;
             border: 1px solid var(--border);
-            border-radius: 8px;
-            background: color-mix(in srgb, var(--surface) 94%, var(--border) 6%);
+            border-radius: var(--radius-md);
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--card) 92%, var(--brand-50) 8%), var(--card));
             text-decoration: none;
             color: inherit;
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+        }
+        .dashboard-quick-link:hover {
+            border-color: color-mix(in srgb, var(--brand-500) 42%, var(--border) 58%);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
         }
         .dashboard-quick-link strong {
             display: block;
             margin-bottom: 6px;
+            color: var(--text);
         }
         .dashboard-quick-link small {
             color: var(--muted);
@@ -39,17 +48,17 @@
             letter-spacing: .02em;
         }
         .dashboard-status-pill.safe {
-            background: rgba(34, 197, 94, 0.18);
-            color: #86efac;
+            background: var(--badge-success-bg);
+            color: var(--badge-success-text);
         }
         .dashboard-status-pill.needs_review,
         .dashboard-status-pill.not_ready {
-            background: rgba(250, 204, 21, 0.18);
-            color: #fde68a;
+            background: var(--badge-warning-bg);
+            color: var(--badge-warning-text);
         }
         .dashboard-status-pill.growing {
-            background: rgba(249, 115, 22, 0.18);
-            color: #fdba74;
+            background: var(--alert-edit-bg);
+            color: var(--alert-edit-text);
         }
         .dashboard-checklist {
             list-style: none;
@@ -60,12 +69,12 @@
             margin-top: 8px;
         }
         .dashboard-check {
-            color: #86efac;
+            color: var(--success-500, #159947);
             font-weight: 700;
             margin-right: 8px;
         }
         .dashboard-cross {
-            color: #fca5a5;
+            color: var(--danger-500, #d92d20);
             font-weight: 700;
             margin-right: 8px;
         }
