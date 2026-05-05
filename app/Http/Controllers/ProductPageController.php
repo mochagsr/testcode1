@@ -46,12 +46,15 @@ class ProductPageController extends Controller
     public function index(Request $request): View
     {
         $search = trim((string) $request->string('search', ''));
+        $productType = $this->resolveProductType($request);
 
         $products = Product::query()
             ->onlyListColumns()
             ->active()
             ->withCategoryInfo()
             ->searchKeyword($search)
+            ->when($productType === 'raw_material', fn (Builder $query): Builder => $query->supplierSourced())
+            ->when($productType === 'general', fn (Builder $query): Builder => $query->generalStock())
             ->orderBy('name')
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
@@ -59,16 +62,19 @@ class ProductPageController extends Controller
         return view('products.index', [
             'products' => $products,
             'search' => $search,
+            'productType' => $productType,
+            'productTypeOptions' => $this->productTypeOptions(),
         ]);
     }
 
     public function exportCsv(Request $request): StreamedResponse
     {
         $search = trim((string) $request->string('search', ''));
+        $productType = $this->resolveProductType($request);
         $printedAt = $this->nowWib();
         $filename = 'products-'.$printedAt->format('Ymd-His').'.xlsx';
 
-        $productQuery = $this->reportProductQuery($search);
+        $productQuery = $this->reportProductQuery($search, $productType);
 
         $productCount = (clone $productQuery)->count();
 
@@ -225,24 +231,27 @@ class ProductPageController extends Controller
     /**
      * @return Builder<Product>
      */
-    private function reportProductQuery(string $search)
+    private function reportProductQuery(string $search, string $productType)
     {
         return Product::query()
             ->active()
             ->withCategoryInfo()
             ->select(['id', 'item_category_id', 'code', 'name', 'stock'])
             ->searchKeyword($search)
+            ->when($productType === 'raw_material', fn (Builder $query): Builder => $query->supplierSourced())
+            ->when($productType === 'general', fn (Builder $query): Builder => $query->generalStock())
             ->orderBy('id');
     }
 
     /**
-     * @return array{products:Collection<int,Product>,printedAt:Carbon,settings:array<string,string>,search:string}
+     * @return array{products:Collection<int,Product>,printedAt:Carbon,settings:array<string,string>,search:string,productType:string,productTypeLabel:string}
      */
     private function reportViewData(Request $request): array
     {
         $search = trim((string) $request->string('search', ''));
+        $productType = $this->resolveProductType($request);
         $printedAt = $this->nowWib();
-        $products = $this->reportProductQuery($search)->get();
+        $products = $this->reportProductQuery($search, $productType)->get();
         $settings = AppSetting::getValues([
             'company_name' => '',
             'company_address' => '',
@@ -255,6 +264,26 @@ class ProductPageController extends Controller
             'printedAt' => $printedAt,
             'settings' => $settings,
             'search' => $search,
+            'productType' => $productType,
+            'productTypeLabel' => $this->productTypeOptions()[$productType] ?? $this->productTypeOptions()['general'],
+        ];
+    }
+
+    private function resolveProductType(Request $request): string
+    {
+        $type = trim((string) $request->string('product_type', 'general'));
+
+        return array_key_exists($type, $this->productTypeOptions()) ? $type : 'general';
+    }
+
+    /**
+     * @return array{general:string,raw_material:string}
+     */
+    private function productTypeOptions(): array
+    {
+        return [
+            'general' => __('ui.product_type_general'),
+            'raw_material' => __('ui.product_type_raw_material'),
         ];
     }
 

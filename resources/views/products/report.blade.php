@@ -65,6 +65,7 @@
         </div>
         <div class="doc-meta-right">
             <div class="meta-line"><div class="meta-label">{{ __('txn.date') }}</div><div>:</div><div class="meta-value">{{ $printedAt->format('d-m-Y H:i:s') }} WIB</div></div>
+            <div class="meta-line"><div class="meta-label">{{ __('ui.product_type_label') }}</div><div>:</div><div class="meta-value">{{ $productTypeLabel }}</div></div>
             <div class="meta-line"><div class="meta-label">{{ __('txn.search') }}</div><div>:</div><div class="meta-value">{{ $search !== '' ? $search : '-' }}</div></div>
             <div class="meta-line"><div class="meta-label">{{ __('txn.total') }}</div><div>:</div><div class="meta-value">{{ $products->count() }}</div></div>
         </div>

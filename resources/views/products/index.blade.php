@@ -6,7 +6,7 @@
     <style>
         .products-toolbar {
             display: grid;
-            grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+            grid-template-columns: minmax(420px, 540px) minmax(0, 1fr);
             align-items: start;
             gap: 10px 14px;
         }
@@ -34,17 +34,22 @@
         }
         .products-toolbar .search-form {
             width: 100%;
-            max-width: 380px;
+            max-width: 520px;
             justify-content: flex-start;
         }
         .products-toolbar .search-form input[type="text"],
+        .products-toolbar .search-form select,
         .products-toolbar .import-form input[type="file"] {
             width: 260px;
             max-width: min(260px, 100%);
         }
         .products-toolbar .search-form input[type="text"] {
-            flex: 1 1 230px;
+            flex: 1 1 210px;
             min-width: 0;
+        }
+        .products-toolbar .search-form select {
+            flex: 0 0 170px;
+            min-width: 160px;
         }
         .products-toolbar .import-form {
             justify-content: flex-start;
@@ -142,17 +147,21 @@
         }
         @media (max-width: 1280px) {
             .products-toolbar {
-                grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+                grid-template-columns: minmax(400px, 500px) minmax(0, 1fr);
                 gap: 8px 12px;
             }
             .products-toolbar .toolbar-right {
                 gap: 8px;
             }
             .products-toolbar .search-form {
-                max-width: 360px;
+                max-width: 500px;
             }
             .products-toolbar .search-form input[type="text"] {
-                flex-basis: 210px;
+                flex-basis: 190px;
+            }
+            .products-toolbar .search-form select {
+                flex-basis: 160px;
+                min-width: 150px;
             }
             .products-toolbar .import-file-wrap {
                 flex-basis: 190px;
@@ -180,9 +189,13 @@
                 justify-content: flex-start;
             }
             .products-toolbar .search-form input[type="text"],
+            .products-toolbar .search-form select,
             .products-toolbar .import-file-wrap {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
+            }
+            .products-toolbar .search-form select {
+                flex: 0 1 280px;
             }
             .products-toolbar .toolbar-right,
             .products-toolbar .import-form,
@@ -218,6 +231,11 @@
             <div class="toolbar-left">
                 <form id="products-search-form" method="get" class="search-form">
                     <input id="products-search-input" type="text" name="search" placeholder="{{ __('ui.search_products_placeholder') }}" value="{{ $search }}">
+                    <select id="products-type-filter" name="product_type" aria-label="{{ __('ui.product_type_label') }}">
+                        @foreach($productTypeOptions as $typeValue => $typeLabel)
+                            <option value="{{ $typeValue }}" @selected($productType === $typeValue)>{{ $typeLabel }}</option>
+                        @endforeach
+                    </select>
                     <button type="submit">{{ __('ui.search') }}</button>
                 </form>
             </div>
@@ -235,9 +253,9 @@
                     </form>
                 @endif
                 <div class="report-actions">
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search]) }}" target="_blank">{{ __('txn.print') }}</a>
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.pdf', ['search' => $search]) }}">Export PDF</a>
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search]) }}">Export Excel</a>
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search, 'product_type' => $productType]) }}" target="_blank">{{ __('txn.print') }}</a>
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.pdf', ['search' => $search, 'product_type' => $productType]) }}">Export PDF</a>
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search, 'product_type' => $productType]) }}">Export Excel</a>
                 </div>
             </div>
         </div>
@@ -372,6 +390,7 @@
         (function () {
             const form = document.getElementById('products-search-form');
             const searchInput = document.getElementById('products-search-input');
+            const typeFilter = document.getElementById('products-type-filter');
 
             if (!form || !searchInput) {
                 return;
@@ -393,6 +412,7 @@
                 form.requestSubmit();
             }, 100);
             searchInput.addEventListener('input', onSearchInput);
+            typeFilter?.addEventListener('change', () => form.requestSubmit());
         })();
 
         (function () {

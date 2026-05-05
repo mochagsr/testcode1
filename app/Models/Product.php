@@ -230,6 +230,32 @@ class Product extends Model
     }
 
     /**
+     * Scope: Products that have been received from a supplier transaction.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeSupplierSourced(Builder $query): Builder
+    {
+        return $query->whereHas('outgoingTransactionItems', function (Builder $itemQuery): void {
+            $itemQuery->whereHas('outgoingTransaction');
+        });
+    }
+
+    /**
+     * Scope: Products that are not tied to any active supplier receipt.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeGeneralStock(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('outgoingTransactionItems', function (Builder $itemQuery): void {
+            $itemQuery->whereHas('outgoingTransaction');
+        });
+    }
+
+    /**
      * Scope: Filter by low stock (stock <= threshold).
      *
      * @param  Builder<Product>  $query

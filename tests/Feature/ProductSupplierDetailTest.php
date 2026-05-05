@@ -126,4 +126,74 @@ class ProductSupplierDetailTest extends TestCase
         $response->assertSee('TRXK-B-0001');
         $response->assertSee('supplier-stock-cards?supplier_id='.$supplierA->id.'&amp;product_id='.$product->id, false);
     }
+
+    public function test_product_index_can_filter_general_goods_and_raw_materials(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => config('rbac.roles.user', []),
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'umum',
+            'name' => 'Umum',
+        ]);
+        $generalProduct = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'bhs3e856',
+            'name' => 'Bahasa Indonesia 3',
+            'unit' => 'exp',
+            'stock' => 10,
+            'price_agent' => 0,
+            'price_sales' => 0,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+        $rawProduct = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'krwb68cd',
+            'name' => 'Kertas Web 68gr CD',
+            'unit' => 'roll',
+            'stock' => 15,
+            'price_agent' => 0,
+            'price_sales' => 0,
+            'price_general' => 0,
+            'is_active' => true,
+        ]);
+        $supplier = Supplier::query()->create([
+            'name' => 'Supplier Bahan Baku',
+            'company_name' => 'PT Bahan',
+        ]);
+        $transaction = OutgoingTransaction::query()->create([
+            'transaction_number' => 'TRXK-RW-0001',
+            'transaction_date' => '2026-05-01',
+            'supplier_id' => $supplier->id,
+            'semester_period' => 'S1-2627',
+            'total' => 130000,
+            'created_by_user_id' => $user->id,
+        ]);
+        OutgoingTransactionItem::query()->create([
+            'outgoing_transaction_id' => $transaction->id,
+            'product_id' => $rawProduct->id,
+            'product_code' => $rawProduct->code,
+            'product_name' => $rawProduct->name,
+            'unit' => 'roll',
+            'quantity' => 10,
+            'unit_cost' => 13000,
+            'line_total' => 130000,
+        ]);
+
+        $generalResponse = $this->actingAs($user)->get(route('products.index'));
+
+        $generalResponse->assertOk();
+        $generalResponse->assertSee(__('ui.product_type_general'));
+        $generalResponse->assertSee(__('ui.product_type_raw_material'));
+        $generalResponse->assertSee($generalProduct->name);
+        $generalResponse->assertDontSee($rawProduct->name);
+
+        $rawResponse = $this->actingAs($user)->get(route('products.index', ['product_type' => 'raw_material']));
+
+        $rawResponse->assertOk();
+        $rawResponse->assertSee($rawProduct->name);
+        $rawResponse->assertDontSee($generalProduct->name);
+    }
 }
