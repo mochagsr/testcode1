@@ -909,7 +909,7 @@ class SupplierStockCardPageController extends Controller
     }
 
     /**
-     * @return array{0:\Illuminate\Support\Collection<int, array<string, mixed>>, 1:\Illuminate\Support\Collection<int, array<string, mixed>>}
+     * @return array{0:Collection<int, array<string, mixed>>, 1:Collection<int, array<string, mixed>>}
      */
     private function buildStockCardData(
         ?int $selectedSupplierId,
@@ -1430,7 +1430,7 @@ class SupplierStockCardPageController extends Controller
                         $row['supplier_id'] = (int) $supplierId;
 
                         return $row;
-                    });
+                    })->values();
                 })
                 ->values();
         }
@@ -1505,7 +1505,7 @@ class SupplierStockCardPageController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $items
+     * @param  Collection<int, array<string, mixed>>  $items
      */
     private function paginateCollection(
         $items,

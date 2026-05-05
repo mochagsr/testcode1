@@ -204,6 +204,76 @@ class SupplierStockCardTest extends TestCase
         $this->assertSame(5, (int) ($summaryRow['balance'] ?? 0));
     }
 
+    public function test_supplier_stock_card_keeps_same_product_from_different_suppliers_separate_after_receipts(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'finance_locked' => false,
+        ]);
+        $supplierA = Supplier::query()->create([
+            'name' => 'Supplier Rumah Cetak',
+            'company_name' => 'PT Rumah Cetak',
+        ]);
+        $supplierB = Supplier::query()->create([
+            'name' => 'Supplier Kober',
+            'company_name' => 'PT Kober',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'ROLWEB',
+            'name' => 'rolweb - roll web',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'KRWB68CD',
+            'name' => 'kertas web 68gr cd',
+            'unit' => 'roll',
+            'stock' => 0,
+            'price_general' => 0,
+            'is_active' => true,
+        ]);
+
+        foreach ([[$supplierA, 'NOTA-A'], [$supplierB, 'NOTA-B']] as [$supplier, $noteNumber]) {
+            $this->actingAs($user)
+                ->post(route('outgoing-transactions.store'), [
+                    'supplier_id' => $supplier->id,
+                    'transaction_date' => '2026-05-05',
+                    'semester_period' => 'S1-2627',
+                    'note_number' => $noteNumber,
+                    'items' => [
+                        [
+                            'product_id' => $product->id,
+                            'product_name' => $product->name,
+                            'item_category_id' => $category->id,
+                            'unit' => 'roll',
+                            'quantity' => 10,
+                            'unit_cost' => 13000,
+                        ],
+                    ],
+                ])
+                ->assertRedirect();
+        }
+
+        $this->assertDatabaseCount('outgoing_transactions', 2);
+        $this->assertDatabaseCount('outgoing_transaction_items', 2);
+
+        $response = $this->actingAs($user)->get(route('supplier-stock-cards.index'));
+
+        $response->assertOk();
+        $response->assertSee('Supplier Rumah Cetak');
+        $response->assertSee('Supplier Kober');
+
+        /** @var LengthAwarePaginator $summaryPaginator */
+        $summaryPaginator = $response->viewData('summaryPaginator');
+        $summaryRows = collect($summaryPaginator->items())
+            ->where('product_id', $product->id)
+            ->sortBy('supplier_id')
+            ->values();
+
+        $this->assertCount(2, $summaryRows);
+        $this->assertSame([10, 10], $summaryRows->pluck('balance')->map(fn ($value): int => (int) $value)->all());
+        $this->assertSame(20, (int) $product->fresh()->stock);
+    }
+
     public function test_supplier_stock_card_shows_manual_outgoing_items_without_product_id(): void
     {
         $user = User::factory()->create(['role' => 'user']);
