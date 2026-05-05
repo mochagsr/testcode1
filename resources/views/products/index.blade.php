@@ -5,11 +5,10 @@
 @section('content')
     <style>
         .products-toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+            align-items: start;
             gap: 10px 14px;
-            flex-wrap: wrap;
         }
         .products-toolbar .toolbar-left,
         .products-toolbar .toolbar-right {
@@ -20,15 +19,10 @@
             min-width: 0;
         }
         .products-toolbar .toolbar-left {
-            order: 2;
-            justify-content: flex-end;
-            flex: 0 1 380px;
-            margin-left: auto;
+            justify-content: flex-start;
         }
         .products-toolbar .toolbar-right {
-            order: 1;
-            justify-content: flex-start;
-            flex: 1 1 560px;
+            justify-content: flex-end;
             gap: 10px;
         }
         .products-toolbar .search-form,
@@ -41,7 +35,7 @@
         .products-toolbar .search-form {
             width: 100%;
             max-width: 380px;
-            justify-content: flex-end;
+            justify-content: flex-start;
         }
         .products-toolbar .search-form input[type="text"],
         .products-toolbar .import-form input[type="file"] {
@@ -76,6 +70,7 @@
             flex-wrap: wrap;
             padding-left: 10px;
             border-left: 1px solid var(--border);
+            justify-content: flex-end;
             flex: 0 1 auto;
         }
         .products-toolbar .import-file-wrap input[type="file"] {
@@ -147,17 +142,14 @@
         }
         @media (max-width: 1280px) {
             .products-toolbar {
+                grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
                 gap: 8px 12px;
             }
-            .products-toolbar .toolbar-left {
-                flex-basis: 330px;
-            }
             .products-toolbar .toolbar-right {
-                flex-basis: 520px;
                 gap: 8px;
             }
             .products-toolbar .search-form {
-                max-width: 330px;
+                max-width: 360px;
             }
             .products-toolbar .search-form input[type="text"] {
                 flex-basis: 210px;
@@ -172,19 +164,14 @@
         }
         @media (max-width: 1100px) {
             .products-toolbar {
+                display: flex;
+                flex-wrap: wrap;
                 align-items: flex-start;
             }
             .products-toolbar .toolbar-left,
             .products-toolbar .toolbar-right {
                 flex: 1 1 100%;
                 margin-left: 0;
-            }
-            .products-toolbar .toolbar-left {
-                order: 1;
-                justify-content: flex-start;
-            }
-            .products-toolbar .toolbar-right {
-                order: 2;
             }
             .products-toolbar .search-form,
             .products-toolbar .import-form {
