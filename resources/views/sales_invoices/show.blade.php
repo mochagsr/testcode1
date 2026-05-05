@@ -624,7 +624,7 @@
                             <input type="text" class="admin-item-product-search" list="admin-invoice-products-list" name="items[${index}][product_name]" value="${defaultProduct ? escapeAttribute(productLabel(defaultProduct)) : ''}" required style="max-width: 280px;">
                             <input type="hidden" class="admin-item-product" name="items[${index}][product_id]" value="${defaultProduct ? defaultProduct.id : ''}">
                         </td>
-                        <td><input type="number" min="1" class="admin-item-qty" name="items[${index}][quantity]" value="1" style="max-width: 90px;" required></td>
+                        <td><input type="number" min="1" class="admin-item-qty" name="items[${index}][quantity]" value="" placeholder="0" style="max-width: 90px;" required></td>
                         <td><input type="number" min="0" step="1" class="admin-item-price" name="items[${index}][unit_price]" value="${defaultProduct ? (defaultProduct.price_general || 0) : 0}" style="max-width: 120px;" required></td>
                         <td><input type="number" min="0" max="100" step="1" class="admin-item-discount" name="items[${index}][discount]" value="0" style="max-width: 85px;"></td>
                         <td>Rp <span class="admin-item-line-total">0</span></td>

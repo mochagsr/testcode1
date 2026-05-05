@@ -525,7 +525,7 @@
                     product_code: item.product_code || '',
                     product_name: item.product_name || '',
                     unit: item.unit || '',
-                    quantity: Number(item.remaining_qty || item.ordered_qty || 1),
+                    quantity: Number(item.remaining_qty || item.ordered_qty || 0),
                     order_note_item_id: item.id || '',
                     stock: Number(item.stock || 0),
                     price_agent: Number(item.price_agent || 0),
@@ -800,8 +800,9 @@
 
         function addRow(prefill = null) {
             const index = tbody.children.length;
-            const prefillQuantity = Number(prefill?.quantity || 1);
-            const initialQty = Number.isFinite(prefillQuantity) && prefillQuantity > 0 ? Math.round(prefillQuantity) : 1;
+            const hasQuantityPrefill = prefill?.quantity !== undefined && prefill?.quantity !== null && String(prefill?.quantity).trim() !== '';
+            const prefillQuantity = Number(prefill?.quantity || 0);
+            const initialQty = hasQuantityPrefill && Number.isFinite(prefillQuantity) && prefillQuantity > 0 ? Math.round(prefillQuantity) : '';
             const prefillProductName = String(prefill?.product_name || '');
             const prefillProductCode = String(prefill?.product_code || '');
             const productText = prefillProductCode !== '' ? `${prefillProductCode} - ${prefillProductName}` : prefillProductName;
@@ -816,7 +817,7 @@
                 <td class="stock">-</td>
                 <td>
                     <div class="quantity-with-unit">
-                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="${initialQty}" required>
+                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="${initialQty}" placeholder="0" required>
                         <span class="qty-unit-label">-</span>
                     </div>
                 </td>
@@ -963,7 +964,7 @@
             bootItems.forEach((row) => {
                 const rowData = {
                     product_id: Number(row.product_id || 0) > 0 ? Number(row.product_id) : null,
-                    quantity: Number(row.quantity || 1),
+                    quantity: row.quantity ?? '',
                     order_note_item_id: Number(row.order_note_item_id || 0) > 0 ? Number(row.order_note_item_id) : '',
                 };
                 addRow(rowData);

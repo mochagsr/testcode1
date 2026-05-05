@@ -499,7 +499,7 @@
                 <td class="stock">-</td>
                 <td>
                     <div class="quantity-with-unit">
-                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="1" required>
+                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="" placeholder="0" required>
                         <span class="qty-unit-label">-</span>
                     </div>
                 </td>

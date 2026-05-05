@@ -616,7 +616,7 @@
                     locationItemsByUid[uid] = rows.map((row) => ({
                         product_id: row.querySelector('.product-id')?.value || '',
                         product_name: row.querySelector('.product-name')?.value || '',
-                        quantity: row.querySelector('.product-qty')?.value || 1,
+                        quantity: row.querySelector('.product-qty')?.value || '',
                         unit: row.querySelector('.product-unit')?.value || '',
                         unit_price: row.querySelector('.product-price')?.value || '',
                         notes: row.querySelector('.product-notes')?.value || '',
@@ -692,7 +692,7 @@
                     </td>
                     <td>
                         <div class="quantity-with-unit">
-                            <input type="number" min="1" class="product-qty" value="${initial.quantity || 1}" required>
+                            <input type="number" min="1" class="product-qty" value="${initial.quantity || ''}" placeholder="0" required>
                             <span class="qty-unit-label">${initial.unit || '-'}</span>
                             <input type="hidden" class="product-unit" value="${initial.unit || ''}">
                         </div>

@@ -313,7 +313,7 @@
                                     <input type="hidden" class="admin-product-id" name="items[{{ $idx }}][product_id]" value="{{ (int) ($item['product_id'] ?? 0) }}">
                                 </td>
                                 <td class="admin-col-unit"><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
-                                <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ (int) ($item['quantity'] ?? 1) }}" required></td>
+                                <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ $item['quantity'] ?? '' }}" placeholder="0" required></td>
                                 <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
                                 <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (isset($item['unit_cost']) && (float) $item['unit_cost'] > 0) ? (int) $item['unit_cost'] : '' }}" placeholder="0"></td>
                                 <td class="admin-col-tax">
@@ -496,7 +496,7 @@
                     tr.innerHTML = `
                         <td class="admin-col-product"><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"><div class="field-inline-error admin-product-error" style="display:block; margin-top:4px;"></div></td>
                         <td class="admin-col-unit"><input type="text" class="admin-unit"></td>
-                        <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" value="1" required></td>
+                        <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" value="" placeholder="0" required></td>
                         <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" value=""></td>
                         <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="" placeholder="0"></td>
                         <td class="admin-col-tax">

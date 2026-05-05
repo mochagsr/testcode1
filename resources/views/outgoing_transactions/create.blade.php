@@ -817,8 +817,9 @@
                 const categoryValue = rowPrefill?.item_category_id
                     ? String(rowPrefill.item_category_id)
                     : (prefillProduct?.item_category_id ? String(prefillProduct.item_category_id) : '');
-                const qtyCandidate = Number(rowPrefill?.quantity ?? 1);
-                const qtyValue = Number.isFinite(qtyCandidate) && qtyCandidate > 0 ? Math.round(qtyCandidate) : 1;
+                const hasQtyPrefill = rowPrefill?.quantity !== undefined && rowPrefill?.quantity !== null && String(rowPrefill?.quantity).trim() !== '';
+                const qtyCandidate = Number(rowPrefill?.quantity ?? 0);
+                const qtyValue = hasQtyPrefill && Number.isFinite(qtyCandidate) && qtyCandidate > 0 ? Math.round(qtyCandidate) : '';
                 const weightRaw = rowPrefill?.weight;
                 const weightValue = weightRaw === null || weightRaw === undefined || String(weightRaw).trim() === ''
                     ? ''
@@ -860,7 +861,7 @@
                         <select class="unit outgoing-unit-select" name="items[${index}][unit]">${buildUnitOptions(unitValue)}</select>
                     </td>
                     <td class="outgoing-col-qty">
-                        <input type="number" min="1" class="qty outgoing-qty-input" name="items[${index}][quantity]" value="${qtyValue}" required>
+                        <input type="number" min="1" class="qty outgoing-qty-input" name="items[${index}][quantity]" value="${qtyValue}" placeholder="0" required>
                     </td>
                     <td class="outgoing-col-weight">
                         <input type="number" min="0" step="0.001" class="weight outgoing-weight-input" name="items[${index}][weight]" value="${escapeAttribute(weightValue)}">

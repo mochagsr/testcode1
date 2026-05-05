@@ -480,7 +480,7 @@
                 </td>
                 <td>
                     <div class="quantity-with-unit">
-                        <input name="items[${index}][quantity]" type="number" min="1" value="1" class="qty-input" required>
+                        <input name="items[${index}][quantity]" type="number" min="1" value="" placeholder="0" class="qty-input" required>
                         <span class="qty-unit-label">-</span>
                     </div>
                 </td>

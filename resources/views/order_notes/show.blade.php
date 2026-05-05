@@ -728,7 +728,7 @@
                         </td>
                         <td>
                             <div class="quantity-with-unit">
-                                <input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="1" required>
+                                <input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="" placeholder="0" required>
                                 <span class="qty-unit-label">-</span>
                             </div>
                         </td>

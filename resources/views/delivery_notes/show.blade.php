@@ -510,7 +510,7 @@
                             <input type="text" name="items[${index}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="" style="min-width: 280px; width: 100%;" required>
                             <input type="hidden" class="admin-delivery-item-product-id" name="items[${index}][product_id]" value="">
                         </td>
-                        <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-delivery-item-qty qty-input" value="1" style="max-width: 104px;" required></td>
+                        <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-delivery-item-qty qty-input" value="" placeholder="0" style="max-width: 104px;" required></td>
                         <td><input type="text" name="items[${index}][unit]" class="admin-delivery-item-unit" value="" style="max-width: 72px;"></td>
                         <td><input type="text" name="items[${index}][notes]" class="admin-delivery-item-notes" value="" style="max-width: 130px;"></td>
                         <td><button type="button" class="btn danger-btn admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
