@@ -72,10 +72,9 @@
         <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_sales_invoices') }}</strong>
             <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                <option value="{{ route('reports.print', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.print') }}</option>
-                <option value="{{ route('reports.export.pdf', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.pdf') }}</option>
-                <option value="{{ route('reports.export.csv', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">{{ __('txn.excel') }}</option>
+                <option value="" selected disabled>Export</option>
+                <option value="{{ route('reports.export.pdf', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">Export PDF</option>
+                <option value="{{ route('reports.export.csv', ['dataset' => 'sales_invoices', 'semester' => $selectedSemester]) }}">Export Excel</option>
             </select>
         </div>
     </div>

@@ -11,36 +11,18 @@
             gap: 14px;
             flex-wrap: wrap;
         }
-        .customers-toolbar .toolbar-left,
-        .customers-toolbar .toolbar-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .customers-toolbar .toolbar-left {
-            flex: 1 1 420px;
-        }
-        .customers-toolbar .toolbar-right {
-            justify-content: flex-end;
-            flex: 1 1 640px;
-        }
-        .customers-toolbar .search-form,
-        .customers-toolbar .import-form {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin: 0;
-        }
         .customers-toolbar .search-form {
-            width: 100%;
-            max-width: 680px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            flex: 1 1 auto;
+            margin: 0;
         }
         .customers-toolbar .search-form input[type="text"] {
             width: 320px;
             max-width: min(320px, 100%);
-            flex: 1 1 240px;
+            flex: 1 1 260px;
             min-width: 0;
         }
         .customers-toolbar .search-form select {
@@ -48,34 +30,64 @@
             max-width: min(250px, 100%);
             margin-left: 0;
         }
-        .customers-toolbar .import-form {
-            justify-content: flex-end;
-            width: 100%;
-            max-width: 100%;
-            gap: 12px;
-        }
-        .customers-toolbar .import-file-wrap {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
-            flex: 0 1 320px;
-            min-width: 280px;
-        }
-        .customers-toolbar .import-file-wrap input[type="file"] {
-            width: 100%;
-            max-width: 100%;
-            min-width: 0;
-            flex: 1 1 auto;
-        }
-        .customers-toolbar .import-actions {
+        .customers-toolbar-actions {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
+            margin-top: 12px;
+            width: 100%;
+        }
+        .customer-import-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10020;
+            background: rgba(15, 23, 42, 0.58);
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+        }
+        .customer-import-overlay.is-open {
+            display: flex;
+        }
+        .customer-import-modal {
+            width: min(520px, 96vw);
+            max-height: 90vh;
+            overflow: auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+            padding: 18px;
+        }
+        .customer-import-modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .customer-import-modal-title {
+            font-size: 18px;
+            font-weight: 800;
+        }
+        .customer-import-file-wrap {
+            padding: 12px;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
+        }
+        .customer-import-file-wrap input[type="file"] {
+            width: 100%;
+        }
+        .customer-import-modal-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            margin-top: 14px;
         }
         .customers-table-wrap {
             overflow-x: auto;
@@ -109,78 +121,53 @@
             line-height: 1.2;
         }
         @media (max-width: 1400px) {
-            .customers-toolbar .toolbar-left,
-            .customers-toolbar .toolbar-right {
-                flex: 1 1 100%;
-            }
-            .customers-toolbar .toolbar-right {
-                justify-content: flex-start;
-            }
-            .customers-toolbar .import-form {
-                justify-content: flex-start;
-            }
-            .customers-toolbar .import-file-wrap {
-                flex-basis: 300px;
+            .customers-toolbar {
+                align-items: flex-start;
             }
         }
         @media (max-width: 1280px) {
-            .customers-toolbar .search-form,
-            .customers-toolbar .import-form {
-                width: 100%;
-            }
-            .customers-toolbar .search-form input[type="text"],
-            .customers-toolbar .import-file-wrap {
+            .customers-toolbar .search-form input[type="text"] {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
-            }
-            .customers-toolbar .import-actions {
-                flex: 1 1 100%;
             }
         }
     </style>
     @php
-        $canManageCustomers = auth()->user()?->canAccessAny(['customers.create', 'customers.edit', 'customers.delete', 'customers.import']) ?? false;
+        $currentUser = auth()->user();
+        $canCreateCustomers = $currentUser?->canAccess('customers.create') ?? false;
+        $canManageCustomers = $currentUser?->canAccessAny(['customers.create', 'customers.edit', 'customers.delete', 'customers.import']) ?? false;
+        $canImportCustomers = $currentUser?->canAccess('customers.import') ?? false;
+        $customerExportQuery = ['search' => $search, 'level_id' => $selectedLevelId ?: null];
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.customers_title') }}</h1>
-        @if($canManageCustomers)
+        @if($canCreateCustomers)
             <a class="btn" href="{{ route('customers-web.create') }}">{{ __('ui.add_customer') }}</a>
         @endif
     </div>
 
     <div class="card">
         <div class="customers-toolbar">
-            <div class="toolbar-left">
-                <form id="customers-search-form" method="get" class="search-form">
-                    <input id="customers-search-input" type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}">
-                    <select name="level_id" id="customers-level-filter">
-                        <option value="">{{ __('ui.all_levels') }}</option>
-                        @foreach($levels as $level)
-                            <option value="{{ $level->id }}" @selected((int) $selectedLevelId === (int) $level->id)>{{ $level->name }}</option>
-                        @endforeach
-                    </select>
-                    <button type="submit">{{ __('ui.search') }}</button>
-                </form>
-            </div>
-            <div class="toolbar-right">
-                @if($canManageCustomers)
-                    <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data" class="import-form">
-                        @csrf
-                        <div class="import-file-wrap">
-                            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                        </div>
-                        <div class="import-actions">
-                            <button type="submit" class="btn process-btn">Import</button>
-                            <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Template Import</a>
-                            <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">Export Excel</a>
-                        </div>
-                    </form>
-                @else
-                    <div class="import-actions">
-                        <a class="btn info-btn" href="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}">Export Excel</a>
-                    </div>
-                @endif
-            </div>
+            <form id="customers-search-form" method="get" class="search-form">
+                <input id="customers-search-input" type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}">
+                <select name="level_id" id="customers-level-filter">
+                    <option value="">{{ __('ui.all_levels') }}</option>
+                    @foreach($levels as $level)
+                        <option value="{{ $level->id }}" @selected((int) $selectedLevelId === (int) $level->id)>{{ $level->name }}</option>
+                    @endforeach
+                </select>
+                <button type="submit">{{ __('ui.search') }}</button>
+            </form>
+        </div>
+        <div class="customers-toolbar-actions">
+            @if($canImportCustomers)
+                <button type="button" class="btn process-btn" id="customer-import-open">Import Data</button>
+            @endif
+            <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                <option value="" selected disabled>Export</option>
+                <option value="{{ route('customers-web.export.pdf', $customerExportQuery) }}">Export PDF</option>
+                <option value="{{ route('customers-web.export.csv', $customerExportQuery) }}">Export Excel</option>
+            </select>
         </div>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
@@ -193,6 +180,31 @@
             </div>
         @endif
     </div>
+
+    @if($canImportCustomers)
+        <div class="customer-import-overlay" id="customer-import-modal" aria-hidden="true">
+            <div class="customer-import-modal" role="dialog" aria-modal="true" aria-labelledby="customer-import-title">
+                <div class="customer-import-modal-head">
+                    <div>
+                        <div class="customer-import-modal-title" id="customer-import-title">Import Data Customer</div>
+                        <div class="muted">Upload file Excel/CSV. Gunakan template kalau format file belum sesuai.</div>
+                    </div>
+                    <button type="button" class="btn info-btn" id="customer-import-close" style="min-height:32px; padding:5px 11px;">{{ __('ui.cancel') }}</button>
+                </div>
+                <form method="post" action="{{ route('customers-web.import') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="customer-import-file-wrap">
+                        <label for="customer-import-file">File Import</label>
+                        <input id="customer-import-file" type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    </div>
+                    <div class="customer-import-modal-actions">
+                        <a class="btn info-btn" href="{{ route('customers-web.import.template') }}">Download Template</a>
+                        <button type="submit" class="btn process-btn">Import</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
 
     <div class="card">
         <div class="customers-table-wrap">
@@ -306,6 +318,9 @@
             const modal = document.getElementById('id-card-modal');
             const modalImage = document.getElementById('id-card-modal-image');
             const triggers = document.querySelectorAll('.id-card-preview-trigger');
+            const importModal = document.getElementById('customer-import-modal');
+            const importOpen = document.getElementById('customer-import-open');
+            const importClose = document.getElementById('customer-import-close');
             if (searchForm && searchInput) {
                 const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
                     ? window.PgposAutoSearch.debounce
@@ -323,6 +338,28 @@
                     searchForm.requestSubmit();
                 }, 100);
                 searchInput.addEventListener('input', onSearchInput);
+            }
+            if (importModal && importOpen && importClose) {
+                const closeImportModal = () => {
+                    importModal.classList.remove('is-open');
+                    importModal.setAttribute('aria-hidden', 'true');
+                };
+                importOpen.addEventListener('click', () => {
+                    importModal.classList.add('is-open');
+                    importModal.setAttribute('aria-hidden', 'false');
+                    document.getElementById('customer-import-file')?.focus();
+                });
+                importClose.addEventListener('click', closeImportModal);
+                importModal.addEventListener('click', (event) => {
+                    if (event.target === importModal) {
+                        closeImportModal();
+                    }
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && importModal.classList.contains('is-open')) {
+                        closeImportModal();
+                    }
+                });
             }
             if (!modal || !modalImage || !triggers.length) {
                 return;

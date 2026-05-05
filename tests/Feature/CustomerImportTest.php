@@ -53,4 +53,42 @@ class CustomerImportTest extends TestCase
         $customer = Customer::query()->where('name', 'Toko Sumber Ilmu')->first();
         $this->assertNotNull($customer?->code);
     }
+
+    public function test_customer_index_groups_import_and_export_actions(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [
+                'masters.customers.view',
+                'customers.import',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('customers-web.index'));
+
+        $response->assertOk()
+            ->assertSee('Import Data')
+            ->assertSee('id="customer-import-modal"', false)
+            ->assertSee('Export PDF')
+            ->assertSee('Export Excel')
+            ->assertSee(route('customers-web.export.pdf'), false)
+            ->assertSee(route('customers-web.export.csv'), false);
+    }
+
+    public function test_customer_pdf_export_downloads_report(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Customer::query()->create([
+            'code' => 'CUST-PDF-01',
+            'name' => 'Customer PDF',
+            'phone' => '081234',
+            'city' => 'Malang',
+            'address' => 'Jl. PDF',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('customers-web.export.pdf'));
+
+        $response->assertOk();
+        $this->assertStringContainsString('application/pdf', (string) $response->headers->get('content-type'));
+    }
 }

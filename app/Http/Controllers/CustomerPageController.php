@@ -9,11 +9,13 @@ use App\Models\CustomerLevel;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
 use App\Support\UploadedImageCompressor;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -131,6 +133,33 @@ class CustomerPageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    public function exportPdf(Request $request): Response
+    {
+        $search = trim((string) $request->string('search', ''));
+        $selectedLevelId = max(0, (int) $request->integer('level_id', 0));
+        $printedAt = $this->nowWib();
+        $customers = Customer::query()
+            ->select(['id', 'customer_level_id', 'name', 'phone', 'phone_secondary', 'city', 'address', 'outstanding_receivable'])
+            ->withLevel()
+            ->when($selectedLevelId > 0, fn ($query) => $query->where('customer_level_id', $selectedLevelId))
+            ->searchKeyword($search)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+        $levelLabel = $selectedLevelId > 0
+            ? (string) (CustomerLevel::query()->whereKey($selectedLevelId)->value('name') ?? '-')
+            : __('ui.all_levels');
+
+        return Pdf::loadView('customers.report', [
+            'customers' => $customers,
+            'search' => $search,
+            'levelLabel' => $levelLabel,
+            'printedAt' => $printedAt,
+            'isPdf' => true,
+        ])->setPaper('a4', 'portrait')
+            ->download('customers-'.$printedAt->format('Ymd-His').'.pdf');
     }
 
     private function nowWib(): Carbon

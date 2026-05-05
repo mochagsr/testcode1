@@ -292,6 +292,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::delete('/suppliers/{supplier}', [SupplierPageController::class, 'destroy'])->middleware('perm:suppliers.delete')->name('suppliers.destroy');
     Route::get('/customers-web', [CustomerPageController::class, 'index'])->middleware('perm:masters.customers.view')->name('customers-web.index');
     Route::get('/customers-web/level/{customerLevel}', [CustomerPageController::class, 'levelCustomers'])->middleware('perm:masters.customers.view')->name('customers-web.level-customers');
+    Route::get('/customers-web/pdf', [CustomerPageController::class, 'exportPdf'])->middleware('perm:masters.customers.view')->name('customers-web.export.pdf');
     Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->middleware('perm:masters.customers.view')->name('customers-web.export.csv');
     Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:customers.import')->name('customers-web.import.template');
     Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:customers.import')->name('customers-web.import');
