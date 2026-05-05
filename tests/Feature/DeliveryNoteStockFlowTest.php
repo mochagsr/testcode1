@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
 use App\Models\ItemCategory;
+use App\Models\OrderNote;
+use App\Models\OrderNoteItem;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -97,7 +99,7 @@ class DeliveryNoteStockFlowTest extends TestCase
             'city' => 'Sidoarjo',
             'items' => [
                 [
-                    'product_name' => $product->code . ' - ' . $product->name,
+                    'product_name' => $product->code.' - '.$product->name,
                     'product_id' => $product->id,
                     'quantity' => 2,
                     'unit' => 'pcs',
@@ -116,6 +118,106 @@ class DeliveryNoteStockFlowTest extends TestCase
             'product_name' => $product->name,
             'quantity' => 2,
         ]);
+    }
+
+    public function test_create_delivery_note_from_order_note_keeps_manual_extra_items(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-DN-ON',
+            'name' => 'Kategori DN Surat Pesanan',
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-DN-ON',
+            'name' => 'Customer DN Surat Pesanan',
+            'city' => 'Malang',
+        ]);
+        $orderedProduct = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-DN-ON',
+            'name' => 'Produk Dari Surat Pesanan',
+            'unit' => 'exp',
+            'stock' => 20,
+            'price_general' => 5000,
+            'is_active' => true,
+        ]);
+        $manualProduct = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-DN-EXT',
+            'name' => 'Produk Tambahan Manual',
+            'unit' => 'pcs',
+            'stock' => 10,
+            'price_general' => 7000,
+            'is_active' => true,
+        ]);
+        $orderNote = OrderNote::query()->create([
+            'note_number' => 'SP-20260505-0001',
+            'note_date' => '2026-05-05',
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'city' => $customer->city,
+            'created_by_name' => $admin->name,
+            'is_canceled' => false,
+        ]);
+        $orderNoteItem = OrderNoteItem::query()->create([
+            'order_note_id' => $orderNote->id,
+            'product_id' => $orderedProduct->id,
+            'product_code' => $orderedProduct->code,
+            'product_name' => $orderedProduct->name,
+            'quantity' => 5,
+        ]);
+
+        $createResponse = $this->actingAs($admin)->get(route('delivery-notes.create', [
+            'order_note_id' => $orderNote->id,
+        ]));
+
+        $createResponse->assertOk()
+            ->assertSee('id="order-note-id"', false)
+            ->assertSee($orderNote->note_number)
+            ->assertSee($orderedProduct->name);
+
+        $storeResponse = $this->actingAs($admin)->post(route('delivery-notes.store'), [
+            'note_date' => '2026-05-05',
+            'customer_id' => $customer->id,
+            'order_note_id' => $orderNote->id,
+            'recipient_name' => 'Penerima Surat Jalan',
+            'city' => 'Malang',
+            'items' => [
+                [
+                    'product_id' => $orderedProduct->id,
+                    'order_note_item_id' => $orderNoteItem->id,
+                    'product_name' => $orderedProduct->name,
+                    'unit' => 'exp',
+                    'quantity' => 3,
+                ],
+                [
+                    'product_id' => $manualProduct->id,
+                    'product_name' => $manualProduct->name,
+                    'unit' => 'pcs',
+                    'quantity' => 2,
+                ],
+            ],
+        ]);
+
+        $note = DeliveryNote::query()->latest('id')->firstOrFail();
+        $storeResponse->assertRedirect(route('delivery-notes.show', $note));
+
+        $this->assertSame((int) $orderNote->id, (int) $note->order_note_id);
+        $this->assertDatabaseHas('delivery_note_items', [
+            'delivery_note_id' => $note->id,
+            'product_id' => $orderedProduct->id,
+            'order_note_item_id' => $orderNoteItem->id,
+            'quantity' => 3,
+        ]);
+        $this->assertDatabaseHas('delivery_note_items', [
+            'delivery_note_id' => $note->id,
+            'product_id' => $manualProduct->id,
+            'order_note_item_id' => null,
+            'quantity' => 2,
+        ]);
+
+        $this->assertSame(17, (int) $orderedProduct->refresh()->stock);
+        $this->assertSame(8, (int) $manualProduct->refresh()->stock);
     }
 
     public function test_cancel_delivery_note_restores_stock_and_creates_in_mutation(): void

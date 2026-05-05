@@ -24,7 +24,6 @@
 
     <form method="post" action="{{ route('delivery-notes.store') }}">
         @csrf
-        <input type="hidden" name="order_note_id" value="{{ old('order_note_id', $selectedOrderNote?->id) }}">
 
         <div class="card">
             <div class="form-section">
@@ -42,7 +41,8 @@
                         </label>
                         @php
                             $customerMap = $customers->keyBy('id');
-                            $oldCustomerId = old('customer_id');
+                            $oldCustomerId = old('customer_id', $selectedOrderNote?->customer_id);
+                            $oldOrderNoteId = (int) old('order_note_id', (int) ($selectedOrderNote?->id ?? 0));
                             $oldCustomerLabel = $oldCustomerId && $customerMap->has($oldCustomerId)
                                 ? $customerMap[$oldCustomerId]->name.' ('.($customerMap[$oldCustomerId]->city ?: '-').')'
                                 : '';
@@ -61,12 +61,24 @@
                             @endforeach
                         </datalist>
                     </div>
-                    @if($selectedOrderNote)
-                        <div class="col-4">
-                            <label>{{ __('txn.linked_order_note') }}</label>
-                            <input type="text" value="{{ $selectedOrderNote->note_number }}" disabled>
+                    <div class="col-4">
+                        <label>{{ __('txn.order_notes_title') }}</label>
+                        <select id="order-note-id" name="order_note_id" @disabled($oldCustomerId <= 0)>
+                            <option value="">{{ __('txn.select_order_note') }}</option>
+                            @if($selectedOrderNote)
+                                <option value="{{ (int) $selectedOrderNote->id }}" selected>{{ $selectedOrderNote->note_number }}</option>
+                            @endif
+                        </select>
+                        <div id="order-note-info" class="muted" style="margin-top: 4px;">
+                            @if($oldCustomerId <= 0)
+                                {{ __('txn.order_note_pick_customer_first') }}
+                            @elseif($selectedOrderNote)
+                                {{ __('txn.order_note_auto_fill_hint') }}
+                            @else
+                                {{ __('txn.no_order_note_available') }}
+                            @endif
                         </div>
-                    @endif
+                    </div>
                     <div class="col-4">
                         <label>{{ __('school_bulk.ship_to_school') }}</label>
                         <input type="text"
@@ -149,9 +161,12 @@
         let shipLocations = @json($shipLocations->values());
         let products = @json($products);
         const bootItems = @json($bootItems ?? []);
+        const bootOrderNoteId = @json((string) old('order_note_id', (string) ($selectedOrderNote?->id ?? '')));
+        let orderNotes = [];
         let customerById = new Map((customers || []).map((customer) => [String(customer.id), customer]));
         let customerByLabel = new Map();
         let customerByName = new Map();
+        let orderNoteById = new Map();
         let shipByLabel = new Map();
         let shipByName = new Map();
         let productByLabel = new Map();
@@ -160,7 +175,10 @@
         const CUSTOMER_LOOKUP_URL = @json(route('api.customers.index'));
         const SHIP_LOCATION_LOOKUP_URL = @json(route('customer-ship-locations.lookup'));
         const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
+        const ORDER_NOTE_LOOKUP_URL = @json(route('api.order-notes.lookup'));
         const LOOKUP_LIMIT = 20;
+        const ORDER_NOTE_LOOKUP_LIMIT = 200;
+        const selectOrderNoteLabel = @json(__('txn.select_order_note'));
         const tbody = document.querySelector('#items-table tbody');
         const productsList = document.getElementById('products-list');
         const customersList = document.getElementById('customers-list');
@@ -170,6 +188,8 @@
         const customerSearch = document.getElementById('customer-search');
         const customerIdField = document.getElementById('customer_id');
         const customerSearchError = document.getElementById('customer-search-error');
+        const orderNoteField = document.getElementById('order-note-id');
+        const orderNoteInfo = document.getElementById('order-note-info');
         const recipientNameField = document.getElementById('recipient_name');
         const shipLocationSearch = document.getElementById('ship-location-search');
         const shipLocationIdField = document.getElementById('customer_ship_location_id');
@@ -181,11 +201,13 @@
         const SEARCH_DEBOUNCE_MS = 100;
         let currentCustomer = null;
         let customerLookupAbort = null;
+        let orderNoteLookupAbort = null;
         let shipLookupAbort = null;
         let productLookupAbort = null;
         let lastCustomerLookupQuery = '';
         let lastShipLookupQuery = '';
         let lastProductLookupQuery = '';
+        let orderNotesCustomerId = '';
 
         function normalizeLookup(value) {
             return String(value || '').trim().toLowerCase();
@@ -253,6 +275,11 @@
             (rows || []).forEach((row) => byId.set(String(row.id), row));
             products = Array.from(byId.values());
             rebuildProductIndexes();
+        }
+
+        function setOrderNotes(rows) {
+            orderNotes = Array.isArray(rows) ? rows : [];
+            orderNoteById = new Map(orderNotes.map((note) => [String(note.id), note]));
         }
 
         function rebuildCustomerIndexes() {
@@ -503,6 +530,159 @@
             }
             if (shipLocationIdField) {
                 shipLocationIdField.value = '';
+            }
+        }
+
+        function orderNoteLabel(note) {
+            const progress = Number(note.progress_percent || 0).toFixed(2).replace(/\.00$/, '');
+            const remaining = Number(note.remaining_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            const dateLabel = note.note_date || '-';
+
+            return `${note.note_number} | ${dateLabel} | ${progress}% | ${remaining}`;
+        }
+
+        function renderOrderNoteOptions(selectedId = '') {
+            if (!orderNoteField) {
+                return;
+            }
+
+            const currentValue = selectedId || orderNoteField.value || '';
+            const options = [`<option value="">${selectOrderNoteLabel}</option>`];
+            orderNotes
+                .filter((note) => Number(note.remaining_total || 0) > 0)
+                .sort((a, b) => String(b.note_number || '').localeCompare(String(a.note_number || '')))
+                .forEach((note) => {
+                    const selected = String(note.id) === String(currentValue) ? ' selected' : '';
+                    options.push(`<option value="${escapeAttribute(note.id)}"${selected}>${escapeAttribute(orderNoteLabel(note))}</option>`);
+                });
+
+            orderNoteField.innerHTML = options.join('');
+            orderNoteField.disabled = !currentCustomer || options.length <= 1;
+            if (!currentCustomer) {
+                orderNoteInfo.textContent = @json(__('txn.order_note_pick_customer_first'));
+            } else if (options.length <= 1) {
+                orderNoteInfo.textContent = @json(__('txn.no_order_note_available'));
+            } else {
+                orderNoteInfo.textContent = @json(__('txn.order_note_auto_fill_hint'));
+            }
+        }
+
+        function updateOrderNoteInfoSelection(note) {
+            if (!orderNoteInfo || !note) {
+                return;
+            }
+            const progress = Number(note.progress_percent || 0).toFixed(2).replace(/\.00$/, '');
+            const orderedTotal = Number(note.ordered_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            const fulfilledTotal = Number(note.fulfilled_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            const remainingTotal = Number(note.remaining_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            orderNoteInfo.textContent = `${note.note_number} | ${progress}% | ${fulfilledTotal}/${orderedTotal} | ${remainingTotal}`;
+        }
+
+        function applyOrderNoteItems(note) {
+            if (!note || !Array.isArray(note.items)) {
+                return;
+            }
+
+            tbody.innerHTML = '';
+            const openItems = note.items.filter((item) => Number(item.remaining_qty || 0) > 0);
+            if (openItems.length === 0) {
+                addRow();
+                recalcItemsTotal();
+                return;
+            }
+
+            openItems.forEach((item) => {
+                addRow({
+                    product_id: item.product_id,
+                    product_code: item.product_code || '',
+                    product_name: item.product_name || '',
+                    unit: item.unit || '',
+                    quantity: Number(item.remaining_qty || item.ordered_qty || 0),
+                    order_note_item_id: item.id || '',
+                    notes: item.notes || '',
+                });
+            });
+            recalcItemsTotal();
+        }
+
+        async function fetchOrderNotesForCustomer(customerId, selectedId = '') {
+            if (!orderNoteField) {
+                return;
+            }
+            if (!customerId) {
+                orderNotesCustomerId = '';
+                setOrderNotes([]);
+                renderOrderNoteOptions('');
+                return;
+            }
+            if (String(orderNotesCustomerId) === String(customerId) && selectedId === '') {
+                renderOrderNoteOptions(orderNoteField.value || '');
+                return;
+            }
+
+            setOrderNotes([]);
+            renderOrderNoteOptions('');
+            try {
+                if (orderNoteLookupAbort) {
+                    orderNoteLookupAbort.abort();
+                }
+                orderNoteLookupAbort = new AbortController();
+                const url = `${ORDER_NOTE_LOOKUP_URL}?customer_id=${encodeURIComponent(customerId)}&per_page=${ORDER_NOTE_LOOKUP_LIMIT}`;
+                const response = await fetch(url, {
+                    signal: orderNoteLookupAbort.signal,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) {
+                    renderOrderNoteOptions('');
+                    return;
+                }
+                const payload = await response.json();
+                const rows = Array.isArray(payload.data) ? payload.data : [];
+                orderNotesCustomerId = String(customerId);
+                setOrderNotes(rows);
+
+                const noteProducts = rows
+                    .flatMap((note) => Array.isArray(note.items) ? note.items : [])
+                    .filter((item) => Number(item.product_id || 0) > 0)
+                    .map((item) => ({
+                        id: Number(item.product_id || 0),
+                        code: String(item.product_code || ''),
+                        name: String(item.product_name || ''),
+                        unit: String(item.unit || ''),
+                        stock: Number(item.stock || 0),
+                    }));
+                if (noteProducts.length > 0) {
+                    upsertProducts(noteProducts);
+                }
+
+                renderOrderNoteOptions(selectedId || '');
+                const selectedNote = orderNoteById.get(String(selectedId || orderNoteField.value || ''));
+                if (selectedNote) {
+                    updateOrderNoteInfoSelection(selectedNote);
+                }
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+                orderNotesCustomerId = '';
+                setOrderNotes([]);
+                renderOrderNoteOptions('');
+            }
+        }
+
+        async function refreshOrderNotesForCurrentCustomer(selectedId = '') {
+            const customerId = String(customerIdField.value || '');
+            if (customerId === '') {
+                await fetchOrderNotesForCustomer('', '');
+                return;
+            }
+
+            await fetchOrderNotesForCustomer(customerId, selectedId);
+        }
+
+        function resetOrderNoteSelection() {
+            if (orderNoteField) {
+                orderNoteField.value = '';
             }
         }
 
@@ -766,6 +946,8 @@
                     rebuildShipIndexes();
                     resetShipLocationSelection();
                     renderShipLocationSuggestions('');
+                    resetOrderNoteSelection();
+                    await refreshOrderNotesForCurrentCustomer();
                 }
             });
             const syncCustomerSelection = async (rawValue) => {
@@ -780,6 +962,8 @@
                         rebuildShipIndexes();
                         resetShipLocationSelection();
                         renderShipLocationSuggestions('');
+                        resetOrderNoteSelection();
+                        await refreshOrderNotesForCurrentCustomer();
                     }
                     return;
                 }
@@ -797,6 +981,8 @@
                     rebuildShipIndexes();
                     resetShipLocationSelection();
                     renderShipLocationSuggestions('');
+                    resetOrderNoteSelection();
+                    await refreshOrderNotesForCurrentCustomer();
                 }
             };
             customerSearch.addEventListener('input', onCustomerInput);
@@ -815,6 +1001,7 @@
         renderCustomerSuggestions('');
         renderShipLocationSuggestions('');
         renderProductSuggestions('');
+        renderOrderNoteOptions(bootOrderNoteId);
         if (shipLocationSearch) {
             const onShipInput = debounce(async (event) => {
                 await fetchShipLocationSuggestions(event.currentTarget.value);
@@ -831,6 +1018,16 @@
                 if (location) {
                     shipLocationSearch.value = shipLocationLabel(location);
                 }
+            });
+        }
+        if (orderNoteField) {
+            orderNoteField.addEventListener('change', () => {
+                const note = orderNoteById.get(String(orderNoteField.value || ''));
+                if (!note) {
+                    return;
+                }
+                updateOrderNoteInfoSelection(note);
+                applyOrderNoteItems(note);
             });
         }
         if (form) {
@@ -890,6 +1087,9 @@
             bootItems.forEach((item) => addRow(item));
         } else {
             addRow();
+        }
+        if (customerIdField.value) {
+            refreshOrderNotesForCurrentCustomer(bootOrderNoteId);
         }
         recalcItemsTotal();
     </script>

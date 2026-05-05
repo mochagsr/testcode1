@@ -57,7 +57,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/', [DashboardController::class, 'index']);
     Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('perm:dashboard.view')->name('dashboard');
     Route::get('/api/order-notes/lookup', [OrderNotePageController::class, 'lookup'])
-        ->middleware('perm:order_notes.create')
+        ->middleware('perm:transactions.view')
         ->name('api.order-notes.lookup');
     Route::get('/api/customers/{customer}/printing-subtypes', [CustomerPrintingSubtypeController::class, 'index'])
         ->middleware('perm:transactions.view')
