@@ -42,6 +42,9 @@ class ProductSupplierDetailTest extends TestCase
         $response->assertOk();
         $response->assertSee(route('products.show', $product), false);
         $response->assertSee(__('txn.detail'));
+        $response->assertSee('products-toolbar', false);
+        $response->assertSee('@media (max-width: 1280px)', false);
+        $response->assertSee('@media (max-width: 1100px)', false);
     }
 
     public function test_product_detail_shows_suppliers_that_supplied_the_product(): void

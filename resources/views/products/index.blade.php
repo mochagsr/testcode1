@@ -8,7 +8,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 14px;
+            gap: 10px 14px;
             flex-wrap: wrap;
         }
         .products-toolbar .toolbar-left,
@@ -17,62 +17,64 @@
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
+            min-width: 0;
         }
         .products-toolbar .toolbar-left {
-            flex: 1 1 320px;
-        }
-        .products-toolbar .toolbar-right {
+            order: 2;
             justify-content: flex-end;
-            flex: 1 1 640px;
+            flex: 0 1 380px;
+            margin-left: auto;
         }
         .products-toolbar .toolbar-right {
-            gap: 18px;
+            order: 1;
+            justify-content: flex-start;
+            flex: 1 1 560px;
+            gap: 10px;
         }
         .products-toolbar .search-form,
         .products-toolbar .import-form {
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: wrap;
             margin: 0;
         }
         .products-toolbar .search-form {
             width: 100%;
-            max-width: 420px;
+            max-width: 380px;
+            justify-content: flex-end;
         }
         .products-toolbar .search-form input[type="text"],
         .products-toolbar .import-form input[type="file"] {
-            width: 320px;
-            max-width: min(320px, 100%);
+            width: 260px;
+            max-width: min(260px, 100%);
         }
         .products-toolbar .search-form input[type="text"] {
-            flex: 1 1 260px;
+            flex: 1 1 230px;
             min-width: 0;
         }
         .products-toolbar .import-form {
-            justify-content: flex-end;
+            justify-content: flex-start;
             width: auto;
             max-width: 100%;
-            gap: 10px;
             flex: 0 1 auto;
         }
         .products-toolbar .import-file-wrap {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 10px;
+            padding: 6px 8px;
             border: 1px solid var(--border);
             border-radius: 10px;
             background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
-            flex: 0 1 320px;
-            min-width: 280px;
+            flex: 0 1 220px;
+            min-width: 200px;
         }
         .products-toolbar .report-actions {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
-            padding-left: 6px;
+            padding-left: 10px;
             border-left: 1px solid var(--border);
             flex: 0 1 auto;
         }
@@ -93,7 +95,7 @@
         }
         .products-table {
             table-layout: auto;
-            min-width: 1180px;
+            min-width: 1080px;
         }
         .products-table th,
         .products-table td {
@@ -101,27 +103,27 @@
         }
         .products-table th.code-col,
         .products-table td.code-col {
-            width: 110px;
+            width: 100px;
         }
         .products-table th.category-col,
         .products-table td.category-col {
-            width: 120px;
+            width: 104px;
         }
         .products-table th.stock-col,
         .products-table td.stock-col {
-            width: 76px;
+            width: 68px;
         }
         .products-table th.price-col,
         .products-table td.price-col {
-            width: 122px;
+            width: 112px;
             white-space: nowrap;
         }
         .products-table th.action-col,
         .products-table td.action-col {
-            width: 500px;
+            width: 340px;
         }
         .products-table td.name-col {
-            min-width: 230px;
+            min-width: 250px;
             white-space: normal;
             word-break: normal;
             overflow-wrap: anywhere;
@@ -132,7 +134,7 @@
         }
         .product-actions {
             display: flex;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             gap: 6px;
             align-items: center;
         }
@@ -143,33 +145,52 @@
             border-radius: 7px;
             white-space: nowrap;
         }
-        @media (max-width: 1400px) {
+        @media (max-width: 1280px) {
+            .products-toolbar {
+                gap: 8px 12px;
+            }
+            .products-toolbar .toolbar-left {
+                flex-basis: 330px;
+            }
+            .products-toolbar .toolbar-right {
+                flex-basis: 520px;
+                gap: 8px;
+            }
+            .products-toolbar .search-form {
+                max-width: 330px;
+            }
+            .products-toolbar .search-form input[type="text"] {
+                flex-basis: 210px;
+            }
+            .products-toolbar .import-file-wrap {
+                flex-basis: 190px;
+                min-width: 180px;
+            }
+            .product-action-btn {
+                padding: 5px 8px;
+            }
+        }
+        @media (max-width: 1100px) {
+            .products-toolbar {
+                align-items: flex-start;
+            }
             .products-toolbar .toolbar-left,
             .products-toolbar .toolbar-right {
                 flex: 1 1 100%;
+                margin-left: 0;
+            }
+            .products-toolbar .toolbar-left {
+                order: 1;
+                justify-content: flex-start;
             }
             .products-toolbar .toolbar-right {
-                justify-content: flex-start;
-            }
-            .products-toolbar .import-form {
-                justify-content: flex-start;
-                width: auto;
-            }
-            .products-toolbar .import-file-wrap {
-                flex-basis: 300px;
-            }
-            .products-toolbar .report-actions {
-                border-left: none;
-                padding-left: 0;
-            }
-        }
-        @media (max-width: 1280px) {
-            .products-toolbar {
-                align-items: flex-start;
+                order: 2;
             }
             .products-toolbar .search-form,
             .products-toolbar .import-form {
                 width: 100%;
+                flex-wrap: wrap;
+                justify-content: flex-start;
             }
             .products-toolbar .search-form input[type="text"],
             .products-toolbar .import-file-wrap {
