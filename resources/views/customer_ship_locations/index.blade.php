@@ -11,8 +11,7 @@
             gap: 14px;
             flex-wrap: wrap;
         }
-        .ship-location-toolbar .toolbar-left,
-        .ship-location-toolbar .toolbar-right {
+        .ship-location-toolbar .toolbar-left {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -21,12 +20,7 @@
         .ship-location-toolbar .toolbar-left {
             flex: 1 1 480px;
         }
-        .ship-location-toolbar .toolbar-right {
-            justify-content: flex-end;
-            flex: 1 1 520px;
-        }
-        .ship-location-toolbar .search-form,
-        .ship-location-toolbar .import-form {
+        .ship-location-toolbar .search-form {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -47,60 +41,22 @@
             flex: 1 1 240px;
             min-width: 0;
         }
-        .ship-location-toolbar .import-form {
-            justify-content: flex-end;
-            width: 100%;
-            gap: 12px;
-        }
-        .ship-location-toolbar .import-file-wrap {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
-            flex: 0 1 320px;
-            min-width: 280px;
-        }
-        .ship-location-toolbar .import-file-wrap input[type="file"] {
-            width: 100%;
-            max-width: 100%;
-            min-width: 0;
-            flex: 1 1 auto;
-        }
-        .ship-location-toolbar .import-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
         @media (max-width: 1400px) {
-            .ship-location-toolbar .toolbar-left,
-            .ship-location-toolbar .toolbar-right {
+            .ship-location-toolbar .toolbar-left {
                 flex: 1 1 100%;
-            }
-            .ship-location-toolbar .toolbar-right,
-            .ship-location-toolbar .import-form {
-                justify-content: flex-start;
             }
         }
         @media (max-width: 1280px) {
             .ship-location-toolbar {
                 align-items: flex-start;
             }
-            .ship-location-toolbar .search-form,
-            .ship-location-toolbar .import-form {
+            .ship-location-toolbar .search-form {
                 width: 100%;
             }
             .ship-location-toolbar .search-form select,
-            .ship-location-toolbar .search-form input[type="text"],
-            .ship-location-toolbar .import-file-wrap {
+            .ship-location-toolbar .search-form input[type="text"] {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
-            }
-            .ship-location-toolbar .import-actions {
-                flex: 1 1 100%;
             }
         }
     </style>
@@ -129,31 +85,7 @@
                     <a class="btn secondary" href="{{ route('customer-ship-locations.index') }}">{{ __('txn.all') }}</a>
                 </form>
             </div>
-            @if($canManageShipLocations)
-                <div class="toolbar-right">
-                    <form method="post" action="{{ route('customer-ship-locations.import') }}" enctype="multipart/form-data" class="import-form">
-                        @csrf
-                        <div class="import-file-wrap">
-                            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                        </div>
-                        <div class="import-actions">
-                            <button type="submit" class="btn process-btn">Import</button>
-                            <a class="btn info-btn" href="{{ route('customer-ship-locations.import.template') }}">Template Import</a>
-                        </div>
-                    </form>
-                </div>
-            @endif
         </div>
-        @if(session('import_errors'))
-            <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">
-                <strong>Error Import:</strong>
-                <ul style="margin:8px 0 0 18px;">
-                    @foreach(array_slice((array) session('import_errors'), 0, 20) as $importError)
-                        <li>{{ $importError }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
     </div>
 
     <div class="card">

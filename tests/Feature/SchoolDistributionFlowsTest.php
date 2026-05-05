@@ -16,6 +16,22 @@ class SchoolDistributionFlowsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_customer_ship_location_index_does_not_show_import_actions(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+
+        $this
+            ->actingAs($admin)
+            ->get(route('customer-ship-locations.index'))
+            ->assertOk()
+            ->assertDontSee('name="import_file"', false)
+            ->assertDontSee('Template Import')
+            ->assertDontSee('customer-ship-locations/import', false);
+    }
+
     public function test_customer_ship_location_create_form_places_school_and_city_before_phone(): void
     {
         $admin = User::factory()->create([

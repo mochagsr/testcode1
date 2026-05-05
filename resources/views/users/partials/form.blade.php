@@ -75,7 +75,7 @@
         'outgoing_transactions.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel tanda terima barang.'],
         'school_bulk_transactions.create' => ['title' => 'Buat sebar sekolah', 'note' => 'Bisa membuat transaksi sebar sekolah dan generate invoice.'],
         'school_bulk_transactions.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel sebar sekolah.'],
-        'customer_ship_locations.create' => ['title' => 'Kelola lokasi kirim', 'note' => 'Bisa tambah, edit, hapus, dan import lokasi kirim sekolah.'],
+        'customer_ship_locations.create' => ['title' => 'Kelola lokasi kirim', 'note' => 'Bisa tambah, edit, dan hapus lokasi kirim sekolah.'],
         'transactions.correction.request' => [
             'title' => 'Ajukan koreksi transaksi',
             'note' => 'Bisa memakai Wizard Koreksi pada transaksi yang perlu diperbaiki.',
