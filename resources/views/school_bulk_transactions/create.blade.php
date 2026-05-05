@@ -6,6 +6,36 @@
     <h1 class="page-title">{{ __('school_bulk.create_bulk_transaction') }}</h1>
 
     <style>
+        #locations-table,
+        .school-items-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        #locations-table th:nth-child(1),
+        #locations-table td:nth-child(1) {
+            width: 28%;
+        }
+        #locations-table th:nth-child(2),
+        #locations-table td:nth-child(2) {
+            width: 140px;
+        }
+        #locations-table th:nth-child(3),
+        #locations-table td:nth-child(3) {
+            width: 140px;
+        }
+        #locations-table th:nth-child(4),
+        #locations-table td:nth-child(4) {
+            width: auto;
+        }
+        #locations-table th:nth-child(5),
+        #locations-table td:nth-child(5) {
+            width: 118px;
+            text-align: center;
+        }
+        #locations-table input {
+            width: 100%;
+            max-width: 100% !important;
+        }
         .school-item-card .quantity-with-unit {
             display: flex;
             align-items: center;
@@ -20,6 +50,46 @@
             color: #526173;
             font-weight: 700;
             white-space: nowrap;
+        }
+        .school-items-table th:nth-child(1),
+        .school-items-table td:nth-child(1) {
+            width: 42%;
+        }
+        .school-items-table th:nth-child(2),
+        .school-items-table td:nth-child(2) {
+            width: 170px;
+        }
+        .school-items-table th:nth-child(3),
+        .school-items-table td:nth-child(3) {
+            width: 140px;
+        }
+        .school-items-table th:nth-child(4),
+        .school-items-table td:nth-child(4) {
+            width: auto;
+        }
+        .school-items-table th:nth-child(5),
+        .school-items-table td:nth-child(5) {
+            width: 110px;
+            text-align: center;
+        }
+        .school-items-table .product-name,
+        .school-items-table .product-notes {
+            width: 100%;
+            max-width: 100% !important;
+        }
+        .school-items-table .product-price {
+            width: 110px;
+            max-width: 110px !important;
+        }
+        .school-table-scroll {
+            width: 100%;
+            overflow-x: auto;
+        }
+        @media (max-width: 900px) {
+            #locations-table,
+            .school-items-table {
+                min-width: 760px;
+            }
         }
     </style>
 
@@ -77,18 +147,20 @@
                 </div>
             </div>
             <p class="muted" style="margin-top: 8px;">{{ __('school_bulk.bulk_locations_note') }}</p>
-            <table id="locations-table" style="margin-top: 10px;">
-                <thead>
-                <tr>
-                    <th>{{ __('school_bulk.school_name') }} *</th>
-                    <th>{{ __('txn.phone') }}</th>
-                    <th>{{ __('txn.city') }}</th>
-                    <th>{{ __('txn.address') }}</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div class="school-table-scroll">
+                <table id="locations-table" style="margin-top: 10px;">
+                    <thead>
+                    <tr>
+                        <th>{{ __('school_bulk.school_name') }} *</th>
+                        <th>{{ __('txn.phone') }}</th>
+                        <th>{{ __('txn.city') }}</th>
+                        <th>{{ __('txn.address') }}</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
 
         <div class="card">
@@ -797,18 +869,20 @@
                             <button type="button" class="btn process-soft-btn school-add-item" ${schoolName === '' ? 'disabled' : ''}>{{ __('txn.add_row') }}</button>
                         </div>
                         ${schoolName === '' ? `<p class="muted" style="margin-top:8px;">{{ __('school_bulk.fill_school_locations') }}</p>` : ''}
-                        <table style="margin-top: 10px; ${schoolName === '' ? 'opacity:0.6;' : ''}">
-                            <thead>
-                            <tr>
-                                <th>{{ __('txn.product') }} *</th>
-                                <th>{{ __('txn.qty') }} *</th>
-                                <th>{{ __('txn.price') }}</th>
-                                <th>{{ __('txn.notes') }}</th>
-                                <th></th>
-                            </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
+                        <div class="school-table-scroll">
+                            <table class="school-items-table" style="margin-top: 10px; ${schoolName === '' ? 'opacity:0.6;' : ''}">
+                                <thead>
+                                <tr>
+                                    <th>{{ __('txn.product') }} *</th>
+                                    <th>{{ __('txn.qty') }} *</th>
+                                    <th>{{ __('txn.price') }}</th>
+                                    <th>{{ __('txn.notes') }}</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
                     `;
 
                     schoolItemCards.appendChild(card);

@@ -77,6 +77,8 @@ class SchoolDistributionFlowsTest extends TestCase
 
         $this->assertStringContainsString('quantity-with-unit', $content);
         $this->assertStringContainsString('qty-unit-label', $content);
+        $this->assertStringContainsString('school-table-scroll', $content);
+        $this->assertStringContainsString('school-items-table', $content);
         $this->assertStringContainsString('type="hidden" class="product-unit"', $content);
         $this->assertStringNotContainsString('<th>Satuan</th>', $content);
     }
