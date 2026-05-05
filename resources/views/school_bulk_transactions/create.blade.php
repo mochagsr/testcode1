@@ -5,6 +5,24 @@
 @section('content')
     <h1 class="page-title">{{ __('school_bulk.create_bulk_transaction') }}</h1>
 
+    <style>
+        .school-item-card .quantity-with-unit {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 130px;
+        }
+        .school-item-card .quantity-with-unit .product-qty {
+            flex: 0 0 92px;
+            max-width: 92px;
+        }
+        .school-item-card .qty-unit-label {
+            color: #526173;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+    </style>
+
     <form method="post" action="{{ route('school-bulk-transactions.store') }}">
         @csrf
 
@@ -641,6 +659,25 @@
                 input?.classList.toggle('input-inline-error', hasMessage);
             }
 
+            function productUnitLabel(product) {
+                const unit = String(product?.unit || '').trim();
+
+                return unit !== '' ? unit : '-';
+            }
+
+            function updateSchoolItemUnit(row, product) {
+                const hiddenUnitInput = row?.querySelector('.product-unit');
+                const unitLabel = row?.querySelector('.qty-unit-label');
+                const unit = productUnitLabel(product);
+
+                if (hiddenUnitInput) {
+                    hiddenUnitInput.value = unit === '-' ? '' : unit;
+                }
+                if (unitLabel) {
+                    unitLabel.textContent = unit;
+                }
+            }
+
             function addSchoolItemRow(cardEl, uid, initial = {}) {
                 const tbody = cardEl.querySelector('tbody');
                 if (!tbody) {
@@ -653,8 +690,13 @@
                         <input type="hidden" class="product-id" value="${initial.product_id || ''}">
                         <div class="field-inline-error product-name-error" style="display:block; margin-top:4px;"></div>
                     </td>
-                    <td><input type="number" min="1" class="product-qty" value="${initial.quantity || 1}" required style="max-width: 92px;"></td>
-                    <td><input type="text" class="product-unit" value="${initial.unit || ''}" style="max-width: 92px;"></td>
+                    <td>
+                        <div class="quantity-with-unit">
+                            <input type="number" min="1" class="product-qty" value="${initial.quantity || 1}" required>
+                            <span class="qty-unit-label">${initial.unit || '-'}</span>
+                            <input type="hidden" class="product-unit" value="${initial.unit || ''}">
+                        </div>
+                    </td>
                     <td><input type="number" min="0" step="1" class="product-price" value="${initial.unit_price || ''}" style="max-width: 110px;"></td>
                     <td><input type="text" class="product-notes" value="${initial.notes || ''}" style="max-width: 220px;"></td>
                     <td><button type="button" class="btn danger-btn remove-item">{{ __('txn.remove') }}</button></td>
@@ -662,7 +704,6 @@
 
                 const productNameInput = tr.querySelector('.product-name');
                 const productIdInput = tr.querySelector('.product-id');
-                const productUnitInput = tr.querySelector('.product-unit');
                 const productPriceInput = tr.querySelector('.product-price');
                 const applyProduct = (product) => {
                     productIdInput.value = product ? product.id : '';
@@ -671,7 +712,7 @@
                     }
                     productNameInput.value = productLabel(product);
                     setSchoolItemProductError(tr, '');
-                    productUnitInput.value = product.unit || productUnitInput.value || '';
+                    updateSchoolItemUnit(tr, product);
                     if (!productPriceInput.value) {
                         productPriceInput.value = Math.round(Number(product.price_general || 0));
                     }
@@ -761,7 +802,6 @@
                             <tr>
                                 <th>{{ __('txn.product') }} *</th>
                                 <th>{{ __('txn.qty') }} *</th>
-                                <th>{{ __('txn.unit') }}</th>
                                 <th>{{ __('txn.price') }}</th>
                                 <th>{{ __('txn.notes') }}</th>
                                 <th></th>

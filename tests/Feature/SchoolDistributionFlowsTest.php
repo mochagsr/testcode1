@@ -62,6 +62,25 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertMatchesRegularExpression('/<option value="1"[^>]*selected[^>]*>/', $content);
     }
 
+    public function test_school_bulk_create_form_shows_unit_as_quantity_label_without_unit_column(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => config('rbac.roles.user', []),
+        ]);
+
+        $content = $this
+            ->actingAs($user)
+            ->get(route('school-bulk-transactions.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('quantity-with-unit', $content);
+        $this->assertStringContainsString('qty-unit-label', $content);
+        $this->assertStringContainsString('type="hidden" class="product-unit"', $content);
+        $this->assertStringNotContainsString('<th>Satuan</th>', $content);
+    }
+
     public function test_customer_ship_location_lookup_filters_by_customer_and_active_status(): void
     {
         $user = User::factory()->create(['role' => 'user']);
