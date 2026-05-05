@@ -11,6 +11,18 @@ class AuthFlowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_login_page_shows_application_brand_name(): void
+    {
+        config(['app.name' => 'MSBERPOS']);
+
+        $this
+            ->get(route('login'))
+            ->assertOk()
+            ->assertSee('MSBERPOS')
+            ->assertSee('login-brand', false)
+            ->assertSee('login-app-name', false);
+    }
+
     public function test_authenticated_user_opening_login_page_is_redirected_to_dashboard(): void
     {
         $user = User::factory()->create();
