@@ -39,8 +39,8 @@
         }
         .pending-delivery-table th,
         .pending-delivery-table td {
-            padding-top: 5px;
-            padding-bottom: 5px;
+            padding-top: 7px;
+            padding-bottom: 7px;
             line-height: 1.2;
             vertical-align: middle;
         }
