@@ -69,6 +69,54 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertFalse($location->fresh()->is_active);
     }
 
+    public function test_school_bulk_index_shows_delivery_note_progress_without_total_items(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BULK-INDEX',
+            'name' => 'Customer Bulk Index',
+            'city' => 'Malang',
+        ]);
+        $transaction = SchoolBulkTransaction::query()->create([
+            'transaction_number' => 'BLK-INDEX-0001',
+            'transaction_date' => '2026-05-07',
+            'customer_id' => $customer->id,
+            'semester_period' => 'S1-2627',
+            'total_locations' => 3,
+            'total_items' => 9,
+            'created_by_user_id' => $admin->id,
+        ]);
+        $location = $transaction->locations()->create([
+            'school_name' => 'SDN Index',
+            'city' => 'Malang',
+            'sort_order' => 0,
+        ]);
+        DeliveryNote::query()->create([
+            'note_number' => 'SJ-INDEX-0001',
+            'note_date' => '2026-05-07',
+            'customer_id' => $customer->id,
+            'school_bulk_transaction_id' => $transaction->id,
+            'school_bulk_location_id' => $location->id,
+            'recipient_name' => 'SDN Index',
+        ]);
+
+        $response = $this
+            ->actingAs($admin)
+            ->get(route('school-bulk-transactions.index'))
+            ->assertOk()
+            ->assertSee(__('school_bulk.delivery_notes_created'))
+            ->assertSee(__('school_bulk.delivery_notes_pending'))
+            ->assertDontSee('<th>'.__('school_bulk.total_items').'</th>', false);
+
+        $content = preg_replace('/\s+/', ' ', $response->getContent());
+
+        $this->assertStringContainsString('BLK-INDEX-0001', (string) $content);
+        $this->assertStringContainsString('<td>3</td> <td>1</td> <td>2</td>', (string) $content);
+    }
+
     public function test_customer_ship_location_create_form_places_school_and_city_before_phone(): void
     {
         $admin = User::factory()->create([

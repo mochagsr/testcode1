@@ -52,9 +52,12 @@ class SchoolBulkTransactionPageController extends Controller
                 'customer_id',
                 'semester_period',
                 'total_locations',
-                'total_items',
             ])
             ->with('customer:id,name,city')
+            ->withCount([
+                'generatedDeliveryNotes as generated_delivery_notes_count' => fn (Builder $query) => $query
+                    ->whereNotNull('school_bulk_location_id'),
+            ])
             ->when($customerId > 0, fn (Builder $query) => $query->where('customer_id', $customerId))
             ->searchKeyword($search)
             ->orderByDesc('transaction_date')

@@ -55,6 +55,8 @@ return [
     'transaction_number' => 'No. Transaksi Sebar',
     'total_schools' => 'Total Sekolah',
     'pending_schools' => 'Sekolah Belum Dibuat Surat Jalan',
+    'delivery_notes_created' => 'Sudah Dibuat Surat Jalan',
+    'delivery_notes_pending' => 'Belum Dibuat Surat Jalan',
     'total_items' => 'Total Item',
     'no_bulk_transactions' => 'Belum ada transaksi sebar sekolah.',
     'school_breakdown_title' => 'Breakdown per Sekolah',
