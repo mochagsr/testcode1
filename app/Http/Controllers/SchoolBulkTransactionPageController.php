@@ -214,7 +214,11 @@ class SchoolBulkTransactionPageController extends Controller
             ]);
 
             $totalItems = 0;
-            $locationRows->each(function (array $row, int $index) use ($transaction, $shipLocations, $locationItemsMap, $products, &$totalItems): void {
+            $defaultLocationItemRows = $locationItemsMap
+                ->values()
+                ->map(fn ($rows): Collection => collect((array) $rows)->values())
+                ->first(fn (Collection $rows): bool => $rows->isNotEmpty(), collect());
+            $locationRows->each(function (array $row, int $index) use ($transaction, $shipLocations, $locationItemsMap, $defaultLocationItemRows, $products, &$totalItems): void {
                 $shipLocation = null;
                 $shipLocationId = (int) ($row['customer_ship_location_id'] ?? 0);
                 if ($shipLocationId > 0) {
@@ -222,6 +226,9 @@ class SchoolBulkTransactionPageController extends Controller
                 }
                 $uid = trim((string) ($row['uid'] ?? ''));
                 $locationItemRows = collect((array) $locationItemsMap->get($uid, []))->values();
+                if ($locationItemRows->isEmpty()) {
+                    $locationItemRows = $defaultLocationItemRows;
+                }
                 if ($locationItemRows->isEmpty()) {
                     throw ValidationException::withMessages([
                         'location_items' => __('school_bulk.fill_items'),
@@ -368,15 +375,20 @@ class SchoolBulkTransactionPageController extends Controller
                 ->groupBy(fn (SchoolBulkTransactionItem $item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
             /** @var Collection<int, SchoolBulkTransactionItem> $globalItems */
             $globalItems = $itemsByLocation->get(0, collect());
+            $templateItems = $globalItems->isNotEmpty()
+                ? $globalItems
+                : $itemsByLocation
+                    ->filter(fn (Collection $items, int $locationId): bool => $locationId > 0 && $items->isNotEmpty())
+                    ->first(default: collect());
 
-            $resolveItemsForLocation = function (SchoolBulkTransactionLocation $location) use ($itemsByLocation, $globalItems): Collection {
+            $resolveItemsForLocation = function (SchoolBulkTransactionLocation $location) use ($itemsByLocation, $templateItems): Collection {
                 /** @var Collection<int, SchoolBulkTransactionItem> $specific */
                 $specific = $itemsByLocation->get((int) $location->id, collect());
                 if ($specific->isNotEmpty()) {
                     return $specific->values();
                 }
-                if ($globalItems->isNotEmpty()) {
-                    return $globalItems->values();
+                if ($templateItems->isNotEmpty()) {
+                    return $templateItems->values();
                 }
 
                 return collect();

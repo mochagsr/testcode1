@@ -344,6 +344,67 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertStringStartsWith('PK', $excelResponse->streamedContent());
     }
 
+    public function test_school_bulk_single_item_template_is_applied_to_all_schools(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BULK-TEMPLATE',
+            'name' => 'Customer Bulk Template',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-BULK-TPL',
+            'name' => 'Kategori Bulk Template',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-BULK-TPL',
+            'name' => 'Buku Template',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_general' => 15000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('school-bulk-transactions.store'), [
+            '_idempotency_key' => 'bulk-template-test-001',
+            'customer_id' => $customer->id,
+            'transaction_date' => '2026-02-20',
+            'semester_period' => 'S2-2526',
+            'locations' => [
+                ['uid' => 'loc-a', 'school_name' => 'SDN A', 'city' => 'Malang'],
+                ['uid' => 'loc-b', 'school_name' => 'SDN B', 'city' => 'Malang'],
+                ['uid' => 'loc-c', 'school_name' => 'SDN C', 'city' => 'Malang'],
+            ],
+            'location_items' => [
+                'loc-a' => [
+                    [
+                        'product_id' => $product->id,
+                        'product_name' => 'Buku Template',
+                        'unit' => 'exp',
+                        'quantity' => 10,
+                        'unit_price' => 15000,
+                    ],
+                ],
+            ],
+        ]);
+
+        $transaction = SchoolBulkTransaction::query()->firstOrFail();
+        $response->assertRedirect(route('school-bulk-transactions.show', $transaction));
+
+        $this->assertSame(3, $transaction->locations()->count());
+        $this->assertSame(3, $transaction->items()->count());
+        $this->assertSame(3, $transaction->items()->pluck('school_bulk_transaction_location_id')->unique()->count());
+
+        $this
+            ->actingAs($user)
+            ->get(route('school-bulk-transactions.show', $transaction))
+            ->assertOk()
+            ->assertSee('SDN A')
+            ->assertSee('SDN B')
+            ->assertSee('SDN C');
+    }
+
     public function test_school_bulk_generates_delivery_notes_before_invoice_and_skips_duplicates(): void
     {
         $user = User::factory()->create(['role' => 'user']);

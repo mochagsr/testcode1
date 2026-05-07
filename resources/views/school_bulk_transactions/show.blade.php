@@ -71,10 +71,17 @@
         @php
             $itemsByLocation = $transaction->items
                 ->groupBy(fn($item) => (int) ($item->school_bulk_transaction_location_id ?? 0));
-            $allSchoolsTotal = (int) $transaction->locations->sum(function ($location) use ($itemsByLocation): int {
+            $templateLocationItems = collect($itemsByLocation->get(0, []))->values();
+            if ($templateLocationItems->isEmpty()) {
+                $templateLocationItems = collect($itemsByLocation)
+                    ->filter(fn($items, $locationId) => (int) $locationId > 0 && collect($items)->isNotEmpty())
+                    ->first(null, collect());
+                $templateLocationItems = collect($templateLocationItems)->values();
+            }
+            $allSchoolsTotal = (int) $transaction->locations->sum(function ($location) use ($itemsByLocation, $templateLocationItems): int {
                 $locationItems = collect($itemsByLocation->get((int) $location->id, []))->values();
                 if ($locationItems->isEmpty()) {
-                    $locationItems = collect($itemsByLocation->get(0, []))->values();
+                    $locationItems = $templateLocationItems;
                 }
 
                 return (int) $locationItems->sum(function ($item): int {
@@ -122,7 +129,7 @@
         @php
             $locationItems = collect($itemsByLocation->get((int) $location->id, []))->values();
             if ($locationItems->isEmpty()) {
-                $locationItems = collect($itemsByLocation->get(0, []))->values();
+                $locationItems = $templateLocationItems;
             }
             $locationTotal = (int) $locationItems->sum(function ($item): int {
                 return ((int) ($item->quantity ?? 0)) * ((int) ($item->unit_price ?? 0));
