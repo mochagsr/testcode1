@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\CustomerShipLocation;
 use App\Models\DeliveryNote;
+use App\Models\DeliveryNoteItem;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\SalesInvoice;
+use App\Models\SalesInvoiceItem;
 use App\Models\SchoolBulkTransaction;
+use App\Models\SchoolBulkTransactionLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -592,5 +595,108 @@ class SchoolDistributionFlowsTest extends TestCase
         $response->assertSee('SDN B');
         $response->assertSee('INV-BILL-001');
         $response->assertSee('INV-BILL-002');
+    }
+
+    public function test_customer_bill_print_splits_combined_invoice_by_delivery_note_school(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-BULK',
+            'name' => 'Customer Bill Bulk',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-BILL-BULK',
+            'name' => 'Kategori Bill Bulk',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-BILL-BULK',
+            'name' => 'Buku Bill Bulk',
+            'unit' => 'exp',
+            'stock' => 1000,
+            'price_general' => 5000,
+            'is_active' => true,
+        ]);
+        $transaction = SchoolBulkTransaction::query()->create([
+            'transaction_number' => 'BLK-BILL-BULK',
+            'transaction_date' => '2026-05-07',
+            'customer_id' => $customer->id,
+            'semester_period' => 'S1-2627',
+            'total_locations' => 3,
+            'total_items' => 3,
+            'created_by_user_id' => $user->id,
+        ]);
+        $locations = collect([
+            ['school_name' => 'sd prambon 1', 'city' => 'malang', 'sort_order' => 0],
+            ['school_name' => 'sd prambon 2', 'city' => 'malang', 'sort_order' => 1],
+            ['school_name' => 'sd prambon 3', 'city' => 'malang', 'sort_order' => 2],
+        ])->map(fn (array $location): SchoolBulkTransactionLocation => SchoolBulkTransactionLocation::query()->create([
+            'school_bulk_transaction_id' => $transaction->id,
+            'school_name' => $location['school_name'],
+            'recipient_name' => $location['school_name'],
+            'city' => $location['city'],
+            'sort_order' => $location['sort_order'],
+        ]));
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-BILL-BULK-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-05-07',
+            'semester_period' => 'S1-2627',
+            'school_bulk_transaction_id' => $transaction->id,
+            'total' => 1500000,
+            'total_paid' => 500000,
+            'balance' => 1000000,
+            'payment_status' => 'partial',
+            'ship_to_name' => 'sd prambon 1',
+            'ship_to_city' => 'malang',
+        ]);
+
+        $locations->each(function (SchoolBulkTransactionLocation $location, int $index) use ($customer, $invoice, $product, $transaction): void {
+            $deliveryNote = DeliveryNote::query()->create([
+                'note_number' => 'SJ-BILL-BULK-00'.($index + 1),
+                'note_date' => '2026-05-07',
+                'customer_id' => $customer->id,
+                'school_bulk_transaction_id' => $transaction->id,
+                'school_bulk_location_id' => $location->id,
+                'recipient_name' => $location->school_name,
+                'city' => $location->city,
+                'is_canceled' => false,
+            ]);
+            $deliveryNoteItem = DeliveryNoteItem::query()->create([
+                'delivery_note_id' => $deliveryNote->id,
+                'product_id' => $product->id,
+                'product_code' => $product->code,
+                'product_name' => $product->name,
+                'unit' => 'exp',
+                'quantity' => 100,
+                'unit_price' => 5000,
+            ]);
+
+            SalesInvoiceItem::query()->create([
+                'sales_invoice_id' => $invoice->id,
+                'delivery_note_item_id' => $deliveryNoteItem->id,
+                'product_id' => $product->id,
+                'product_code' => $product->code,
+                'product_name' => $product->name,
+                'quantity' => 100,
+                'unit_price' => 5000,
+                'discount' => 0,
+                'line_total' => 500000,
+            ]);
+        });
+
+        $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S1-2627',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.school_breakdown_title'));
+        $response->assertSee('sd prambon 1');
+        $response->assertSee('sd prambon 2');
+        $response->assertSee('sd prambon 3');
+        $response->assertSee('INV-BILL-BULK-001');
     }
 }

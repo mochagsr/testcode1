@@ -11,6 +11,7 @@ use App\Models\InvoicePayment;
 use App\Models\ReceivableLedger;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
+use App\Models\SalesInvoiceItem;
 use App\Models\SalesReturn;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
@@ -29,8 +30,11 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use SanderMuller\FluentValidation\FluentRule;
@@ -393,20 +397,20 @@ class ReceivablePageController extends Controller
 
             $sheet->fromArray($rowsOut, null, 'A'.$tableStart);
             $lastRow = $tableStart + count($rowsOut) - 1;
-            $sheet->getStyle('A'.$tableStart.':I'.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.$tableStart.':I'.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             $sheet->getStyle('A'.$tableStart.':I'.$lastRow)->getAlignment()->setWrapText(true);
             $sheet->getStyle('A'.$tableStart.':I'.$lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
             $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getFont()->setBold(true);
             $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-            $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
+            $sheet->getStyle('A'.$tableStart.':I'.$tableStart)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
             $sheet->getStyle('A'.($tableStart + 1).':A'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('D'.($tableStart + 1).':D'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('E'.($tableStart + 1).':H'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $sheet->getStyle('A'.($tableStart + 1).':C'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             $totalRow = $tableStart + count($rowsOut) - 1;
             $sheet->getStyle('A'.$totalRow.':I'.$totalRow)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-            $sheet->getStyle('A'.$totalRow.':I'.$totalRow)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
+            $sheet->getStyle('A'.$totalRow.':I'.$totalRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
             $sheet->getStyle('E'.$totalRow.':H'.$totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $sheet->getStyle('B'.$totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
@@ -502,8 +506,8 @@ class ReceivablePageController extends Controller
                 $sheet->fromArray([['No.', 'Deskripsi', 'Nominal']], null, 'A'.$tableStart);
                 $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getFont()->setBold(true);
                 $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFE5E7EB');
-                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE5E7EB');
+                $sheet->getStyle('A'.$tableStart.':C'.$tableStart)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
                 $cursor = $tableStart + 1;
                 foreach ($invoiceRows as $index => $invoiceRow) {
@@ -517,7 +521,7 @@ class ReceivablePageController extends Controller
                     $cursor++;
                 }
                 $dataEnd = $cursor - 1;
-                $sheet->getStyle('A'.($tableStart + 1).':C'.$dataEnd)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A'.($tableStart + 1).':C'.$dataEnd)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                 $sheet->getStyle('A'.($tableStart + 1).':A'.$dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('C'.($tableStart + 1).':C'.$dataEnd)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
@@ -525,7 +529,7 @@ class ReceivablePageController extends Controller
                 $sheet->setCellValue('A'.($cursor + 1), 'TOTAL');
                 $sheet->setCellValue('C'.($cursor + 1), 'Rp '.number_format($invoiceTotal, 0, ',', '.'));
                 $sheet->getStyle('A'.($cursor + 1).':C'.($cursor + 1))->getFont()->setBold(true);
-                $sheet->getStyle('A'.($cursor + 1).':C'.($cursor + 1))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A'.($cursor + 1).':C'.($cursor + 1))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                 $sheet->getStyle('A'.($cursor + 1).':B'.($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('C'.($cursor + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
@@ -570,15 +574,15 @@ class ReceivablePageController extends Controller
             }
 
             $columnCount = 4 + $semesterHeaders->count() + 1;
-            $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
+            $lastColumn = Coordinate::stringFromColumnIndex($columnCount);
 
             $sheet->mergeCells('A1:'.$lastColumn.'1');
             $sheet->setCellValue('A1', (string) ($data['printTitle'] ?? $data['title']));
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            $sheet->mergeCells(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A').'2:'.$lastColumn.'2');
-            $sheet->setCellValue(($columnCount > 1 ? \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A').'2', 'Update : '.now()->translatedFormat('j F Y'));
+            $sheet->mergeCells(($columnCount > 1 ? Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A').'2:'.$lastColumn.'2');
+            $sheet->setCellValue(($columnCount > 1 ? Coordinate::stringFromColumnIndex(max(1, $columnCount - 1)) : 'A').'2', 'Update : '.now()->translatedFormat('j F Y'));
             $sheet->getStyle('A2:'.$lastColumn.'2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $sheet->getStyle('A2:'.$lastColumn.'2')->getFont()->setItalic(true)->setBold(true);
 
@@ -591,17 +595,17 @@ class ReceivablePageController extends Controller
             if ($semesterHeaders->isNotEmpty()) {
                 $semesterStartColumn = 5;
                 $semesterEndColumn = $semesterStartColumn + $semesterHeaders->count() - 1;
-                $semesterStartLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterStartColumn);
-                $semesterEndLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterEndColumn);
+                $semesterStartLetter = Coordinate::stringFromColumnIndex($semesterStartColumn);
+                $semesterEndLetter = Coordinate::stringFromColumnIndex($semesterEndColumn);
                 $sheet->mergeCells($semesterStartLetter.$tableStart.':'.$semesterEndLetter.$tableStart);
                 $sheet->setCellValue($semesterStartLetter.$tableStart, 'PIUTANG');
                 foreach ($semesterHeaders->values() as $index => $header) {
-                    $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($semesterStartColumn + $index);
+                    $columnLetter = Coordinate::stringFromColumnIndex($semesterStartColumn + $index);
                     $sheet->setCellValue($columnLetter.($tableStart + 1), (string) $header);
                 }
             }
 
-            $totalColumnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
+            $totalColumnLetter = Coordinate::stringFromColumnIndex($columnCount);
             $sheet->mergeCells($totalColumnLetter.$tableStart.':'.$totalColumnLetter.($tableStart + 1));
             $sheet->setCellValue($totalColumnLetter.$tableStart, 'TOTAL PIUTANG');
 
@@ -620,7 +624,7 @@ class ReceivablePageController extends Controller
                 $sheet->setCellValue('D'.$rowCursor, (string) ($row['address'] ?? '-'));
 
                 foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
-                    $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex);
+                    $columnLetter = Coordinate::stringFromColumnIndex(5 + $semesterIndex);
                     $value = (int) ($row['semester_totals'][$semesterCode] ?? 0);
                     $sheet->setCellValue($columnLetter.$rowCursor, 'Rp '.number_format($value, 0, ',', '.'));
                     $sheet->getStyle($columnLetter.$rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
@@ -634,7 +638,7 @@ class ReceivablePageController extends Controller
             $sheet->mergeCells('A'.$rowCursor.':D'.$rowCursor);
             $sheet->setCellValue('A'.$rowCursor, __('receivable.semester_total'));
             foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
-                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex);
+                $columnLetter = Coordinate::stringFromColumnIndex(5 + $semesterIndex);
                 $sheet->setCellValue($columnLetter.$rowCursor, 'Rp '.number_format((int) ($data['totals']['per_semester'][$semesterCode] ?? 0), 0, ',', '.'));
                 $sheet->getStyle($columnLetter.$rowCursor)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             }
@@ -644,18 +648,18 @@ class ReceivablePageController extends Controller
             $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getFont()->setBold(true);
             $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFEFF3F8');
-            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.$rowCursor)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.($tableStart + 1))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFEFF3F8');
+            $sheet->getStyle('A'.$tableStart.':'.$lastColumn.$rowCursor)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             $sheet->getStyle('A'.$tableStart.':'.$lastColumn.$rowCursor)->getAlignment()->setWrapText(true);
             $sheet->getStyle('A'.$rowCursor.':'.$lastColumn.$rowCursor)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-            $sheet->getStyle('A'.$rowCursor.':'.$lastColumn.$rowCursor)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
+            $sheet->getStyle('A'.$rowCursor.':'.$lastColumn.$rowCursor)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF2F74C8');
             $sheet->getStyle('A'.$dataStartRow.':A'.($rowCursor - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             foreach (['A' => 5, 'B' => 20, 'C' => 14, 'D' => 34] as $column => $width) {
                 $sheet->getColumnDimension($column)->setWidth($width);
             }
             foreach ($semesterCodes->values() as $semesterIndex => $semesterCode) {
-                $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5 + $semesterIndex))->setWidth(16);
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex(5 + $semesterIndex))->setWidth(16);
             }
             $sheet->getColumnDimension($totalColumnLetter)->setWidth(16);
 
@@ -1212,7 +1216,7 @@ class ReceivablePageController extends Controller
                 $sheet->mergeCells('B'.$rowCursor.':G'.($rowCursor + 2));
                 $sheet->setCellValue('B'.$rowCursor, $notesText);
                 $sheet->getStyle('B'.$rowCursor.':G'.($rowCursor + 2))->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
-                $sheet->getStyle('A'.$rowCursor.':G'.($rowCursor + 2))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                $sheet->getStyle('A'.$rowCursor.':G'.($rowCursor + 2))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                 $rowCursor += 4;
             }
 
@@ -2166,8 +2170,17 @@ class ReceivablePageController extends Controller
                 'ship_to_name',
                 'ship_to_city',
                 'customer_ship_location_id',
+                'school_bulk_location_id',
             ])
-            ->with(['shipLocation:id,school_name,city'])
+            ->with([
+                'shipLocation:id,school_name,city',
+                'schoolBulkLocation:id,school_name,city',
+                'items:id,sales_invoice_id,delivery_note_item_id,product_id,product_name,quantity,unit_price,discount,line_total',
+                'items.deliveryNoteItem:id,delivery_note_id',
+                'items.deliveryNoteItem.deliveryNote:id,note_number,note_date,customer_ship_location_id,school_bulk_location_id,recipient_name,city',
+                'items.deliveryNoteItem.deliveryNote.shipLocation:id,school_name,city',
+                'items.deliveryNoteItem.deliveryNote.schoolBulkLocation:id,school_name,city',
+            ])
             ->forCustomer($customerId)
             ->active()
             ->when($transactionType !== '', function ($query) use ($transactionType): void {
@@ -2179,24 +2192,7 @@ class ReceivablePageController extends Controller
             ->orderBy('invoice_date')
             ->orderBy('id')
             ->get()
-            ->map(function (SalesInvoice $invoice): array {
-                $schoolName = trim((string) ($invoice->ship_to_name ?: ($invoice->shipLocation?->school_name ?: '')));
-                $schoolCity = trim((string) ($invoice->ship_to_city ?: ($invoice->shipLocation?->city ?: '')));
-                if ($schoolName === '') {
-                    $schoolName = (string) __('receivable.unknown_school');
-                }
-
-                return [
-                    'school_name' => $schoolName,
-                    'school_city' => $schoolCity !== '' ? $schoolCity : '-',
-                    'invoice_id' => $invoice->id ? (int) $invoice->id : null,
-                    'invoice_number' => (string) ($invoice->invoice_number ?? '-'),
-                    'date_label' => $this->formatBillDate($invoice->invoice_date),
-                    'invoice_total' => (int) round((float) ($invoice->total ?? 0)),
-                    'paid_total' => (int) round((float) ($invoice->total_paid ?? 0)),
-                    'balance_total' => (int) round((float) ($invoice->balance ?? 0)),
-                ];
-            });
+            ->flatMap(fn (SalesInvoice $invoice): Collection => $this->customerBillSchoolRowsForInvoice($invoice));
 
         if ($rows->isEmpty()) {
             return collect();
@@ -2220,6 +2216,161 @@ class ReceivablePageController extends Controller
             })
             ->sortBy(fn (array $group): string => mb_strtolower((string) ($group['school_name'] ?? '-')))
             ->values();
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     school_name:string,
+     *     school_city:string,
+     *     invoice_id:int|null,
+     *     invoice_number:string,
+     *     date_label:string,
+     *     invoice_total:int,
+     *     paid_total:int,
+     *     balance_total:int
+     * }>
+     */
+    private function customerBillSchoolRowsForInvoice(SalesInvoice $invoice): Collection
+    {
+        $itemGroups = $invoice->items
+            ->map(function (SalesInvoiceItem $item) use ($invoice): array {
+                $school = $this->invoiceItemSchoolIdentity($item, $invoice);
+
+                return [
+                    ...$school,
+                    'invoice_total' => $this->invoiceItemLineTotal($item),
+                ];
+            })
+            ->filter(fn (array $row): bool => (int) ($row['invoice_total'] ?? 0) > 0)
+            ->groupBy(fn (array $row): string => (string) ($row['group_key'] ?? '-'))
+            ->map(function (Collection $group): array {
+                $first = (array) $group->first();
+
+                return [
+                    'school_name' => (string) ($first['school_name'] ?? '-'),
+                    'school_city' => (string) ($first['school_city'] ?? '-'),
+                    'invoice_total' => (int) $group->sum(fn (array $row): int => (int) ($row['invoice_total'] ?? 0)),
+                ];
+            })
+            ->values();
+
+        if ($itemGroups->isEmpty()) {
+            $identity = $this->invoiceHeaderSchoolIdentity($invoice);
+            $itemGroups = collect([[
+                'school_name' => $identity['school_name'],
+                'school_city' => $identity['school_city'],
+                'invoice_total' => (int) round((float) ($invoice->total ?? 0)),
+            ]]);
+        }
+
+        $paidAllocations = $this->allocateIntegerAmount(
+            (int) round((float) ($invoice->total_paid ?? 0)),
+            $itemGroups->pluck('invoice_total')->map(fn (mixed $amount): int => (int) $amount)->all()
+        );
+
+        return $itemGroups
+            ->values()
+            ->map(function (array $group, int $index) use ($invoice, $paidAllocations): array {
+                $invoiceTotal = (int) ($group['invoice_total'] ?? 0);
+                $paidTotal = (int) ($paidAllocations[$index] ?? 0);
+
+                return [
+                    'school_name' => (string) ($group['school_name'] ?? '-'),
+                    'school_city' => (string) ($group['school_city'] ?? '-'),
+                    'invoice_id' => $invoice->id ? (int) $invoice->id : null,
+                    'invoice_number' => (string) ($invoice->invoice_number ?? '-'),
+                    'date_label' => $this->formatBillDate($invoice->invoice_date),
+                    'invoice_total' => $invoiceTotal,
+                    'paid_total' => $paidTotal,
+                    'balance_total' => max(0, $invoiceTotal - $paidTotal),
+                ];
+            });
+    }
+
+    /**
+     * @return array{school_name:string,school_city:string,group_key:string}
+     */
+    private function invoiceItemSchoolIdentity(SalesInvoiceItem $item, SalesInvoice $invoice): array
+    {
+        $deliveryNote = $item->deliveryNoteItem?->deliveryNote;
+        $bulkLocation = $deliveryNote?->schoolBulkLocation;
+        $shipLocation = $deliveryNote?->shipLocation;
+        $schoolName = trim((string) ($bulkLocation?->school_name ?: ($shipLocation?->school_name ?: ($deliveryNote?->recipient_name ?: ''))));
+        $schoolCity = trim((string) ($bulkLocation?->city ?: ($shipLocation?->city ?: ($deliveryNote?->city ?: ''))));
+
+        if ($schoolName === '') {
+            return $this->invoiceHeaderSchoolIdentity($invoice);
+        }
+
+        $schoolCity = $schoolCity !== '' ? $schoolCity : '-';
+
+        return [
+            'school_name' => $schoolName,
+            'school_city' => $schoolCity,
+            'group_key' => mb_strtolower($schoolName.'|'.$schoolCity),
+        ];
+    }
+
+    /**
+     * @return array{school_name:string,school_city:string,group_key:string}
+     */
+    private function invoiceHeaderSchoolIdentity(SalesInvoice $invoice): array
+    {
+        $schoolName = trim((string) ($invoice->schoolBulkLocation?->school_name ?: ($invoice->ship_to_name ?: ($invoice->shipLocation?->school_name ?: ''))));
+        $schoolCity = trim((string) ($invoice->schoolBulkLocation?->city ?: ($invoice->ship_to_city ?: ($invoice->shipLocation?->city ?: ''))));
+        if ($schoolName === '') {
+            $schoolName = (string) __('receivable.unknown_school');
+        }
+        $schoolCity = $schoolCity !== '' ? $schoolCity : '-';
+
+        return [
+            'school_name' => $schoolName,
+            'school_city' => $schoolCity,
+            'group_key' => mb_strtolower($schoolName.'|'.$schoolCity),
+        ];
+    }
+
+    private function invoiceItemLineTotal(SalesInvoiceItem $item): int
+    {
+        $lineTotal = (int) round((float) ($item->line_total ?? 0));
+        if ($lineTotal > 0) {
+            return $lineTotal;
+        }
+
+        $quantity = (int) round((float) ($item->quantity ?? 0));
+        $unitPrice = (int) round((float) ($item->unit_price ?? 0));
+        $discount = (int) round((float) ($item->discount ?? 0));
+
+        return max(0, ($quantity * $unitPrice) - $discount);
+    }
+
+    /**
+     * @param  array<int, int>  $baseAmounts
+     * @return array<int, int>
+     */
+    private function allocateIntegerAmount(int $amount, array $baseAmounts): array
+    {
+        $baseTotal = array_sum($baseAmounts);
+        if ($amount <= 0 || $baseTotal <= 0) {
+            return array_fill(0, count($baseAmounts), 0);
+        }
+
+        $remainingAmount = min($amount, $baseTotal);
+        $lastIndex = count($baseAmounts) - 1;
+
+        return array_map(function (int $baseAmount, int $index) use ($amount, $baseTotal, $lastIndex, &$remainingAmount): int {
+            if ($baseAmount <= 0 || $remainingAmount <= 0) {
+                return 0;
+            }
+
+            $allocation = $index === $lastIndex
+                ? $remainingAmount
+                : (int) round($amount * ($baseAmount / $baseTotal));
+            $allocation = min($baseAmount, $remainingAmount, max(0, $allocation));
+            $remainingAmount -= $allocation;
+
+            return $allocation;
+        }, $baseAmounts, array_keys($baseAmounts));
     }
 
     private function formatBillDate(mixed $value): string
