@@ -62,6 +62,51 @@
             background: #fef3f2;
             border-color: #fecdca;
         }
+        .ship-location-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .ship-location-table th:nth-child(1),
+        .ship-location-table td:nth-child(1) {
+            width: 15%;
+        }
+        .ship-location-table th:nth-child(2),
+        .ship-location-table td:nth-child(2) {
+            width: 21%;
+        }
+        .ship-location-table th:nth-child(3),
+        .ship-location-table td:nth-child(3) {
+            width: 15%;
+        }
+        .ship-location-table th:nth-child(4),
+        .ship-location-table td:nth-child(4) {
+            width: 10%;
+        }
+        .ship-location-table th:nth-child(5),
+        .ship-location-table td:nth-child(5) {
+            width: auto;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .ship-location-table th:nth-child(6),
+        .ship-location-table td:nth-child(6) {
+            width: 112px;
+        }
+        .ship-location-table th:nth-child(7),
+        .ship-location-table td:nth-child(7) {
+            width: 148px;
+        }
+        .ship-location-action {
+            display: flex;
+            gap: 6px;
+            justify-content: flex-start;
+            flex-wrap: nowrap;
+        }
+        .ship-location-action .btn {
+            min-width: 0;
+            padding-left: 12px;
+            padding-right: 12px;
+        }
         @media (max-width: 1400px) {
             .ship-location-toolbar .toolbar-left {
                 flex: 1 1 100%;
@@ -110,7 +155,7 @@
     </div>
 
     <div class="card">
-        <table>
+        <table class="ship-location-table">
             <thead>
             <tr>
                 <th>{{ __('txn.customer') }}</th>
@@ -152,7 +197,7 @@
                         @endif
                     </td>
                     <td>
-                        <div class="flex">
+                        <div class="ship-location-action">
                             <a class="btn edit-btn" href="{{ route('customer-ship-locations.edit', $location) }}">{{ __('ui.edit') }}</a>
                             <form method="post" action="{{ route('customer-ship-locations.destroy', $location) }}" data-confirm-modal data-confirm-message="{{ __('school_bulk.confirm_delete_ship_location') }}">
                                 @csrf
