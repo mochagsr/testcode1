@@ -45,9 +45,9 @@
             margin: 0;
         }
         .ship-location-status-select {
-            width: 118px;
+            width: 92px;
             min-height: 34px;
-            padding: 6px 10px;
+            padding: 6px 22px 6px 10px;
             border-radius: 999px;
             font-weight: 700;
             font-size: 12px;
@@ -90,22 +90,22 @@
         }
         .ship-location-table th:nth-child(6),
         .ship-location-table td:nth-child(6) {
-            width: 112px;
+            width: 104px;
         }
         .ship-location-table th:nth-child(7),
         .ship-location-table td:nth-child(7) {
-            width: 148px;
+            width: 136px;
         }
         .ship-location-action {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             justify-content: flex-start;
             flex-wrap: nowrap;
         }
         .ship-location-action .btn {
             min-width: 0;
-            padding-left: 12px;
-            padding-right: 12px;
+            padding-left: 10px;
+            padding-right: 10px;
         }
         @media (max-width: 1400px) {
             .ship-location-toolbar .toolbar-left {
