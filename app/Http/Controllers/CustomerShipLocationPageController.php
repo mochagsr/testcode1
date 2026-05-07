@@ -97,6 +97,20 @@ class CustomerShipLocationPageController extends Controller
             ->with('success', __('school_bulk.ship_location_updated'));
     }
 
+    public function updateStatus(Request $request, CustomerShipLocation $customerShipLocation): RedirectResponse
+    {
+        $data = $request->validate([
+            'is_active' => FluentRule::boolean()->required(),
+        ]);
+
+        $customerShipLocation->update([
+            'is_active' => (bool) $data['is_active'],
+        ]);
+        AppCache::bumpLookupVersion();
+
+        return back()->with('success', __('school_bulk.ship_location_status_updated'));
+    }
+
     public function destroy(CustomerShipLocation $customerShipLocation): RedirectResponse
     {
         $customerShipLocation->delete();

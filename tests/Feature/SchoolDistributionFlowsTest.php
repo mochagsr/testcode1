@@ -33,6 +33,42 @@ class SchoolDistributionFlowsTest extends TestCase
             ->assertDontSee('customer-ship-locations/import', false);
     }
 
+    public function test_customer_ship_location_status_can_be_changed_from_index(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-SHIP-STATUS',
+            'name' => 'Customer Status',
+            'city' => 'Malang',
+        ]);
+        $location = CustomerShipLocation::query()->create([
+            'customer_id' => $customer->id,
+            'school_name' => 'Sekolah Status',
+            'recipient_phone' => '081230000099',
+            'city' => 'Malang',
+            'is_active' => true,
+        ]);
+
+        $this
+            ->actingAs($admin)
+            ->get(route('customer-ship-locations.index'))
+            ->assertOk()
+            ->assertSee(route('customer-ship-locations.update-status', $location), false)
+            ->assertSee('name="is_active"', false);
+
+        $this
+            ->actingAs($admin)
+            ->patch(route('customer-ship-locations.update-status', $location), [
+                'is_active' => '0',
+            ])
+            ->assertRedirect();
+
+        $this->assertFalse($location->fresh()->is_active);
+    }
+
     public function test_customer_ship_location_create_form_places_school_and_city_before_phone(): void
     {
         $admin = User::factory()->create([

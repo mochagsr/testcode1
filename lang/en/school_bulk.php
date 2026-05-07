@@ -10,6 +10,7 @@ return [
     'status_inactive' => 'Inactive',
     'ship_location_created' => 'School ship location created successfully.',
     'ship_location_updated' => 'School ship location updated successfully.',
+    'ship_location_status_updated' => 'School ship location status updated successfully.',
     'ship_location_deleted' => 'School ship location deleted successfully.',
     'no_ship_locations' => 'No school ship locations found.',
     'confirm_delete_ship_location' => 'Delete this ship location?',

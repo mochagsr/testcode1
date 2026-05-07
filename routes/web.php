@@ -214,6 +214,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/customer-ship-locations/create', [CustomerShipLocationPageController::class, 'create'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.create');
     Route::post('/customer-ship-locations', [CustomerShipLocationPageController::class, 'store'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.store');
     Route::get('/customer-ship-locations/{customerShipLocation}/edit', [CustomerShipLocationPageController::class, 'edit'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.edit');
+    Route::patch('/customer-ship-locations/{customerShipLocation}/status', [CustomerShipLocationPageController::class, 'updateStatus'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.update-status');
     Route::put('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'update'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.update');
     Route::delete('/customer-ship-locations/{customerShipLocation}', [CustomerShipLocationPageController::class, 'destroy'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.destroy');
     Route::get('/customer-ship-locations/lookup', [CustomerShipLocationPageController::class, 'lookup'])->middleware('perm:customer_ship_locations.create')->name('customer-ship-locations.lookup');

@@ -10,6 +10,7 @@ return [
     'status_inactive' => 'Nonaktif',
     'ship_location_created' => 'Lokasi kirim sekolah berhasil ditambahkan.',
     'ship_location_updated' => 'Lokasi kirim sekolah berhasil diperbarui.',
+    'ship_location_status_updated' => 'Status lokasi kirim sekolah berhasil diperbarui.',
     'ship_location_deleted' => 'Lokasi kirim sekolah berhasil dihapus.',
     'no_ship_locations' => 'Belum ada data lokasi kirim sekolah.',
     'confirm_delete_ship_location' => 'Hapus lokasi kirim ini?',

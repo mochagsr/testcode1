@@ -41,6 +41,27 @@
             flex: 1 1 240px;
             min-width: 0;
         }
+        .ship-location-status-form {
+            margin: 0;
+        }
+        .ship-location-status-select {
+            width: 118px;
+            min-height: 34px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+        .ship-location-status-select.is-active {
+            color: #067647;
+            background: #ecfdf3;
+            border-color: #abefc6;
+        }
+        .ship-location-status-select.is-inactive {
+            color: #b42318;
+            background: #fef3f2;
+            border-color: #fecdca;
+        }
         @media (max-width: 1400px) {
             .ship-location-toolbar .toolbar-left {
                 flex: 1 1 100%;
@@ -110,10 +131,24 @@
                     <td>{{ $location->city ?: '-' }}</td>
                     <td>{{ $location->address ?: '-' }}</td>
                     <td>
-                        @if($location->is_active)
-                            <span class="badge success">{{ __('txn.status_active') }}</span>
+                        @if($canManageShipLocations)
+                            <form method="post" action="{{ route('customer-ship-locations.update-status', $location) }}" class="ship-location-status-form">
+                                @csrf
+                                @method('PATCH')
+                                <select name="is_active"
+                                        class="ship-location-status-select {{ $location->is_active ? 'is-active' : 'is-inactive' }}"
+                                        onchange="this.form.submit()"
+                                        aria-label="{{ __('txn.status') }} {{ $location->school_name }}">
+                                    <option value="1" @selected($location->is_active)>{{ __('txn.status_active') }}</option>
+                                    <option value="0" @selected(! $location->is_active)>{{ __('school_bulk.status_inactive') }}</option>
+                                </select>
+                            </form>
                         @else
-                            <span class="badge danger">{{ __('txn.status_canceled') }}</span>
+                            @if($location->is_active)
+                                <span class="badge success">{{ __('txn.status_active') }}</span>
+                            @else
+                                <span class="badge danger">{{ __('school_bulk.status_inactive') }}</span>
+                            @endif
                         @endif
                     </td>
                     <td>
