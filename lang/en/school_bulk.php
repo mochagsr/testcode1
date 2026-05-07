@@ -59,7 +59,7 @@ return [
     'delivery_notes_pending' => 'Delivery Notes Pending',
     'total_items' => 'Total Items',
     'no_bulk_transactions' => 'No school distribution transactions yet.',
-    'school_breakdown_title' => 'School Breakdown',
+    'school_breakdown_title' => 'Transaction Breakdown',
     'total_per_school' => 'Total per School',
     'grand_total_all_schools' => 'Grand Total All Schools',
     'qty_total_per_school' => 'School Total Qty',

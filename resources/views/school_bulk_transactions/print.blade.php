@@ -8,8 +8,8 @@
         @include('partials.print.paper_transaction')
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
-        .school-page { page-break-after: always; break-after: page; padding-bottom: 6px; }
-        .school-page:last-child { page-break-after: auto; break-after: auto; }
+        .school-page { padding-bottom: 6px; }
+        .school-page + .school-page { page-break-before: always; break-before: page; }
         .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
         .company-left { display: flex; gap: 6px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; overflow: hidden; flex-shrink: 0; }

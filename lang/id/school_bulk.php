@@ -59,7 +59,7 @@ return [
     'delivery_notes_pending' => 'Belum Dibuat Surat Jalan',
     'total_items' => 'Total Item',
     'no_bulk_transactions' => 'Belum ada transaksi sebar sekolah.',
-    'school_breakdown_title' => 'Breakdown per Sekolah',
+    'school_breakdown_title' => 'Breakdown per Transaksi',
     'total_per_school' => 'Total per Sekolah',
     'grand_total_all_schools' => 'Grand Total Semua Sekolah',
     'qty_total_per_school' => 'Total Qty Sekolah',
