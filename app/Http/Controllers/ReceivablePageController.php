@@ -1177,8 +1177,8 @@ class ReceivablePageController extends Controller
                     }
                     foreach ($groupRows as $groupRow) {
                         $sheet->fromArray([[
-                            (string) ($group['school_name'] ?? '-'),
-                            (string) ($group['school_city'] ?? '-'),
+                            (string) ($groupRow['school_name'] ?? '-'),
+                            (string) ($groupRow['school_city'] ?? '-'),
                             (string) ($groupRow['date_label'] ?? ''),
                             (string) ($groupRow['invoice_number'] ?? ''),
                             number_format((int) round((float) ($groupRow['invoice_total'] ?? 0)), 0, ',', '.'),
@@ -2144,6 +2144,9 @@ class ReceivablePageController extends Controller
      *     school_name:string,
      *     school_city:string,
      *     rows:Collection<int, array{
+     *         row_kind:string,
+     *         school_name:string,
+     *         school_city:string,
      *         invoice_id:int|null,
      *         invoice_number:string,
      *         date_label:string,
@@ -2180,6 +2183,7 @@ class ReceivablePageController extends Controller
                 'items.deliveryNoteItem.deliveryNote:id,note_number,note_date,customer_ship_location_id,school_bulk_location_id,recipient_name,city',
                 'items.deliveryNoteItem.deliveryNote.shipLocation:id,school_name,city',
                 'items.deliveryNoteItem.deliveryNote.schoolBulkLocation:id,school_name,city',
+                'payments:id,sales_invoice_id,payment_date,amount,method,notes',
             ])
             ->forCustomer($customerId)
             ->active()
@@ -2198,28 +2202,30 @@ class ReceivablePageController extends Controller
             return collect();
         }
 
-        return $rows
-            ->groupBy(fn (array $row): string => mb_strtolower(($row['school_name'] ?? '-').'|'.($row['school_city'] ?? '-')))
-            ->map(function (Collection $group): array {
-                $first = (array) $group->first();
-
-                return [
-                    'school_name' => (string) ($first['school_name'] ?? '-'),
-                    'school_city' => (string) ($first['school_city'] ?? '-'),
-                    'rows' => $group->values(),
-                    'totals' => [
-                        'invoice_total' => (int) $group->sum(fn (array $row): int => (int) ($row['invoice_total'] ?? 0)),
-                        'paid_total' => (int) $group->sum(fn (array $row): int => (int) ($row['paid_total'] ?? 0)),
-                        'balance_total' => (int) $group->sum(fn (array $row): int => (int) ($row['balance_total'] ?? 0)),
-                    ],
-                ];
-            })
-            ->sortBy(fn (array $group): string => mb_strtolower((string) ($group['school_name'] ?? '-')))
-            ->values();
+        return collect([[
+            'school_name' => '',
+            'school_city' => '',
+            'rows' => $rows->values(),
+            'totals' => [
+                'invoice_total' => (int) $rows->sum(fn (array $row): int => (int) ($row['invoice_total'] ?? 0)),
+                'paid_total' => (int) $rows->sum(fn (array $row): int => (int) ($row['paid_total'] ?? 0)),
+                'balance_total' => (int) round((float) SalesInvoice::query()
+                    ->forCustomer($customerId)
+                    ->active()
+                    ->when($transactionType !== '', function ($query) use ($transactionType): void {
+                        $query->where('transaction_type', $transactionType);
+                    })
+                    ->when($semester !== '', function ($query) use ($semester): void {
+                        $query->forSemester($semester);
+                    })
+                    ->sum('balance')),
+            ],
+        ]]);
     }
 
     /**
      * @return Collection<int, array{
+     *     row_kind:string,
      *     school_name:string,
      *     school_city:string,
      *     invoice_id:int|null,
@@ -2263,28 +2269,30 @@ class ReceivablePageController extends Controller
             ]]);
         }
 
-        $paidAllocations = $this->allocateIntegerAmount(
-            (int) round((float) ($invoice->total_paid ?? 0)),
-            $itemGroups->pluck('invoice_total')->map(fn (mixed $amount): int => (int) $amount)->all()
-        );
+        $invoiceTotal = (int) $itemGroups->sum(fn (array $group): int => (int) ($group['invoice_total'] ?? 0));
+        $runningBalance = $invoiceTotal;
 
-        return $itemGroups
+        $invoiceRows = $itemGroups
             ->values()
-            ->map(function (array $group, int $index) use ($invoice, $paidAllocations): array {
-                $invoiceTotal = (int) ($group['invoice_total'] ?? 0);
-                $paidTotal = (int) ($paidAllocations[$index] ?? 0);
+            ->map(function (array $group) use ($invoice): array {
+                $rowInvoiceTotal = (int) ($group['invoice_total'] ?? 0);
 
                 return [
+                    'row_kind' => 'invoice',
                     'school_name' => (string) ($group['school_name'] ?? '-'),
                     'school_city' => (string) ($group['school_city'] ?? '-'),
                     'invoice_id' => $invoice->id ? (int) $invoice->id : null,
                     'invoice_number' => (string) ($invoice->invoice_number ?? '-'),
                     'date_label' => $this->formatBillDate($invoice->invoice_date),
-                    'invoice_total' => $invoiceTotal,
-                    'paid_total' => $paidTotal,
-                    'balance_total' => max(0, $invoiceTotal - $paidTotal),
+                    'invoice_total' => $rowInvoiceTotal,
+                    'paid_total' => 0,
+                    'balance_total' => $rowInvoiceTotal,
                 ];
             });
+
+        $paymentRows = $this->customerBillPaymentRowsForInvoice($invoice, $runningBalance);
+
+        return $invoiceRows->concat($paymentRows)->values();
     }
 
     /**
@@ -2345,32 +2353,76 @@ class ReceivablePageController extends Controller
     }
 
     /**
-     * @param  array<int, int>  $baseAmounts
-     * @return array<int, int>
+     * @return Collection<int, array{
+     *     row_kind:string,
+     *     school_name:string,
+     *     school_city:string,
+     *     invoice_id:int|null,
+     *     invoice_number:string,
+     *     date_label:string,
+     *     invoice_total:int,
+     *     paid_total:int,
+     *     balance_total:int
+     * }>
      */
-    private function allocateIntegerAmount(int $amount, array $baseAmounts): array
+    private function customerBillPaymentRowsForInvoice(SalesInvoice $invoice, int $openingInvoiceBalance): Collection
     {
-        $baseTotal = array_sum($baseAmounts);
-        if ($amount <= 0 || $baseTotal <= 0) {
-            return array_fill(0, count($baseAmounts), 0);
+        $payments = $invoice->payments
+            ->sortBy([
+                ['payment_date', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values();
+
+        if ($payments->isEmpty() && (int) round((float) ($invoice->total_paid ?? 0)) <= 0) {
+            return collect();
         }
 
-        $remainingAmount = min($amount, $baseTotal);
-        $lastIndex = count($baseAmounts) - 1;
+        $runningBalance = $openingInvoiceBalance;
 
-        return array_map(function (int $baseAmount, int $index) use ($amount, $baseTotal, $lastIndex, &$remainingAmount): int {
-            if ($baseAmount <= 0 || $remainingAmount <= 0) {
-                return 0;
-            }
+        if ($payments->isEmpty()) {
+            $paidTotal = min((int) round((float) ($invoice->total_paid ?? 0)), $runningBalance);
+            $runningBalance = max(0, $runningBalance - $paidTotal);
 
-            $allocation = $index === $lastIndex
-                ? $remainingAmount
-                : (int) round($amount * ($baseAmount / $baseTotal));
-            $allocation = min($baseAmount, $remainingAmount, max(0, $allocation));
-            $remainingAmount -= $allocation;
+            return collect([[
+                'row_kind' => 'payment',
+                'school_name' => __('receivable.transaction_type_payment'),
+                'school_city' => '-',
+                'invoice_id' => $invoice->id ? (int) $invoice->id : null,
+                'invoice_number' => (string) ($invoice->invoice_number ?? '-'),
+                'date_label' => $this->formatBillDate($invoice->invoice_date),
+                'invoice_total' => 0,
+                'paid_total' => $paidTotal,
+                'balance_total' => $runningBalance,
+            ]]);
+        }
 
-            return $allocation;
-        }, $baseAmounts, array_keys($baseAmounts));
+        return $payments
+            ->map(function (InvoicePayment $payment) use (&$runningBalance, $invoice): array {
+                $paidTotal = min((int) round((float) ($payment->amount ?? 0)), $runningBalance);
+                $runningBalance = max(0, $runningBalance - $paidTotal);
+                $paymentNumber = $this->extractDocumentReference((string) ($payment->notes ?? ''), ['KWT', 'PYT']);
+                if ($paymentNumber === '') {
+                    $paymentNumber = trim((string) ($payment->notes ?? ''));
+                }
+                if ($paymentNumber === '') {
+                    $paymentNumber = (string) ($invoice->invoice_number ?? '-');
+                }
+
+                return [
+                    'row_kind' => 'payment',
+                    'school_name' => __('receivable.transaction_type_payment'),
+                    'school_city' => '-',
+                    'invoice_id' => $invoice->id ? (int) $invoice->id : null,
+                    'invoice_number' => $paymentNumber,
+                    'date_label' => $this->formatBillDate($payment->payment_date),
+                    'invoice_total' => 0,
+                    'paid_total' => $paidTotal,
+                    'balance_total' => $runningBalance,
+                ];
+            })
+            ->filter(fn (array $row): bool => (int) ($row['paid_total'] ?? 0) > 0)
+            ->values();
     }
 
     private function formatBillDate(mixed $value): string

@@ -225,10 +225,12 @@
             @foreach($schoolBreakdownRows as $group)
                 @php
                     $groupRows = collect($group['rows'] ?? []);
-                    $schoolName = (string) ($group['school_name'] ?? '-');
-                    $schoolCity = (string) ($group['school_city'] ?? '-');
                 @endphp
                 @foreach($groupRows as $groupRow)
+                    @php
+                        $schoolName = (string) ($groupRow['school_name'] ?? '-');
+                        $schoolCity = (string) ($groupRow['school_city'] ?? '-');
+                    @endphp
                     <tr>
                         <td>{{ $schoolName }}</td>
                         <td>{{ $schoolCity }}</td>
@@ -241,7 +243,7 @@
                 @endforeach
                 @php $groupTotals = (array) ($group['totals'] ?? []); @endphp
                 <tr class="total-row">
-                    <td colspan="4" style="text-align:right;">{{ __('receivable.bill_total') }} {{ $schoolName }}</td>
+                    <td colspan="4" style="text-align:right;">{{ __('receivable.bill_total') }}</td>
                     <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
                     <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['paid_total'] ?? 0)), 0, ',', '.') }}</td>
                     <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['balance_total'] ?? 0)), 0, ',', '.') }}</td>

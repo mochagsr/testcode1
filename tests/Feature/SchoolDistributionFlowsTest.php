@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerShipLocation;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
+use App\Models\InvoicePayment;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\SalesInvoice;
@@ -686,6 +687,13 @@ class SchoolDistributionFlowsTest extends TestCase
                 'line_total' => 500000,
             ]);
         });
+        InvoicePayment::query()->create([
+            'sales_invoice_id' => $invoice->id,
+            'payment_date' => '2026-05-07',
+            'amount' => 500000,
+            'method' => 'Tunai',
+            'notes' => 'Pembayaran KWT-BILL-BULK-001',
+        ]);
 
         $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
             'customer' => $customer->id,
@@ -698,5 +706,7 @@ class SchoolDistributionFlowsTest extends TestCase
         $response->assertSee('sd prambon 2');
         $response->assertSee('sd prambon 3');
         $response->assertSee('INV-BILL-BULK-001');
+        $response->assertSee('KWT-BILL-BULK-001');
+        $response->assertDontSee('166.667');
     }
 }
