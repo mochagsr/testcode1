@@ -33,6 +33,44 @@
             color: var(--muted);
             font-size: 0.86em;
         }
+        .pending-delivery-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .pending-delivery-table th,
+        .pending-delivery-table td {
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        .pending-delivery-table th:first-child,
+        .pending-delivery-table td:first-child {
+            width: 34px;
+            padding-left: 8px;
+            padding-right: 4px;
+            text-align: center;
+        }
+        .pending-delivery-table th:nth-child(2),
+        .pending-delivery-table td:nth-child(2) {
+            width: 16%;
+        }
+        .pending-delivery-table th:nth-child(3),
+        .pending-delivery-table td:nth-child(3) {
+            width: 11%;
+        }
+        .pending-delivery-table th:nth-child(4),
+        .pending-delivery-table td:nth-child(4) {
+            width: 16%;
+        }
+        .pending-delivery-table th:nth-child(5),
+        .pending-delivery-table td:nth-child(5) {
+            width: 12%;
+        }
+        .pending-delivery-checkbox {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            vertical-align: middle;
+        }
     </style>
 
     <div class="page-header-actions">
@@ -56,10 +94,10 @@
         <div class="card">
             <p class="muted" style="margin-top:0;">{{ __('txn.pending_delivery_notes_help') }}</p>
             <div class="table-mobile-scroll">
-                <table>
+                <table class="pending-delivery-table">
                     <thead>
                     <tr>
-                        <th style="width:42px;"></th>
+                        <th></th>
                         <th>{{ __('txn.note_number') }}</th>
                         <th>
                             <a class="sort-link" href="{{ $sortUrl('date') }}">
@@ -89,7 +127,7 @@
                             $remaining = max(0, $delivered - $invoiced);
                         @endphp
                         <tr>
-                            <td><input type="checkbox" name="delivery_note_ids[]" value="{{ $row->id }}"></td>
+                            <td><input class="pending-delivery-checkbox" type="checkbox" name="delivery_note_ids[]" value="{{ $row->id }}"></td>
                             <td><a href="{{ route('delivery-notes.show', $row) }}">{{ $row->note_number }}</a></td>
                             <td>{{ $row->note_date?->format('d-m-Y') }}</td>
                             <td>{{ $row->customer?->name ?: $row->recipient_name }}</td>
