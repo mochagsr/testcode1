@@ -39,8 +39,9 @@
         }
         .pending-delivery-table th,
         .pending-delivery-table td {
-            padding-top: 10px;
-            padding-bottom: 10px;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            line-height: 1.2;
         }
         .pending-delivery-table th:first-child,
         .pending-delivery-table td:first-child {
@@ -66,8 +67,8 @@
             width: 12%;
         }
         .pending-delivery-checkbox {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             margin: 0;
             vertical-align: middle;
         }
