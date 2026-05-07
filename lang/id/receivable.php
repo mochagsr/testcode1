@@ -160,7 +160,7 @@ return [
     'discount_percent' => 'Diskon (%)',
     'discount_amount' => 'Diskon (Nominal)',
     'discount_pay_amount' => 'Bayar (Setelah Diskon)',
-    'school_breakdown_title' => 'Breakdown Per Sekolah',
+    'school_breakdown_title' => 'Breakdown Per Transaksi',
     'school_name' => 'Sekolah',
     'school_city' => 'Kota Sekolah',
     'school_invoice_total' => 'Total Faktur',
@@ -172,4 +172,3 @@ return [
     'default_billing_note' => "Untuk pesanan dan komplain bisa langsung hubungi nomor perusahaan.\nRetur maksimal 10% dari total pengambilan.",
     'default_transfer_accounts' => "BCA : 0110989806 a/n Marimin\nBRI : 124701000187568 a/n Marimin\nMANDIRI : 144.00.1327809.5 a/n Sumarni",
 ];
-

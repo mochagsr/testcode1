@@ -586,6 +586,8 @@ class SchoolDistributionFlowsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee(__('receivable.school_breakdown_title'));
+        $response->assertSee('receivable-breakdown-page');
+        $response->assertDontSee('Breakdown Per Sekolah');
         $response->assertSee('SDN A');
         $response->assertSee('SDN B');
         $response->assertSee('INV-BILL-001');

@@ -157,7 +157,7 @@ return [
     'discount_percent' => 'Discount (%)',
     'discount_amount' => 'Discount (Amount)',
     'discount_pay_amount' => 'Pay (After Discount)',
-    'school_breakdown_title' => 'Breakdown by School',
+    'school_breakdown_title' => 'Transaction Breakdown',
     'school_name' => 'School',
     'school_city' => 'School City',
     'school_invoice_total' => 'Invoice Total',
@@ -169,4 +169,3 @@ return [
     'default_billing_note' => "For orders and complaints, please contact the company number directly.\nReturns are limited to 10% of total delivery.",
     'default_transfer_accounts' => "BCA : 0110989806 a/n Marimin\nBRI : 124701000187568 a/n Marimin\nMANDIRI : 144.00.1327809.5 a/n Sumarni",
 ];
-

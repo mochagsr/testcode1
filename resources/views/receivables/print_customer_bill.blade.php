@@ -46,6 +46,7 @@
         .transfer-line { white-space: pre-line; }
         .footer-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 10px; }
         .footer-box { border: 1px solid #111; padding: 8px; min-height: 64px; }
+        .receivable-breakdown-page { page-break-before: always; break-before: page; margin-top: 0; }
         .muted { color: #444; }
         @media print {
             .no-print { display: none; }
@@ -205,7 +206,7 @@
     </table>
 
     @if($schoolBreakdownRows->isNotEmpty())
-        <table>
+        <table class="receivable-breakdown-page">
             <thead>
             <tr>
                 <th colspan="7" style="text-align:left;">{{ __('receivable.school_breakdown_title') }}</th>
