@@ -463,7 +463,7 @@
 
         function recalcItemsTotal() {
             const total = Array.from(tbody.querySelectorAll('.qty-input'))
-                .reduce((sum, input) => sum + Math.max(0, Number(input.value || 0)), 0);
+                .reduce((sum, input) => sum + Math.max(0, window.PgposNumberFormat.parseInt(input.value || 0)), 0);
             if (itemsTotalQty) {
                 itemsTotalQty.textContent = total.toLocaleString('id-ID', { maximumFractionDigits: 0 });
             }
@@ -480,7 +480,7 @@
                 </td>
                 <td>
                     <div class="quantity-with-unit">
-                        <input name="items[${index}][quantity]" type="number" min="1" value="" placeholder="0" class="qty-input" required>
+                        <input name="items[${index}][quantity]" type="text" inputmode="numeric" value="" placeholder="0" class="qty-input js-thousand-input" required>
                         <span class="qty-unit-label">-</span>
                     </div>
                 </td>
@@ -488,6 +488,7 @@
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
+            tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
             tr.querySelector('.qty-input')?.addEventListener('input', recalcItemsTotal);
 
             const onProductInput = debounce(async (event) => {

@@ -178,7 +178,7 @@
                                         <input type="text" name="items[{{ $index }}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="{{ $item->product_name }}" style="min-width: 280px; width: 100%;" required>
                                         <input type="hidden" class="admin-delivery-item-product-id" name="items[{{ $index }}][product_id]" value="{{ $item->product_id }}">
                                     </td>
-                                    <td><input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-delivery-item-qty qty-input" value="{{ (int) round($item->quantity) }}" style="max-width: 104px;" required></td>
+                                    <td><input type="text" inputmode="numeric" name="items[{{ $index }}][quantity]" class="admin-delivery-item-qty qty-input js-thousand-input" value="{{ (int) round($item->quantity) }}" style="max-width: 104px;" required></td>
                                     <td><input type="text" name="items[{{ $index }}][unit]" class="admin-delivery-item-unit" value="{{ $item->unit }}" style="max-width: 72px;"></td>
                                     <td><input type="text" name="items[{{ $index }}][notes]" class="admin-delivery-item-notes" value="{{ $item->notes }}" style="max-width: 130px;"></td>
                                     <td><button type="button" class="btn danger-btn admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
@@ -510,12 +510,13 @@
                             <input type="text" name="items[${index}][product_name]" class="admin-delivery-item-search" list="admin-delivery-products-list" value="" style="min-width: 280px; width: 100%;" required>
                             <input type="hidden" class="admin-delivery-item-product-id" name="items[${index}][product_id]" value="">
                         </td>
-                        <td><input type="number" min="1" name="items[${index}][quantity]" class="admin-delivery-item-qty qty-input" value="" placeholder="0" style="max-width: 104px;" required></td>
+                        <td><input type="text" inputmode="numeric" name="items[${index}][quantity]" class="admin-delivery-item-qty qty-input js-thousand-input" value="" placeholder="0" style="max-width: 104px;" required></td>
                         <td><input type="text" name="items[${index}][unit]" class="admin-delivery-item-unit" value="" style="max-width: 72px;"></td>
                         <td><input type="text" name="items[${index}][notes]" class="admin-delivery-item-notes" value="" style="max-width: 130px;"></td>
                         <td><button type="button" class="btn danger-btn admin-remove-delivery-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
+                    tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
                     bindRow(tr);
                     reindexRows();
                 }
@@ -535,7 +536,7 @@
                     }
                     const invalid = rows.some((row) => {
                         const productId = row.querySelector('.admin-delivery-item-product-id')?.value;
-                        const qty = Number(row.querySelector('.admin-delivery-item-qty')?.value || 0);
+                        const qty = window.PgposNumberFormat.parseInt(row.querySelector('.admin-delivery-item-qty')?.value || 0);
                         if (!productId) {
                             setProductFieldError(row, @js(__('txn.product_not_registered')));
                         } else {

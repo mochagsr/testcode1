@@ -145,10 +145,10 @@
                             </td>
                             <td class="num remaining-col">{{ number_format($remaining, 0, ',', '.') }}</td>
                             <td class="qty-col">
-                                <input class="qty" type="number" name="items[{{ $index }}][quantity]" value="{{ $qty }}" min="1" max="{{ $remaining }}" required>
+                                <input class="qty js-thousand-input" type="text" inputmode="numeric" name="items[{{ $index }}][quantity]" value="{{ $qty }}" data-max="{{ $remaining }}" required>
                             </td>
                             <td class="price-col">
-                                <input class="price" type="number" name="items[{{ $index }}][unit_price]" value="{{ $price }}" min="1" step="1" required>
+                                <input class="price js-thousand-input" type="text" inputmode="numeric" name="items[{{ $index }}][unit_price]" value="{{ $price }}" required>
                             </td>
                             <td class="discount-col">
                                 <input class="discount" type="number" name="items[{{ $index }}][discount]" value="{{ $discount }}" min="0" max="100" step="1">
@@ -178,8 +178,8 @@
         function recalc() {
             let total = 0;
             document.querySelectorAll('#items-table tbody tr').forEach((row) => {
-                const qty = Number(row.querySelector('.qty')?.value || 0);
-                const price = Number(row.querySelector('.price')?.value || 0);
+                const qty = window.PgposNumberFormat.parseInt(row.querySelector('.qty')?.value || 0);
+                const price = window.PgposNumberFormat.parseInt(row.querySelector('.price')?.value || 0);
                 const discountPercent = Math.max(0, Math.min(100, Number(row.querySelector('.discount')?.value || 0)));
                 const gross = qty * price;
                 const lineTotal = Math.max(0, gross - Math.round(gross * discountPercent / 100));
@@ -198,6 +198,7 @@
         document.querySelectorAll('.qty,.price,.discount').forEach((input) => {
             input.addEventListener('input', recalc);
         });
+        document.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
         recalc();
     </script>
 @endsection

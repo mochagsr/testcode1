@@ -456,7 +456,7 @@
         function recalc() {
             let total = 0;
             document.querySelectorAll('#items-table tbody tr').forEach((row) => {
-                const qty = parseInt(row.querySelector('.qty').value || 0, 10);
+                const qty = window.PgposNumberFormat.parseInt(row.querySelector('.qty').value || 0);
                 const productId = row.querySelector('.product-id')?.value;
                 const product = getProductById(productId);
                 const key = getPriceKeyForCustomer();
@@ -499,7 +499,7 @@
                 <td class="stock">-</td>
                 <td>
                     <div class="quantity-with-unit">
-                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="" placeholder="0" required>
+                        <input class="qty js-thousand-input" type="text" inputmode="numeric" name="items[${index}][quantity]" value="" placeholder="0" required>
                         <span class="qty-unit-label">-</span>
                     </div>
                 </td>
@@ -508,6 +508,7 @@
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
+            tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
 
             const onProductInput = debounce(async (event) => {
                 setProductFieldError(tr, '');

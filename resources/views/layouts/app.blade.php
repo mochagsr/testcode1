@@ -1619,6 +1619,7 @@
                         form.getAttribute('data-confirm-message') || defaultConfirmTitle,
                         () => {
                             form.dataset.confirmApproved = '1';
+                            window.PgposNumberFormat?.cleanForm(form);
                             form.submit();
                         },
                         form.getAttribute('data-confirm-title') || defaultConfirmTitle
@@ -1631,6 +1632,74 @@
                 window.PgposDialog.showMessage(@json((string) session('error_popup')));
             </script>
         @endif
+        <script>
+            (function () {
+                function digitsOnly(value) {
+                    return String(value || '').replace(/\D/g, '');
+                }
+
+                function formatThousands(value) {
+                    const digits = digitsOnly(value);
+                    if (digits === '') {
+                        return '';
+                    }
+
+                    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                }
+
+                function parseFormattedInteger(value) {
+                    const digits = digitsOnly(value);
+
+                    return digits === '' ? 0 : Number(digits);
+                }
+
+                function formatNumberInput(input) {
+                    if (!input) {
+                        return;
+                    }
+
+                    const formatted = formatThousands(input.value);
+                    if (input.value !== formatted) {
+                        input.value = formatted;
+                    }
+                }
+
+                function cleanNumberInputs(form) {
+                    if (!form) {
+                        return;
+                    }
+
+                    form.querySelectorAll('.js-thousand-input').forEach((input) => {
+                        input.value = digitsOnly(input.value);
+                    });
+                }
+
+                document.addEventListener('input', (event) => {
+                    const target = event.target;
+                    if (!(target instanceof HTMLInputElement) || !target.classList.contains('js-thousand-input')) {
+                        return;
+                    }
+
+                    formatNumberInput(target);
+                });
+
+                document.addEventListener('submit', (event) => {
+                    cleanNumberInputs(event.target);
+                }, true);
+
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.querySelectorAll('.js-thousand-input').forEach(formatNumberInput);
+                });
+
+                window.PgposNumberFormat = Object.assign({}, window.PgposNumberFormat || {}, {
+                    digitsOnly,
+                    formatThousands,
+                    parseInt: parseFormattedInteger,
+                    formatInput: formatNumberInput,
+                    cleanForm: cleanNumberInputs,
+                });
+            })();
+        </script>
         @yield('content')
     </main>
 </div>

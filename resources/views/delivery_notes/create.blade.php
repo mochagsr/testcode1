@@ -852,7 +852,7 @@
 
         function recalcItemsTotal() {
             const total = Array.from(tbody.querySelectorAll('.qty-input'))
-                .reduce((sum, input) => sum + Math.max(0, Number(input.value || 0)), 0);
+                .reduce((sum, input) => sum + Math.max(0, window.PgposNumberFormat.parseInt(input.value || 0)), 0);
             if (itemsTotalQty) {
                 itemsTotalQty.textContent = total.toLocaleString('id-ID', { maximumFractionDigits: 0 });
             }
@@ -869,12 +869,13 @@
                     <input type="hidden" name="items[${index}][order_note_item_id]" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
-                <td><input name="items[${index}][quantity]" type="number" min="1" value="${escapeAttribute(String(prefill?.quantity || ''))}" placeholder="0" class="qty-input" required style="max-width: 104px;"></td>
+                <td><input name="items[${index}][quantity]" type="text" inputmode="numeric" value="${escapeAttribute(String(prefill?.quantity || ''))}" placeholder="0" class="qty-input js-thousand-input" required style="max-width: 104px;"></td>
                 <td><input name="items[${index}][unit]" class="unit" value="${escapeAttribute(String(prefill?.unit || ''))}" style="max-width: 72px;"></td>
                 <td><input name="items[${index}][notes]" value="${escapeAttribute(String(prefill?.notes || ''))}"></td>
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
+            tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
             tr.querySelector('.qty-input')?.addEventListener('input', recalcItemsTotal);
 
             const onProductInput = debounce(async (event) => {

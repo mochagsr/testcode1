@@ -408,7 +408,7 @@
                                         </td>
                                         <td>
                                             <div class="quantity-with-unit">
-                                                <input type="number" min="1" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input" value="{{ (int) round($item->quantity) }}" required>
+                                                <input type="text" inputmode="numeric" name="items[{{ $index }}][quantity]" class="admin-order-item-qty qty-input js-thousand-input" value="{{ (int) round($item->quantity) }}" required>
                                                 <span class="qty-unit-label">{{ $productUnitsById->get((int) $item->product_id) ?: '-' }}</span>
                                             </div>
                                         </td>
@@ -728,7 +728,7 @@
                         </td>
                         <td>
                             <div class="quantity-with-unit">
-                                <input type="number" min="1" name="items[${index}][quantity]" class="admin-order-item-qty qty-input" value="" placeholder="0" required>
+                                <input type="text" inputmode="numeric" name="items[${index}][quantity]" class="admin-order-item-qty qty-input js-thousand-input" value="" placeholder="0" required>
                                 <span class="qty-unit-label">-</span>
                             </div>
                         </td>
@@ -736,6 +736,7 @@
                         <td><button type="button" class="btn danger-btn admin-remove-order-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
+                    tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
                     bindRow(tr);
                     reindexRows();
                 }
@@ -755,7 +756,7 @@
                     }
                     const invalid = rows.some((row) => {
                         const productId = row.querySelector('.admin-order-item-product-id')?.value;
-                        const qty = Number(row.querySelector('.admin-order-item-qty')?.value || 0);
+                        const qty = window.PgposNumberFormat.parseInt(row.querySelector('.admin-order-item-qty')?.value || 0);
                         if (!productId) {
                             setProductFieldError(row, @js(__('txn.product_not_registered')));
                         } else {

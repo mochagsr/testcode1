@@ -313,13 +313,13 @@
                                     <input type="hidden" class="admin-product-id" name="items[{{ $idx }}][product_id]" value="{{ (int) ($item['product_id'] ?? 0) }}">
                                 </td>
                                 <td class="admin-col-unit"><input type="text" class="admin-unit" name="items[{{ $idx }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
-                                <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" name="items[{{ $idx }}][quantity]" value="{{ $item['quantity'] ?? '' }}" placeholder="0" required></td>
+                                <td class="admin-col-qty"><input type="text" inputmode="numeric" class="admin-qty admin-qty-input js-thousand-input" name="items[{{ $idx }}][quantity]" value="{{ $item['quantity'] ?? '' }}" placeholder="0" required></td>
                                 <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" name="items[{{ $idx }}][weight]" value="{{ isset($item['weight']) && $item['weight'] !== null && $item['weight'] !== '' ? number_format((float) $item['weight'], 3, '.', '') : '' }}"></td>
-                                <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" name="items[{{ $idx }}][unit_cost]" value="{{ (isset($item['unit_cost']) && (float) $item['unit_cost'] > 0) ? (int) $item['unit_cost'] : '' }}" placeholder="0"></td>
+                                <td class="admin-col-price"><input type="text" inputmode="numeric" class="admin-unit-cost admin-price-input js-thousand-input" name="items[{{ $idx }}][unit_cost]" value="{{ (isset($item['unit_cost']) && (float) $item['unit_cost'] > 0) ? (int) $item['unit_cost'] : '' }}" placeholder="0"></td>
                                 <td class="admin-col-tax">
                                     <div class="dual-inline-inputs admin-tax-inputs">
                                         <input type="number" min="0" step="0.01" class="admin-tax-percent" name="items[{{ $idx }}][tax_percent]" value="{{ (isset($item['tax_percent']) && (float) $item['tax_percent'] > 0) ? number_format((float) $item['tax_percent'], 2, '.', '') : '' }}" placeholder="%">
-                                        <input type="number" min="0" step="1" class="admin-tax-amount" name="items[{{ $idx }}][tax_amount]" value="{{ (isset($item['tax_amount']) && (float) $item['tax_amount'] > 0) ? (int) round((float) $item['tax_amount'], 0) : '' }}" placeholder="nilai">
+                                        <input type="text" inputmode="numeric" class="admin-tax-amount js-thousand-input" name="items[{{ $idx }}][tax_amount]" value="{{ (isset($item['tax_amount']) && (float) $item['tax_amount'] > 0) ? (int) round((float) $item['tax_amount'], 0) : '' }}" placeholder="nilai">
                                         <input type="hidden" class="admin-tax-input-mode" name="items[{{ $idx }}][tax_input_mode]" value="{{ ($item['tax_input_mode'] ?? 'percent') === 'amount' ? 'amount' : 'percent' }}">
                                     </div>
                                 </td>
@@ -438,11 +438,11 @@
                     const taxModeField = row.querySelector('.admin-tax-input-mode');
                     const removeBtn = row.querySelector('.admin-remove-item');
                     const syncTaxFields = () => {
-                        const qty = Math.max(0, Number(qtyField?.value || 0));
-                        const unitCost = Math.max(0, Number(costField?.value || 0));
+                        const qty = Math.max(0, window.PgposNumberFormat.parseInt(qtyField?.value || 0));
+                        const unitCost = Math.max(0, window.PgposNumberFormat.parseInt(costField?.value || 0));
                         const lineSubtotal = qty * unitCost;
                         if ((taxModeField?.value || 'percent') === 'amount') {
-                            const taxAmount = Math.max(0, Math.round(Number(taxAmountField?.value || 0)));
+                            const taxAmount = Math.max(0, Math.round(window.PgposNumberFormat.parseInt(taxAmountField?.value || 0)));
                             if (taxPercentField) {
                                 taxPercentField.value = lineSubtotal > 0 ? ((taxAmount / lineSubtotal) * 100).toFixed(2) : '';
                             }
@@ -451,6 +451,7 @@
                             if (taxAmountField) {
                                 const computedTaxAmount = Math.round(lineSubtotal * (taxPercent / 100));
                                 taxAmountField.value = computedTaxAmount > 0 ? String(computedTaxAmount) : '';
+                                window.PgposNumberFormat.formatInput(taxAmountField);
                             }
                         }
                     };
@@ -467,8 +468,9 @@
                         nameField.value = p.name || '';
                         setProductFieldError(row, '');
                         unitField.value = p.unit || '';
-                        if (Number(costField.value || 0) <= 0) {
+                        if (window.PgposNumberFormat.parseInt(costField.value || 0) <= 0) {
                             costField.value = Math.round(Number(p.price_general || 0));
+                            window.PgposNumberFormat.formatInput(costField);
                         }
                     });
                     removeBtn.addEventListener('click', () => {
@@ -496,13 +498,13 @@
                     tr.innerHTML = `
                         <td class="admin-col-product"><input type="text" class="admin-product-name" list="admin-outgoing-products-list" placeholder="{{ __('txn.select_product') }}" required><input type="hidden" class="admin-product-id"><div class="field-inline-error admin-product-error" style="display:block; margin-top:4px;"></div></td>
                         <td class="admin-col-unit"><input type="text" class="admin-unit"></td>
-                        <td class="admin-col-qty"><input type="number" min="1" class="admin-qty admin-qty-input" value="" placeholder="0" required></td>
+                        <td class="admin-col-qty"><input type="text" inputmode="numeric" class="admin-qty admin-qty-input js-thousand-input" value="" placeholder="0" required></td>
                         <td class="admin-col-weight"><input type="number" min="0" step="0.001" class="admin-weight admin-weight-input" value=""></td>
-                        <td class="admin-col-price"><input type="number" min="0" step="1" class="admin-unit-cost admin-price-input" value="" placeholder="0"></td>
+                        <td class="admin-col-price"><input type="text" inputmode="numeric" class="admin-unit-cost admin-price-input js-thousand-input" value="" placeholder="0"></td>
                         <td class="admin-col-tax">
                             <div class="dual-inline-inputs admin-tax-inputs">
                                 <input type="number" min="0" step="0.01" class="admin-tax-percent" value="" placeholder="%">
-                                <input type="number" min="0" step="1" class="admin-tax-amount" value="" placeholder="nilai">
+                                <input type="text" inputmode="numeric" class="admin-tax-amount js-thousand-input" value="" placeholder="nilai">
                                 <input type="hidden" class="admin-tax-input-mode" value="percent">
                             </div>
                         </td>
@@ -510,6 +512,7 @@
                         <td class="admin-col-action"><button type="button" class="btn danger-btn admin-remove-item admin-remove-btn">{{ __('txn.remove') }}</button></td>
                     `;
                     body.appendChild(tr);
+                    tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
                     bindRow(tr);
                     reindex();
                 };
@@ -527,7 +530,7 @@
                     }
                     const invalid = rows.some((row) => {
                         const productId = row.querySelector('.admin-product-id')?.value;
-                        const qty = Number(row.querySelector('.admin-qty')?.value || 0);
+                        const qty = window.PgposNumberFormat.parseInt(row.querySelector('.admin-qty')?.value || 0);
                         if (!productId) {
                             setProductFieldError(row, @js(__('txn.product_not_registered')));
                         } else {

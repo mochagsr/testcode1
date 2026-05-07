@@ -688,9 +688,9 @@
                     locationItemsByUid[uid] = rows.map((row) => ({
                         product_id: row.querySelector('.product-id')?.value || '',
                         product_name: row.querySelector('.product-name')?.value || '',
-                        quantity: row.querySelector('.product-qty')?.value || '',
+                        quantity: window.PgposNumberFormat.parseInt(row.querySelector('.product-qty')?.value || ''),
                         unit: row.querySelector('.product-unit')?.value || '',
-                        unit_price: row.querySelector('.product-price')?.value || '',
+                        unit_price: window.PgposNumberFormat.parseInt(row.querySelector('.product-price')?.value || ''),
                         notes: row.querySelector('.product-notes')?.value || '',
                     }));
                 });
@@ -764,15 +764,16 @@
                     </td>
                     <td>
                         <div class="quantity-with-unit">
-                            <input type="number" min="1" class="product-qty" value="${initial.quantity || ''}" placeholder="0" required>
+                            <input type="text" inputmode="numeric" class="product-qty js-thousand-input" value="${initial.quantity || ''}" placeholder="0" required>
                             <span class="qty-unit-label">${initial.unit || '-'}</span>
                             <input type="hidden" class="product-unit" value="${initial.unit || ''}">
                         </div>
                     </td>
-                    <td><input type="number" min="0" step="1" class="product-price" value="${initial.unit_price || ''}" style="max-width: 110px;"></td>
+                    <td><input type="text" inputmode="numeric" class="product-price js-thousand-input" value="${initial.unit_price || ''}" style="max-width: 110px;"></td>
                     <td><input type="text" class="product-notes" value="${initial.notes || ''}" style="max-width: 220px;"></td>
                     <td><button type="button" class="btn danger-btn remove-item">{{ __('txn.remove') }}</button></td>
                 `;
+                tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
 
                 const productNameInput = tr.querySelector('.product-name');
                 const productIdInput = tr.querySelector('.product-id');
@@ -787,6 +788,7 @@
                     updateSchoolItemUnit(tr, product);
                     if (!productPriceInput.value) {
                         productPriceInput.value = Math.round(Number(product.price_general || 0));
+                        window.PgposNumberFormat.formatInput(productPriceInput);
                     }
                 };
                 const onProductInput = debounce(async (event) => {

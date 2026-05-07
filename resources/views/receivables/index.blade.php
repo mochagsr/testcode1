@@ -1068,7 +1068,7 @@
                                 </div>
                                 <div>
                                     <label id="receivable-adjustment-amount-label">{{ __('receivable.method_writeoff') }}</label>
-                                    <input id="receivable-adjustment-amount" type="number" min="1" step="1">
+                                    <input id="receivable-adjustment-amount" type="text" inputmode="numeric" class="js-thousand-input">
                                 </div>
                             </div>
 
@@ -1079,7 +1079,7 @@
                                 </div>
                                 <div>
                                     <label>{{ __('receivable.discount_pay_amount') }}</label>
-                                    <input id="receivable-adjustment-pay-amount" type="number" min="0" step="1">
+                                    <input id="receivable-adjustment-pay-amount" type="text" inputmode="numeric" class="js-thousand-input">
                                 </div>
                             </div>
 
@@ -1174,7 +1174,7 @@
             };
 
             const clamp = (num, min, max) => Math.min(max, Math.max(min, num));
-            const toInt = (value) => Math.round(Number(value || 0));
+            const toInt = (value) => Math.round(window.PgposNumberFormat.parseInt(value || 0));
 
             const updateDiscountFromPercent = () => {
                 const percent = clamp(Number(discountPercentInput.value || 0), 0, 100);
@@ -1183,6 +1183,8 @@
                 discountPercentInput.value = Number(percent.toFixed(2)).toString();
                 amountInput.value = String(discountAmount);
                 payAmountInput.value = String(payAmount);
+                window.PgposNumberFormat.formatInput(amountInput);
+                window.PgposNumberFormat.formatInput(payAmountInput);
             };
 
             const updateDiscountFromPay = () => {
@@ -1192,6 +1194,8 @@
                 payAmountInput.value = String(payAmount);
                 amountInput.value = String(discountAmount);
                 discountPercentInput.value = Number(percent.toFixed(2)).toString();
+                window.PgposNumberFormat.formatInput(amountInput);
+                window.PgposNumberFormat.formatInput(payAmountInput);
             };
 
             const updateDiscountFromAmount = () => {
@@ -1201,6 +1205,8 @@
                 amountInput.value = String(discountAmount);
                 payAmountInput.value = String(payAmount);
                 discountPercentInput.value = Number(percent.toFixed(2)).toString();
+                window.PgposNumberFormat.formatInput(amountInput);
+                window.PgposNumberFormat.formatInput(payAmountInput);
             };
 
             const openModal = (nextMode) => {
@@ -1212,8 +1218,6 @@
                     titleEl.textContent = @json(__('receivable.method_discount'));
                     amountLabel.textContent = @json(__('receivable.discount_amount'));
                     discountWrap.style.display = 'grid';
-                    amountInput.min = '0';
-                    amountInput.max = String(totalOutstanding);
                     discountPercentInput.value = '0';
                     payAmountInput.value = String(totalOutstanding);
                     updateDiscountFromPercent();
@@ -1221,9 +1225,8 @@
                     titleEl.textContent = @json(__('receivable.method_writeoff'));
                     amountLabel.textContent = @json(__('receivable.method_writeoff'));
                     discountWrap.style.display = 'none';
-                    amountInput.min = '1';
-                    amountInput.max = String(totalOutstanding);
                     amountInput.value = String(totalOutstanding);
+                    window.PgposNumberFormat.formatInput(amountInput);
                 }
 
                 modal.style.display = 'block';

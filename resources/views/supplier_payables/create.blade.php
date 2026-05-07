@@ -42,7 +42,7 @@
                 </div>
                 <div class="col-4">
                     <label>{{ __('txn.amount') }}</label>
-                    <input type="number" min="1" step="1" name="amount" value="{{ old('amount') }}" required>
+                    <input type="text" inputmode="numeric" class="js-thousand-input" name="amount" value="{{ old('amount') }}" placeholder="0" required>
                 </div>
                 <div class="col-4">
                     <label>{{ __('supplier_payable.supplier_signature') }}</label>

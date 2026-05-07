@@ -248,11 +248,11 @@
                 </div>
                 <div class="col-6">
                     <label>{{ __('supplier_stock.current_stock') }}</label>
-                    <input type="number" id="stock-edit-current-stock" value="" disabled>
+                    <input type="text" class="js-thousand-input" id="stock-edit-current-stock" value="" disabled>
                 </div>
                 <div class="col-6">
                     <label>{{ __('supplier_stock.new_stock') }}</label>
-                    <input type="number" min="0" name="stock" id="stock-edit-new-stock" value="" required>
+                    <input type="text" inputmode="numeric" class="js-thousand-input" name="stock" id="stock-edit-new-stock" value="" required>
                 </div>
             </div>
             <div class="muted" id="stock-edit-status" style="margin-top:6px;">{{ __('supplier_stock.auto_save_hint') }}</div>
@@ -314,6 +314,8 @@
                 itemNameInput.value = String(button.getAttribute('data-product-name') || '-');
                 currentStockInput.value = String(button.getAttribute('data-current-stock') || '0');
                 newStockInput.value = String(button.getAttribute('data-current-stock') || '0');
+                window.PgposNumberFormat.formatInput(currentStockInput);
+                window.PgposNumberFormat.formatInput(newStockInput);
                 originalStock = Number(button.getAttribute('data-current-stock') || '0');
                 statusText.textContent = @json(__('supplier_stock.auto_save_hint'));
                 modal.style.display = 'block';
@@ -329,8 +331,8 @@
                 }
             };
             const hasPendingStockChange = () => {
-                const current = Number(currentStockInput.value || '0');
-                const next = Number(newStockInput.value || '0');
+                const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
+                const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
                 return !Number.isNaN(next) && next >= 0 && current !== next;
             };
             const requestCloseModal = () => {
@@ -361,14 +363,15 @@
                 });
             };
             const triggerAutoSave = () => {
-                const current = Number(currentStockInput.value || '0');
-                const next = Number(newStockInput.value || '0');
+                const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
+                const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
                 if (Number.isNaN(next) || next < 0) return;
                 if (current === next) return;
                 if (isSubmitting) return;
                 isSubmitting = true;
                 statusText.textContent = @json(__('supplier_stock.saving'));
                 const payload = new FormData(form);
+                payload.set('stock', String(next));
                 fetch(form.action, {
                     method: 'POST',
                     body: payload,
@@ -394,6 +397,9 @@
                         }
                         const savedStock = Number(data.stock ?? next);
                         currentStockInput.value = String(savedStock);
+                        newStockInput.value = String(savedStock);
+                        window.PgposNumberFormat.formatInput(currentStockInput);
+                        window.PgposNumberFormat.formatInput(newStockInput);
                         originalStock = savedStock;
                         setStockText(rowKeyInput.value, savedStock);
                         const serverMessage = String(data.message || @json(__('supplier_stock.saved')));
@@ -408,6 +414,8 @@
                         setStockText(rowKeyInput.value, originalStock);
                         currentStockInput.value = String(originalStock);
                         newStockInput.value = String(originalStock);
+                        window.PgposNumberFormat.formatInput(currentStockInput);
+                        window.PgposNumberFormat.formatInput(newStockInput);
                         statusText.textContent = error.message || @json(__('supplier_stock.save_failed'));
                     })
                     .finally(() => {

@@ -58,19 +58,22 @@ class TransactionQuantityUnitLabelTest extends TestCase
         $this->actingAs($admin)
             ->get(route('order-notes.create'))
             ->assertOk()
-            ->assertSee('value="" placeholder="0" class="qty-input"', false)
+            ->assertSee('class="qty-input js-thousand-input"', false)
+            ->assertSee('value="" placeholder="0"', false)
             ->assertDontSee('value="1" class="qty-input"', false);
 
         $this->actingAs($admin)
             ->get(route('delivery-notes.create'))
             ->assertOk()
-            ->assertSee('placeholder="0" class="qty-input"', false)
+            ->assertSee('class="qty-input js-thousand-input"', false)
+            ->assertSee('placeholder="0"', false)
             ->assertDontSee('prefill?.quantity || 1', false);
 
         $this->actingAs($admin)
             ->get(route('school-bulk-transactions.create'))
             ->assertOk()
-            ->assertSee('class="product-qty" value="${initial.quantity || \'\'}" placeholder="0"', false)
+            ->assertSee('class="product-qty js-thousand-input"', false)
+            ->assertSee('value="${initial.quantity || \'\'}" placeholder="0"', false)
             ->assertDontSee('initial.quantity || 1', false);
 
         $this->actingAs($admin)

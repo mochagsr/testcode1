@@ -371,11 +371,11 @@
                 </div>
                 <div class="col-6">
                     <label>{{ __('ui.current_stock') }}</label>
-                    <input type="number" id="product-stock-edit-current-stock" value="" disabled>
+                    <input type="text" class="js-thousand-input" id="product-stock-edit-current-stock" value="" disabled>
                 </div>
                 <div class="col-6">
                     <label>{{ __('ui.new_stock') }}</label>
-                    <input type="number" min="0" name="stock" id="product-stock-edit-new-stock" value="" required>
+                    <input type="text" inputmode="numeric" class="js-thousand-input" name="stock" id="product-stock-edit-new-stock" value="" required>
                 </div>
             </div>
             <div class="muted" id="product-stock-edit-status" style="margin-top:6px;">{{ __('ui.auto_save_hint') }}</div>
@@ -456,6 +456,8 @@
                 nameInput.value = String(button.getAttribute('data-product-name') || '-');
                 currentStockInput.value = String(originalStock);
                 newStockInput.value = String(originalStock);
+                window.PgposNumberFormat.formatInput(currentStockInput);
+                window.PgposNumberFormat.formatInput(newStockInput);
                 statusText.textContent = @json(__('ui.auto_save_hint'));
                 modal.style.display = 'block';
                 overlay.style.display = 'block';
@@ -471,8 +473,8 @@
                 }
             };
             const hasPendingStockChange = () => {
-                const current = Number(currentStockInput.value || '0');
-                const next = Number(newStockInput.value || '0');
+                const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
+                const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
                 return !Number.isNaN(next) && next >= 0 && current !== next;
             };
             const requestCloseModal = () => {
@@ -491,8 +493,8 @@
             };
 
             const triggerAutoSave = () => {
-                const current = Number(currentStockInput.value || '0');
-                const next = Number(newStockInput.value || '0');
+                const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
+                const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
                 if (Number.isNaN(next) || next < 0) return;
                 if (current === next) return;
                 if (isSubmitting) return;
@@ -501,6 +503,7 @@
                 isSubmitting = true;
                 statusText.textContent = @json(__('ui.saving'));
                 const payload = new FormData(form);
+                payload.set('stock', String(next));
                 fetch(form.action, {
                     method: 'POST',
                     body: payload,
@@ -529,6 +532,8 @@
                         originalStock = savedStock;
                         currentStockInput.value = String(savedStock);
                         newStockInput.value = String(savedStock);
+                        window.PgposNumberFormat.formatInput(currentStockInput);
+                        window.PgposNumberFormat.formatInput(newStockInput);
                         setRowStock(selectedProductId, savedStock);
                         const serverMessage = String(data.message || @json(__('ui.saved')));
                         const serverType = String(data.message_type || 'edit');
@@ -542,6 +547,8 @@
                         setRowStock(selectedProductId, originalStock);
                         currentStockInput.value = String(originalStock);
                         newStockInput.value = String(originalStock);
+                        window.PgposNumberFormat.formatInput(currentStockInput);
+                        window.PgposNumberFormat.formatInput(newStockInput);
                         statusText.textContent = error.message || @json(__('ui.save_failed'));
                     })
                     .finally(() => {

@@ -47,7 +47,7 @@
                 <div class="row">
                     <div class="col-4">
                         <label>{{ __('ui.initial_receivable') }}</label>
-                        <input type="number" min="0" step="1" name="outstanding_receivable" value="{{ old('outstanding_receivable', $customer?->outstanding_receivable ?? 0) }}">
+                        <input type="text" inputmode="numeric" class="js-thousand-input" name="outstanding_receivable" value="{{ old('outstanding_receivable', $customer?->outstanding_receivable ?? 0) }}">
                     </div>
                     <div class="col-4">
                         <label>{{ __('ui.id_card_photo') }}</label>

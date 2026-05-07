@@ -767,6 +767,7 @@
                 const productId = row.querySelector('.product-id')?.value;
                 const product = getProductById(productId);
                 priceInput.value = resolveProductPrice(product);
+                window.PgposNumberFormat.formatInput(priceInput);
             });
             recalc();
         }
@@ -774,16 +775,16 @@
         function recalc() {
             let total = 0;
             document.querySelectorAll('#items-table tbody tr').forEach((row) => {
-                const qty = parseFloat(row.querySelector('.qty').value || 0);
-                const price = parseFloat(row.querySelector('.price').value || 0);
-                const discountPercent = Math.max(0, Math.min(100, parseFloat(row.querySelector('.discount').value || 0)));
+                const qty = window.PgposNumberFormat.parseInt(row.querySelector('.qty').value || 0);
+                const price = window.PgposNumberFormat.parseInt(row.querySelector('.price').value || 0);
+                const discountPercent = Math.max(0, Math.min(100, window.PgposNumberFormat.parseInt(row.querySelector('.discount').value || 0)));
                 const gross = qty * price;
                 const discountAmount = gross * (discountPercent / 100);
                 const line = Math.max(0, gross - discountAmount);
-                row.querySelector('.line-total').textContent = line.toFixed(0);
+                row.querySelector('.line-total').textContent = Math.round(line).toLocaleString('id-ID', { maximumFractionDigits: 0 });
                 total += line;
             });
-            grandTotal.textContent = total.toFixed(0);
+            grandTotal.textContent = Math.round(total).toLocaleString('id-ID', { maximumFractionDigits: 0 });
         }
 
         function updateRowMeta(row, product) {
@@ -794,6 +795,7 @@
             }
             const priceInput = row.querySelector('.price');
             priceInput.value = resolveProductPrice(product);
+            window.PgposNumberFormat.formatInput(priceInput);
             priceInput.dataset.manual = '0';
             recalc();
         }
@@ -817,11 +819,11 @@
                 <td class="stock">-</td>
                 <td>
                     <div class="quantity-with-unit">
-                        <input class="qty" type="number" min="1" name="items[${index}][quantity]" value="${initialQty}" placeholder="0" required>
+                        <input class="qty js-thousand-input" type="text" inputmode="numeric" name="items[${index}][quantity]" value="${initialQty}" placeholder="0" required>
                         <span class="qty-unit-label">-</span>
                     </div>
                 </td>
-                <td><input class="price" type="number" min="0" step="1" name="items[${index}][unit_price]" value="0" required style="max-width: 88px;"></td>
+                <td><input class="price js-thousand-input" type="text" inputmode="numeric" name="items[${index}][unit_price]" value="0" required style="max-width: 88px;"></td>
                 <td>
                     <div style="display:flex; align-items:center; gap:4px;">
                         <input class="discount" type="number" min="0" max="100" step="1" name="items[${index}][discount]" value="0" style="max-width: 54px;">
@@ -832,6 +834,7 @@
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
             tbody.appendChild(tr);
+            tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
 
             const onProductInput = debounce(async (event) => {
                 setProductFieldError(tr, '');

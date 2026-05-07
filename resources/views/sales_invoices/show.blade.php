@@ -307,8 +307,8 @@
                                             <input type="text" class="admin-item-product-search" list="admin-invoice-products-list" name="items[{{ $index }}][product_name]" value="{{ $itemLabel }}" required style="max-width: 280px;">
                                             <input type="hidden" class="admin-item-product" name="items[{{ $index }}][product_id]" value="{{ (int) $item->product_id }}">
                                         </td>
-                                        <td><input type="number" min="1" class="admin-item-qty" name="items[{{ $index }}][quantity]" value="{{ (int) round($item->quantity) }}" style="max-width: 90px;" required></td>
-                                        <td><input type="number" min="0" step="1" class="admin-item-price" name="items[{{ $index }}][unit_price]" value="{{ (int) round($item->unit_price) }}" style="max-width: 120px;" required></td>
+                                        <td><input type="text" inputmode="numeric" class="admin-item-qty js-thousand-input" name="items[{{ $index }}][quantity]" value="{{ (int) round($item->quantity) }}" style="max-width: 90px;" required></td>
+                                        <td><input type="text" inputmode="numeric" class="admin-item-price js-thousand-input" name="items[{{ $index }}][unit_price]" value="{{ (int) round($item->unit_price) }}" style="max-width: 120px;" required></td>
                                         <td><input type="number" min="0" max="100" step="1" class="admin-item-discount" name="items[{{ $index }}][discount]" value="{{ (int) round($discountPercent) }}" style="max-width: 85px;"></td>
                                         <td>Rp <span class="admin-item-line-total">{{ number_format((int) round($item->line_total), 0, ',', '.') }}</span></td>
                                         <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
@@ -538,8 +538,8 @@
                 }
 
                 function recalcRow(row) {
-                    const qty = Math.max(0, Number(row.querySelector('.admin-item-qty')?.value || 0));
-                    const price = Math.max(0, Number(row.querySelector('.admin-item-price')?.value || 0));
+                    const qty = Math.max(0, window.PgposNumberFormat.parseInt(row.querySelector('.admin-item-qty')?.value || 0));
+                    const price = Math.max(0, window.PgposNumberFormat.parseInt(row.querySelector('.admin-item-price')?.value || 0));
                     const discount = Math.max(0, Math.min(100, Number(row.querySelector('.admin-item-discount')?.value || 0)));
                     const gross = qty * price;
                     const discountAmount = gross * (discount / 100);
@@ -600,8 +600,9 @@
                         searchInput.value = productLabel(selected);
                         setProductFieldError(row, '');
                         const priceInput = row.querySelector('.admin-item-price');
-                        if (selected && priceInput && Number(priceInput.value || 0) <= 0) {
+                        if (selected && priceInput && window.PgposNumberFormat.parseInt(priceInput.value || 0) <= 0) {
                             priceInput.value = selected.price_general || 0;
+                            window.PgposNumberFormat.formatInput(priceInput);
                         }
                         recalcRow(row);
                     });
@@ -624,13 +625,14 @@
                             <input type="text" class="admin-item-product-search" list="admin-invoice-products-list" name="items[${index}][product_name]" value="${defaultProduct ? escapeAttribute(productLabel(defaultProduct)) : ''}" required style="max-width: 280px;">
                             <input type="hidden" class="admin-item-product" name="items[${index}][product_id]" value="${defaultProduct ? defaultProduct.id : ''}">
                         </td>
-                        <td><input type="number" min="1" class="admin-item-qty" name="items[${index}][quantity]" value="" placeholder="0" style="max-width: 90px;" required></td>
-                        <td><input type="number" min="0" step="1" class="admin-item-price" name="items[${index}][unit_price]" value="${defaultProduct ? (defaultProduct.price_general || 0) : 0}" style="max-width: 120px;" required></td>
+                        <td><input type="text" inputmode="numeric" class="admin-item-qty js-thousand-input" name="items[${index}][quantity]" value="" placeholder="0" style="max-width: 90px;" required></td>
+                        <td><input type="text" inputmode="numeric" class="admin-item-price js-thousand-input" name="items[${index}][unit_price]" value="${defaultProduct ? (defaultProduct.price_general || 0) : 0}" style="max-width: 120px;" required></td>
                         <td><input type="number" min="0" max="100" step="1" class="admin-item-discount" name="items[${index}][discount]" value="0" style="max-width: 85px;"></td>
                         <td>Rp <span class="admin-item-line-total">0</span></td>
                         <td><button type="button" class="btn danger-btn admin-remove-item">{{ __('txn.remove') }}</button></td>
                     `;
                     tbody.appendChild(tr);
+                    tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
                     bindRow(tr);
                     reindexRows();
                 }
@@ -651,8 +653,8 @@
                     }
                     const invalid = rows.some((row) => {
                         const productId = row.querySelector('.admin-item-product')?.value;
-                        const qty = Number(row.querySelector('.admin-item-qty')?.value || 0);
-                        const price = Number(row.querySelector('.admin-item-price')?.value || 0);
+                        const qty = window.PgposNumberFormat.parseInt(row.querySelector('.admin-item-qty')?.value || 0);
+                        const price = window.PgposNumberFormat.parseInt(row.querySelector('.admin-item-price')?.value || 0);
                         if (!productId) {
                             setProductFieldError(row, @js(__('txn.product_not_registered')));
                         } else {

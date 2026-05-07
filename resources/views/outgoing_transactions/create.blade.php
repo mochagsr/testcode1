@@ -598,9 +598,9 @@
                 let total = 0;
                 let totalWeight = 0;
                 tableBody.querySelectorAll('tr').forEach((row) => {
-                    const qty = Math.max(0, Number(row.querySelector('.qty')?.value || 0));
+                    const qty = Math.max(0, window.PgposNumberFormat.parseInt(row.querySelector('.qty')?.value || 0));
                     const weight = Math.max(0, Number(row.querySelector('.weight')?.value || 0));
-                    const unitCost = Math.max(0, Number(row.querySelector('.unit-cost')?.value || 0));
+                    const unitCost = Math.max(0, window.PgposNumberFormat.parseInt(row.querySelector('.unit-cost')?.value || 0));
                     const taxPercentField = row.querySelector('.tax-percent');
                     const taxAmountField = row.querySelector('.tax-amount');
                     const taxModeField = row.querySelector('.tax-input-mode');
@@ -611,7 +611,7 @@
                     const lineSubtotal = qty * unitCost;
                     let lineTax = 0;
                     if (taxMode === 'amount') {
-                        lineTax = Math.max(0, Math.round(Number(taxAmountRaw || 0)));
+                        lineTax = Math.max(0, Math.round(window.PgposNumberFormat.parseInt(taxAmountRaw || 0)));
                         if (taxPercentField) {
                             taxPercentField.value = lineSubtotal > 0 ? ((lineTax / lineSubtotal) * 100).toFixed(2) : '';
                         }
@@ -619,6 +619,7 @@
                         lineTax = Math.round(lineSubtotal * (taxPercent / 100));
                         if (taxAmountField) {
                             taxAmountField.value = lineTax > 0 ? String(lineTax) : '';
+                            window.PgposNumberFormat.formatInput(taxAmountField);
                         }
                     }
                     const lineTotal = lineSubtotal + lineTax;
@@ -861,18 +862,18 @@
                         <select class="unit outgoing-unit-select" name="items[${index}][unit]">${buildUnitOptions(unitValue)}</select>
                     </td>
                     <td class="outgoing-col-qty">
-                        <input type="number" min="1" class="qty outgoing-qty-input" name="items[${index}][quantity]" value="${qtyValue}" placeholder="0" required>
+                        <input type="text" inputmode="numeric" class="qty outgoing-qty-input js-thousand-input" name="items[${index}][quantity]" value="${qtyValue}" placeholder="0" required>
                     </td>
                     <td class="outgoing-col-weight">
                         <input type="number" min="0" step="0.001" class="weight outgoing-weight-input" name="items[${index}][weight]" value="${escapeAttribute(weightValue)}">
                     </td>
                     <td class="outgoing-col-price">
-                        <input type="number" min="0" step="1" class="unit-cost outgoing-price-input" name="items[${index}][unit_cost]" value="${unitCostValue}" placeholder="0">
+                        <input type="text" inputmode="numeric" class="unit-cost outgoing-price-input js-thousand-input" name="items[${index}][unit_cost]" value="${unitCostValue}" placeholder="0">
                     </td>
                     <td class="outgoing-col-tax">
                         <div class="dual-inline-inputs outgoing-tax-inputs">
                             <input type="number" min="0" step="0.01" class="tax-percent" name="items[${index}][tax_percent]" value="${taxPercentValue}" placeholder="%">
-                            <input type="number" min="0" step="1" class="tax-amount" name="items[${index}][tax_amount]" value="${taxAmountValue}" placeholder="nilai">
+                            <input type="text" inputmode="numeric" class="tax-amount js-thousand-input" name="items[${index}][tax_amount]" value="${taxAmountValue}" placeholder="nilai">
                             <input type="hidden" class="tax-input-mode" name="items[${index}][tax_input_mode]" value="${taxInputMode}">
                         </div>
                     </td>
@@ -881,6 +882,7 @@
                     <td class="outgoing-col-action"><button type="button" class="btn danger-btn remove outgoing-remove-btn">{{ __('txn.remove') }}</button></td>
                 `;
                 tableBody.appendChild(tr);
+                tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
 
                 const productSearch = tr.querySelector('.product-search');
                 const productId = tr.querySelector('.product-id');
@@ -912,8 +914,9 @@
                         categoryField.value = String(product.item_category_id);
                     }
                     unitField.value = product.unit || unitField.value;
-                    if (Number(unitCostField.value || 0) <= 0) {
+                    if (window.PgposNumberFormat.parseInt(unitCostField.value || 0) <= 0) {
                         unitCostField.value = Number(product.price_general || 0);
+                        window.PgposNumberFormat.formatInput(unitCostField);
                     }
                     recalc();
                 });
@@ -943,8 +946,9 @@
                         categoryField.value = String(product.item_category_id);
                     }
                     unitField.value = product.unit || unitField.value;
-                    if (Number(unitCostField.value || 0) <= 0) {
+                    if (window.PgposNumberFormat.parseInt(unitCostField.value || 0) <= 0) {
                         unitCostField.value = Number(product.price_general || 0);
+                        window.PgposNumberFormat.formatInput(unitCostField);
                     }
                     recalc();
                 });
@@ -971,8 +975,9 @@
                         categoryField.value = String(product.item_category_id);
                     }
                     unitField.value = product.unit || unitField.value;
-                    if (Number(unitCostField.value || 0) <= 0) {
+                    if (window.PgposNumberFormat.parseInt(unitCostField.value || 0) <= 0) {
                         unitCostField.value = Number(product.price_general || 0);
+                        window.PgposNumberFormat.formatInput(unitCostField);
                     }
                     recalc();
                 });
