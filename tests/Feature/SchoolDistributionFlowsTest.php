@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\CustomerShipLocation;
+use App\Models\DeliveryNote;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\SalesInvoice;
@@ -259,7 +260,7 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertStringStartsWith('PK', $excelResponse->streamedContent());
     }
 
-    public function test_school_bulk_generate_invoices_creates_one_invoice_per_school_and_skips_duplicates(): void
+    public function test_school_bulk_generates_delivery_notes_before_invoice_and_skips_duplicates(): void
     {
         $user = User::factory()->create(['role' => 'user']);
         $customer = Customer::query()->create([
@@ -356,61 +357,47 @@ class SchoolDistributionFlowsTest extends TestCase
             route('school-bulk-transactions.generate-invoices', $transaction),
             [
                 '_idempotency_key' => 'bulk-generate-first',
-                'invoice_date' => '2026-02-20',
-                'due_date' => '2026-03-01',
+                'note_date' => '2026-02-20',
             ]
         );
         $firstResponse->assertRedirect(route('school-bulk-transactions.show', $transaction));
 
-        $this->assertDatabaseCount('sales_invoices', 2);
-        $generatedInvoices = SalesInvoice::query()
+        $this->assertDatabaseCount('delivery_notes', 2);
+        $generatedNotes = DeliveryNote::query()
             ->where('school_bulk_transaction_id', $transaction->id)
             ->orderBy('id')
             ->get();
-        $this->assertCount(2, $generatedInvoices);
-        $this->assertSame(2, $generatedInvoices->pluck('school_bulk_location_id')->filter()->unique()->count());
-        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => (int) ($invoice->customer_ship_location_id ?? 0) > 0));
-        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_name ?? '')) !== ''));
-        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => trim((string) ($invoice->ship_to_city ?? '')) !== ''));
+        $this->assertCount(2, $generatedNotes);
+        $this->assertSame(2, $generatedNotes->pluck('school_bulk_location_id')->filter()->unique()->count());
+        $this->assertTrue($generatedNotes->every(fn (DeliveryNote $note): bool => (int) ($note->customer_ship_location_id ?? 0) > 0));
+        $this->assertTrue($generatedNotes->every(fn (DeliveryNote $note): bool => trim((string) ($note->recipient_name ?? '')) !== ''));
+        $this->assertTrue($generatedNotes->every(fn (DeliveryNote $note): bool => trim((string) ($note->city ?? '')) !== ''));
         $this->assertEqualsCanonicalizing(
             ['SDN A', 'SDN B'],
-            $generatedInvoices->pluck('ship_to_name')->map(fn ($name): string => trim((string) $name))->all()
-        );
-        $this->assertEqualsCanonicalizing(
-            [75000, 105000],
-            $generatedInvoices->map(fn (SalesInvoice $invoice): int => (int) round((float) $invoice->total))->all()
-        );
-        $this->assertTrue($generatedInvoices->every(fn (SalesInvoice $invoice): bool => (string) $invoice->payment_status === 'unpaid'));
-        $this->assertEqualsCanonicalizing(
-            [75000, 105000],
-            $generatedInvoices->map(fn (SalesInvoice $invoice): int => (int) round((float) $invoice->balance))->all()
+            $generatedNotes->pluck('recipient_name')->map(fn ($name): string => trim((string) $name))->all()
         );
 
         $product->refresh();
         $this->assertSame(88, (int) $product->stock);
-        $this->assertDatabaseCount('sales_invoice_items', 2);
+        $this->assertDatabaseCount('delivery_note_items', 2);
+        $this->assertDatabaseCount('sales_invoices', 0);
+        $this->assertDatabaseCount('sales_invoice_items', 0);
         $this->assertDatabaseCount('stock_mutations', 2);
-        $this->assertDatabaseCount('receivable_ledgers', 2);
-        $this->assertDatabaseHas('receivable_ledgers', [
-            'customer_id' => $customer->id,
-            'debit' => 105000,
-            'credit' => 0,
+        $this->assertDatabaseHas('stock_mutations', [
+            'reference_type' => DeliveryNote::class,
         ]);
-        $this->assertDatabaseCount('journal_entries', 2);
-        $this->assertDatabaseHas('journal_entries', [
-            'entry_type' => 'sales_invoice_create',
-            'reference_type' => SalesInvoice::class,
-        ]);
+        $this->assertDatabaseCount('receivable_ledgers', 0);
+        $this->assertDatabaseCount('journal_entries', 0);
 
         $secondResponse = $this->actingAs($user)->post(
             route('school-bulk-transactions.generate-invoices', $transaction),
             [
                 '_idempotency_key' => 'bulk-generate-second',
-                'invoice_date' => '2026-02-20',
+                'note_date' => '2026-02-20',
             ]
         );
         $secondResponse->assertRedirect(route('school-bulk-transactions.show', $transaction));
-        $this->assertDatabaseCount('sales_invoices', 2);
+        $this->assertDatabaseCount('delivery_notes', 2);
     }
 
     public function test_customer_bill_print_includes_school_breakdown_section(): void

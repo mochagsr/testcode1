@@ -184,12 +184,11 @@ class ActionSmokeTest extends TestCase
         $this->actingAs($admin)
             ->withHeader('X-Idempotency-Key', 'bulk-generate-smoke')
             ->post(route('school-bulk-transactions.generate-invoices', $bulk), [
-                'invoice_date' => '2026-04-05',
-                'due_date' => '2026-04-20',
+                'note_date' => '2026-04-05',
             ])
             ->assertRedirect();
 
-        $this->assertDatabaseCount('sales_invoices', 2);
+        $this->assertDatabaseCount('delivery_notes', 1);
     }
 
     /**

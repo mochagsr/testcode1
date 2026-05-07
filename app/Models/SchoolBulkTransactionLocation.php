@@ -62,6 +62,14 @@ class SchoolBulkTransactionLocation extends Model
     }
 
     /**
+     * @return HasMany<DeliveryNote, $this>
+     */
+    public function generatedDeliveryNotes(): HasMany
+    {
+        return $this->hasMany(DeliveryNote::class, 'school_bulk_location_id');
+    }
+
+    /**
      * @return HasMany<SchoolBulkTransactionItem, $this>
      */
     public function items(): HasMany

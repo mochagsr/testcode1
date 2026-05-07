@@ -260,6 +260,7 @@ return [
     'audit_action_supplier_stock_manual_adjust' => 'Penyesuaian manual stok supplier',
     'audit_action_school_bulk_create' => 'Transaksi sebar sekolah dibuat',
     'audit_action_school_bulk_generate_invoices' => 'Generate faktur dari transaksi sebar sekolah',
+    'audit_action_school_bulk_generate_delivery_notes' => 'Generate surat jalan dari transaksi sebar sekolah',
     'audit_action_master_category_import' => 'Import kategori barang',
     'audit_action_master_customer_ship_location_import' => 'Import lokasi kirim customer',
     'audit_action_approval_request_create' => 'Ajukan koreksi transaksi',

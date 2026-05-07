@@ -6,17 +6,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\CustomerShipLocation;
+use App\Models\DeliveryNote;
+use App\Models\DeliveryNoteItem;
 use App\Models\Product;
-use App\Models\SalesInvoice;
-use App\Models\SalesInvoiceItem;
 use App\Models\SchoolBulkTransaction;
 use App\Models\SchoolBulkTransactionItem;
 use App\Models\SchoolBulkTransactionLocation;
 use App\Models\StockMutation;
-use App\Services\AccountingService;
 use App\Services\AuditLogService;
-use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
+use App\Support\PrintPaperSize;
 use App\Support\SemesterBookService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -37,9 +36,7 @@ class SchoolBulkTransactionPageController extends Controller
 {
     public function __construct(
         private readonly SemesterBookService $semesterBookService,
-        private readonly AuditLogService $auditLogService,
-        private readonly ReceivableLedgerService $receivableLedgerService,
-        private readonly AccountingService $accountingService
+        private readonly AuditLogService $auditLogService
     ) {}
 
     public function index(Request $request): View
@@ -300,6 +297,8 @@ class SchoolBulkTransactionPageController extends Controller
             'createdByUser:id,name',
             'locations',
             'items',
+            'generatedDeliveryNotes:id,note_number,note_date,school_bulk_location_id,is_canceled',
+            'generatedDeliveryNotes.schoolBulkLocation:id,school_name',
             'generatedInvoices:id,invoice_number,invoice_date,school_bulk_location_id,balance,payment_status,is_canceled',
             'generatedInvoices.schoolBulkLocation:id,school_name',
         ]);
@@ -312,8 +311,7 @@ class SchoolBulkTransactionPageController extends Controller
     public function generateInvoices(Request $request, SchoolBulkTransaction $schoolBulkTransaction): RedirectResponse
     {
         $data = $request->validate([
-            'invoice_date' => FluentRule::date()->nullable(),
-            'due_date' => FluentRule::date()->nullable(),
+            'note_date' => FluentRule::date()->nullable(),
         ]);
 
         $result = DB::transaction(function () use ($schoolBulkTransaction, $data): array {
@@ -327,31 +325,22 @@ class SchoolBulkTransactionPageController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $invoiceDate = isset($data['invoice_date']) && $data['invoice_date'] !== ''
-                ? Carbon::parse((string) $data['invoice_date'])
+            $noteDate = isset($data['note_date']) && $data['note_date'] !== ''
+                ? Carbon::parse((string) $data['note_date'])
                 : Carbon::parse((string) $transaction->transaction_date);
-            $dueDate = isset($data['due_date']) && $data['due_date'] !== ''
-                ? Carbon::parse((string) $data['due_date'])
-                : null;
-            if ($dueDate !== null && $dueDate->lt($invoiceDate)) {
-                throw ValidationException::withMessages([
-                    'due_date' => __('txn.due_date_after_invoice'),
-                ]);
-            }
 
             if ($transaction->locations->isEmpty()) {
                 throw ValidationException::withMessages([
-                    'invoice_date' => __('school_bulk.no_locations_to_generate'),
+                    'note_date' => __('school_bulk.no_locations_to_generate'),
                 ]);
             }
             if ($transaction->items->isEmpty()) {
                 throw ValidationException::withMessages([
-                    'invoice_date' => __('school_bulk.no_items_to_generate'),
+                    'note_date' => __('school_bulk.no_items_to_generate'),
                 ]);
             }
 
-            $existingLocationIds = SalesInvoice::query()
-                ->withTrashed()
+            $existingLocationIds = DeliveryNote::query()
                 ->where('school_bulk_transaction_id', $transaction->id)
                 ->whereNotNull('school_bulk_location_id')
                 ->pluck('school_bulk_location_id')
@@ -398,12 +387,12 @@ class SchoolBulkTransactionPageController extends Controller
                     ->values();
                 if ($locationItems->isEmpty()) {
                     throw ValidationException::withMessages([
-                        'invoice_date' => __('school_bulk.no_items_to_generate'),
+                        'note_date' => __('school_bulk.no_items_to_generate'),
                     ]);
                 }
                 if ($locationItems->contains(fn (SchoolBulkTransactionItem $item): bool => (int) ($item->product_id ?? 0) <= 0)) {
                     throw ValidationException::withMessages([
-                        'invoice_date' => __('school_bulk.bulk_items_require_master_products'),
+                        'note_date' => __('school_bulk.bulk_items_require_master_products'),
                     ]);
                 }
 
@@ -426,7 +415,7 @@ class SchoolBulkTransactionPageController extends Controller
                 ->keyBy('id');
             if ($products->count() !== $productIds->count()) {
                 throw ValidationException::withMessages([
-                    'invoice_date' => __('txn.product_not_found'),
+                    'note_date' => __('txn.product_not_found'),
                 ]);
             }
             foreach ($requiredByProduct as $productId => $requiredQty) {
@@ -436,21 +425,31 @@ class SchoolBulkTransactionPageController extends Controller
                 }
                 if ((int) $product->stock < (int) $requiredQty) {
                     throw ValidationException::withMessages([
-                        'invoice_date' => __('txn.insufficient_stock_for', ['product' => $product->name]),
+                        'note_date' => __('txn.insufficient_stock_for', ['product' => $product->name]),
                     ]);
                 }
             }
 
-            $semesterPeriod = $this->semesterBookService->normalizeSemester((string) ($transaction->semester_period ?? ''))
-                ?? $this->semesterBookService->semesterFromDate($invoiceDate->toDateString())
-                ?? $this->semesterBookService->currentSemester();
-
             $createdNumbers = [];
             foreach ($targetLocations as $location) {
-                $invoiceNumber = $this->generateInvoiceNumber($invoiceDate->toDateString());
-                $subtotal = 0;
-                $computedRows = [];
+                $noteNumber = $this->generateDeliveryNoteNumber($noteDate->toDateString());
                 $locationItems = $resolveItemsForLocation($location);
+
+                $deliveryNote = DeliveryNote::create([
+                    'note_number' => $noteNumber,
+                    'note_date' => $noteDate->toDateString(),
+                    'customer_id' => (int) $transaction->customer_id,
+                    'customer_ship_location_id' => $location->customer_ship_location_id,
+                    'school_bulk_transaction_id' => (int) $transaction->id,
+                    'school_bulk_location_id' => (int) $location->id,
+                    'transaction_type' => 'product',
+                    'recipient_name' => (string) ($location->school_name ?: ($location->recipient_name ?: '')),
+                    'recipient_phone' => $location->recipient_phone ?: null,
+                    'city' => $location->city ?: null,
+                    'address' => $location->address ?: null,
+                    'notes' => __('school_bulk.generated_from_bulk', ['number' => $transaction->transaction_number]),
+                    'created_by_name' => auth()->user()?->name,
+                ]);
 
                 foreach ($locationItems as $item) {
                     $product = $products->get((int) $item->product_id);
@@ -458,85 +457,35 @@ class SchoolBulkTransactionPageController extends Controller
                         continue;
                     }
                     $quantity = max(1, (int) $item->quantity);
-                    $unitPrice = (int) round((float) ($item->unit_price ?? $product->price_general ?? 0));
-                    $lineTotal = $quantity * $unitPrice;
-                    $subtotal += $lineTotal;
-                    $computedRows[] = [
-                        'product' => $product,
-                        'quantity' => $quantity,
-                        'unit_price' => $unitPrice,
-                        'line_total' => $lineTotal,
-                    ];
-                }
 
-                $invoice = SalesInvoice::create([
-                    'invoice_number' => $invoiceNumber,
-                    'customer_id' => (int) $transaction->customer_id,
-                    'customer_ship_location_id' => $location->customer_ship_location_id,
-                    'school_bulk_transaction_id' => (int) $transaction->id,
-                    'school_bulk_location_id' => (int) $location->id,
-                    'invoice_date' => $invoiceDate->toDateString(),
-                    'due_date' => $dueDate?->toDateString(),
-                    'semester_period' => $semesterPeriod,
-                    'subtotal' => (int) round((float) $subtotal),
-                    'total' => (int) round((float) $subtotal),
-                    'total_paid' => 0,
-                    'balance' => (int) round((float) $subtotal),
-                    'payment_status' => 'unpaid',
-                    'ship_to_name' => (string) ($location->school_name ?: ($location->recipient_name ?: '')),
-                    'ship_to_phone' => $location->recipient_phone ?: null,
-                    'ship_to_city' => $location->city ?: null,
-                    'ship_to_address' => $location->address ?: null,
-                    'notes' => __('school_bulk.generated_from_bulk', ['number' => $transaction->transaction_number]),
-                ]);
-
-                foreach ($computedRows as $row) {
-                    /** @var Product $product */
-                    $product = $row['product'];
-                    SalesInvoiceItem::create([
-                        'sales_invoice_id' => $invoice->id,
+                    DeliveryNoteItem::create([
+                        'delivery_note_id' => $deliveryNote->id,
                         'product_id' => $product->id,
                         'product_code' => $product->code,
                         'product_name' => $product->name,
-                        'quantity' => (int) $row['quantity'],
-                        'unit_price' => (int) $row['unit_price'],
-                        'discount' => 0,
-                        'line_total' => (int) $row['line_total'],
+                        'unit' => (string) ($item->unit ?: $product->unit),
+                        'quantity' => $quantity,
+                        'unit_price' => $item->unit_price !== null ? (int) round((float) $item->unit_price) : null,
+                        'notes' => $item->notes,
                     ]);
 
-                    $product->decrement('stock', (int) $row['quantity']);
+                    $product->decrement('stock', $quantity);
 
                     StockMutation::create([
                         'product_id' => $product->id,
-                        'reference_type' => SalesInvoice::class,
-                        'reference_id' => $invoice->id,
+                        'reference_type' => DeliveryNote::class,
+                        'reference_id' => $deliveryNote->id,
                         'mutation_type' => 'out',
-                        'quantity' => (int) $row['quantity'],
-                        'notes' => __('school_bulk.generated_invoice_stock_note', [
+                        'quantity' => $quantity,
+                        'notes' => __('school_bulk.generated_delivery_note_stock_note', [
                             'bulk' => $transaction->transaction_number,
-                            'invoice' => $invoice->invoice_number,
+                            'delivery' => $deliveryNote->note_number,
                         ]),
                         'created_by_user_id' => auth()->id(),
                     ]);
                 }
 
-                $this->receivableLedgerService->addDebit(
-                    customerId: (int) $invoice->customer_id,
-                    invoiceId: (int) $invoice->id,
-                    entryDate: $invoiceDate,
-                    amount: (float) $subtotal,
-                    periodCode: $invoice->semester_period,
-                    description: __('receivable.invoice_label').' '.$invoice->invoice_number
-                );
-
-                $this->accountingService->postSalesInvoice(
-                    invoiceId: (int) $invoice->id,
-                    date: $invoiceDate,
-                    amount: (int) round((float) $subtotal),
-                    paymentMethod: 'kredit'
-                );
-
-                $createdNumbers[] = $invoice->invoice_number;
+                $createdNumbers[] = $deliveryNote->note_number;
             }
 
             return [
@@ -547,20 +496,20 @@ class SchoolBulkTransactionPageController extends Controller
         });
 
         $this->auditLogService->log(
-            'school.bulk.generate_invoices',
+            'school.bulk.generate_delivery_notes',
             $schoolBulkTransaction,
-            __('school_bulk.audit_bulk_generate_invoices', [
+            __('school_bulk.audit_bulk_generate_delivery_notes', [
                 'number' => $schoolBulkTransaction->transaction_number,
                 'created' => (int) ($result['created'] ?? 0),
                 'skipped' => (int) ($result['skipped'] ?? 0),
             ]),
             $request
         );
-        AppCache::forgetAfterFinancialMutation();
+        AppCache::bumpLookupVersion();
 
         return redirect()
             ->route('school-bulk-transactions.show', $schoolBulkTransaction)
-            ->with('success', __('school_bulk.bulk_generate_invoices_success', [
+            ->with('success', __('school_bulk.bulk_generate_delivery_notes_success', [
                 'created' => (int) ($result['created'] ?? 0),
                 'skipped' => (int) ($result['skipped'] ?? 0),
             ]));
@@ -593,7 +542,7 @@ class SchoolBulkTransactionPageController extends Controller
         return Pdf::loadView('school_bulk_transactions.print', [
             'transaction' => $schoolBulkTransaction,
             'isPdf' => true,
-        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11())->download($filename);
+        ])->setPaper(PrintPaperSize::continuousForm95x11())->download($filename);
     }
 
     public function exportExcel(SchoolBulkTransaction $schoolBulkTransaction): StreamedResponse
@@ -684,15 +633,15 @@ class SchoolBulkTransactionPageController extends Controller
         return sprintf('%s-%04d', $prefix, $sequence);
     }
 
-    private function generateInvoiceNumber(string $invoiceDate): string
+    private function generateDeliveryNoteNumber(string $noteDate): string
     {
-        $date = Carbon::parse($invoiceDate);
-        $prefix = 'INV-'.$date->format('dmY');
-        $lastNumber = SalesInvoice::query()
-            ->whereDate('invoice_date', $date->toDateString())
-            ->where('invoice_number', 'like', $prefix.'-%')
+        $date = Carbon::parse($noteDate);
+        $prefix = 'SJ-'.$date->format('dmY');
+        $lastNumber = DeliveryNote::query()
+            ->whereDate('note_date', $date->toDateString())
+            ->where('note_number', 'like', $prefix.'-%')
             ->lockForUpdate()
-            ->max('invoice_number');
+            ->max('note_number');
 
         $sequence = 1;
         if (is_string($lastNumber) && preg_match('/-(\d{4})$/', $lastNumber, $matches) === 1) {

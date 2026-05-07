@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
+use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\DeliveryNote;
@@ -22,13 +23,17 @@ use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\CustomerPrintingSubtypeResolver;
 use App\Support\ExcelExportStyler;
+use App\Support\PrintPaperSize;
+use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
 use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -277,7 +282,7 @@ class SalesInvoicePageController extends Controller
 
             $itemIds = $rows->pluck('delivery_note_item_id')->map(fn ($id): int => (int) $id)->unique()->values()->all();
             $deliveryItems = DeliveryNoteItem::query()
-                ->with(['deliveryNote:id,note_number,note_date,customer_id,order_note_id,transaction_type,customer_printing_subtype_id,printing_subtype_name,is_canceled', 'product:id,code,name'])
+                ->with(['deliveryNote:id,note_number,note_date,customer_id,customer_ship_location_id,order_note_id,school_bulk_transaction_id,school_bulk_location_id,transaction_type,customer_printing_subtype_id,printing_subtype_name,recipient_name,recipient_phone,city,address,is_canceled', 'product:id,code,name'])
                 ->whereIn('id', $itemIds)
                 ->lockForUpdate()
                 ->get()
@@ -296,9 +301,16 @@ class SalesInvoicePageController extends Controller
             $subtotal = 0.0;
             $deliveryNoteIds = [];
             $orderNoteIds = [];
+            $customerShipLocationIds = [];
+            $schoolBulkTransactionIds = [];
+            $schoolBulkLocationIds = [];
             $transactionType = TransactionType::PRODUCT;
             $printingSubtypeId = null;
             $printingSubtypeName = null;
+            $shipToName = null;
+            $shipToPhone = null;
+            $shipToCity = null;
+            $shipToAddress = null;
 
             foreach ($rows as $index => $row) {
                 $deliveryItemId = (int) ($row['delivery_note_item_id'] ?? 0);
@@ -331,12 +343,25 @@ class SalesInvoicePageController extends Controller
                 $subtotal += $lineTotal;
 
                 $deliveryNoteIds[(int) $deliveryItem->delivery_note_id] = true;
+                if ((int) ($deliveryItem->deliveryNote->customer_ship_location_id ?? 0) > 0) {
+                    $customerShipLocationIds[(int) $deliveryItem->deliveryNote->customer_ship_location_id] = true;
+                }
                 if ((int) ($deliveryItem->deliveryNote->order_note_id ?? 0) > 0) {
                     $orderNoteIds[(int) $deliveryItem->deliveryNote->order_note_id] = true;
+                }
+                if ((int) ($deliveryItem->deliveryNote->school_bulk_transaction_id ?? 0) > 0) {
+                    $schoolBulkTransactionIds[(int) $deliveryItem->deliveryNote->school_bulk_transaction_id] = true;
+                }
+                if ((int) ($deliveryItem->deliveryNote->school_bulk_location_id ?? 0) > 0) {
+                    $schoolBulkLocationIds[(int) $deliveryItem->deliveryNote->school_bulk_location_id] = true;
                 }
                 $transactionType = TransactionType::normalize((string) ($deliveryItem->deliveryNote->transaction_type ?: $transactionType));
                 $printingSubtypeId = $printingSubtypeId ?? ($deliveryItem->deliveryNote->customer_printing_subtype_id ? (int) $deliveryItem->deliveryNote->customer_printing_subtype_id : null);
                 $printingSubtypeName = $printingSubtypeName ?? $deliveryItem->deliveryNote->printing_subtype_name;
+                $shipToName = $shipToName ?? ($deliveryItem->deliveryNote->recipient_name ?: null);
+                $shipToPhone = $shipToPhone ?? ($deliveryItem->deliveryNote->recipient_phone ?: null);
+                $shipToCity = $shipToCity ?? ($deliveryItem->deliveryNote->city ?: null);
+                $shipToAddress = $shipToAddress ?? ($deliveryItem->deliveryNote->address ?: null);
 
                 $computedRows[] = [
                     'delivery_item' => $deliveryItem,
@@ -348,11 +373,16 @@ class SalesInvoicePageController extends Controller
             }
 
             $linkedOrderNoteId = count($orderNoteIds) === 1 ? (int) array_key_first($orderNoteIds) : null;
+            $linkedCustomerShipLocationId = count($customerShipLocationIds) === 1 ? (int) array_key_first($customerShipLocationIds) : null;
+            $linkedSchoolBulkTransactionId = count($schoolBulkTransactionIds) === 1 ? (int) array_key_first($schoolBulkTransactionIds) : null;
+            $linkedSchoolBulkLocationId = count($schoolBulkLocationIds) === 1 ? (int) array_key_first($schoolBulkLocationIds) : null;
             $invoice = SalesInvoice::create([
                 'invoice_number' => $invoiceNumber,
                 'customer_id' => $customerId,
-                'customer_ship_location_id' => null,
+                'customer_ship_location_id' => $linkedCustomerShipLocationId,
                 'order_note_id' => $linkedOrderNoteId,
+                'school_bulk_transaction_id' => $linkedSchoolBulkTransactionId,
+                'school_bulk_location_id' => $linkedSchoolBulkLocationId,
                 'invoice_date' => $invoiceDate->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
                 'semester_period' => $selectedSemester,
@@ -364,10 +394,10 @@ class SalesInvoicePageController extends Controller
                 'total_paid' => 0,
                 'balance' => $subtotal,
                 'payment_status' => 'unpaid',
-                'ship_to_name' => null,
-                'ship_to_phone' => null,
-                'ship_to_city' => null,
-                'ship_to_address' => null,
+                'ship_to_name' => $shipToName,
+                'ship_to_phone' => $shipToPhone,
+                'ship_to_city' => $shipToCity,
+                'ship_to_address' => $shipToAddress,
                 'notes' => $this->invoiceNotesFromDeliveryNotes($data['notes'] ?? null, array_keys($deliveryNoteIds)),
             ]);
 
@@ -595,7 +625,7 @@ class SalesInvoicePageController extends Controller
                     } else {
                         $productId = (int) $product->id;
                         $candidates = $orderNoteItemsByProductId[$productId] ?? collect();
-                        if ($candidates instanceof \Illuminate\Support\Collection && $candidates->isNotEmpty()) {
+                        if ($candidates instanceof Collection && $candidates->isNotEmpty()) {
                             $offset = (int) ($orderNoteItemProductOffset[$productId] ?? 0);
                             $candidate = $candidates->get($offset) ?? $candidates->last();
                             if ($candidate instanceof OrderNoteItem) {
@@ -975,7 +1005,7 @@ class SalesInvoicePageController extends Controller
                     } else {
                         $productId = (int) $product->id;
                         $candidates = $orderNoteItemsByProductId[$productId] ?? collect();
-                        if ($candidates instanceof \Illuminate\Support\Collection && $candidates->isNotEmpty()) {
+                        if ($candidates instanceof Collection && $candidates->isNotEmpty()) {
                             $offset = (int) ($orderNoteItemProductOffset[$productId] ?? 0);
                             $candidate = $candidates->get($offset) ?? $candidates->last();
                             if ($candidate instanceof OrderNoteItem) {
@@ -1249,7 +1279,7 @@ class SalesInvoicePageController extends Controller
         $pdf = Pdf::loadView('sales_invoices.print', [
             'invoice' => $salesInvoice,
             'isPdf' => true,
-        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
+        ])->setPaper(PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }
@@ -1277,9 +1307,9 @@ class SalesInvoicePageController extends Controller
             $paymentMethodLabel = $hasCashOnCreate ? __('txn.cash') : __('txn.credit');
             $discountTotal = (float) $salesInvoice->items->sum('discount');
             $totalQty = (int) round((float) $salesInvoice->items->sum('quantity'), 0);
-            $address = \App\Support\PrintTextFormatter::wrapWords((string) ($salesInvoice->customer?->address ?: ''), 5);
-            $notes = \App\Support\PrintTextFormatter::wrapWords(
-                trim((string) ($salesInvoice->notes ?: \App\Models\AppSetting::getValue('company_invoice_notes', ''))),
+            $address = PrintTextFormatter::wrapWords((string) ($salesInvoice->customer?->address ?: ''), 5);
+            $notes = PrintTextFormatter::wrapWords(
+                trim((string) ($salesInvoice->notes ?: AppSetting::getValue('company_invoice_notes', ''))),
                 4
             );
 
@@ -1334,9 +1364,9 @@ class SalesInvoicePageController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
-    private function pendingDeliveryNoteRows(string $search, string $sort = 'date', string $direction = 'desc'): \Illuminate\Database\Eloquent\Builder
+    private function pendingDeliveryNoteRows(string $search, string $sort = 'date', string $direction = 'desc'): Builder
     {
         $direction = $direction === 'asc' ? 'asc' : 'desc';
         $invoicedSubquery = DB::table('sales_invoice_items as sii')
@@ -1388,7 +1418,7 @@ class SalesInvoicePageController extends Controller
 
     /**
      * @param  list<int>  $deliveryNoteIds
-     * @return array{customer: Customer, delivery_notes: \Illuminate\Support\Collection<int, DeliveryNote>, rows: \Illuminate\Support\Collection<int, array<string, mixed>>}
+     * @return array{customer: Customer, delivery_notes: Collection<int, DeliveryNote>, rows: Collection<int, array<string, mixed>>}
      */
     private function deliveryNoteInvoiceContext(array $deliveryNoteIds): array
     {
@@ -1579,9 +1609,9 @@ class SalesInvoicePageController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
-    private function openOrderNotesForCustomer(int $customerId, int $limit = 50): \Illuminate\Support\Collection
+    private function openOrderNotesForCustomer(int $customerId, int $limit = 50): Collection
     {
         $customerName = trim((string) (Customer::query()->whereKey($customerId)->value('name') ?? ''));
         $normalizedCustomerName = mb_strtolower($customerName);

@@ -23,6 +23,8 @@ class DeliveryNote extends Model
         'customer_id',
         'customer_ship_location_id',
         'order_note_id',
+        'school_bulk_transaction_id',
+        'school_bulk_location_id',
         'transaction_type',
         'customer_printing_subtype_id',
         'printing_subtype_name',
@@ -69,6 +71,22 @@ class DeliveryNote extends Model
     public function orderNote(): BelongsTo
     {
         return $this->belongsTo(OrderNote::class, 'order_note_id');
+    }
+
+    /**
+     * @return BelongsTo<SchoolBulkTransaction, $this>
+     */
+    public function schoolBulkTransaction(): BelongsTo
+    {
+        return $this->belongsTo(SchoolBulkTransaction::class, 'school_bulk_transaction_id');
+    }
+
+    /**
+     * @return BelongsTo<SchoolBulkTransactionLocation, $this>
+     */
+    public function schoolBulkLocation(): BelongsTo
+    {
+        return $this->belongsTo(SchoolBulkTransactionLocation::class, 'school_bulk_location_id');
     }
 
     public function printingSubtype(): BelongsTo

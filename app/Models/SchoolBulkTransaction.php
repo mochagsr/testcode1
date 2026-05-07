@@ -87,6 +87,16 @@ class SchoolBulkTransaction extends Model
     }
 
     /**
+     * @return HasMany<DeliveryNote, $this>
+     */
+    public function generatedDeliveryNotes(): HasMany
+    {
+        return $this->hasMany(DeliveryNote::class, 'school_bulk_transaction_id')
+            ->orderBy('note_date')
+            ->orderBy('id');
+    }
+
+    /**
      * @param  Builder<SchoolBulkTransaction>  $query
      * @return Builder<SchoolBulkTransaction>
      */

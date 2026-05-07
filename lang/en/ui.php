@@ -260,6 +260,7 @@ return [
     'audit_action_supplier_stock_manual_adjust' => 'Supplier stock adjusted manually',
     'audit_action_school_bulk_create' => 'School distribution transaction created',
     'audit_action_school_bulk_generate_invoices' => 'Generate invoices from school distribution',
+    'audit_action_school_bulk_generate_delivery_notes' => 'Generate delivery notes from school distribution',
     'audit_action_master_category_import' => 'Import categories',
     'audit_action_master_customer_ship_location_import' => 'Import customer ship locations',
     'audit_action_approval_request_create' => 'Submit correction request',
