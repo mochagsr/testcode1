@@ -16,7 +16,7 @@ class ProductDeletionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_product_index_uses_modal_delete_action(): void
+    public function test_product_index_hides_delete_action_and_keeps_safe_actions(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $product = $this->createProduct();
@@ -24,9 +24,13 @@ class ProductDeletionTest extends TestCase
         $this->actingAs($admin)
             ->get(route('products.index'))
             ->assertOk()
-            ->assertSee('product-delete-modal', false)
-            ->assertSee('js-open-product-delete-modal', false)
-            ->assertSee(route('products.destroy', $product), false)
+            ->assertSee(__('ui.view'))
+            ->assertSee(__('ui.edit'))
+            ->assertSee(__('ui.edit_stock'))
+            ->assertSee(__('ui.stock_mutations_title'))
+            ->assertDontSee('product-delete-modal', false)
+            ->assertDontSee('js-open-product-delete-modal', false)
+            ->assertDontSee('data-delete-url', false)
             ->assertDontSee('onsubmit="return confirm', false);
     }
 
