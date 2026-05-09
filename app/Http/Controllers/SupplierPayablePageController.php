@@ -15,11 +15,13 @@ use App\Services\SupplierLedgerService;
 use App\Support\AppCache;
 use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
+use App\Support\PrintPaperSize;
 use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
 use App\Support\UploadedImageCompressor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +31,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -175,7 +178,7 @@ class SupplierPayablePageController extends Controller
         $data = $request->validate([
             'supplier_id' => FluentRule::integer()->required()->exists('suppliers', 'id'),
             'year' => FluentRule::field()->required()->rule('digits:4'),
-            'month' => FluentRule::integer()->required()->min(1)->max(12),
+            'month' => FluentRule::integer()->nullable()->min(1)->max(12),
             'search' => FluentRule::string()->nullable(),
         ]);
 
@@ -184,19 +187,33 @@ class SupplierPayablePageController extends Controller
             return back()->with('error', __('supplier_payable.invalid_year'));
         }
 
-        $month = (int) $data['month'];
-        $this->semesterBookService->closeSupplierMonth((int) $data['supplier_id'], $normalizedYear, $month);
+        $month = $this->normalizeMonth((string) ($data['month'] ?? ''));
+        if ($month !== null) {
+            $this->semesterBookService->closeSupplierMonth((int) $data['supplier_id'], $normalizedYear, $month);
+
+            return redirect()
+                ->route('supplier-payables.index', [
+                    'supplier_id' => (int) $data['supplier_id'],
+                    'year' => $normalizedYear,
+                    'month' => $month,
+                    'search' => trim((string) ($data['search'] ?? '')),
+                ])
+                ->with('success', __('supplier_payable.month_closed_success', [
+                    'year' => $normalizedYear,
+                    'month' => $this->monthOptions()[$month] ?? sprintf('%02d', $month),
+                ]));
+        }
+
+        $this->semesterBookService->closeSupplierYear((int) $data['supplier_id'], $normalizedYear);
 
         return redirect()
             ->route('supplier-payables.index', [
                 'supplier_id' => (int) $data['supplier_id'],
                 'year' => $normalizedYear,
-                'month' => $month,
                 'search' => trim((string) ($data['search'] ?? '')),
             ])
-            ->with('success', __('supplier_payable.month_closed_success', [
+            ->with('success', __('supplier_payable.year_closed_success', [
                 'year' => $normalizedYear,
-                'month' => $this->monthOptions()[$month] ?? sprintf('%02d', $month),
             ]));
     }
 
@@ -205,7 +222,7 @@ class SupplierPayablePageController extends Controller
         $data = $request->validate([
             'supplier_id' => FluentRule::integer()->required()->exists('suppliers', 'id'),
             'year' => FluentRule::field()->required()->rule('digits:4'),
-            'month' => FluentRule::integer()->required()->min(1)->max(12),
+            'month' => FluentRule::integer()->nullable()->min(1)->max(12),
             'search' => FluentRule::string()->nullable(),
         ]);
 
@@ -214,19 +231,33 @@ class SupplierPayablePageController extends Controller
             return back()->with('error', __('supplier_payable.invalid_year'));
         }
 
-        $month = (int) $data['month'];
-        $this->semesterBookService->openSupplierMonth((int) $data['supplier_id'], $normalizedYear, $month);
+        $month = $this->normalizeMonth((string) ($data['month'] ?? ''));
+        if ($month !== null) {
+            $this->semesterBookService->openSupplierMonth((int) $data['supplier_id'], $normalizedYear, $month);
+
+            return redirect()
+                ->route('supplier-payables.index', [
+                    'supplier_id' => (int) $data['supplier_id'],
+                    'year' => $normalizedYear,
+                    'month' => $month,
+                    'search' => trim((string) ($data['search'] ?? '')),
+                ])
+                ->with('success', __('supplier_payable.month_opened_success', [
+                    'year' => $normalizedYear,
+                    'month' => $this->monthOptions()[$month] ?? sprintf('%02d', $month),
+                ]));
+        }
+
+        $this->semesterBookService->openSupplierYear((int) $data['supplier_id'], $normalizedYear);
 
         return redirect()
             ->route('supplier-payables.index', [
                 'supplier_id' => (int) $data['supplier_id'],
                 'year' => $normalizedYear,
-                'month' => $month,
                 'search' => trim((string) ($data['search'] ?? '')),
             ])
-            ->with('success', __('supplier_payable.month_opened_success', [
+            ->with('success', __('supplier_payable.year_opened_success', [
                 'year' => $normalizedYear,
-                'month' => $this->monthOptions()[$month] ?? sprintf('%02d', $month),
             ]));
     }
 
@@ -455,7 +486,7 @@ class SupplierPayablePageController extends Controller
         $pdf = Pdf::loadView('supplier_payables.print', [
             'payment' => $supplierPayment,
             'isPdf' => true,
-        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x55());
+        ])->setPaper(PrintPaperSize::continuousForm95x55());
 
         return $pdf->download($supplierPayment->payment_number.'.pdf');
     }
@@ -545,8 +576,8 @@ class SupplierPayablePageController extends Controller
             $sheet->setCellValue('A'.($signatureRow + 2), (string) ($supplierPayment->supplier_signature ?: '-'));
             $sheet->setCellValue('E'.($signatureRow + 2), (string) ($supplierPayment->user_signature ?: '-'));
             $sheet->getStyle('A'.($signatureRow + 2).':F'.($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
 
             foreach (range('A', 'F') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
@@ -610,7 +641,7 @@ class SupplierPayablePageController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, string>
+     * @return Collection<int, string>
      */
     private function supplierYearOptions(): Collection
     {
@@ -627,7 +658,7 @@ class SupplierPayablePageController extends Controller
 
     /**
      * @return array{
-     *   suppliers:\Illuminate\Contracts\Pagination\LengthAwarePaginator,
+     *   suppliers:LengthAwarePaginator,
      *   selectedSupplier:?Supplier,
      *   selectedSupplierId:?int,
      *   ledgerRows:Collection<int, SupplierLedger>,
@@ -685,8 +716,9 @@ class SupplierPayablePageController extends Controller
             $mutationBalance = $totalDebit - $totalCredit;
             $finalOutstanding = $selectedYear !== null ? $mutationBalance : (int) ($selectedSupplier->outstanding_payable ?? 0);
             $selectedSupplierMonthClosed = $selectedYear !== null
-                && $selectedMonth !== null
-                && $this->semesterBookService->isSupplierMonthClosed((int) $selectedSupplier->id, $selectedYear, $selectedMonth);
+                && ($selectedMonth !== null
+                    ? $this->semesterBookService->isSupplierMonthClosed((int) $selectedSupplier->id, $selectedYear, $selectedMonth)
+                    : $this->semesterBookService->isSupplierYearClosed((int) $selectedSupplier->id, $selectedYear));
 
             $supplierPaymentIds = $ledgerRows
                 ->pluck('supplier_payment_id')

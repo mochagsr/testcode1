@@ -8,13 +8,13 @@
         @include('partials.print.paper_a4')
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
-        .company-head { display: grid; grid-template-columns: minmax(0, 48%) minmax(180px, 22%) minmax(0, 30%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .company-head { display: grid; grid-template-columns: minmax(0, 40%) minmax(190px, 26%) minmax(240px, 34%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; column-gap: 26px; }
         .company-brand { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
         .company-logo { width: 40px; height: 60px; border: none; display: grid; place-items: center; overflow: hidden; flex-shrink: 0; }
         .company-logo img { width: 100%; height: 100%; object-fit: contain; }
         .company-name { font-size: 15px; font-weight: 800; letter-spacing: 0; margin-bottom: 2px; line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
         .company-detail { font-size: 12px; line-height: 1.35; white-space: pre-line; font-weight: 600; }
-        .doc-title-center { font-size: 12px; line-height: 1.3; text-align: center; align-self: center; justify-self: start; font-weight: 700; margin-left: -28px; }
+        .doc-title-center { font-size: 12px; line-height: 1.3; text-align: center; align-self: center; justify-self: center; font-weight: 700; }
         .doc-meta-right { font-size: 12px; line-height: 1.3; max-width: 270px; justify-self: end; width: 100%; margin-left: auto; font-weight: 700; }
         .doc-meta-right .meta-line { display: grid; grid-template-columns: 76px 8px minmax(0, 1fr); align-items: start; }
         .doc-meta-right .meta-label { font-weight: 700; }

@@ -51,6 +51,11 @@
             width: 1%;
             white-space: nowrap;
         }
+        .supplier-stock-toolbar-export {
+            width: auto;
+            min-width: 130px;
+            max-width: 150px;
+        }
     </style>
 
     <h1 class="page-title">{{ __('supplier_stock.title') }}</h1>
@@ -71,8 +76,12 @@
             <input type="date" name="date_to" value="{{ $dateTo }}" style="max-width:180px;">
             <button type="submit">{{ __('txn.search') }}</button>
             <a class="btn info-btn" href="{{ route('supplier-stock-cards.print', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}" target="_blank">{{ __('txn.print') }}</a>
-            <a class="btn info-btn" href="{{ route('supplier-stock-cards.export.pdf', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">{{ __('txn.pdf') }}</a>
-            <a class="btn info-btn" href="{{ route('supplier-stock-cards.export.excel', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">Export Excel</a>
+            <select class="supplier-stock-toolbar-export" aria-label="Export" onchange="if (this.value) { window.location.href = this.value; this.selectedIndex = 0; }">
+                <option value="">Export</option>
+                <option value="{{ route('supplier-stock-cards.export.pdf', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">Export PDF</option>
+                <option value="{{ route('supplier-stock-cards.export.excel', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">Export Excel</option>
+            </select>
+            <a class="btn process-btn" href="{{ route('products.index') }}?search=&product_type=raw_material">Lihat Stok</a>
             <a class="btn secondary" href="{{ route('supplier-stock-cards.index') }}">{{ __('txn.all') }}</a>
         </form>
     </div>

@@ -69,6 +69,12 @@ class SupplierStockCardTest extends TestCase
         $response->assertSee('Supplier Default');
         $response->assertSee('Buku Default');
         $response->assertSee('9');
+        $response->assertSee('Export PDF');
+        $response->assertSee('Export Excel');
+        $response->assertSee(route('supplier-stock-cards.export.pdf'), false);
+        $response->assertSee(route('supplier-stock-cards.export.excel'), false);
+        $response->assertSee('Lihat Stok');
+        $response->assertSee(route('products.index').'?search=&product_type=raw_material', false);
     }
 
     public function test_supplier_stock_card_shows_in_out_and_balance_per_supplier(): void

@@ -6,6 +6,7 @@ use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\OutgoingTransactionItem;
 use App\Models\Product;
+use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,7 +42,7 @@ class ProductSupplierDetailTest extends TestCase
 
         $response->assertOk();
         $response->assertSee(route('products.show', $product), false);
-        $response->assertSee(__('txn.detail'));
+        $response->assertSee(__('ui.view'));
         $response->assertSee('products-toolbar', false);
         $response->assertSee('@media (max-width: 1280px)', false);
         $response->assertSee('@media (max-width: 1100px)', false);
@@ -62,7 +63,7 @@ class ProductSupplierDetailTest extends TestCase
             'code' => 'krwb68cd',
             'name' => 'Kertas Web 68gr CD',
             'unit' => 'roll',
-            'stock' => 15,
+            'stock' => 115,
             'price_agent' => 0,
             'price_sales' => 0,
             'price_general' => 0,
@@ -113,11 +114,26 @@ class ProductSupplierDetailTest extends TestCase
             'unit_cost' => 12500,
             'line_total' => 62500,
         ]);
+        StockMutation::query()->create([
+            'product_id' => $product->id,
+            'reference_type' => Product::class,
+            'reference_id' => $product->id,
+            'mutation_type' => 'in',
+            'quantity' => 100,
+            'notes' => __('ui.stock_mutation_initial_stock'),
+            'created_by_user_id' => $user->id,
+        ]);
 
         $response = $this->actingAs($user)->get(route('products.show', $product));
 
         $response->assertOk();
         $response->assertSee('Supplier Barang Ini');
+        $response->assertSee('Stok Total');
+        $response->assertSee('115 roll');
+        $response->assertSee('Stok Awal');
+        $response->assertSee('100 roll');
+        $response->assertSee('Total Masuk Supplier');
+        $response->assertSee('15 roll');
         $response->assertSee('Supplier A');
         $response->assertSee('Supplier B');
         $response->assertSee('Rp 13.000');

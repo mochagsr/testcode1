@@ -70,6 +70,14 @@ class PrintPaperSizeConfigurationTest extends TestCase
         }
     }
 
+    public function test_supplier_payable_report_header_keeps_title_and_metadata_apart(): void
+    {
+        $template = (string) file_get_contents(resource_path('views/supplier_payables/report.blade.php'));
+
+        $this->assertStringContainsString('column-gap: 26px', $template);
+        $this->assertStringNotContainsString('margin-left: -28px', $template);
+    }
+
     public function test_pdf_exports_use_expected_paper_size_by_document_type(): void
     {
         $transactionControllerFiles = [

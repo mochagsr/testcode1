@@ -137,7 +137,25 @@ class ProductPageController extends Controller
         return view('products.show', [
             'product' => $product,
             'supplierRows' => $this->supplierRowsForProduct($product),
+            'initialStock' => $this->initialStockForProduct($product),
         ]);
+    }
+
+    private function initialStockForProduct(Product $product): int
+    {
+        $initialStockNotes = array_values(array_unique([
+            __('ui.stock_mutation_initial_stock'),
+            trans('ui.stock_mutation_initial_stock', [], 'id'),
+            trans('ui.stock_mutation_initial_stock', [], 'en'),
+        ]));
+
+        return (int) StockMutation::query()
+            ->where('product_id', (int) $product->id)
+            ->where('reference_type', Product::class)
+            ->where('reference_id', (int) $product->id)
+            ->where('mutation_type', 'in')
+            ->whereIn('notes', $initialStockNotes)
+            ->sum('quantity');
     }
 
     private function nowWib(): Carbon
