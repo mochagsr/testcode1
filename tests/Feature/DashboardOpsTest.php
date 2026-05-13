@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
+use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -28,6 +29,24 @@ class DashboardOpsTest extends TestCase
         $response->assertSee(__('ui.dashboard_quick_actions'));
     }
 
+    public function test_user_dashboard_places_pending_order_notes_before_uncollected_receivables(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('dashboard-user-panels', false);
+
+        $content = $response->getContent();
+        $pendingOrderPosition = strpos($content, __('ui.dashboard_pending_order_notes'));
+        $uncollectedReceivablePosition = strpos($content, __('ui.dashboard_uncollected_receivables'));
+
+        $this->assertIsInt($pendingOrderPosition);
+        $this->assertIsInt($uncollectedReceivablePosition);
+        $this->assertLessThan($uncollectedReceivablePosition, $pendingOrderPosition);
+    }
+
     public function test_audit_log_page_shows_extended_module_filters(): void
     {
         $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
@@ -50,7 +69,7 @@ class DashboardOpsTest extends TestCase
         AuditLog::query()->create([
             'user_id' => $user->id,
             'action' => 'master.customer.updated',
-            'subject_type' => \App\Models\Customer::class,
+            'subject_type' => Customer::class,
             'subject_id' => 9999,
             'description' => 'Customer malformed payload',
             'before_data' => [

@@ -187,6 +187,8 @@ return [
     'stock_mutation_import_reduce_note' => 'Stock reduced from product import',
     'stock_mutation_desc_sales_invoice_out' => 'Stock :qty used in invoice :number',
     'stock_mutation_desc_sales_invoice_in' => 'Stock :qty returned from invoice :number',
+    'stock_mutation_desc_delivery_note_out' => 'Stock :qty used in delivery note :number',
+    'stock_mutation_desc_delivery_note_in' => 'Stock :qty returned from canceled/corrected delivery note :number',
     'stock_mutation_desc_outgoing_in' => 'Stock :qty added from outgoing transaction :number',
     'stock_mutation_desc_outgoing_out' => 'Stock :qty reduced for outgoing transaction correction :number',
     'stock_mutation_desc_return_in' => 'Stock :qty added from sales return :number',

@@ -31,6 +31,14 @@ class TransactionQuantityUnitLabelTest extends TestCase
             ->assertSee('"unit":"exp"', false);
 
         $this->actingAs($admin)
+            ->get(route('delivery-notes.create'))
+            ->assertOk()
+            ->assertSee('quantity-with-unit', false)
+            ->assertSee('qty-unit-label', false)
+            ->assertSee('type="hidden" name="items[${index}][unit]" class="unit"', false)
+            ->assertDontSee('<th style="width: 10%">'.__('txn.unit').'</th>', false);
+
+        $this->actingAs($admin)
             ->get(route('sales-invoices.create'))
             ->assertOk()
             ->assertSee('qty-unit-label', false)

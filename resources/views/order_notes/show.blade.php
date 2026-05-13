@@ -103,19 +103,19 @@
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
         }
         .txn-status-chip.open {
-            background: rgba(239, 68, 68, 0.20);
-            color: #fecaca;
-            border-color: rgba(248, 113, 113, 0.55);
+            background: var(--badge-danger-bg);
+            color: var(--badge-danger-text);
+            border-color: color-mix(in srgb, var(--badge-danger-text) 42%, transparent);
         }
         .txn-status-chip.partial {
-            background: rgba(245, 158, 11, 0.20);
-            color: #fde68a;
-            border-color: rgba(251, 191, 36, 0.55);
+            background: var(--badge-warning-bg);
+            color: var(--badge-warning-text);
+            border-color: color-mix(in srgb, var(--badge-warning-text) 42%, transparent);
         }
         .txn-status-chip.finished {
-            background: rgba(34, 197, 94, 0.20);
-            color: #bbf7d0;
-            border-color: rgba(74, 222, 128, 0.55);
+            background: var(--badge-success-bg);
+            color: var(--badge-success-text);
+            border-color: color-mix(in srgb, var(--badge-success-text) 42%, transparent);
         }
         .order-note-items-table,
         .order-note-delivery-table {
@@ -222,21 +222,24 @@
                 <div class="col-4"><strong>{{ __('txn.date') }}</strong><div>{{ $note->note_date->format('d-m-Y') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $note->customer_name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $note->customer_phone ?: '-' }}</div></div>
-                <div class="col-12"><strong>{{ __('txn.address') }}</strong><div>{{ $note->address ?: $note->customer?->address ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $note->city ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.created_by') }}</strong><div>{{ $note->created_by_name ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.linked_customer') }}</strong><div>{{ $note->customer?->name ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.status') }}</strong><div>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</div></div>
                 @php
                     $progressLabel = rtrim(rtrim(number_format((float) ($noteProgress['progress_percent'] ?? 0), 2, '.', ''), '0'), '.');
-                    $progressStatusLabel = ($noteProgress['status'] ?? 'open') === 'finished' ? __('txn.order_note_status_finished') : __('txn.order_note_status_open');
+                    $progressStatusLabel = match ($noteProgress['status'] ?? 'open') {
+                        'finished' => __('txn.order_note_status_finished'),
+                        'partial' => __('txn.order_note_status_partial'),
+                        'not_delivered' => __('txn.order_note_status_not_delivered'),
+                        default => __('txn.order_note_status_open'),
+                    };
                 @endphp
+                <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $note->city ?: '-' }}</div></div>
+                <div class="col-8"><strong>{{ __('txn.address') }}</strong><div>{{ $note->address ?: $note->customer?->address ?: '-' }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.created_by') }}</strong><div>{{ $note->created_by_name ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.order_note_progress') }}</strong><div>{{ $progressLabel }}%</div></div>
                 <div class="col-4"><strong>{{ __('txn.order_note_qty_ordered') }}</strong><div>{{ number_format((int) ($noteProgress['ordered_total'] ?? 0), 0, ',', '.') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.order_note_qty_fulfilled') }}</strong><div>{{ number_format((int) ($noteProgress['fulfilled_total'] ?? 0), 0, ',', '.') }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.order_note_qty_remaining') }}</strong><div>{{ number_format((int) ($noteProgress['remaining_total'] ?? 0), 0, ',', '.') }}</div></div>
+                <div class="col-8"><strong>{{ __('txn.notes') }}</strong><div>{{ $note->notes ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.order_note_status_open') }}/{{ __('txn.order_note_status_finished') }}</strong><div>{{ $progressStatusLabel }}</div></div>
-                <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $note->notes ?: '-' }}</div></div>
                 @if($note->is_canceled)
                     <div class="col-12"><strong>{{ __('txn.cancel_reason') }}</strong><div>{{ $note->cancel_reason ?: '-' }}</div></div>
                 @endif

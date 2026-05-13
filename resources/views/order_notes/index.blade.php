@@ -12,6 +12,11 @@
             padding-top: 6px;
             padding-bottom: 6px;
         }
+        .order-status-badge.badge.warning {
+            background: #fff4d6;
+            border-color: #f6b73c;
+            color: #7a3f00;
+        }
     </style>
 
     <div class="page-header-actions">
@@ -72,7 +77,7 @@
     </div>
 
     <div class="card">
-        <div class="table-mobile-scroll">
+        <div class="table-mobile-scroll transaction-list-scroll">
         <table class="mobile-stack-table">
             <thead>
             <tr>
@@ -98,7 +103,12 @@
                         'status' => 'open',
                     ];
                     $progressLabel = rtrim(rtrim(number_format((float) ($progress['progress_percent'] ?? 0), 2, '.', ''), '0'), '.');
-                    $statusLabel = ($progress['status'] ?? 'open') === 'finished' ? __('txn.order_note_status_finished') : __('txn.order_note_status_open');
+                    $statusLabel = match ($progress['status'] ?? 'open') {
+                        'finished' => __('txn.order_note_status_finished'),
+                        'partial' => __('txn.order_note_status_partial'),
+                        'not_delivered' => __('txn.order_note_status_not_delivered'),
+                        default => __('txn.order_note_status_open'),
+                    };
                 @endphp
                 <tr>
                     <td data-label="{{ __('txn.no') }}">
@@ -120,9 +130,9 @@
                         @if($note->is_canceled)
                             <span class="badge danger">{{ __('txn.status_canceled') }}</span>
                         @elseif(($progress['status'] ?? 'open') === 'finished')
-                            <span class="badge success">{{ $statusLabel }}</span>
+                            <span class="badge success order-status-badge">{{ $statusLabel }}</span>
                         @else
-                            <span class="badge warning">{{ $statusLabel }}</span>
+                            <span class="badge warning order-status-badge">{{ $statusLabel }}</span>
                         @endif
                     </td>
                     <td data-label="{{ __('txn.created_by') }}">{{ $note->created_by_name ?: '-' }}</td>

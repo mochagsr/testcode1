@@ -66,14 +66,11 @@
             <p class="form-section-note">{{ __('txn.delivery_summary_note') }}</p>
             <div class="row">
                 <div class="col-4"><strong>{{ __('txn.date') }}</strong><div>{{ $note->note_date->format('d-m-Y') }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.recipient') }}</strong><div>{{ $note->recipient_name }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $note->recipient_name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $note->recipient_phone ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $note->city ?: '-' }}</div></div>
+                <div class="col-4"><strong>{{ __('txn.address') }}</strong><div>{{ $note->address ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.created_by') }}</strong><div>{{ $note->created_by_name ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.linked_customer') }}</strong><div>{{ $note->customer?->name ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('school_bulk.ship_to_school') }}</strong><div>{{ $note->shipLocation?->school_name ?: '-' }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.status') }}</strong><div>{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</div></div>
-                <div class="col-12"><strong>{{ __('txn.address') }}</strong><div>{{ $note->address ?: '-' }}</div></div>
                 <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $note->notes ?: '-' }}</div></div>
                 @if($note->is_canceled)
                     <div class="col-12"><strong>{{ __('txn.cancel_reason') }}</strong><div>{{ $note->cancel_reason ?: '-' }}</div></div>

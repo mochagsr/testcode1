@@ -227,6 +227,7 @@
             let lastShipLookupQuery = '';
             let productLookupAbort = null;
             let lastProductLookupQuery = '';
+            let currentCustomer = null;
 
             const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
                 ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
@@ -248,6 +249,46 @@
 
             function normalizeLookup(value) {
                 return String(value || '').trim().toLowerCase();
+            }
+
+            function normalizeLevelLabel(value) {
+                return String(value || '').trim().toLowerCase();
+            }
+
+            function getPriceKeyForCustomer() {
+                if (!currentCustomer) {
+                    return 'price_general';
+                }
+
+                const code = normalizeLevelLabel(currentCustomer.level?.code);
+                const name = normalizeLevelLabel(currentCustomer.level?.name);
+                const combined = `${code} ${name}`.trim();
+
+                if (combined.includes('agent') || combined.includes('agen')) {
+                    return 'price_agent';
+                }
+
+                if (combined.includes('sales') || combined.includes('sale') || combined.includes('penjualan')) {
+                    return 'price_sales';
+                }
+
+                return 'price_general';
+            }
+
+            function productPriceForCurrentCustomer(product) {
+                if (!product) {
+                    return 0;
+                }
+
+                const key = getPriceKeyForCustomer();
+                if (key === 'price_agent') {
+                    return Number(product.price_agent ?? product.price_general ?? 0);
+                }
+                if (key === 'price_sales') {
+                    return Number(product.price_sales ?? product.price_general ?? 0);
+                }
+
+                return Number(product.price_general ?? 0);
             }
 
             function customerLabel(customer) {
@@ -394,6 +435,7 @@
                 if (!customerIdField) {
                     return;
                 }
+                currentCustomer = customer || null;
                 customerIdField.value = customer ? customer.id : '';
                 if (customer && customerSearch) {
                     customerSearch.value = customerLabel(customer);
@@ -787,7 +829,7 @@
                     setSchoolItemProductError(tr, '');
                     updateSchoolItemUnit(tr, product);
                     if (!productPriceInput.value) {
-                        productPriceInput.value = Math.round(Number(product.price_general || 0));
+                        productPriceInput.value = Math.round(productPriceForCurrentCustomer(product));
                         window.PgposNumberFormat.formatInput(productPriceInput);
                     }
                 };

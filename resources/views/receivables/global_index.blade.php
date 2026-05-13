@@ -84,12 +84,11 @@
                 <a class="btn info-btn" target="_blank" href="{{ route('receivables.global.print', request()->query()) }}">
                     {{ $selectedCustomerId > 0 ? 'Print Invoice' : __('txn.print') }}
                 </a>
-                <a class="btn danger-btn" target="_blank" href="{{ route('receivables.global.export.pdf', request()->query()) }}">
-                    {{ $selectedCustomerId > 0 ? 'Export Invoice PDF' : 'Export PDF' }}
-                </a>
-                <a class="btn payment-btn" href="{{ route('receivables.global.export.excel', request()->query()) }}">
-                    {{ $selectedCustomerId > 0 ? 'Export Invoice Excel' : 'Export Excel' }}
-                </a>
+                <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                    <option value="" selected disabled>Export</option>
+                    <option value="{{ route('receivables.global.export.excel', request()->query()) }}">Export Excel</option>
+                    <option value="{{ route('receivables.global.export.pdf', request()->query()) }}">Export PDF</option>
+                </select>
             </div>
         </form>
     </div>

@@ -31,6 +31,10 @@
         .receivable-semester-table {
             min-width: 1120px;
         }
+        .receivable-semester-table tfoot td {
+            border-top: 2px solid color-mix(in srgb, var(--table-border) 72%, var(--text) 28%);
+            background: color-mix(in srgb, var(--surface) 96%, var(--border) 4%);
+        }
         @media (max-width: 1400px) {
             .receivable-semester-toolbar .toolbar-left,
             .receivable-semester-toolbar .toolbar-right {
@@ -95,8 +99,11 @@
 
             <div class="toolbar-right">
                 <a class="btn info-btn" target="_blank" href="{{ route('receivables.semester.print', request()->query()) }}">{{ __('txn.print') }}</a>
-                <a class="btn info-btn" target="_blank" href="{{ route('receivables.semester.export.pdf', request()->query()) }}">{{ __('txn.pdf') }}</a>
-                <a class="btn info-btn" href="{{ route('receivables.semester.export.excel', request()->query()) }}">Export Excel</a>
+                <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                    <option value="" selected disabled>Export</option>
+                    <option value="{{ route('receivables.semester.export.excel', request()->query()) }}">Export Excel</option>
+                    <option value="{{ route('receivables.semester.export.pdf', request()->query()) }}">Export PDF</option>
+                </select>
             </div>
         </form>
     </div>
@@ -145,7 +152,7 @@
                 @endforelse
                 </tbody>
                 <tfoot>
-                <tr style="font-weight:700;">
+                <tr class="receivable-semester-total-row" style="font-weight:700;">
                     <td colspan="4">{{ __('receivable.semester_total') }}</td>
                     <td class="num">Rp {{ number_format((int) ($totals['sales_total'] ?? 0), 0, ',', '.') }}</td>
                     <td class="num">Rp {{ number_format((int) ($totals['payment_total'] ?? 0), 0, ',', '.') }}</td>

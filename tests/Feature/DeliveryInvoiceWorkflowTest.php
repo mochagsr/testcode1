@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerLevel;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\ItemCategory;
@@ -164,6 +165,125 @@ class DeliveryInvoiceWorkflowTest extends TestCase
         $this->assertDatabaseCount('sales_invoices', 0);
     }
 
+    public function test_invoice_from_delivery_note_highlights_row_when_quantity_exceeds_remaining(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-ERP-HIGHLIGHT',
+            'name' => 'Customer Highlight',
+            'city' => 'Malang',
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-ERP-HIGHLIGHT',
+            'name' => 'Buku',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'BK-ERP-HIGHLIGHT',
+            'name' => 'Buku Highlight',
+            'unit' => 'exp',
+            'stock' => 50,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-HIGHLIGHT-001',
+            'note_date' => '2026-04-28',
+            'customer_id' => $customer->id,
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'transaction_type' => 'product',
+            'created_by_name' => 'Gudang',
+        ]);
+        $deliveryItem = DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'unit' => $product->unit,
+            'quantity' => 5,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('sales-invoices.create-from-delivery-notes', ['delivery_note_ids' => [$deliveryNote->id]]))
+            ->followingRedirects()
+            ->post(route('sales-invoices.store-from-delivery-notes'), [
+                'customer_id' => $customer->id,
+                'invoice_date' => '2026-04-28',
+                'semester_period' => 'S2-2526',
+                'payment_method' => 'kredit',
+                'items' => [
+                    [
+                        'delivery_note_item_id' => $deliveryItem->id,
+                        'quantity' => 6,
+                        'unit_price' => 12000,
+                        'discount' => 0,
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertSee('invoice-item-row has-row-error', false)
+            ->assertSee('has-field-error', false)
+            ->assertSee(__('txn.delivery_note_invoice_qty_exceeds_remaining'));
+
+        $this->assertDatabaseCount('sales_invoices', 0);
+    }
+
+    public function test_invoice_from_delivery_note_uses_sales_price_for_sales_customer_level(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $salesLevel = CustomerLevel::query()->create([
+            'code' => 'SLS',
+            'name' => 'Sales',
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-SALES-001',
+            'name' => 'Anton',
+            'city' => 'Malang',
+            'customer_level_id' => $salesLevel->id,
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-SALES-001',
+            'name' => 'Buku',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'BK-SALES-001',
+            'name' => 'Buku Sales',
+            'unit' => 'exp',
+            'stock' => 50,
+            'price_agent' => 3500,
+            'price_sales' => 4500,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-SALES-001',
+            'note_date' => '2026-04-28',
+            'customer_id' => $customer->id,
+            'recipient_name' => $customer->name,
+            'city' => $customer->city,
+            'transaction_type' => 'product',
+            'created_by_name' => 'Gudang',
+        ]);
+        DeliveryNoteItem::query()->create([
+            'delivery_note_id' => $deliveryNote->id,
+            'product_id' => $product->id,
+            'product_code' => $product->code,
+            'product_name' => $product->name,
+            'unit' => $product->unit,
+            'quantity' => 10,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales-invoices.create-from-delivery-notes', [
+                'delivery_note_ids' => [$deliveryNote->id],
+            ]))
+            ->assertOk()
+            ->assertSee('name="items[0][unit_price]" value="4500"', false)
+            ->assertDontSee('name="items[0][unit_price]" value="12000"', false);
+    }
+
     public function test_duplicate_delivery_note_selection_and_items_are_processed_once_for_invoicing(): void
     {
         $user = User::factory()->create(['role' => 'admin']);
@@ -217,7 +337,13 @@ class DeliveryInvoiceWorkflowTest extends TestCase
             ->assertOk();
         $createResponse->assertSee('28-04-2026');
         $createResponse->assertSee(__('txn.uninvoiced_quantity'));
+        $createResponse->assertSee(__('txn.uninvoiced_quantity_short'));
         $createResponse->assertSee(__('txn.invoice_quantity'));
+        $createResponse->assertSee(__('txn.invoice_quantity_short'));
+        $createResponse->assertSee('parseInvoiceNumber', false);
+        $createResponse->assertSee("input.addEventListener('change', recalc);", false);
+        $createResponse->assertSee('placeholder="0" min="0" max="100" step="1"', false);
+        $createResponse->assertDontSee('class="discount" type="number" name="items[0][discount]" value="0"', false);
         $this->assertSame(2, substr_count($createResponse->getContent(), 'SJ-DUP-ID-001'));
 
         $this->actingAs($user)

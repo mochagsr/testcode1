@@ -1423,7 +1423,12 @@ class SalesInvoicePageController extends Controller
     private function deliveryNoteInvoiceContext(array $deliveryNoteIds): array
     {
         $deliveryNotes = DeliveryNote::query()
-            ->with(['customer:id,name,city,phone,address', 'orderNote:id,note_number', 'items.product:id,code,name,price_agent,price_sales,price_general'])
+            ->with([
+                'customer:id,customer_level_id,name,city,phone,address',
+                'customer.level:id,code,name',
+                'orderNote:id,note_number',
+                'items.product:id,code,name,price_agent,price_sales,price_general',
+            ])
             ->whereIn('id', $deliveryNoteIds)
             ->where('is_canceled', false)
             ->orderBy('note_date')
@@ -1461,10 +1466,14 @@ class SalesInvoicePageController extends Controller
             ->groupBy('sii.delivery_note_item_id')
             ->pluck('invoiced_qty', 'sii.delivery_note_item_id');
 
+        $customer = Customer::query()
+            ->with('level:id,code,name')
+            ->findOrFail((int) $customerIds->first());
+
         $rows = $deliveryNotes
-            ->flatMap(function (DeliveryNote $note) use ($invoicedByItem): array {
+            ->flatMap(function (DeliveryNote $note) use ($customer, $invoicedByItem): array {
                 return $note->items
-                    ->map(function (DeliveryNoteItem $item) use ($note, $invoicedByItem): ?array {
+                    ->map(function (DeliveryNoteItem $item) use ($customer, $note, $invoicedByItem): ?array {
                         $remaining = max(0, (int) $item->quantity - (int) round((float) ($invoicedByItem[(int) $item->id] ?? 0)));
                         if ($remaining <= 0) {
                             return null;
@@ -1475,7 +1484,9 @@ class SalesInvoicePageController extends Controller
                             'delivery_note' => $note,
                             'item' => $item,
                             'remaining_qty' => $remaining,
-                            'default_price' => (int) round((float) ($product?->price_general ?? 0)),
+                            'default_price' => $product instanceof Product
+                                ? (int) $this->resolvePriceByCustomerLevel($product, $customer)
+                                : 0,
                         ];
                     })
                     ->filter()
@@ -1490,13 +1501,28 @@ class SalesInvoicePageController extends Controller
             ]);
         }
 
-        $customer = Customer::query()->findOrFail((int) $customerIds->first());
-
         return [
             'customer' => $customer,
             'delivery_notes' => $deliveryNotes,
             'rows' => $rows,
         ];
+    }
+
+    private function resolvePriceByCustomerLevel(Product $product, Customer $customer): float
+    {
+        $levelCode = mb_strtolower(trim((string) ($customer->level?->code ?? '')));
+        $levelName = mb_strtolower(trim((string) ($customer->level?->name ?? '')));
+        $combined = trim($levelCode.' '.$levelName);
+
+        if (str_contains($combined, 'agent') || str_contains($combined, 'agen')) {
+            return (float) round((float) ($product->price_agent ?? $product->price_general ?? 0));
+        }
+
+        if (str_contains($combined, 'sales') || str_contains($combined, 'sale') || str_contains($combined, 'penjualan')) {
+            return (float) round((float) ($product->price_sales ?? $product->price_general ?? 0));
+        }
+
+        return (float) round((float) ($product->price_general ?? 0));
     }
 
     private function invoiceNotesFromDeliveryNotes(?string $notes, array $deliveryNoteIds): ?string

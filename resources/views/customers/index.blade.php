@@ -16,7 +16,7 @@
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
-            flex: 1 1 auto;
+            flex: 1 1 620px;
             margin: 0;
         }
         .customers-toolbar .search-form input[type="text"] {
@@ -33,10 +33,11 @@
         .customers-toolbar-actions {
             display: flex;
             align-items: center;
+            justify-content: flex-end;
             gap: 8px;
             flex-wrap: wrap;
-            margin-top: 12px;
-            width: 100%;
+            margin-left: auto;
+            flex: 0 0 auto;
         }
         .customer-import-overlay {
             display: none;
@@ -126,6 +127,11 @@
             }
         }
         @media (max-width: 1280px) {
+            .customers-toolbar-actions {
+                width: 100%;
+                justify-content: flex-start;
+                margin-left: 0;
+            }
             .customers-toolbar .search-form input[type="text"] {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
@@ -158,16 +164,16 @@
                 </select>
                 <button type="submit">{{ __('ui.search') }}</button>
             </form>
-        </div>
-        <div class="customers-toolbar-actions">
-            @if($canImportCustomers)
-                <button type="button" class="btn process-btn" id="customer-import-open">Import Data</button>
-            @endif
-            <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                <option value="" selected disabled>Export</option>
-                <option value="{{ route('customers-web.export.pdf', $customerExportQuery) }}">Export PDF</option>
-                <option value="{{ route('customers-web.export.csv', $customerExportQuery) }}">Export Excel</option>
-            </select>
+            <div class="customers-toolbar-actions">
+                @if($canImportCustomers)
+                    <button type="button" class="btn process-btn" id="customer-import-open">Import Data</button>
+                @endif
+                <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                    <option value="" selected disabled>Export</option>
+                    <option value="{{ route('customers-web.export.pdf', $customerExportQuery) }}">Export PDF</option>
+                    <option value="{{ route('customers-web.export.csv', $customerExportQuery) }}">Export Excel</option>
+                </select>
+            </div>
         </div>
         @if(session('import_errors'))
             <div class="card" style="margin-top:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.4);">

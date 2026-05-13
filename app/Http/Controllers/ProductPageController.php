@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesProductUnits;
 use App\Models\AppSetting;
+use App\Models\DeliveryNote;
 use App\Models\ItemCategory;
 use App\Models\OutgoingTransaction;
 use App\Models\Product;
@@ -133,11 +134,13 @@ class ProductPageController extends Controller
     public function show(Product $product): View
     {
         $product->load('category:id,code,name');
+        $supplierRows = $this->supplierRowsForProduct($product);
 
         return view('products.show', [
             'product' => $product,
-            'supplierRows' => $this->supplierRowsForProduct($product),
+            'supplierRows' => $supplierRows,
             'initialStock' => $this->initialStockForProduct($product),
+            'showSupplierSection' => $supplierRows->isNotEmpty(),
         ]);
     }
 
@@ -380,6 +383,7 @@ class ProductPageController extends Controller
             'product' => $product,
             'stockMutations' => $stockMutations,
             'mutationReferenceMap' => $mutationReferenceMap,
+            'initialStock' => $this->initialStockForProduct($product),
         ]);
     }
 
@@ -596,6 +600,7 @@ class ProductPageController extends Controller
         /** @var Collection<int, StockMutation> $mutations */
         $mutations = collect($paginator->items());
         $idsByType = [
+            DeliveryNote::class => [],
             SalesInvoice::class => [],
             SalesReturn::class => [],
             OutgoingTransaction::class => [],
@@ -612,6 +617,15 @@ class ProductPageController extends Controller
 
         $map = [];
         $salesInvoices = collect();
+        $deliveryNotes = collect();
+        if ($idsByType[DeliveryNote::class] !== []) {
+            $deliveryNotes = DeliveryNote::query()
+                ->select(['id', 'note_number'])
+                ->whereIn('id', array_values(array_unique($idsByType[DeliveryNote::class])))
+                ->get()
+                ->keyBy('id');
+        }
+
         if ($idsByType[SalesInvoice::class] !== []) {
             $salesInvoices = SalesInvoice::query()
                 ->select(['id', 'invoice_number'])
@@ -638,6 +652,12 @@ class ProductPageController extends Controller
                 ->keyBy('id');
         }
 
+        foreach ($deliveryNotes as $deliveryNote) {
+            $map[DeliveryNote::class.'#'.(int) $deliveryNote->id] = [
+                'number' => (string) $deliveryNote->note_number,
+                'url' => route('delivery-notes.show', $deliveryNote),
+            ];
+        }
         foreach ($salesInvoices as $invoice) {
             $map[SalesInvoice::class.'#'.(int) $invoice->id] = [
                 'number' => (string) $invoice->invoice_number,

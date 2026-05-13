@@ -150,8 +150,11 @@
             </div>
             <button type="submit">{{ __('txn.search') }}</button>
             <a class="btn info-btn" href="{{ route('supplier-payables.print', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}" target="_blank">{{ __('txn.print') }}</a>
-            <a class="btn info-btn" href="{{ route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">{{ __('txn.pdf') }}</a>
-            <a class="btn info-btn" href="{{ route('supplier-payables.export.excel', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">Export Excel</a>
+            <select class="action-menu action-menu-md" aria-label="Export" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                <option value="" selected disabled>Export</option>
+                <option value="{{ route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">Export PDF</option>
+                <option value="{{ route('supplier-payables.export.excel', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}">Export Excel</option>
+            </select>
             <a class="btn payment-btn" href="{{ route('supplier-payables.create') }}">{{ __('supplier_payable.add_payment') }}</a>
         </form>
     </div>

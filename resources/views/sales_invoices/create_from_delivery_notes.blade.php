@@ -5,8 +5,20 @@
 @section('content')
     <style>
         #items-table {
+            min-width: 1040px;
             table-layout: fixed;
             width: 100%;
+        }
+        #items-table th {
+            line-height: 1.15;
+            white-space: normal;
+        }
+        #items-table .compact-heading {
+            align-items: center;
+            display: inline-flex;
+            flex-direction: column;
+            gap: 2px;
+            line-height: 1.05;
         }
         #items-table .date-col {
             width: 9%;
@@ -15,31 +27,50 @@
             width: 13%;
         }
         #items-table .product-col {
-            width: 37%;
+            width: 31%;
         }
         #items-table .remaining-col {
-            width: 7%;
+            width: 10%;
         }
         #items-table .qty-col {
-            width: 6%;
+            width: 11%;
         }
         #items-table .price-col {
             width: 10%;
         }
         #items-table .discount-col {
-            width: 7%;
+            width: 6%;
         }
         #items-table .total-col {
-            width: 11%;
+            width: 10%;
         }
         #items-table input.qty,
         #items-table input.discount {
-            max-width: 62px;
+            max-width: 76px;
             min-width: 0;
         }
         #items-table input.price {
             max-width: 92px;
             min-width: 0;
+        }
+        #items-table .invoice-item-row.has-row-error td {
+            background: color-mix(in srgb, var(--badge-danger-bg) 62%, transparent);
+        }
+        #items-table .invoice-item-row.has-row-error td:first-child,
+        #items-table .invoice-item-row.has-row-error .product-col {
+            box-shadow: inset 4px 0 0 color-mix(in srgb, var(--badge-danger-text) 78%, transparent);
+        }
+        #items-table .invoice-item-row.has-row-error input.has-field-error {
+            border-color: color-mix(in srgb, var(--badge-danger-text) 70%, transparent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--badge-danger-bg) 70%, transparent);
+        }
+        #items-table .invoice-row-error-message {
+            color: var(--badge-danger-text);
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.35;
+            margin-top: 6px;
         }
     </style>
 
@@ -107,8 +138,16 @@
                         <th class="date-col">{{ __('txn.date') }}</th>
                         <th class="delivery-col">{{ __('txn.delivery_notes_title') }}</th>
                         <th class="product-col">{{ __('txn.product') }}</th>
-                        <th class="num remaining-col">{{ __('txn.uninvoiced_quantity') }}</th>
-                        <th class="qty-col">{{ __('txn.invoice_quantity') }}</th>
+                        <th class="num remaining-col" title="{{ __('txn.uninvoiced_quantity') }}">
+                            <span class="compact-heading">
+                                <span>{{ __('txn.uninvoiced_quantity_short') }}</span>
+                            </span>
+                        </th>
+                        <th class="qty-col" title="{{ __('txn.invoice_quantity') }}">
+                            <span class="compact-heading">
+                                <span>{{ __('txn.invoice_quantity_short') }}</span>
+                            </span>
+                        </th>
                         <th class="price-col">{{ __('txn.price') }}</th>
                         <th class="discount-col">{{ __('txn.discount') }} (%)</th>
                         <th class="num total-col">{{ __('txn.line_total') }}</th>
@@ -125,9 +164,17 @@
                             $oldPrefix = 'items.'.$index.'.';
                             $price = old($oldPrefix.'unit_price', $row['default_price'] ?? 0);
                             $qty = old($oldPrefix.'quantity', $remaining);
-                            $discount = old($oldPrefix.'discount', 0);
+                            $discount = old($oldPrefix.'discount');
+                            $quantityErrorKey = $oldPrefix.'quantity';
+                            $priceErrorKey = $oldPrefix.'unit_price';
+                            $discountErrorKey = $oldPrefix.'discount';
+                            $itemErrorKey = $oldPrefix.'delivery_note_item_id';
+                            $rowHasError = $errors->has($quantityErrorKey)
+                                || $errors->has($priceErrorKey)
+                                || $errors->has($discountErrorKey)
+                                || $errors->has($itemErrorKey);
                         @endphp
-                        <tr>
+                        <tr class="invoice-item-row{{ $rowHasError ? ' has-row-error' : '' }}">
                             @if($shouldRenderDeliveryNote)
                                 @php
                                     $renderedDeliveryNotes[$noteId] = true;
@@ -145,13 +192,22 @@
                             </td>
                             <td class="num remaining-col">{{ number_format($remaining, 0, ',', '.') }}</td>
                             <td class="qty-col">
-                                <input class="qty js-thousand-input" type="text" inputmode="numeric" name="items[{{ $index }}][quantity]" value="{{ $qty }}" data-max="{{ $remaining }}" required>
+                                <input class="qty js-thousand-input{{ $errors->has($quantityErrorKey) ? ' has-field-error' : '' }}" type="text" inputmode="numeric" name="items[{{ $index }}][quantity]" value="{{ $qty }}" data-max="{{ $remaining }}" required>
+                                @error($quantityErrorKey)
+                                    <span class="invoice-row-error-message">{{ $message }}</span>
+                                @enderror
                             </td>
                             <td class="price-col">
-                                <input class="price js-thousand-input" type="text" inputmode="numeric" name="items[{{ $index }}][unit_price]" value="{{ $price }}" required>
+                                <input class="price js-thousand-input{{ $errors->has($priceErrorKey) ? ' has-field-error' : '' }}" type="text" inputmode="numeric" name="items[{{ $index }}][unit_price]" value="{{ $price }}" required>
+                                @error($priceErrorKey)
+                                    <span class="invoice-row-error-message">{{ $message }}</span>
+                                @enderror
                             </td>
                             <td class="discount-col">
-                                <input class="discount" type="number" name="items[{{ $index }}][discount]" value="{{ $discount }}" min="0" max="100" step="1">
+                                <input class="discount{{ $errors->has($discountErrorKey) ? ' has-field-error' : '' }}" type="number" name="items[{{ $index }}][discount]" value="{{ $discount }}" placeholder="0" min="0" max="100" step="1">
+                                @error($discountErrorKey)
+                                    <span class="invoice-row-error-message">{{ $message }}</span>
+                                @enderror
                             </td>
                             <td class="num total-col">Rp <span class="line-total">0</span></td>
                         </tr>
@@ -172,15 +228,35 @@
 
     <script>
         function formatNumber(value) {
-            return Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            const numericValue = Number(value || 0);
+
+            if (!Number.isFinite(numericValue)) {
+                return '0';
+            }
+
+            return numericValue.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+        }
+
+        function parseInvoiceNumber(value) {
+            const rawValue = typeof value === 'object' && value !== null && 'value' in value
+                ? value.value
+                : value;
+
+            if (window.PgposNumberFormat && typeof window.PgposNumberFormat.parseInt === 'function') {
+                return window.PgposNumberFormat.parseInt(rawValue || 0);
+            }
+
+            const digits = String(rawValue || '').replace(/\D/g, '');
+
+            return digits === '' ? 0 : Number(digits);
         }
 
         function recalc() {
             let total = 0;
             document.querySelectorAll('#items-table tbody tr').forEach((row) => {
-                const qty = window.PgposNumberFormat.parseInt(row.querySelector('.qty')?.value || 0);
-                const price = window.PgposNumberFormat.parseInt(row.querySelector('.price')?.value || 0);
-                const discountPercent = Math.max(0, Math.min(100, Number(row.querySelector('.discount')?.value || 0)));
+                const qty = Math.max(0, parseInvoiceNumber(row.querySelector('.qty')));
+                const price = Math.max(0, parseInvoiceNumber(row.querySelector('.price')));
+                const discountPercent = Math.max(0, Math.min(100, parseInvoiceNumber(row.querySelector('.discount'))));
                 const gross = qty * price;
                 const lineTotal = Math.max(0, gross - Math.round(gross * discountPercent / 100));
                 total += lineTotal;
@@ -197,8 +273,11 @@
 
         document.querySelectorAll('.qty,.price,.discount').forEach((input) => {
             input.addEventListener('input', recalc);
+            input.addEventListener('change', recalc);
         });
-        document.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
+        document.querySelectorAll('.js-thousand-input').forEach((input) => {
+            window.PgposNumberFormat?.formatInput(input);
+        });
         recalc();
     </script>
 @endsection

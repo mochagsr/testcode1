@@ -81,7 +81,7 @@ class OrderNoteProgressTest extends TestCase
         $indexResponse->assertSee('PO-20260228-0001');
         $indexResponse->assertSee('40%');
         $indexResponse->assertSee('6');
-        $indexResponse->assertSee(__('txn.order_note_status_open'));
+        $indexResponse->assertSee(__('txn.order_note_status_partial'));
 
         $showResponse = $this->actingAs($user)->get(route('order-notes.show', $note));
         $showResponse->assertOk();

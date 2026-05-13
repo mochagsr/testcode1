@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerLevel;
 use App\Models\CustomerShipLocation;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
@@ -61,7 +62,9 @@ class SchoolDistributionFlowsTest extends TestCase
             ->get(route('customer-ship-locations.index'))
             ->assertOk()
             ->assertSee(route('customer-ship-locations.update-status', $location), false)
-            ->assertSee('name="is_active"', false);
+            ->assertSee('class="ship-location-status-input"', false)
+            ->assertSee('type="hidden" name="is_active" value="0"', false)
+            ->assertSee(__('txn.status_active'));
 
         $this
             ->actingAs($admin)
@@ -119,6 +122,115 @@ class SchoolDistributionFlowsTest extends TestCase
 
         $this->assertStringContainsString('BLK-INDEX-0001', (string) $content);
         $this->assertStringContainsString('<td>3</td> <td>1</td> <td>2</td>', (string) $content);
+    }
+
+    public function test_school_bulk_draft_can_be_deleted_by_transaction_creator_before_documents_are_generated(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'user',
+            'permissions' => [],
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BULK-DELETE',
+            'name' => 'Customer Bulk Delete',
+            'city' => 'Malang',
+        ]);
+        $transaction = SchoolBulkTransaction::query()->create([
+            'transaction_number' => 'BLK-DELETE-0001',
+            'transaction_date' => '2026-05-07',
+            'customer_id' => $customer->id,
+            'semester_period' => 'S1-2627',
+            'total_locations' => 1,
+            'total_items' => 1,
+            'created_by_user_id' => $user->id,
+        ]);
+        $location = $transaction->locations()->create([
+            'school_name' => 'SDN Draft Delete',
+            'city' => 'Malang',
+            'sort_order' => 0,
+        ]);
+        $item = $transaction->items()->create([
+            'school_bulk_transaction_location_id' => $location->id,
+            'product_name' => 'Buku Draft Delete',
+            'unit' => 'exp',
+            'quantity' => 10,
+            'unit_price' => 15000,
+            'sort_order' => 0,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->get(route('school-bulk-transactions.index'))
+            ->assertOk()
+            ->assertSee(route('school-bulk-transactions.destroy', $transaction), false)
+            ->assertSee(__('ui.delete'));
+
+        $this
+            ->actingAs($user)
+            ->delete(route('school-bulk-transactions.destroy', $transaction))
+            ->assertRedirect(route('school-bulk-transactions.index'))
+            ->assertSessionHas('success', __('school_bulk.bulk_transaction_deleted'));
+
+        $this->assertDatabaseMissing('school_bulk_transactions', ['id' => $transaction->id]);
+        $this->assertDatabaseMissing('school_bulk_transaction_locations', ['id' => $location->id]);
+        $this->assertDatabaseMissing('school_bulk_transaction_items', ['id' => $item->id]);
+    }
+
+    public function test_school_bulk_delete_is_blocked_after_delivery_note_is_generated(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BULK-BLOCK',
+            'name' => 'Customer Bulk Block',
+            'city' => 'Malang',
+        ]);
+        $transaction = SchoolBulkTransaction::query()->create([
+            'transaction_number' => 'BLK-BLOCK-0001',
+            'transaction_date' => '2026-05-07',
+            'customer_id' => $customer->id,
+            'semester_period' => 'S1-2627',
+            'total_locations' => 1,
+            'total_items' => 1,
+            'created_by_user_id' => $admin->id,
+        ]);
+        $location = $transaction->locations()->create([
+            'school_name' => 'SDN Block Delete',
+            'city' => 'Malang',
+            'sort_order' => 0,
+        ]);
+        DeliveryNote::query()->create([
+            'note_number' => 'SJ-BLOCK-0001',
+            'note_date' => '2026-05-07',
+            'customer_id' => $customer->id,
+            'school_bulk_transaction_id' => $transaction->id,
+            'school_bulk_location_id' => $location->id,
+            'recipient_name' => 'SDN Block Delete',
+        ]);
+
+        $this
+            ->actingAs($admin)
+            ->get(route('school-bulk-transactions.index'))
+            ->assertOk()
+            ->assertSee('title="'.__('school_bulk.bulk_transaction_delete_hint').'"', false)
+            ->assertSee(__('school_bulk.bulk_transaction_delete_hint'));
+
+        $this
+            ->actingAs($admin)
+            ->get(route('school-bulk-transactions.show', $transaction))
+            ->assertOk()
+            ->assertSee('title="'.__('school_bulk.bulk_transaction_delete_hint').'"', false)
+            ->assertSee(__('school_bulk.bulk_transaction_delete_hint'));
+
+        $this
+            ->actingAs($admin)
+            ->delete(route('school-bulk-transactions.destroy', $transaction))
+            ->assertRedirect()
+            ->assertSessionHas('error', __('school_bulk.bulk_transaction_delete_blocked'));
+
+        $this->assertDatabaseHas('school_bulk_transactions', ['id' => $transaction->id]);
     }
 
     public function test_customer_ship_location_create_form_places_school_and_city_before_phone(): void
@@ -348,6 +460,104 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertStringStartsWith('PK', $excelResponse->streamedContent());
     }
 
+    public function test_school_bulk_uses_customer_level_price_through_delivery_note_invoice_flow(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $salesLevel = CustomerLevel::query()->create([
+            'code' => 'SLS',
+            'name' => 'Sales',
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BULK-SALES',
+            'name' => 'Anton Sales',
+            'city' => 'Malang',
+            'customer_level_id' => $salesLevel->id,
+        ]);
+        $shipLocation = CustomerShipLocation::query()->create([
+            'customer_id' => $customer->id,
+            'school_name' => 'SDN Sales',
+            'recipient_phone' => '08120000001',
+            'city' => 'Malang',
+            'address' => 'Jl. Sales',
+            'is_active' => true,
+        ]);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-SALES',
+            'name' => 'Kategori Sales',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'PRD-SALES',
+            'name' => 'Buku Harga Sales',
+            'unit' => 'exp',
+            'stock' => 100,
+            'price_agent' => 3500,
+            'price_sales' => 4500,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('school-bulk-transactions.store'), [
+            '_idempotency_key' => 'bulk-sales-price-001',
+            'customer_id' => $customer->id,
+            'transaction_date' => '2026-05-10',
+            'semester_period' => 'S1-2627',
+            'locations' => [
+                [
+                    'uid' => 'loc-sales',
+                    'customer_ship_location_id' => $shipLocation->id,
+                    'school_name' => $shipLocation->school_name,
+                    'recipient_phone' => $shipLocation->recipient_phone,
+                    'city' => $shipLocation->city,
+                    'address' => $shipLocation->address,
+                ],
+            ],
+            'location_items' => [
+                'loc-sales' => [
+                    [
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'unit' => $product->unit,
+                        'quantity' => 10,
+                        'unit_price' => '',
+                    ],
+                ],
+            ],
+        ]);
+
+        $transaction = SchoolBulkTransaction::query()->firstOrFail();
+        $response->assertRedirect(route('school-bulk-transactions.show', $transaction));
+        $this->assertDatabaseHas('school_bulk_transaction_items', [
+            'school_bulk_transaction_id' => $transaction->id,
+            'product_id' => $product->id,
+            'unit_price' => 4500,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('school-bulk-transactions.generate-invoices', $transaction), [
+                'note_date' => '2026-05-10',
+            ])
+            ->assertRedirect(route('school-bulk-transactions.show', $transaction));
+
+        $deliveryNote = DeliveryNote::query()
+            ->where('school_bulk_transaction_id', $transaction->id)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('delivery_note_items', [
+            'delivery_note_id' => $deliveryNote->id,
+            'product_id' => $product->id,
+            'unit_price' => 4500,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales-invoices.create-from-delivery-notes', [
+                'delivery_note_ids' => [$deliveryNote->id],
+            ]))
+            ->assertOk()
+            ->assertSee('name="items[0][unit_price]" value="4500"', false)
+            ->assertDontSee('name="items[0][unit_price]" value="12000"', false);
+    }
+
     public function test_school_bulk_single_item_template_is_applied_to_all_schools(): void
     {
         $user = User::factory()->create(['role' => 'user']);
@@ -538,6 +748,13 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertDatabaseCount('receivable_ledgers', 0);
         $this->assertDatabaseCount('journal_entries', 0);
 
+        $this
+            ->actingAs($user)
+            ->get(route('school-bulk-transactions.show', $transaction))
+            ->assertOk()
+            ->assertSee('2 / 2 '.__('school_bulk.total_schools'))
+            ->assertSee(__('school_bulk.pending_schools').': 0');
+
         $secondResponse = $this->actingAs($user)->post(
             route('school-bulk-transactions.generate-invoices', $transaction),
             [
@@ -549,7 +766,7 @@ class SchoolDistributionFlowsTest extends TestCase
         $this->assertDatabaseCount('delivery_notes', 2);
     }
 
-    public function test_customer_bill_print_includes_school_breakdown_section(): void
+    public function test_customer_bill_print_includes_invoice_breakdown_section(): void
     {
         $user = User::factory()->create(['role' => 'user']);
         $customer = Customer::query()->create([
@@ -589,11 +806,11 @@ class SchoolDistributionFlowsTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee(__('receivable.school_breakdown_title'));
+        $response->assertSee(__('receivable.invoice_breakdown_title'));
         $response->assertSee('receivable-breakdown-page');
         $response->assertDontSee('Breakdown Per Sekolah');
-        $response->assertSee('SDN A');
-        $response->assertSee('SDN B');
+        $response->assertDontSee('SDN A');
+        $response->assertDontSee('SDN B');
         $response->assertSee('INV-BILL-001');
         $response->assertSee('INV-BILL-002');
     }
@@ -701,10 +918,10 @@ class SchoolDistributionFlowsTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee(__('receivable.school_breakdown_title'));
-        $response->assertSee('sd prambon 1');
-        $response->assertSee('sd prambon 2');
-        $response->assertSee('sd prambon 3');
+        $response->assertSee(__('receivable.invoice_breakdown_title'));
+        $response->assertDontSee('sd prambon 1');
+        $response->assertDontSee('sd prambon 2');
+        $response->assertDontSee('sd prambon 3');
         $response->assertSee('INV-BILL-BULK-001');
         $response->assertSee('KWT-BILL-BULK-001');
         $response->assertDontSee('166.667');

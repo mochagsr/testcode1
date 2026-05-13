@@ -74,6 +74,7 @@
         'outgoing_transactions.edit' => ['title' => 'Edit tanda terima barang', 'note' => 'Bisa edit tanda terima barang dari halaman detail.'],
         'outgoing_transactions.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel tanda terima barang.'],
         'school_bulk_transactions.create' => ['title' => 'Buat sebar sekolah', 'note' => 'Bisa membuat transaksi sebar sekolah dan generate invoice.'],
+        'school_bulk_transactions.delete' => ['title' => 'Hapus sebar sekolah draft', 'note' => 'Bisa menghapus transaksi sebar sekolah yang belum dibuat surat jalan atau faktur.'],
         'school_bulk_transactions.export' => ['title' => 'Cetak / PDF / Excel', 'note' => 'Bisa cetak, PDF, dan Excel sebar sekolah.'],
         'customer_ship_locations.create' => ['title' => 'Kelola lokasi kirim', 'note' => 'Bisa tambah, edit, dan hapus lokasi kirim sekolah.'],
         'transactions.correction.request' => [
@@ -200,6 +201,7 @@
         'outgoing_transactions.edit' => 'outgoing_transactions',
         'outgoing_transactions.export' => 'outgoing_transactions',
         'school_bulk_transactions.create' => 'school_bulk_transactions',
+        'school_bulk_transactions.delete' => 'school_bulk_transactions',
         'school_bulk_transactions.export' => 'school_bulk_transactions',
         'customer_ship_locations.create' => 'ship_locations',
         'transactions.correction.request' => 'transactions',

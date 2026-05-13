@@ -31,6 +31,8 @@
             <div class="col-3"><strong>{{ __('delivery_trip.meal_cost') }}</strong><div>Rp {{ number_format((int) $trip->meal_cost, 0, ',', '.') }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.other_cost') }}</strong><div>Rp {{ number_format((int) $trip->other_cost, 0, ',', '.') }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.total_cost') }}</strong><div><strong>Rp {{ number_format((int) $trip->total_cost, 0, ',', '.') }}</strong></div></div>
+            <div class="col-3"><strong>{{ __('txn.status') }}</strong><div>{{ $trip->is_active ? __('delivery_trip.trip_status_active') : __('delivery_trip.trip_status_inactive') }}</div></div>
+            <div class="col-3"><strong>{{ __('delivery_trip.completed_at') }}</strong><div>{{ $trip->completed_at?->format('d-m-Y H:i') ?: '-' }}</div></div>
             <div class="col-3"><strong>{{ __('txn.created_by') }}</strong><div>{{ $trip->creator?->name ?: '-' }}</div></div>
             <div class="col-3"><strong>{{ __('delivery_trip.updated_by') }}</strong><div>{{ $trip->updater?->name ?: '-' }}</div></div>
             <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $trip->notes ?: '-' }}</div></div>

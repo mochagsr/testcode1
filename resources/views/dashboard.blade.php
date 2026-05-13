@@ -78,6 +78,29 @@
             font-weight: 700;
             margin-right: 8px;
         }
+        .dashboard-user-panels {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+            align-items: start;
+        }
+        .dashboard-user-panels .card {
+            min-width: 0;
+            height: 100%;
+        }
+        .dashboard-user-table-wrap {
+            overflow-x: auto;
+            border-radius: var(--radius-md);
+        }
+        .dashboard-user-table-wrap table {
+            margin-bottom: 0;
+        }
+        @media (max-width: 980px) {
+            .dashboard-user-panels {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
     <h1 class="page-title">{{ __('ui.dashboard_title') }}</h1>
 
@@ -352,32 +375,77 @@
         </div>
     @endif
 
-    <div class="row" style="margin-top: 8px;">
-        <div class="{{ $showCompactUserDashboard ? 'col-12' : 'col-6' }}">
+    @if($showCompactUserDashboard)
+        <div class="dashboard-user-panels">
+            <div class="card">
+                <h3>{{ __('ui.dashboard_pending_order_notes') }}</h3>
+                <div class="dashboard-user-table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>{{ __('ui.dashboard_order_note_number') }}</th>
+                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('txn.date') }}</th>
+                            <th>{{ __('ui.dashboard_order_note_progress') }}</th>
+                            <th>{{ __('ui.dashboard_order_note_remaining') }}</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @forelse ($pendingOrderNotes as $note)
+                            @php
+                                $orderedTotal = (int) round((float) ($note->ordered_total ?? 0));
+                                $fulfilledTotal = (int) round((float) ($note->fulfilled_total ?? 0));
+                                $remainingTotal = max(0, (int) round((float) ($note->remaining_total ?? 0)));
+                                $progressPercent = $orderedTotal > 0 ? min(100, round(($fulfilledTotal / $orderedTotal) * 100, 2)) : 0;
+                                $progressLabel = rtrim(rtrim(number_format($progressPercent, 2, '.', ''), '0'), '.');
+                            @endphp
+                            <tr>
+                                <td><a href="{{ route('order-notes.show', $note->id) }}">{{ $note->note_number }}</a></td>
+                                <td>{{ $note->customer_name ?: '-' }}</td>
+                                <td>{{ optional($note->note_date)->format('d-m-Y') ?: '-' }}</td>
+                                <td>{{ $progressLabel }}%</td>
+                                <td>{{ number_format($remainingTotal, 0, ',', '.') }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="muted">{{ __('ui.dashboard_no_pending_order_notes') }}</td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if(method_exists($pendingOrderNotes, 'links'))
+                    <div style="margin-top: 12px;">
+                        {{ $pendingOrderNotes->links() }}
+                    </div>
+                @endif
+            </div>
             <div class="card">
                 <h3>{{ __('ui.dashboard_uncollected_receivables') }}</h3>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>{{ __('ui.customer') }}</th>
-                        <th>{{ __('ui.city') }}</th>
-                        <th>{{ __('ui.dashboard_global_receivable') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @forelse ($uncollectedCustomers as $customer)
+                <div class="dashboard-user-table-wrap">
+                    <table>
+                        <thead>
                         <tr>
-                            <td>{{ $customer->name }}</td>
-                            <td>{{ $customer->city ?: '-' }}</td>
-                            <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
+                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('ui.city') }}</th>
+                            <th>{{ __('ui.dashboard_global_receivable') }}</th>
                         </tr>
-                    @empty
-                        <tr>
-                            <td colspan="3" class="muted">{{ __('ui.dashboard_no_uncollected_receivables') }}</td>
-                        </tr>
-                    @endforelse
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        @forelse ($uncollectedCustomers as $customer)
+                            <tr>
+                                <td>{{ $customer->name }}</td>
+                                <td>{{ $customer->city ?: '-' }}</td>
+                                <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3" class="muted">{{ __('ui.dashboard_no_uncollected_receivables') }}</td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
                 @if(method_exists($uncollectedCustomers, 'links'))
                     <div style="margin-top: 12px;">
                         {{ $uncollectedCustomers->links() }}
@@ -385,50 +453,85 @@
                 @endif
             </div>
         </div>
-        <div class="{{ $showCompactUserDashboard ? 'col-12' : 'col-6' }}">
-            <div class="card">
-                <h3>{{ __('ui.dashboard_pending_order_notes') }}</h3>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>{{ __('ui.dashboard_order_note_number') }}</th>
-                        <th>{{ __('ui.customer') }}</th>
-                        <th>{{ __('txn.date') }}</th>
-                        <th>{{ __('ui.dashboard_order_note_progress') }}</th>
-                        <th>{{ __('ui.dashboard_order_note_remaining') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @forelse ($pendingOrderNotes as $note)
-                        @php
-                            $orderedTotal = (int) round((float) ($note->ordered_total ?? 0));
-                            $fulfilledTotal = (int) round((float) ($note->fulfilled_total ?? 0));
-                            $remainingTotal = max(0, (int) round((float) ($note->remaining_total ?? 0)));
-                            $progressPercent = $orderedTotal > 0 ? min(100, round(($fulfilledTotal / $orderedTotal) * 100, 2)) : 0;
-                            $progressLabel = rtrim(rtrim(number_format($progressPercent, 2, '.', ''), '0'), '.');
-                        @endphp
+    @else
+        <div class="row" style="margin-top: 8px;">
+            <div class="col-6">
+                <div class="card">
+                    <h3>{{ __('ui.dashboard_uncollected_receivables') }}</h3>
+                    <table>
+                        <thead>
                         <tr>
-                            <td><a href="{{ route('order-notes.show', $note->id) }}">{{ $note->note_number }}</a></td>
-                            <td>{{ $note->customer_name ?: '-' }}</td>
-                            <td>{{ optional($note->note_date)->format('d-m-Y') ?: '-' }}</td>
-                            <td>{{ $progressLabel }}%</td>
-                            <td>{{ number_format($remainingTotal, 0, ',', '.') }}</td>
+                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('ui.city') }}</th>
+                            <th>{{ __('ui.dashboard_global_receivable') }}</th>
                         </tr>
-                    @empty
+                        </thead>
+                        <tbody>
+                        @forelse ($uncollectedCustomers as $customer)
+                            <tr>
+                                <td>{{ $customer->name }}</td>
+                                <td>{{ $customer->city ?: '-' }}</td>
+                                <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3" class="muted">{{ __('ui.dashboard_no_uncollected_receivables') }}</td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                    @if(method_exists($uncollectedCustomers, 'links'))
+                        <div style="margin-top: 12px;">
+                            {{ $uncollectedCustomers->links() }}
+                        </div>
+                    @endif
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card">
+                    <h3>{{ __('ui.dashboard_pending_order_notes') }}</h3>
+                    <table>
+                        <thead>
                         <tr>
-                            <td colspan="5" class="muted">{{ __('ui.dashboard_no_pending_order_notes') }}</td>
+                            <th>{{ __('ui.dashboard_order_note_number') }}</th>
+                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('txn.date') }}</th>
+                            <th>{{ __('ui.dashboard_order_note_progress') }}</th>
+                            <th>{{ __('ui.dashboard_order_note_remaining') }}</th>
                         </tr>
-                    @endforelse
-                    </tbody>
-                </table>
-                @if(method_exists($pendingOrderNotes, 'links'))
-                    <div style="margin-top: 12px;">
-                        {{ $pendingOrderNotes->links() }}
-                    </div>
-                @endif
+                        </thead>
+                        <tbody>
+                        @forelse ($pendingOrderNotes as $note)
+                            @php
+                                $orderedTotal = (int) round((float) ($note->ordered_total ?? 0));
+                                $fulfilledTotal = (int) round((float) ($note->fulfilled_total ?? 0));
+                                $remainingTotal = max(0, (int) round((float) ($note->remaining_total ?? 0)));
+                                $progressPercent = $orderedTotal > 0 ? min(100, round(($fulfilledTotal / $orderedTotal) * 100, 2)) : 0;
+                                $progressLabel = rtrim(rtrim(number_format($progressPercent, 2, '.', ''), '0'), '.');
+                            @endphp
+                            <tr>
+                                <td><a href="{{ route('order-notes.show', $note->id) }}">{{ $note->note_number }}</a></td>
+                                <td>{{ $note->customer_name ?: '-' }}</td>
+                                <td>{{ optional($note->note_date)->format('d-m-Y') ?: '-' }}</td>
+                                <td>{{ $progressLabel }}%</td>
+                                <td>{{ number_format($remainingTotal, 0, ',', '.') }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="muted">{{ __('ui.dashboard_no_pending_order_notes') }}</td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                    @if(method_exists($pendingOrderNotes, 'links'))
+                        <div style="margin-top: 12px;">
+                            {{ $pendingOrderNotes->links() }}
+                        </div>
+                    @endif
+                </div>
             </div>
         </div>
-    </div>
+    @endif
 
     @if($showAdminDashboard)
         <div class="row" style="margin-top: 8px;">

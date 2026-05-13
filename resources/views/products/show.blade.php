@@ -198,53 +198,53 @@
         </div>
     </div>
 
-    <div class="card">
-        <h3 style="margin-top: 0;">Supplier Barang Ini</h3>
-        <p class="muted" style="margin-top: 0;">Ringkasan supplier yang pernah memasok barang ini dari data tanda terima barang.</p>
-        <div style="overflow-x:auto;">
-            <table class="product-supplier-table">
-                <thead>
-                <tr>
-                    <th class="supplier-col">{{ __('txn.supplier') }}</th>
-                    <th class="qty-col">{{ __('supplier_stock.total_in') }}</th>
-                    <th class="price-col">Harga Beli Terakhir</th>
-                    <th class="date-col">Tanggal Terakhir Beli</th>
-                    <th class="receipt-col">Tanda Terima Terakhir</th>
-                    <th class="action-col">{{ __('txn.action') }}</th>
-                </tr>
-                </thead>
-                <tbody>
-                @forelse($supplierRows as $row)
+    @if($showSupplierSection)
+        <div class="card">
+            <h3 style="margin-top: 0;">Supplier Barang Ini</h3>
+            <p class="muted" style="margin-top: 0;">Ringkasan supplier yang pernah memasok barang ini dari data tanda terima barang.</p>
+            <div style="overflow-x:auto;">
+                <table class="product-supplier-table">
+                    <thead>
                     <tr>
-                        <td class="supplier-col">
-                            <strong>{{ $row['supplier_name'] }}</strong>
-                            @if($row['supplier_company_name'] !== '')
-                                <div class="muted">{{ $row['supplier_company_name'] }}</div>
-                            @endif
-                        </td>
-                        <td class="qty-col">{{ number_format((int) $row['total_quantity'], 0, ',', '.') }} {{ $row['last_unit'] ?: $stockUnit }}</td>
-                        <td class="price-col">Rp {{ number_format((int) $row['last_unit_cost'], 0, ',', '.') }}</td>
-                        <td class="date-col">
-                            {{ $row['last_transaction_date'] ? \Illuminate\Support\Carbon::parse($row['last_transaction_date'])->format('d-m-Y') : '-' }}
-                        </td>
-                        <td class="receipt-col">
-                            @if((int) $row['last_transaction_id'] > 0 && $row['last_transaction_number'] !== '')
-                                <a href="{{ route('outgoing-transactions.show', $row['last_transaction_id']) }}">{{ $row['last_transaction_number'] }}</a>
-                            @else
-                                -
-                            @endif
-                        </td>
-                        <td class="action-col">
-                            <a class="btn process-soft-btn supplier-stock-link" href="{{ route('supplier-stock-cards.index', ['supplier_id' => $row['supplier_id'], 'product_id' => $product->id]) }}">
-                                Kartu Stok
-                            </a>
-                        </td>
+                        <th class="supplier-col">{{ __('txn.supplier') }}</th>
+                        <th class="qty-col">{{ __('supplier_stock.total_in') }}</th>
+                        <th class="price-col">Harga Beli Terakhir</th>
+                        <th class="date-col">Tanggal Terakhir Beli</th>
+                        <th class="receipt-col">Tanda Terima Terakhir</th>
+                        <th class="action-col">{{ __('txn.action') }}</th>
                     </tr>
-                @empty
-                    <tr><td colspan="6" class="muted">Belum ada supplier yang memasok barang ini.</td></tr>
-                @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                    @foreach($supplierRows as $row)
+                        <tr>
+                            <td class="supplier-col">
+                                <strong>{{ $row['supplier_name'] }}</strong>
+                                @if($row['supplier_company_name'] !== '')
+                                    <div class="muted">{{ $row['supplier_company_name'] }}</div>
+                                @endif
+                            </td>
+                            <td class="qty-col">{{ number_format((int) $row['total_quantity'], 0, ',', '.') }} {{ $row['last_unit'] ?: $stockUnit }}</td>
+                            <td class="price-col">Rp {{ number_format((int) $row['last_unit_cost'], 0, ',', '.') }}</td>
+                            <td class="date-col">
+                                {{ $row['last_transaction_date'] ? \Illuminate\Support\Carbon::parse($row['last_transaction_date'])->format('d-m-Y') : '-' }}
+                            </td>
+                            <td class="receipt-col">
+                                @if((int) $row['last_transaction_id'] > 0 && $row['last_transaction_number'] !== '')
+                                    <a href="{{ route('outgoing-transactions.show', $row['last_transaction_id']) }}">{{ $row['last_transaction_number'] }}</a>
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td class="action-col">
+                                <a class="btn process-soft-btn supplier-stock-link" href="{{ route('supplier-stock-cards.index', ['supplier_id' => $row['supplier_id'], 'product_id' => $product->id]) }}">
+                                    Kartu Stok
+                                </a>
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+    @endif
 @endsection

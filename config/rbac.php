@@ -39,7 +39,11 @@ return [
             'delivery_trips.create',
             'outgoing_transactions.create',
             'school_bulk_transactions.create',
+            'school_bulk_transactions.delete',
             'customer_ship_locations.create',
+        ],
+        'school_bulk_transactions.create' => [
+            'school_bulk_transactions.delete',
         ],
         'transactions.edit' => [
             'sales_invoices.edit',
@@ -57,6 +61,7 @@ return [
             'delivery_notes.cancel',
             'order_notes.cancel',
             'receivable_payments.cancel',
+            'school_bulk_transactions.delete',
         ],
         'transactions.export' => [
             'sales_invoices.export',
@@ -121,6 +126,7 @@ return [
         'outgoing_transactions.edit',
         'outgoing_transactions.export',
         'school_bulk_transactions.create',
+        'school_bulk_transactions.delete',
         'school_bulk_transactions.export',
         'customer_ship_locations.create',
         'receivables.view',

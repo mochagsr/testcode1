@@ -44,23 +44,62 @@
         .ship-location-status-form {
             margin: 0;
         }
-        .ship-location-status-select {
-            width: 92px;
-            min-height: 34px;
-            padding: 6px 22px 6px 10px;
+        .ship-location-status-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .ship-location-status-input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .ship-location-status-track {
+            position: relative;
+            width: 48px;
+            height: 28px;
             border-radius: 999px;
-            font-weight: 700;
+            background: #98a2b3;
+            border: 1px solid #98a2b3;
+            transition: background 0.18s ease, border-color 0.18s ease;
+            flex: 0 0 auto;
+        }
+        .ship-location-status-track::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(16, 24, 40, 0.22);
+            transition: transform 0.18s ease;
+        }
+        .ship-location-status-input:checked + .ship-location-status-track {
+            background: #12b76a;
+            border-color: #12b76a;
+        }
+        .ship-location-status-input:checked + .ship-location-status-track::after {
+            transform: translateX(20px);
+        }
+        .ship-location-status-input:focus-visible + .ship-location-status-track {
+            outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent);
+            outline-offset: 2px;
+        }
+        .ship-location-status-label {
+            min-width: 74px;
             font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
         }
-        .ship-location-status-select.is-active {
-            color: #067647;
-            background: #ecfdf3;
-            border-color: #abefc6;
+        .ship-location-status-label.is-active {
+            color: #12b76a;
         }
-        .ship-location-status-select.is-inactive {
-            color: #b42318;
-            background: #fef3f2;
-            border-color: #fecdca;
+        .ship-location-status-label.is-inactive {
+            color: #98a2b3;
         }
         .ship-location-table {
             table-layout: fixed;
@@ -180,13 +219,21 @@
                             <form method="post" action="{{ route('customer-ship-locations.update-status', $location) }}" class="ship-location-status-form">
                                 @csrf
                                 @method('PATCH')
-                                <select name="is_active"
-                                        class="ship-location-status-select {{ $location->is_active ? 'is-active' : 'is-inactive' }}"
+                                <label class="ship-location-status-toggle" aria-label="{{ __('txn.status') }} {{ $location->school_name }}">
+                                    <input type="hidden" name="is_active" value="0">
+                                    <input
+                                        type="checkbox"
+                                        name="is_active"
+                                        value="1"
+                                        class="ship-location-status-input"
+                                        @checked($location->is_active)
                                         onchange="this.form.submit()"
-                                        aria-label="{{ __('txn.status') }} {{ $location->school_name }}">
-                                    <option value="1" @selected($location->is_active)>{{ __('txn.status_active') }}</option>
-                                    <option value="0" @selected(! $location->is_active)>{{ __('school_bulk.status_inactive') }}</option>
-                                </select>
+                                    >
+                                    <span class="ship-location-status-track" aria-hidden="true"></span>
+                                    <span class="ship-location-status-label {{ $location->is_active ? 'is-active' : 'is-inactive' }}">
+                                        {{ $location->is_active ? __('txn.status_active') : __('school_bulk.status_inactive') }}
+                                    </span>
+                                </label>
                             </form>
                         @else
                             @if($location->is_active)

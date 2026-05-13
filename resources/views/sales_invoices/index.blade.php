@@ -80,7 +80,7 @@
     </div>
 
     <div class="card invoice-list-card">
-        <div class="table-mobile-scroll">
+        <div class="table-mobile-scroll transaction-list-scroll">
         <table class="mobile-stack-table">
             <thead>
             <tr>

@@ -187,6 +187,8 @@ return [
     'stock_mutation_import_reduce_note' => 'Pengurangan stok dari import barang',
     'stock_mutation_desc_sales_invoice_out' => 'Stok :qty dipakai di invoice :number',
     'stock_mutation_desc_sales_invoice_in' => 'Stok :qty dikembalikan dari invoice :number',
+    'stock_mutation_desc_delivery_note_out' => 'Stok :qty dipakai di surat jalan :number',
+    'stock_mutation_desc_delivery_note_in' => 'Stok :qty dikembalikan dari pembatalan/koreksi surat jalan :number',
     'stock_mutation_desc_outgoing_in' => 'Stok :qty ditambah dari transaksi keluar :number',
     'stock_mutation_desc_outgoing_out' => 'Stok :qty dikurangi untuk koreksi transaksi keluar :number',
     'stock_mutation_desc_return_in' => 'Stok :qty ditambah dari retur :number',

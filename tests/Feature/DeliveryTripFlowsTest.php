@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Models\JournalEntry;
 use App\Models\DeliveryTrip;
+use App\Models\JournalEntry;
 use App\Models\User;
 use App\Support\SemesterBookService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,6 +39,8 @@ class DeliveryTripFlowsTest extends TestCase
         $this->assertSame('Pak Asisten', (string) $trip?->assistant_name);
         $this->assertSame(210000, (int) $trip?->total_cost);
         $this->assertSame(0, (int) $trip?->member_count);
+        $this->assertTrue((bool) $trip?->is_active);
+        $this->assertNull($trip?->completed_at);
         $this->assertDatabaseHas('journal_entries', [
             'reference_type' => DeliveryTrip::class,
             'reference_id' => (int) $trip?->id,
@@ -124,5 +126,45 @@ class DeliveryTripFlowsTest extends TestCase
             ->first();
 
         $this->assertNotNull($adjustmentEntry);
+    }
+
+    public function test_admin_can_complete_active_delivery_trip_and_store_completion_time(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+
+        $this->actingAs($admin)->post(route('delivery-trips.store'), [
+            'trip_date' => '2026-02-20',
+            'driver_name' => 'Supir Aktif',
+            'assistant_name' => 'Asisten Aktif',
+            'vehicle_plate' => 'N 8888 AK',
+            'fuel_cost' => 75000,
+            'toll_cost' => 25000,
+            'meal_cost' => 0,
+            'other_cost' => 0,
+            'notes' => 'Perjalanan yang sedang berlangsung',
+        ])->assertRedirect();
+
+        $trip = DeliveryTrip::query()->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('delivery-trips.index'))
+            ->assertOk()
+            ->assertSee(__('delivery_trip.active_trips_title'))
+            ->assertSee($trip->trip_number)
+            ->assertSee(__('delivery_trip.trip_status_active'));
+
+        $this->actingAs($admin)
+            ->patch(route('delivery-trips.complete', $trip))
+            ->assertRedirect(route('delivery-trips.index'));
+
+        $trip->refresh();
+
+        $this->assertFalse((bool) $trip->is_active);
+        $this->assertNotNull($trip->completed_at);
+
+        $this->actingAs($admin)
+            ->get(route('delivery-trips.index'))
+            ->assertOk()
+            ->assertSee($trip->completed_at?->format('d-m-Y H:i'));
     }
 }

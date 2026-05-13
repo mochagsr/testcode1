@@ -3,6 +3,12 @@
 @section('title', __('school_bulk.bulk_transaction_title').' - '.config('app.name', 'Laravel'))
 
 @section('content')
+    @php
+        $canDeleteDraft = auth()->user()?->canAccess('school_bulk_transactions.delete')
+            && (int) ($transaction->generated_delivery_documents_count ?? 0) === 0
+            && (int) ($transaction->generated_invoice_documents_count ?? 0) === 0;
+        $showDeleteBlockedAction = auth()->user()?->canAccess('school_bulk_transactions.delete') && ! $canDeleteDraft;
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('school_bulk.bulk_transaction_title') }} {{ $transaction->transaction_number }}</h1>
         <div class="flex">
@@ -13,6 +19,16 @@
                 <option value="{{ route('school-bulk-transactions.export.pdf', $transaction) }}">{{ __('txn.pdf') }}</option>
                 <option value="{{ route('school-bulk-transactions.export.excel', $transaction) }}">{{ __('txn.excel') }}</option>
             </select>
+            @if($canDeleteDraft)
+                <form method="post" action="{{ route('school-bulk-transactions.destroy', $transaction) }}" data-confirm-modal data-confirm-message="{{ __('school_bulk.confirm_delete_bulk_transaction') }}">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
+                </form>
+            @endif
+            @if($showDeleteBlockedAction)
+                <button type="button" class="btn danger-btn" disabled title="{{ __('school_bulk.bulk_transaction_delete_hint') }}">{{ __('ui.delete') }}</button>
+            @endif
         </div>
     </div>
 

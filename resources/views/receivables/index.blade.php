@@ -72,6 +72,14 @@
             overflow: visible;
             text-overflow: clip;
         }
+        .receivable-bill-table thead th,
+        .receivable-bill-table thead th.num {
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+            line-height: 1.2;
+            vertical-align: middle;
+        }
         .receivable-ledger-table td.action,
         .receivable-ledger-table th.action {
             width: 78px;
@@ -206,7 +214,7 @@
             min-width: 1240px;
         }
         .receivable-scroll-wrap.bill table {
-            min-width: 1160px;
+            min-width: 1280px;
         }
         .receivable-scroll-wrap.outstanding table {
             min-width: 1120px;
@@ -465,22 +473,11 @@
                     >
                         {{ __('receivable.print_customer_bill') }}
                     </a>
-                    <a
-                        class="btn info-btn"
-                        href="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        {{ __('receivable.save_pdf') }}
-                    </a>
-                    <a
-                        class="btn info-btn"
-                        href="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        {{ __('receivable.save_excel') }}
-                    </a>
+                    <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                        <option value="" selected disabled>Export</option>
+                        <option value="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">Export Excel</option>
+                        <option value="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">Export PDF</option>
+                    </select>
                 </div>
             </div>
         @endif
@@ -818,10 +815,9 @@
                         <h4 style="margin: 0;">{{ __('receivable.customer_bill_title') }}</h4>
                         <div style="text-align: right;">
                         <select class="action-menu action-menu-lg" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                            <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                            <option value="{{ route('receivables.print-customer-bill', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ __('receivable.print_customer_bill') }}</option>
-                            <option value="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ __('receivable.save_pdf') }}</option>
-                            <option value="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">{{ __('receivable.save_excel') }}</option>
+                            <option value="" selected disabled>Export</option>
+                            <option value="{{ route('receivables.export-customer-bill-excel', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">Export Excel</option>
+                            <option value="{{ route('receivables.export-customer-bill-pdf', ['customer' => $selectedCustomerId, 'semester' => $selectedSemester, 'transaction_type' => ($selectedTransactionType ?? '')]) }}">Export PDF</option>
                         </select>
                     </div>
                     </div>
@@ -830,14 +826,14 @@
                             <div class="receivable-scroll-wrap bill">
                             <table class="receivable-bill-table">
                                 <colgroup>
-                                    <col style="width: 11%;">
-                                    <col style="width: 22%;">
-                                    <col style="width: 13%;">
+                                    <col style="width: 10%;">
+                                    <col style="width: 20%;">
+                                    <col style="width: 12%;">
                                     <col style="width: 13%;">
                                     <col style="width: 12%;">
+                                    <col style="width: 12%;">
+                                    <col style="width: 11%;">
                                     <col style="width: 10%;">
-                                    <col style="width: 10%;">
-                                    <col style="width: 9%;">
                                 </colgroup>
                                 <thead>
                                 <tr>
@@ -916,10 +912,14 @@
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['sales_return'] ?? 0))), 0, ',', '.') }}</td>
                                     <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
                                 </tr>
+                                @php
+                                    $billRunningBalanceTotal = (int) round((float) (($billStatementTotals['running_balance'] ?? 0)));
+                                    $billHasCreditBalance = $billRunningBalanceTotal < 0;
+                                @endphp
                                 <tr style="font-weight:700;">
                                     <td colspan="5"></td>
-                                    <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
-                                    <td class="num">Rp {{ number_format((int) round((float) (($billStatementTotals['running_balance'] ?? 0))), 0, ',', '.') }}</td>
+                                    <td colspan="2" style="text-align:right;">{{ $billHasCreditBalance ? __('receivable.bill_total_credit_balance') : __('receivable.bill_total_receivable') }}</td>
+                                    <td class="num">Rp {{ number_format(abs($billRunningBalanceTotal), 0, ',', '.') }}</td>
                                 </tr>
                                 </tbody>
                             </table>

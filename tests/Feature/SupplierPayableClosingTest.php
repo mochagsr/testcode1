@@ -75,4 +75,18 @@ class SupplierPayableClosingTest extends TestCase
         $monthResponse->assertOk();
         $monthResponse->assertSee(__('supplier_payable.close_month_action'));
     }
+
+    public function test_supplier_payable_index_uses_export_dropdown(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
+
+        $response = $this->actingAs($admin)->get(route('supplier-payables.index'));
+
+        $response->assertOk();
+        $response->assertSee('<option value="" selected disabled>Export</option>', false);
+        $response->assertSee(route('supplier-payables.export.pdf'), false);
+        $response->assertSee(route('supplier-payables.export.excel'), false);
+        $response->assertDontSee('">'.__('txn.pdf').'</a>', false);
+        $response->assertDontSee('">Export Excel</a>', false);
+    }
 }

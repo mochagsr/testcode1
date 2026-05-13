@@ -296,7 +296,7 @@
             if (combined.includes('agent') || combined.includes('agen')) {
                 return 'price_agent';
             }
-            if (combined.includes('sales')) {
+            if (combined.includes('sales') || combined.includes('sale') || combined.includes('penjualan')) {
                 return 'price_sales';
             }
             return 'price_general';

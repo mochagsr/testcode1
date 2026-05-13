@@ -119,6 +119,7 @@ class MasterPermissionAccessTest extends TestCase
             'settings.semester.open',
             'supplier-payables.year-close',
             'supplier-payables.year-open',
+            'school-bulk-transactions.destroy',
             'users.index',
             'audit-logs.index',
             'ops-health.index',
@@ -131,7 +132,6 @@ class MasterPermissionAccessTest extends TestCase
             $this->assertNotContains('admin', $middleware, sprintf('Route [%s] should rely on detailed permissions instead of admin-only middleware.', $routeName));
         }
     }
-
 
     public function test_outgoing_create_button_hidden_without_create_permission(): void
     {
@@ -219,8 +219,8 @@ class MasterPermissionAccessTest extends TestCase
         $this->assertContains('transactions.view', $resolvedPermissions);
         $this->assertContains('transactions.create', $resolvedPermissions);
         $this->assertContains('outgoing_transactions.create', $resolvedPermissions);
+        $this->assertContains('school_bulk_transactions.delete', $resolvedPermissions);
         $this->assertContains('suppliers.create', $resolvedPermissions);
         $this->assertNotContains('settings.admin', $resolvedPermissions);
     }
-
 }

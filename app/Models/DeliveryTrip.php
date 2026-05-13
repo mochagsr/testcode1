@@ -32,6 +32,8 @@ class DeliveryTrip extends Model
         'other_cost',
         'total_cost',
         'notes',
+        'is_active',
+        'completed_at',
         'created_by_user_id',
         'updated_by_user_id',
     ];
@@ -49,6 +51,8 @@ class DeliveryTrip extends Model
             'meal_cost' => 'integer',
             'other_cost' => 'integer',
             'total_cost' => 'integer',
+            'is_active' => 'boolean',
+            'completed_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
     }
@@ -92,6 +96,8 @@ class DeliveryTrip extends Model
             'meal_cost',
             'other_cost',
             'total_cost',
+            'is_active',
+            'completed_at',
         ]);
     }
 

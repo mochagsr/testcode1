@@ -1046,10 +1046,10 @@ class ReceivablePageController extends Controller
     {
         $data = $this->customerBillViewData($request, $customer);
         $rows = collect($data['rows'] ?? []);
-        $schoolBreakdown = collect($data['schoolBreakdown'] ?? []);
+        $invoiceBreakdown = collect($data['invoiceBreakdown'] ?? []);
         $filename = 'tagihan-'.$customer->id.'-'.$this->nowWib()->format('Ymd-His').'.xlsx';
 
-        return response()->streamDownload(function () use ($rows, $data, $schoolBreakdown): void {
+        return response()->streamDownload(function () use ($rows, $data, $invoiceBreakdown): void {
             $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Tagihan');
@@ -1151,63 +1151,75 @@ class ReceivablePageController extends Controller
 
             $rowCursor = $tableStartRow + count($rowsOut) + 2;
 
-            if ($schoolBreakdown->isNotEmpty()) {
-                $sheet->mergeCells('A'.$rowCursor.':G'.$rowCursor);
-                $sheet->setCellValue('A'.$rowCursor, __('receivable.school_breakdown_title'));
+            if ($invoiceBreakdown->isNotEmpty()) {
+                $sheet->mergeCells('A'.$rowCursor.':E'.$rowCursor);
+                $sheet->setCellValue('A'.$rowCursor, __('receivable.invoice_breakdown_title'));
                 $sheet->getStyle('A'.$rowCursor)->getFont()->setBold(true);
                 $rowCursor++;
-                $schoolHeader = [
-                    __('receivable.school_name'),
-                    __('receivable.school_city'),
-                    __('receivable.bill_date'),
-                    __('receivable.bill_proof_number'),
+                $invoiceHeader = [
+                    __('receivable.invoice_number'),
                     __('receivable.school_invoice_total'),
+                    __('receivable.invoice_return_total'),
                     __('receivable.school_paid_total'),
                     __('receivable.school_balance_total'),
                 ];
                 $sectionStart = $rowCursor;
-                $sheet->fromArray([$schoolHeader], null, 'A'.$rowCursor);
+                $sheet->fromArray([$invoiceHeader], null, 'A'.$rowCursor);
                 $rowCursor++;
-                $schoolDataCount = 0;
+                $invoiceDataCount = 0;
 
-                foreach ($schoolBreakdown as $group) {
-                    $groupRows = collect($group['rows'] ?? []);
-                    if ($groupRows->isEmpty()) {
-                        continue;
-                    }
-                    foreach ($groupRows as $groupRow) {
+                foreach ($invoiceBreakdown as $invoiceRow) {
+                    $sheet->fromArray([[
+                        (string) ($invoiceRow['invoice_number'] ?? '-'),
+                        number_format((int) round((float) ($invoiceRow['invoice_total'] ?? 0)), 0, ',', '.'),
+                        number_format((int) round((float) ($invoiceRow['return_total'] ?? 0)), 0, ',', '.'),
+                        number_format((int) round((float) ($invoiceRow['paid_total'] ?? 0)), 0, ',', '.'),
+                        number_format((int) round((float) ($invoiceRow['balance_total'] ?? 0)), 0, ',', '.'),
+                    ]], null, 'A'.$rowCursor);
+                    $rowCursor++;
+                    $invoiceDataCount++;
+                }
+
+                if ($invoiceDataCount > 0) {
+                    ExcelExportStyler::styleTable($sheet, $sectionStart, 5, $invoiceDataCount, false);
+                    $sheet->getStyle('A'.$sectionStart.':E'.($rowCursor - 1))->getAlignment()->setWrapText(true);
+                }
+                $rowCursor += 2;
+
+                foreach ($invoiceBreakdown as $invoiceRow) {
+                    $sheet->mergeCells('A'.$rowCursor.':D'.$rowCursor);
+                    $sheet->setCellValue('A'.$rowCursor, (string) ($invoiceRow['invoice_number'] ?? '-'));
+                    $sheet->getStyle('A'.$rowCursor)->getFont()->setBold(true);
+                    $rowCursor++;
+                    $detailStart = $rowCursor;
+                    $sheet->fromArray([[
+                        __('receivable.bill_date'),
+                        __('receivable.transaction_type'),
+                        __('receivable.bill_proof_number'),
+                        __('receivable.bill_amount'),
+                    ]], null, 'A'.$rowCursor);
+                    $rowCursor++;
+                    $detailRows = collect($invoiceRow['details'] ?? []);
+                    foreach ($detailRows as $detailRow) {
+                        $amount = (int) round((float) ($detailRow['amount'] ?? 0));
                         $sheet->fromArray([[
-                            (string) ($groupRow['school_name'] ?? '-'),
-                            (string) ($groupRow['school_city'] ?? '-'),
-                            (string) ($groupRow['date_label'] ?? ''),
-                            (string) ($groupRow['invoice_number'] ?? ''),
-                            number_format((int) round((float) ($groupRow['invoice_total'] ?? 0)), 0, ',', '.'),
-                            number_format((int) round((float) ($groupRow['paid_total'] ?? 0)), 0, ',', '.'),
-                            number_format((int) round((float) ($groupRow['balance_total'] ?? 0)), 0, ',', '.'),
+                            (string) ($detailRow['date_label'] ?? ''),
+                            (string) ($detailRow['type_label'] ?? ''),
+                            (string) ($detailRow['proof_number'] ?? ''),
+                            ($amount < 0 ? '(' : '').number_format(abs($amount), 0, ',', '.').($amount < 0 ? ')' : ''),
                         ]], null, 'A'.$rowCursor);
                         $rowCursor++;
-                        $schoolDataCount++;
                     }
-
-                    $totalsPerSchool = (array) ($group['totals'] ?? []);
                     $sheet->fromArray([[
                         '',
                         '',
-                        '',
-                        __('receivable.bill_total'),
-                        number_format((int) round((float) ($totalsPerSchool['invoice_total'] ?? 0)), 0, ',', '.'),
-                        number_format((int) round((float) ($totalsPerSchool['paid_total'] ?? 0)), 0, ',', '.'),
-                        number_format((int) round((float) ($totalsPerSchool['balance_total'] ?? 0)), 0, ',', '.'),
+                        __('receivable.school_balance_total'),
+                        number_format((int) round((float) ($invoiceRow['balance_total'] ?? 0)), 0, ',', '.'),
                     ]], null, 'A'.$rowCursor);
                     $rowCursor++;
-                    $schoolDataCount++;
+                    ExcelExportStyler::styleTable($sheet, $detailStart, 4, $detailRows->count() + 1, false);
+                    $rowCursor++;
                 }
-
-                if ($schoolDataCount > 0) {
-                    ExcelExportStyler::styleTable($sheet, $sectionStart, 7, $schoolDataCount, false);
-                    $sheet->getStyle('A'.$sectionStart.':G'.($rowCursor - 1))->getAlignment()->setWrapText(true);
-                }
-                $rowCursor++;
             }
 
             if ($notesText !== '') {
@@ -1524,7 +1536,7 @@ class ReceivablePageController extends Controller
         );
         $statementRows = $statementData['rows'];
         $totals = $statementData['totals'];
-        $schoolBreakdown = $this->buildCustomerBillSchoolBreakdown(
+        $invoiceBreakdown = $this->buildCustomerBillInvoiceBreakdown(
             (int) $customer->id,
             $selectedSemester !== '' ? $selectedSemester : null,
             $selectedTransactionType !== '' ? $selectedTransactionType : null
@@ -1544,7 +1556,7 @@ class ReceivablePageController extends Controller
             'rows' => $statementRows,
             'totalOutstanding' => (int) round((float) $totals['running_balance']),
             'totals' => $totals,
-            'schoolBreakdown' => $schoolBreakdown,
+            'invoiceBreakdown' => $invoiceBreakdown,
             'companyLogoPath' => $settings['companyLogoPath'] ?? null,
             'companyName' => $settings['companyName'] ?? 'CV. PUSTAKA GRAFIKA',
             'companyAddress' => $settings['companyAddress'] ?? '',
@@ -1622,7 +1634,7 @@ class ReceivablePageController extends Controller
                 'customer_id' => $customerId,
                 'semester' => (string) ($normalizedSemester ?? ''),
                 'transaction_type' => (string) ($normalizedTransactionType ?? ''),
-                'version' => 'v2',
+                'version' => 'v3',
             ]),
             now()->addSeconds(45),
             fn () => $this->buildCustomerBillStatement($customerId, $normalizedSemester, $normalizedTransactionType)
@@ -1840,6 +1852,9 @@ class ReceivablePageController extends Controller
                 default => $baseProofNumber,
             };
             $invoiceId = $ledgerRow->invoice?->id;
+            if ($entryType === 'payment' && $invoiceId === null && $installment > 0) {
+                $entryType = 'overpayment';
+            }
             $typeKey = $transactionType ?? 'none';
             $subtypeKey = $printingSubtypeName !== '' ? mb_strtolower($printingSubtypeName, 'UTF-8') : 'none';
             $groupKey = $isAdminInvoiceAdjustment
@@ -2090,7 +2105,9 @@ class ReceivablePageController extends Controller
     private function customerBillEntryTransactionTypeLabel(?string $transactionType, string $entryType): string
     {
         return match ($entryType) {
-            'payment', 'writeoff', 'discount' => __('receivable.transaction_type_payment'),
+            'payment' => __('receivable.transaction_type_invoice_payment'),
+            'overpayment' => __('receivable.transaction_type_overpayment'),
+            'writeoff', 'discount' => __('receivable.transaction_type_payment'),
             'cancel', 'adjustment' => __('receivable.transaction_type_user_edit'),
             'return' => __('receivable.transaction_type_return'),
             default => __('receivable.transaction_type_sale'),
@@ -2103,7 +2120,7 @@ class ReceivablePageController extends Controller
             return __('txn.status_canceled');
         }
 
-        if (in_array($entryType, ['payment', 'writeoff', 'discount', 'return'], true)) {
+        if (in_array($entryType, ['payment', 'overpayment', 'writeoff', 'discount', 'return'], true)) {
             return __('receivable.printing_subtype_none');
         }
 
@@ -2137,6 +2154,308 @@ class ReceivablePageController extends Controller
         }
 
         return strtoupper((string) $match[0]);
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     invoice_id:int,
+     *     invoice_number:string,
+     *     invoice_date:string,
+     *     invoice_total:int,
+     *     return_total:int,
+     *     paid_total:int,
+     *     balance_total:int,
+     *     details:Collection<int, array{date_label:string,type_label:string,proof_number:string,amount:int}>
+     * }>
+     */
+    private function buildCustomerBillInvoiceBreakdown(int $customerId, ?string $selectedSemester, ?string $selectedTransactionType = null): Collection
+    {
+        $semester = $selectedSemester ?? '';
+        $transactionType = $selectedTransactionType ?? '';
+        $invoices = SalesInvoice::query()
+            ->select([
+                'id',
+                'invoice_number',
+                'invoice_date',
+                'semester_period',
+                'total',
+                'total_paid',
+                'balance',
+            ])
+            ->with('payments:id,sales_invoice_id,payment_date,amount,method,notes')
+            ->forCustomer($customerId)
+            ->active()
+            ->when($transactionType !== '', function ($query) use ($transactionType): void {
+                $query->where('transaction_type', $transactionType);
+            })
+            ->when($semester !== '', function ($query) use ($semester): void {
+                $query->forSemester($semester);
+            })
+            ->orderBy('invoice_date')
+            ->orderBy('id')
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return collect();
+        }
+
+        $invoiceRows = [];
+        $invoiceOrder = [];
+        foreach ($invoices as $invoice) {
+            $invoiceId = (int) $invoice->id;
+            $invoiceTotal = (int) round((float) ($invoice->total ?? 0));
+            $invoiceRows[$invoiceId] = [
+                'invoice_id' => $invoiceId,
+                'invoice_number' => (string) ($invoice->invoice_number ?? '-'),
+                'invoice_date' => $this->formatBillDate($invoice->invoice_date),
+                'invoice_total' => $invoiceTotal,
+                'return_total' => 0,
+                'paid_total' => 0,
+                'recorded_paid_total' => (int) round((float) ($invoice->total_paid ?? 0)),
+                'recorded_balance_total' => (int) round((float) ($invoice->balance ?? 0)),
+                'details' => collect([[
+                    'date_label' => $this->formatBillDate($invoice->invoice_date),
+                    'type_label' => __('receivable.transaction_type_sale'),
+                    'proof_number' => (string) ($invoice->invoice_number ?? '-'),
+                    'amount' => $invoiceTotal,
+                ]]),
+            ];
+            $invoiceOrder[] = $invoiceId;
+        }
+
+        $ledgerRows = ReceivableLedger::query()
+            ->forCustomer($customerId)
+            ->when($transactionType !== '', function ($query) use ($transactionType): void {
+                $query->where('transaction_type', $transactionType);
+            })
+            ->when($semester !== '', function ($query) use ($semester): void {
+                $query->forSemester($semester);
+            })
+            ->where('credit', '>', 0)
+            ->orderByDate('asc')
+            ->get(['id', 'sales_invoice_id', 'entry_date', 'description', 'credit']);
+
+        foreach ($ledgerRows as $ledgerRow) {
+            $amount = (int) round((float) ($ledgerRow->credit ?? 0));
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $description = trim((string) ($ledgerRow->description ?? ''));
+            $entryType = $this->customerBillInvoiceBreakdownEntryType($description);
+            $targetInvoiceId = (int) ($ledgerRow->sales_invoice_id ?? 0);
+            $detail = [
+                'date_label' => $this->formatBillDate($ledgerRow->entry_date),
+                'type_label' => $this->customerBillInvoiceBreakdownTypeLabel($entryType),
+                'proof_number' => $this->customerBillInvoiceBreakdownProofNumber($description, $entryType),
+                'amount' => -$amount,
+            ];
+
+            $this->applyCustomerBillInvoiceBreakdownCredit(
+                invoiceRows: $invoiceRows,
+                invoiceOrder: $invoiceOrder,
+                targetInvoiceId: $targetInvoiceId > 0 ? $targetInvoiceId : null,
+                amount: $amount,
+                entryType: $entryType,
+                detail: $detail
+            );
+        }
+
+        foreach ($invoices as $invoice) {
+            $invoiceId = (int) $invoice->id;
+            if (! isset($invoiceRows[$invoiceId])) {
+                continue;
+            }
+
+            $recordedPaid = (int) ($invoiceRows[$invoiceId]['recorded_paid_total'] ?? 0);
+            $missingPayment = max(0, $recordedPaid - (int) ($invoiceRows[$invoiceId]['paid_total'] ?? 0));
+            if ($missingPayment > 0) {
+                $remainingMissingPayment = $missingPayment;
+                $payments = $invoice->payments
+                    ->sortBy([
+                        ['payment_date', 'asc'],
+                        ['id', 'asc'],
+                    ])
+                    ->values();
+                foreach ($payments as $payment) {
+                    if ($remainingMissingPayment <= 0) {
+                        break;
+                    }
+
+                    $paymentAmount = min($remainingMissingPayment, (int) round((float) ($payment->amount ?? 0)));
+                    if ($paymentAmount <= 0) {
+                        continue;
+                    }
+
+                    $paymentProofNumber = $this->extractDocumentReference((string) ($payment->notes ?? ''), ['KWT', 'PYT']);
+                    $this->applyCustomerBillInvoiceBreakdownCredit(
+                        invoiceRows: $invoiceRows,
+                        invoiceOrder: $invoiceOrder,
+                        targetInvoiceId: $invoiceId,
+                        amount: $paymentAmount,
+                        entryType: 'payment',
+                        detail: [
+                            'date_label' => $this->formatBillDate($payment->payment_date),
+                            'type_label' => __('receivable.transaction_type_payment'),
+                            'proof_number' => $paymentProofNumber !== '' ? $paymentProofNumber : (string) ($invoice->invoice_number ?? '-'),
+                            'amount' => -$paymentAmount,
+                        ]
+                    );
+                    $remainingMissingPayment -= $paymentAmount;
+                }
+
+                if ($remainingMissingPayment > 0) {
+                    $this->applyCustomerBillInvoiceBreakdownCredit(
+                        invoiceRows: $invoiceRows,
+                        invoiceOrder: $invoiceOrder,
+                        targetInvoiceId: $invoiceId,
+                        amount: $remainingMissingPayment,
+                        entryType: 'payment',
+                        detail: [
+                            'date_label' => $this->formatBillDate($invoice->invoice_date),
+                            'type_label' => __('receivable.transaction_type_payment'),
+                            'proof_number' => (string) ($invoice->invoice_number ?? '-'),
+                            'amount' => -$remainingMissingPayment,
+                        ]
+                    );
+                }
+            }
+
+            $computedBalance = max(0, (int) ($invoiceRows[$invoiceId]['invoice_total'] ?? 0)
+                - (int) ($invoiceRows[$invoiceId]['return_total'] ?? 0)
+                - (int) ($invoiceRows[$invoiceId]['paid_total'] ?? 0));
+            $recordedBalance = (int) ($invoiceRows[$invoiceId]['recorded_balance_total'] ?? $computedBalance);
+            $missingReturn = max(0, $computedBalance - $recordedBalance);
+            if ($missingReturn > 0) {
+                $this->applyCustomerBillInvoiceBreakdownCredit(
+                    invoiceRows: $invoiceRows,
+                    invoiceOrder: $invoiceOrder,
+                    targetInvoiceId: $invoiceId,
+                    amount: $missingReturn,
+                    entryType: 'return',
+                    detail: [
+                        'date_label' => $this->formatBillDate($invoice->invoice_date),
+                        'type_label' => __('receivable.transaction_type_return'),
+                        'proof_number' => (string) ($invoice->invoice_number ?? '-'),
+                        'amount' => -$missingReturn,
+                    ]
+                );
+            }
+        }
+
+        return collect($invoiceOrder)
+            ->map(function (int $invoiceId) use ($invoiceRows): array {
+                $row = $invoiceRows[$invoiceId];
+                $row['balance_total'] = max(0, (int) ($row['invoice_total'] ?? 0)
+                    - (int) ($row['return_total'] ?? 0)
+                    - (int) ($row['paid_total'] ?? 0));
+                unset($row['recorded_paid_total'], $row['recorded_balance_total']);
+
+                return $row;
+            })
+            ->values();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $invoiceRows
+     * @param  array<int, int>  $invoiceOrder
+     * @param  array{date_label:string,type_label:string,proof_number:string,amount:int}  $detail
+     */
+    private function applyCustomerBillInvoiceBreakdownCredit(
+        array &$invoiceRows,
+        array $invoiceOrder,
+        ?int $targetInvoiceId,
+        int $amount,
+        string $entryType,
+        array $detail
+    ): void {
+        if ($amount <= 0) {
+            return;
+        }
+
+        if ($targetInvoiceId !== null && isset($invoiceRows[$targetInvoiceId])) {
+            $this->pushCustomerBillInvoiceBreakdownCredit($invoiceRows[$targetInvoiceId], $amount, $entryType, $detail);
+
+            return;
+        }
+
+        $remainingAmount = $amount;
+        foreach ($invoiceOrder as $invoiceId) {
+            if ($remainingAmount <= 0 || ! isset($invoiceRows[$invoiceId])) {
+                break;
+            }
+
+            $invoiceBalance = max(0, (int) ($invoiceRows[$invoiceId]['invoice_total'] ?? 0)
+                - (int) ($invoiceRows[$invoiceId]['return_total'] ?? 0)
+                - (int) ($invoiceRows[$invoiceId]['paid_total'] ?? 0));
+            if ($invoiceBalance <= 0) {
+                continue;
+            }
+
+            $allocated = min($remainingAmount, $invoiceBalance);
+            $allocatedDetail = $detail;
+            $allocatedDetail['amount'] = -$allocated;
+            $this->pushCustomerBillInvoiceBreakdownCredit($invoiceRows[$invoiceId], $allocated, $entryType, $allocatedDetail);
+            $remainingAmount -= $allocated;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $invoiceRow
+     * @param  array{date_label:string,type_label:string,proof_number:string,amount:int}  $detail
+     */
+    private function pushCustomerBillInvoiceBreakdownCredit(array &$invoiceRow, int $amount, string $entryType, array $detail): void
+    {
+        if ($entryType === 'return') {
+            $invoiceRow['return_total'] = (int) ($invoiceRow['return_total'] ?? 0) + $amount;
+        } else {
+            $invoiceRow['paid_total'] = (int) ($invoiceRow['paid_total'] ?? 0) + $amount;
+        }
+
+        /** @var Collection<int, array<string, mixed>> $details */
+        $details = $invoiceRow['details'] instanceof Collection ? $invoiceRow['details'] : collect($invoiceRow['details'] ?? []);
+        $details->push($detail);
+        $invoiceRow['details'] = $details;
+    }
+
+    private function customerBillInvoiceBreakdownEntryType(string $description): string
+    {
+        $normalized = mb_strtolower(trim($description), 'UTF-8');
+        if (str_contains($normalized, 'retur') || str_contains($normalized, 'return')) {
+            return 'return';
+        }
+        if (str_contains($normalized, 'write-off') || str_contains($normalized, 'writeoff')) {
+            return 'writeoff';
+        }
+        if (str_contains($normalized, 'diskon') || str_contains($normalized, 'discount')) {
+            return 'discount';
+        }
+
+        return 'payment';
+    }
+
+    private function customerBillInvoiceBreakdownTypeLabel(string $entryType): string
+    {
+        return match ($entryType) {
+            'return' => __('receivable.transaction_type_return'),
+            'writeoff' => __('receivable.method_writeoff'),
+            'discount' => __('receivable.method_discount'),
+            default => __('receivable.transaction_type_payment'),
+        };
+    }
+
+    private function customerBillInvoiceBreakdownProofNumber(string $description, string $entryType): string
+    {
+        $prefixes = match ($entryType) {
+            'return' => ['RTR', 'RET', 'RTN'],
+            default => ['KWT', 'PYT'],
+        };
+        $reference = $this->extractDocumentReference($description, $prefixes);
+        if ($reference !== '') {
+            return $reference;
+        }
+
+        return trim($description) !== '' ? trim($description) : '-';
     }
 
     /**

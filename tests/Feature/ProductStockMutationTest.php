@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
+use App\Models\DeliveryNote;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\StockMutation;
@@ -135,6 +137,58 @@ class ProductStockMutationTest extends TestCase
         $response->assertSee(__('ui.stock_mutations_title'));
         $response->assertSee($product->code);
         $response->assertSee('mutation_page=2', false);
+    }
+
+    public function test_product_mutations_page_links_delivery_note_references(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $category = ItemCategory::query()->create([
+            'code' => 'CAT-DN-LINK',
+            'name' => 'Barang Surat Jalan',
+        ]);
+        $customer = Customer::query()->create([
+            'code' => 'CUST-DN-LINK',
+            'name' => 'Customer Surat Jalan',
+            'city' => 'Malang',
+        ]);
+        $product = Product::query()->create([
+            'item_category_id' => $category->id,
+            'code' => 'dn-link-001',
+            'name' => 'Barang Mutasi Surat Jalan',
+            'unit' => 'exp',
+            'stock' => 80,
+            'price_agent' => 0,
+            'price_sales' => 0,
+            'price_general' => 12000,
+            'is_active' => true,
+        ]);
+        $deliveryNote = DeliveryNote::query()->create([
+            'note_number' => 'SJ-20260513-0001',
+            'note_date' => '2026-05-13',
+            'customer_id' => $customer->id,
+            'recipient_name' => 'Penerima Surat Jalan',
+            'city' => 'Malang',
+        ]);
+
+        StockMutation::query()->create([
+            'product_id' => $product->id,
+            'reference_type' => DeliveryNote::class,
+            'reference_id' => $deliveryNote->id,
+            'mutation_type' => 'out',
+            'quantity' => 20,
+            'notes' => 'Delivery note '.$deliveryNote->note_number,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('products.mutations', $product));
+
+        $response->assertOk();
+        $response->assertSee(route('delivery-notes.show', $deliveryNote), false);
+        $response->assertSee($deliveryNote->note_number);
+        $response->assertSee(__('ui.stock_mutation_desc_delivery_note_out', [
+            'qty' => '-20',
+            'number' => $deliveryNote->note_number,
+        ]));
     }
 
     public function test_quick_stock_update_from_products_index_updates_stock_and_creates_mutation(): void

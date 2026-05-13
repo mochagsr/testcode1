@@ -9,6 +9,7 @@ use App\Services\AccountingService;
 use App\Services\AuditLogService;
 use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
+use App\Support\PrintPaperSize;
 use App\Support\PrintTextFormatter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -18,6 +19,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -47,8 +50,16 @@ class DeliveryTripPageController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $activeTrips = DeliveryTrip::query()
+            ->onlyListColumns()
+            ->where('is_active', true)
+            ->orderByDesc('trip_date')
+            ->orderByDesc('id')
+            ->get();
+
         return view('delivery_trips.index', [
             'trips' => $trips,
+            'activeTrips' => $activeTrips,
             'search' => $search,
             'selectedTripDate' => $selectedTripDate,
         ]);
@@ -82,6 +93,8 @@ class DeliveryTripPageController extends Controller
                 'other_cost' => (int) ($data['other_cost'] ?? 0),
                 'total_cost' => $totalCost,
                 'notes' => $this->nullIfEmpty((string) ($data['notes'] ?? '')),
+                'is_active' => true,
+                'completed_at' => null,
                 'created_by_user_id' => (int) ($request->user()?->id ?? 0) ?: null,
             ]);
 
@@ -204,6 +217,47 @@ class DeliveryTripPageController extends Controller
             ->with('success', __('delivery_trip.updated_success'));
     }
 
+    public function complete(Request $request, DeliveryTrip $deliveryTrip): RedirectResponse
+    {
+        DB::transaction(function () use ($request, $deliveryTrip): void {
+            $trip = DeliveryTrip::query()
+                ->whereKey($deliveryTrip->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $trip->is_active) {
+                return;
+            }
+
+            $before = [
+                'is_active' => (bool) $trip->is_active,
+                'completed_at' => $trip->completed_at?->format('Y-m-d H:i:s'),
+            ];
+
+            $trip->update([
+                'is_active' => false,
+                'completed_at' => now(),
+                'updated_by_user_id' => (int) ($request->user()?->id ?? 0) ?: null,
+            ]);
+
+            $this->auditLogService->log(
+                'delivery.trip.complete',
+                $trip,
+                __('delivery_trip.audit_completed', ['number' => $trip->trip_number]),
+                $request,
+                $before,
+                [
+                    'is_active' => (bool) $trip->is_active,
+                    'completed_at' => $trip->completed_at?->format('Y-m-d H:i:s'),
+                ]
+            );
+        });
+
+        return redirect()
+            ->route('delivery-trips.index')
+            ->with('success', __('delivery_trip.completed_success', ['number' => $deliveryTrip->trip_number]));
+    }
+
     public function print(DeliveryTrip $deliveryTrip): View
     {
         $deliveryTrip->load([
@@ -228,7 +282,7 @@ class DeliveryTripPageController extends Controller
         return Pdf::loadView('delivery_trips.print', [
             'trip' => $deliveryTrip,
             'isPdf' => true,
-        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11())->download($filename);
+        ])->setPaper(PrintPaperSize::continuousForm95x11())->download($filename);
     }
 
     public function exportExcel(DeliveryTrip $deliveryTrip): StreamedResponse
@@ -309,12 +363,12 @@ class DeliveryTripPageController extends Controller
             $sheet->setCellValue('D'.$notesHeaderRow, __('txn.notes'));
             $sheet->getStyle('D'.$notesHeaderRow.':F'.$notesHeaderRow)->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F2937']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F2937']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             ]);
             $sheet->mergeCells('D8:F12');
             $sheet->setCellValue('D8', $notes !== '' ? $notes : '-');
-            $sheet->getStyle('D8:F12')->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('D8:F12')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             $sheet->getStyle('D8:F12')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
             $signatureRow = 15;
@@ -328,8 +382,8 @@ class DeliveryTripPageController extends Controller
             $sheet->setCellValue('A'.($signatureRow + 2), $deliveryTrip->driver_name);
             $sheet->setCellValue('E'.($signatureRow + 2), $deliveryTrip->creator?->name ?: '-');
             $sheet->getStyle('A'.($signatureRow + 2).':F'.($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
 
             foreach (range('A', 'F') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);

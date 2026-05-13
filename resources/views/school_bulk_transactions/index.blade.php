@@ -6,6 +6,7 @@
     <style>
         .school-bulk-table {
             table-layout: fixed;
+            min-width: 1040px;
             width: 100%;
         }
         .school-bulk-table th:nth-child(1),
@@ -35,12 +36,28 @@
         }
         .school-bulk-table th:nth-child(8),
         .school-bulk-table td:nth-child(8) {
-            width: 90px;
+            width: 190px;
             text-align: center;
         }
         .school-bulk-table .action-menu {
             width: 82px;
             min-width: 82px;
+        }
+        .school-bulk-actions {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: nowrap;
+            gap: 6px;
+            width: 100%;
+        }
+        .school-bulk-actions .danger-btn {
+            min-height: 34px;
+            padding: 6px 10px;
+        }
+        .school-bulk-actions .danger-btn[disabled] {
+            cursor: help;
+            opacity: .55;
         }
     </style>
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
@@ -65,54 +82,72 @@
     </div>
 
     <div class="card">
-        <table class="school-bulk-table">
-            <thead>
-            <tr>
-                <th>{{ __('school_bulk.transaction_number') }}</th>
-                <th>{{ __('txn.date') }}</th>
-                <th>{{ __('txn.customer') }}</th>
-                <th>{{ __('txn.semester_period') }}</th>
-                <th>{{ __('school_bulk.total_schools') }}</th>
-                <th>{{ __('school_bulk.delivery_notes_created') }}</th>
-                <th>{{ __('school_bulk.delivery_notes_pending') }}</th>
-                <th>{{ __('txn.action') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse($transactions as $transaction)
-                @php
-                    $createdDeliveryNotes = min((int) $transaction->total_locations, (int) ($transaction->generated_delivery_notes_count ?? 0));
-                    $pendingDeliveryNotes = max(0, (int) $transaction->total_locations - $createdDeliveryNotes);
-                @endphp
+        <div class="transaction-list-scroll">
+            <table class="school-bulk-table">
+                <thead>
                 <tr>
-                    <td>
-                        <div class="list-doc-cell">
-                            <a class="list-doc-link" href="{{ route('school-bulk-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a>
-                        </div>
-                    </td>
-                    <td>{{ optional($transaction->transaction_date)->format('d-m-Y') ?: '-' }}</td>
-                    <td>{{ $transaction->customer?->name ?: '-' }}</td>
-                    <td>{{ $transaction->semester_period ?: '-' }}</td>
-                    <td>{{ (int) $transaction->total_locations }}</td>
-                    <td>{{ $createdDeliveryNotes }}</td>
-                    <td>{{ $pendingDeliveryNotes }}</td>
-                    <td>
-                        <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank');this.selectedIndex=0;}">
-                            <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                            <option value="{{ route('school-bulk-transactions.show', $transaction) }}">{{ __('txn.detail') }}</option>
-                            <option value="{{ route('school-bulk-transactions.print', $transaction) }}">{{ __('txn.print') }}</option>
-                            <option value="{{ route('school-bulk-transactions.export.pdf', $transaction) }}">{{ __('txn.pdf') }}</option>
-                            <option value="{{ route('school-bulk-transactions.export.excel', $transaction) }}">{{ __('txn.excel') }}</option>
-                        </select>
-                    </td>
+                    <th>{{ __('school_bulk.transaction_number') }}</th>
+                    <th>{{ __('txn.date') }}</th>
+                    <th>{{ __('txn.customer') }}</th>
+                    <th>{{ __('txn.semester_period') }}</th>
+                    <th>{{ __('school_bulk.total_schools') }}</th>
+                    <th>{{ __('school_bulk.delivery_notes_created') }}</th>
+                    <th>{{ __('school_bulk.delivery_notes_pending') }}</th>
+                    <th>{{ __('txn.action') }}</th>
                 </tr>
-            @empty
-                <tr>
-                    <td colspan="8" class="muted">{{ __('school_bulk.no_bulk_transactions') }}</td>
-                </tr>
-            @endforelse
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                @forelse($transactions as $transaction)
+                    @php
+                        $createdDeliveryNotes = min((int) $transaction->total_locations, (int) ($transaction->generated_delivery_notes_count ?? 0));
+                        $pendingDeliveryNotes = max(0, (int) $transaction->total_locations - $createdDeliveryNotes);
+                        $canDeleteDraft = auth()->user()?->canAccess('school_bulk_transactions.delete')
+                            && (int) ($transaction->generated_delivery_documents_count ?? 0) === 0
+                            && (int) ($transaction->generated_invoice_documents_count ?? 0) === 0;
+                        $showDeleteBlockedAction = auth()->user()?->canAccess('school_bulk_transactions.delete') && ! $canDeleteDraft;
+                    @endphp
+                    <tr>
+                        <td>
+                            <div class="list-doc-cell">
+                                <a class="list-doc-link" href="{{ route('school-bulk-transactions.show', $transaction) }}">{{ $transaction->transaction_number }}</a>
+                            </div>
+                        </td>
+                        <td>{{ optional($transaction->transaction_date)->format('d-m-Y') ?: '-' }}</td>
+                        <td>{{ $transaction->customer?->name ?: '-' }}</td>
+                        <td>{{ $transaction->semester_period ?: '-' }}</td>
+                        <td>{{ (int) $transaction->total_locations }}</td>
+                        <td>{{ $createdDeliveryNotes }}</td>
+                        <td>{{ $pendingDeliveryNotes }}</td>
+                        <td>
+                            <div class="school-bulk-actions">
+                                <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank');this.selectedIndex=0;}">
+                                    <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
+                                    <option value="{{ route('school-bulk-transactions.show', $transaction) }}">{{ __('txn.detail') }}</option>
+                                    <option value="{{ route('school-bulk-transactions.print', $transaction) }}">{{ __('txn.print') }}</option>
+                                    <option value="{{ route('school-bulk-transactions.export.pdf', $transaction) }}">{{ __('txn.pdf') }}</option>
+                                    <option value="{{ route('school-bulk-transactions.export.excel', $transaction) }}">{{ __('txn.excel') }}</option>
+                                </select>
+                                @if($canDeleteDraft)
+                                    <form method="post" action="{{ route('school-bulk-transactions.destroy', $transaction) }}" data-confirm-modal data-confirm-message="{{ __('school_bulk.confirm_delete_bulk_transaction') }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
+                                    </form>
+                                @endif
+                                @if($showDeleteBlockedAction)
+                                    <button type="button" class="btn danger-btn" disabled title="{{ __('school_bulk.bulk_transaction_delete_hint') }}">{{ __('ui.delete') }}</button>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="8" class="muted">{{ __('school_bulk.no_bulk_transactions') }}</td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
 
         <div style="margin-top: 12px;">
             {{ $transactions->links() }}

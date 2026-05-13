@@ -775,6 +775,42 @@
             background: color-mix(in srgb, var(--border) 70%, var(--text) 30%);
             border-radius: 999px;
         }
+        .transaction-list-scroll {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: min(420px, calc(100vh - 280px));
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid var(--table-border);
+            border-radius: var(--radius-md);
+            scrollbar-gutter: stable;
+            background: var(--table-bg);
+            position: relative;
+            z-index: 0;
+            box-shadow: var(--shadow-sm);
+        }
+        .transaction-list-scroll > table {
+            min-width: 720px;
+            border: none;
+            margin-bottom: 0;
+        }
+        .transaction-list-scroll thead th {
+            position: sticky;
+            top: 0;
+            z-index: 4;
+            background: var(--table-header-bg);
+            box-shadow: inset 0 -1px 0 var(--table-border);
+        }
+        .transaction-list-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .transaction-list-scroll::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, var(--border) 70%, var(--text) 30%);
+            border-radius: 999px;
+        }
+        .transaction-list-scroll::-webkit-scrollbar-track {
+            background: color-mix(in srgb, var(--surface) 88%, var(--border) 12%);
+        }
         .main {
             position: relative;
             isolation: isolate;

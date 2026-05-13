@@ -53,8 +53,7 @@
         $companyPhone = trim((string) \App\Models\AppSetting::getValue('company_phone', ''));
         $companyEmail = trim((string) \App\Models\AppSetting::getValue('company_email', ''));
         $companyNotes = trim((string) \App\Models\AppSetting::getValue('company_notes', ''));
-        $companyInvoiceNotes = trim((string) \App\Models\AppSetting::getValue('company_invoice_notes', ''));
-        $printNotes = \App\Support\PrintTextFormatter::normalizeMultiline((string) ($note->notes ?: $companyInvoiceNotes));
+        $printNotes = \App\Support\PrintTextFormatter::normalizeMultiline((string) ($note->notes ?? ''));
         $customerAddress = \App\Support\PrintTextFormatter::wrapWords((string) ($note->address ?: $note->customer?->address ?: ''), 4);
         $customerCity = trim((string) ($note->city ?: $note->customer?->city ?: ''));
         $customerDisplayName = trim((string) ($note->customer?->name ?: preg_replace('/\s*\([^)]+\)\s*$/', '', (string) $note->customer_name)));

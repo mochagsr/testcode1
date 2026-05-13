@@ -131,6 +131,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'show'])->middleware('perm:transactions.view')->name('delivery-trips.show');
     Route::get('/delivery-trips/{deliveryTrip}/edit', [DeliveryTripPageController::class, 'edit'])->middleware('perm:delivery_trips.edit')->name('delivery-trips.edit');
     Route::put('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'update'])->middleware(['finance.unlocked', 'perm:delivery_trips.edit'])->name('delivery-trips.update');
+    Route::patch('/delivery-trips/{deliveryTrip}/status', [DeliveryTripPageController::class, 'complete'])->middleware('perm:delivery_trips.edit')->name('delivery-trips.complete');
     Route::get('/delivery-trips/{deliveryTrip}/print', [DeliveryTripPageController::class, 'print'])->middleware('perm:delivery_trips.export')->name('delivery-trips.print');
     Route::get('/delivery-trips/{deliveryTrip}/pdf', [DeliveryTripPageController::class, 'exportPdf'])->middleware('perm:delivery_trips.export')->name('delivery-trips.export.pdf');
     Route::get('/delivery-trips/{deliveryTrip}/excel', [DeliveryTripPageController::class, 'exportExcel'])->middleware('perm:delivery_trips.export')->name('delivery-trips.export.excel');
@@ -229,6 +230,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/school-bulk-transactions/{schoolBulkTransaction}/print', [SchoolBulkTransactionPageController::class, 'print'])->middleware('perm:school_bulk_transactions.export')->name('school-bulk-transactions.print');
     Route::get('/school-bulk-transactions/{schoolBulkTransaction}/pdf', [SchoolBulkTransactionPageController::class, 'exportPdf'])->middleware('perm:school_bulk_transactions.export')->name('school-bulk-transactions.export.pdf');
     Route::get('/school-bulk-transactions/{schoolBulkTransaction}/excel', [SchoolBulkTransactionPageController::class, 'exportExcel'])->middleware('perm:school_bulk_transactions.export')->name('school-bulk-transactions.export.excel');
+    Route::delete('/school-bulk-transactions/{schoolBulkTransaction}', [SchoolBulkTransactionPageController::class, 'destroy'])->middleware('perm:school_bulk_transactions.delete')->name('school-bulk-transactions.destroy');
 
     Route::get('/reports', [ReportExportController::class, 'index'])->middleware('perm:reports.view')->name('reports.index');
     Route::get('/reports/{dataset}/csv', [ReportExportController::class, 'exportCsv'])->middleware('perm:reports.export')->name('reports.export.csv');

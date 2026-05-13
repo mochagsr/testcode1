@@ -18,7 +18,11 @@
             $referenceNumber = $reference['number'] ?? ('#'.(int) ($mutation->reference_id ?? 0));
             $referenceLink = $reference['url'] ?? null;
             $type = (string) ($mutation->reference_type ?? '');
-            if ($type === 'App\\Models\\SalesInvoice') {
+            if ($type === 'App\\Models\\DeliveryNote') {
+                $description = $isOut
+                    ? __('ui.stock_mutation_desc_delivery_note_out', ['qty' => $signedQty, 'number' => $referenceNumber])
+                    : __('ui.stock_mutation_desc_delivery_note_in', ['qty' => $signedQty, 'number' => $referenceNumber]);
+            } elseif ($type === 'App\\Models\\SalesInvoice') {
                 $description = $isOut
                     ? __('ui.stock_mutation_desc_sales_invoice_out', ['qty' => $signedQty, 'number' => $referenceNumber])
                     : __('ui.stock_mutation_desc_sales_invoice_in', ['qty' => $signedQty, 'number' => $referenceNumber]);

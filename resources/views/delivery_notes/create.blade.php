@@ -20,6 +20,21 @@
             text-align: right;
             font-size: 16px;
         }
+        .quantity-with-unit {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 130px;
+        }
+        .quantity-with-unit .qty-input {
+            flex: 0 0 88px;
+            max-width: 88px;
+        }
+        .qty-unit-label {
+            color: #526173;
+            font-weight: 700;
+            white-space: nowrap;
+        }
     </style>
 
     <form method="post" action="{{ route('delivery-notes.store') }}">
@@ -137,9 +152,8 @@
                 <table id="items-table">
                     <thead>
                     <tr>
-                        <th style="width: 48%">{{ __('txn.product') }} *</th>
-                        <th style="width: 12%">{{ __('txn.qty') }} *</th>
-                        <th style="width: 10%">{{ __('txn.unit') }}</th>
+                        <th style="width: 54%">{{ __('txn.product') }} *</th>
+                        <th style="width: 14%">{{ __('txn.qty') }} *</th>
                         <th>{{ __('txn.notes') }}</th>
                         <th></th>
                     </tr>
@@ -772,6 +786,26 @@
                 || null;
         }
 
+        function productUnitLabel(productOrUnit) {
+            const unit = typeof productOrUnit === 'string'
+                ? productOrUnit
+                : String(productOrUnit?.unit || '');
+
+            return String(unit || '').trim() !== '' ? String(unit).trim() : '-';
+        }
+
+        function setRowUnit(row, unit) {
+            const unitValue = String(unit || '').trim();
+            const unitField = row?.querySelector('.unit');
+            const unitLabel = row?.querySelector('.qty-unit-label');
+            if (unitField) {
+                unitField.value = unitValue;
+            }
+            if (unitLabel) {
+                unitLabel.textContent = productUnitLabel(unitValue);
+            }
+        }
+
         async function resolveCustomerFromInput(rawValue) {
             const input = String(rawValue || '').trim();
             if (input === '') {
@@ -861,6 +895,7 @@
         function addRow(prefill = null) {
             const index = tbody.children.length;
             const productText = prefill?.product_code ? `${prefill.product_code} - ${prefill.product_name || ''}` : (prefill?.product_name || '');
+            const unitText = productUnitLabel(prefill?.unit || '');
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
@@ -869,8 +904,13 @@
                     <input type="hidden" name="items[${index}][order_note_item_id]" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
-                <td><input name="items[${index}][quantity]" type="text" inputmode="numeric" value="${escapeAttribute(String(prefill?.quantity || ''))}" placeholder="0" class="qty-input js-thousand-input" required style="max-width: 104px;"></td>
-                <td><input name="items[${index}][unit]" class="unit" value="${escapeAttribute(String(prefill?.unit || ''))}" style="max-width: 72px;"></td>
+                <td>
+                    <div class="quantity-with-unit">
+                        <input name="items[${index}][quantity]" type="text" inputmode="numeric" value="${escapeAttribute(String(prefill?.quantity || ''))}" placeholder="0" class="qty-input js-thousand-input" required>
+                        <span class="qty-unit-label">${escapeAttribute(unitText)}</span>
+                        <input type="hidden" name="items[${index}][unit]" class="unit" value="${escapeAttribute(String(prefill?.unit || ''))}">
+                    </div>
+                </td>
                 <td><input name="items[${index}][notes]" value="${escapeAttribute(String(prefill?.notes || ''))}"></td>
                 <td><button type="button" class="btn danger-btn remove">{{ __('txn.remove') }}</button></td>
             `;
@@ -884,7 +924,7 @@
                 const product = findProductByLabel(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
-                    tr.querySelector('.unit').value = product.unit || '';
+                    setRowUnit(tr, product.unit || '');
                 }
             });
             tr.querySelector('.product-search').addEventListener('input', onProductInput);
@@ -895,6 +935,9 @@
                 const product = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (!product) {
+                    if (String(event.currentTarget.value || '').trim() === '') {
+                        setRowUnit(tr, '');
+                    }
                     if (String(event.currentTarget.value || '').trim() !== '') {
                         setProductFieldError(tr, @json(__('txn.product_not_registered')));
                     } else {
@@ -903,13 +946,14 @@
                     return;
                 }
                 tr.querySelector('.product-search').value = productLabel(product);
-                tr.querySelector('.unit').value = product.unit || '';
+                setRowUnit(tr, product.unit || '');
                 setProductFieldError(tr, '');
             });
             tr.querySelector('.product-search').addEventListener('blur', async (event) => {
                 const value = String(event.currentTarget.value || '').trim();
                 if (value === '') {
                     tr.querySelector('.product-id').value = '';
+                    setRowUnit(tr, '');
                     setProductFieldError(tr, '');
                     return;
                 }
@@ -917,7 +961,7 @@
                 tr.querySelector('.product-id').value = product ? product.id : '';
                 if (product) {
                     tr.querySelector('.product-search').value = productLabel(product);
-                    tr.querySelector('.unit').value = product.unit || tr.querySelector('.unit').value || '';
+                    setRowUnit(tr, product.unit || tr.querySelector('.unit')?.value || '');
                     setProductFieldError(tr, '');
                 } else {
                     setProductFieldError(tr, @json(__('txn.product_not_registered')));
@@ -1063,7 +1107,7 @@
                         productSearchField.value = productLabel(product);
                         const unitField = row.querySelector('.unit');
                         if (unitField && String(unitField.value || '').trim() === '') {
-                            unitField.value = product.unit || '';
+                            setRowUnit(row, product.unit || '');
                         }
                         setProductFieldError(row, '');
                     } else if (String(productSearchField.value || '').trim() !== '') {

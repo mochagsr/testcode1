@@ -25,8 +25,7 @@
             justify-content: flex-end;
             gap: 10px;
         }
-        .products-toolbar .search-form,
-        .products-toolbar .import-form {
+        .products-toolbar .search-form {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -38,8 +37,7 @@
             justify-content: flex-start;
         }
         .products-toolbar .search-form input[type="text"],
-        .products-toolbar .search-form select,
-        .products-toolbar .import-form input[type="file"] {
+        .products-toolbar .search-form select {
             width: 260px;
             max-width: min(260px, 100%);
         }
@@ -51,23 +49,6 @@
             flex: 0 0 170px;
             min-width: 160px;
         }
-        .products-toolbar .import-form {
-            justify-content: flex-start;
-            width: auto;
-            max-width: 100%;
-            flex: 0 1 auto;
-        }
-        .products-toolbar .import-file-wrap {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 8px;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
-            flex: 0 1 220px;
-            min-width: 200px;
-        }
         .products-toolbar .report-actions {
             display: flex;
             align-items: center;
@@ -78,17 +59,56 @@
             justify-content: flex-end;
             flex: 0 1 auto;
         }
-        .products-toolbar .import-file-wrap input[type="file"] {
-            width: 100%;
-            max-width: 100%;
-            min-width: 0;
-            flex: 1 1 auto;
+        .product-import-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10020;
+            background: rgba(15, 23, 42, 0.58);
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
         }
-        .products-toolbar .import-actions {
+        .product-import-overlay.is-open {
+            display: flex;
+        }
+        .product-import-modal {
+            width: min(520px, 96vw);
+            max-height: 90vh;
+            overflow: auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+            padding: 18px;
+        }
+        .product-import-modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .product-import-modal-title {
+            font-size: 18px;
+            font-weight: 800;
+        }
+        .product-import-file-wrap {
+            padding: 12px;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
+        }
+        .product-import-file-wrap input[type="file"] {
+            width: 100%;
+        }
+        .product-import-modal-actions {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
+            justify-content: flex-end;
+            margin-top: 14px;
         }
         .products-table-wrap {
             overflow-x: auto;
@@ -164,10 +184,6 @@
                 flex-basis: 160px;
                 min-width: 150px;
             }
-            .products-toolbar .import-file-wrap {
-                flex-basis: 190px;
-                min-width: 180px;
-            }
             .product-action-btn {
                 padding: 5px 8px;
             }
@@ -183,15 +199,13 @@
                 flex: 1 1 100%;
                 margin-left: 0;
             }
-            .products-toolbar .search-form,
-            .products-toolbar .import-form {
+            .products-toolbar .search-form {
                 width: 100%;
                 flex-wrap: wrap;
                 justify-content: flex-start;
             }
             .products-toolbar .search-form input[type="text"],
-            .products-toolbar .search-form select,
-            .products-toolbar .import-file-wrap {
+            .products-toolbar .search-form select {
                 width: min(100%, 280px);
                 max-width: min(100%, 280px);
             }
@@ -199,9 +213,7 @@
                 flex: 0 1 280px;
             }
             .products-toolbar .toolbar-right,
-            .products-toolbar .import-form,
-            .products-toolbar .report-actions,
-            .products-toolbar .import-actions {
+            .products-toolbar .report-actions {
                 flex: 1 1 100%;
             }
             .products-toolbar .toolbar-right {
@@ -241,21 +253,15 @@
             </div>
             <div class="toolbar-right">
                 @if($canImportProducts)
-                    <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data" class="import-form">
-                        @csrf
-                        <div class="import-file-wrap">
-                            <input type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
-                        </div>
-                        <div class="import-actions">
-                            <button type="submit" class="btn process-btn product-action-btn">Import</button>
-                            <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Template Import</a>
-                        </div>
-                    </form>
+                    <button type="button" class="btn process-btn product-action-btn" id="product-import-open">Import Data</button>
                 @endif
                 <div class="report-actions">
                     <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search, 'product_type' => $productType]) }}" target="_blank">{{ __('txn.print') }}</a>
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.pdf', ['search' => $search, 'product_type' => $productType]) }}">Export PDF</a>
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.csv', ['search' => $search, 'product_type' => $productType]) }}">Export Excel</a>
+                    <select class="action-menu action-menu-md product-action-btn" aria-label="Export" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
+                        <option value="" selected disabled>Export</option>
+                        <option value="{{ route('products.export.pdf', ['search' => $search, 'product_type' => $productType]) }}">Export PDF</option>
+                        <option value="{{ route('products.export.csv', ['search' => $search, 'product_type' => $productType]) }}">Export Excel</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -270,6 +276,31 @@
             </div>
         @endif
     </div>
+
+    @if($canImportProducts)
+        <div class="product-import-overlay" id="product-import-modal" aria-hidden="true">
+            <div class="product-import-modal" role="dialog" aria-modal="true" aria-labelledby="product-import-title">
+                <div class="product-import-modal-head">
+                    <div>
+                        <div class="product-import-modal-title" id="product-import-title">Import Data Barang</div>
+                        <div class="muted">Upload file Excel/CSV. Gunakan template kalau format file belum sesuai.</div>
+                    </div>
+                    <button type="button" class="btn info-btn product-action-btn" id="product-import-close" style="min-height:32px; padding:5px 11px;">{{ __('ui.cancel') }}</button>
+                </div>
+                <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="product-import-file-wrap">
+                        <label for="product-import-file">File Import</label>
+                        <input id="product-import-file" type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
+                    </div>
+                    <div class="product-import-modal-actions">
+                        <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Download Template</a>
+                        <button type="submit" class="btn process-btn product-action-btn">Import</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
 
     <div class="card">
         <div class="products-table-wrap">
@@ -308,7 +339,9 @@
                     <td class="price-col">Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
                     <td class="action-col">
                         <div class="product-actions">
-                            <a class="btn info-btn product-action-btn" href="{{ route('products.show', $product) }}">{{ __('ui.view') }}</a>
+                            @if($productType === 'raw_material')
+                                <a class="btn info-btn product-action-btn" href="{{ route('products.show', $product) }}">{{ __('ui.view') }}</a>
+                            @endif
                             @if($canEditProducts)
                                 <a class="btn edit-btn product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
                             @endif
@@ -398,6 +431,37 @@
             }, 100);
             searchInput.addEventListener('input', onSearchInput);
             typeFilter?.addEventListener('change', () => form.requestSubmit());
+        })();
+
+        (function () {
+            const importModal = document.getElementById('product-import-modal');
+            const importOpen = document.getElementById('product-import-open');
+            const importClose = document.getElementById('product-import-close');
+            if (!importModal || !importOpen || !importClose) {
+                return;
+            }
+
+            const closeImportModal = () => {
+                importModal.classList.remove('is-open');
+                importModal.setAttribute('aria-hidden', 'true');
+            };
+
+            importOpen.addEventListener('click', () => {
+                importModal.classList.add('is-open');
+                importModal.setAttribute('aria-hidden', 'false');
+                document.getElementById('product-import-file')?.focus();
+            });
+            importClose.addEventListener('click', closeImportModal);
+            importModal.addEventListener('click', (event) => {
+                if (event.target === importModal) {
+                    closeImportModal();
+                }
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && importModal.classList.contains('is-open')) {
+                    closeImportModal();
+                }
+            });
         })();
 
         (function () {

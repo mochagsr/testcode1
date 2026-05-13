@@ -750,7 +750,9 @@ class OrderNotePageController extends Controller
                 'fulfilled_total' => $fulfilledTotal,
                 'remaining_total' => $remainingTotal,
                 'progress_percent' => $progressPercent,
-                'status' => $remainingTotal > 0 ? 'open' : 'finished',
+                'status' => $fulfilledTotal <= 0
+                    ? 'not_delivered'
+                    : ($remainingTotal > 0 ? 'partial' : 'finished'),
             ];
         }
 

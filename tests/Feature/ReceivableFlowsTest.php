@@ -20,8 +20,10 @@ use App\Models\SalesInvoiceItem;
 use App\Models\SalesReturn;
 use App\Models\SalesReturnItem;
 use App\Models\User;
+use App\Support\SemesterBookService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ReceivableFlowsTest extends TestCase
@@ -155,7 +157,7 @@ class ReceivableFlowsTest extends TestCase
             'transaction_type' => 'printing',
             'customer_printing_subtype_id' => $subtype->id,
             'printing_subtype_name' => $subtype->name,
-            'description' => 'Invoice ' . $invoice->invoice_number,
+            'description' => 'Invoice '.$invoice->invoice_number,
             'debit' => 120000,
             'credit' => 0,
             'balance_after' => 120000,
@@ -389,7 +391,7 @@ class ReceivableFlowsTest extends TestCase
             'customer_id' => $customer->id,
         ]));
         $response->assertOk();
-        $response->assertSee('INV-DISC-001 - ' . __('receivable.method_discount'));
+        $response->assertSee('INV-DISC-001 - '.__('receivable.method_discount'));
     }
 
     public function test_receivable_index_uses_ledger_balance_as_single_source_of_truth(): void
@@ -886,7 +888,7 @@ class ReceivableFlowsTest extends TestCase
 
         $ledgerOutstanding = (int) round((float) ReceivableLedger::query()
             ->where('customer_id', $customer->id)
-            ->sum(\Illuminate\Support\Facades\DB::raw('debit - credit')));
+            ->sum(DB::raw('debit - credit')));
         $this->assertSame(100000, $ledgerOutstanding);
     }
 
@@ -1427,6 +1429,7 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee(__('receivable.semester_page_title'));
         $response->assertSee('Angga');
         $response->assertSee('Rp 70.000');
+        $response->assertSee('receivable-semester-total-row', false);
     }
 
     public function test_admin_receivable_index_shows_semester_ready_to_close_notice_when_all_customers_paid(): void
@@ -1483,7 +1486,7 @@ class ReceivableFlowsTest extends TestCase
             'is_canceled' => false,
         ]);
 
-        $service = app(\App\Support\SemesterBookService::class);
+        $service = app(SemesterBookService::class);
         $states = $service->customerSemesterLockStates([(int) $customer->id], 'S2-2526');
 
         $this->assertFalse($service->isCustomerLocked((int) $customer->id, 'S2-2526'));
@@ -1543,7 +1546,7 @@ class ReceivableFlowsTest extends TestCase
         ]);
 
         $postResponse->assertRedirect();
-        $this->assertTrue(app(\App\Support\SemesterBookService::class)->isCustomerLocked((int) $customer->id, 'S2-2526'));
+        $this->assertTrue(app(SemesterBookService::class)->isCustomerLocked((int) $customer->id, 'S2-2526'));
     }
 
     public function test_receivable_semester_print_renders_totals(): void
@@ -1705,7 +1708,7 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('KWT-06042026-0001');
         $response->assertSee('RTR-28022026-0001');
         $response->assertSee(__('receivable.transaction_type_sale'));
-        $response->assertSee(__('receivable.transaction_type_payment'));
+        $response->assertSee(__('receivable.transaction_type_invoice_payment'));
         $response->assertSee(__('receivable.transaction_type_return'));
         $response->assertSee(__('receivable.transaction_subtype_product'));
         $response->assertSee(__('receivable.transaction_subtype_printing_named', ['name' => 'Brosur']));
@@ -1721,7 +1724,7 @@ class ReceivableFlowsTest extends TestCase
         $screenResponse->assertSee(route('receivable-payments.show', $receivablePayment), false);
         $screenResponse->assertSee(route('sales-returns.show', $salesReturn), false);
         $screenResponse->assertSee(__('receivable.transaction_type_sale'));
-        $screenResponse->assertSee(__('receivable.transaction_type_payment'));
+        $screenResponse->assertSee(__('receivable.transaction_type_invoice_payment'));
         $screenResponse->assertSee(__('receivable.transaction_type_return'));
         $screenResponse->assertSee(__('receivable.transaction_subtype_product'));
         $screenResponse->assertSee(__('receivable.transaction_subtype_printing_named', ['name' => 'Brosur']));
@@ -1817,7 +1820,7 @@ class ReceivableFlowsTest extends TestCase
         $tempFile = tempnam(sys_get_temp_dir(), 'bill-xlsx-');
         file_put_contents($tempFile, $content);
 
-        $zip = new \ZipArchive();
+        $zip = new \ZipArchive;
         $this->assertTrue($zip->open($tempFile) === true);
         $workbookPayload = '';
         for ($index = 0; $index < $zip->numFiles; $index++) {
@@ -1833,8 +1836,101 @@ class ReceivableFlowsTest extends TestCase
         $this->assertStringContainsString('RTR-28022026-0002', $workbookPayload);
         $this->assertStringContainsString(__('receivable.transaction_type'), $workbookPayload);
         $this->assertStringContainsString(__('receivable.transaction_subtype'), $workbookPayload);
-        $this->assertStringContainsString(__('receivable.transaction_type_payment'), $workbookPayload);
+        $this->assertStringContainsString(__('receivable.transaction_type_invoice_payment'), $workbookPayload);
         $this->assertStringContainsString(__('receivable.transaction_type_return'), $workbookPayload);
+    }
+
+    public function test_customer_bill_distinguishes_invoice_payment_from_overpayment_credit(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-OVERPAY-001',
+            'name' => 'Eko',
+            'city' => 'Malang',
+            'address' => 'Jl Mergosono',
+            'credit_balance' => 2858500,
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-13052026-0001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-05-13',
+            'semester_period' => 'S1-2627',
+            'transaction_type' => 'product',
+            'subtotal' => 2141500,
+            'total' => 2141500,
+            'total_paid' => 2141500,
+            'balance' => 0,
+            'payment_status' => 'paid',
+        ]);
+
+        $payment = ReceivablePayment::query()->create([
+            'payment_number' => 'KWT-13052026-0001',
+            'customer_id' => $customer->id,
+            'payment_date' => '2026-05-13',
+            'customer_address' => 'Jl Mergosono',
+            'amount' => 5000000,
+            'amount_in_words' => 'lima juta rupiah',
+            'customer_signature' => 'Eko',
+            'user_signature' => 'Kasir',
+            'notes' => 'Pembayaran piutang',
+            'created_by_user_id' => $user->id,
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-05-13',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-13052026-0001',
+            'debit' => 2141500,
+            'credit' => 0,
+            'balance_after' => 2141500,
+            'period_code' => 'S1-2627',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-05-13',
+            'transaction_type' => 'product',
+            'description' => 'Pembayaran KWT-13052026-0001 untuk INV-13052026-0001',
+            'debit' => 0,
+            'credit' => 2141500,
+            'balance_after' => 0,
+            'period_code' => 'S1-2627',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => null,
+            'entry_date' => '2026-05-13',
+            'transaction_type' => null,
+            'description' => 'Pembayaran KWT-13052026-0001',
+            'debit' => 0,
+            'credit' => 2858500,
+            'balance_after' => 0,
+            'period_code' => null,
+        ]);
+
+        $printResponse = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+        ]));
+
+        $printResponse->assertOk();
+        $printResponse->assertSee('KWT-13052026-0001');
+        $printResponse->assertSee(__('receivable.transaction_type_invoice_payment'));
+        $printResponse->assertSee(__('receivable.transaction_type_overpayment'));
+        $printResponse->assertSee(__('receivable.bill_total_credit_balance'));
+        $printResponse->assertSee('Rp 2.858.500');
+
+        $screenResponse = $this->actingAs($user)->get(route('receivables.index', [
+            'customer_id' => $customer->id,
+        ]));
+
+        $screenResponse->assertOk();
+        $screenResponse->assertSee(route('receivable-payments.show', $payment), false);
+        $screenResponse->assertSee(__('receivable.transaction_type_invoice_payment'));
+        $screenResponse->assertSee(__('receivable.transaction_type_overpayment'));
+        $screenResponse->assertSee(__('receivable.bill_total_credit_balance'));
     }
 
     public function test_customer_bill_resolves_legacy_payment_rows_to_kwt_number(): void
@@ -1956,6 +2052,81 @@ class ReceivableFlowsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Admin - Penyesuaian nilai faktur INV-28022026-0001 (+Rp 52.500)');
         $response->assertDontSee('[ADMIN EDIT FAKTUR +]');
+    }
+
+    public function test_customer_bill_print_breaks_down_invoice_status_with_returns_and_payments(): void
+    {
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-BILL-INVOICE-001',
+            'name' => 'Anton',
+            'city' => 'Malang',
+        ]);
+
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-INVOICE-BREAKDOWN-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-05-10',
+            'semester_period' => 'S1-2627',
+            'transaction_type' => 'product',
+            'subtotal' => 2688000,
+            'total' => 2688000,
+            'total_paid' => 1000000,
+            'balance' => 1643000,
+            'payment_status' => 'partial',
+        ]);
+
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-05-10',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-INVOICE-BREAKDOWN-001',
+            'debit' => 2688000,
+            'credit' => 0,
+            'balance_after' => 2688000,
+            'period_code' => 'S1-2627',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => null,
+            'entry_date' => '2026-05-10',
+            'transaction_type' => 'product',
+            'description' => 'Retur RTR-INVOICE-BREAKDOWN-001',
+            'debit' => 0,
+            'credit' => 45000,
+            'balance_after' => 2643000,
+            'period_code' => 'S1-2627',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-05-15',
+            'transaction_type' => 'product',
+            'description' => 'Pembayaran KWT-INVOICE-BREAKDOWN-001 untuk INV-INVOICE-BREAKDOWN-001',
+            'debit' => 0,
+            'credit' => 1000000,
+            'balance_after' => 1643000,
+            'period_code' => 'S1-2627',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S1-2627',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee(__('receivable.invoice_breakdown_title'));
+        $response->assertSee(__('receivable.invoice_number'));
+        $response->assertSee('INV-INVOICE-BREAKDOWN-001');
+        $response->assertSee('RTR-INVOICE-BREAKDOWN-001');
+        $response->assertSee('KWT-INVOICE-BREAKDOWN-001');
+        $response->assertSee('2.688.000');
+        $response->assertSee('45.000');
+        $response->assertSee('1.000.000');
+        $response->assertSee('1.643.000');
+        $response->assertDontSee(__('receivable.school_name'));
+        $response->assertDontSee('Sekolah - Anton');
     }
 
     public function test_customer_bill_print_marks_invoice_cancellation_as_user_edit(): void

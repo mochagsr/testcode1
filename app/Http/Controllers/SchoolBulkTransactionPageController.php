@@ -57,6 +57,10 @@ class SchoolBulkTransactionPageController extends Controller
             ->withCount([
                 'generatedDeliveryNotes as generated_delivery_notes_count' => fn (Builder $query) => $query
                     ->whereNotNull('school_bulk_location_id'),
+                'generatedDeliveryNotes as generated_delivery_documents_count' => fn (Builder $query) => $query,
+                'generatedInvoices as generated_invoices_count' => fn (Builder $query) => $query
+                    ->whereNotNull('school_bulk_location_id'),
+                'generatedInvoices as generated_invoice_documents_count' => fn (Builder $query) => $query->withTrashed(),
             ])
             ->when($customerId > 0, fn (Builder $query) => $query->where('customer_id', $customerId))
             ->searchKeyword($search)
@@ -88,14 +92,16 @@ class SchoolBulkTransactionPageController extends Controller
             AppCache::lookupCacheKey('forms.school_bulk.customers', ['limit' => 200]),
             now()->addSeconds(60),
             fn () => Customer::query()
-                ->onlyOptionColumns()
+                ->onlyDeliveryFormColumns()
+                ->with('level:id,code,name')
                 ->orderBy('name')
                 ->limit(200)
                 ->get()
         );
         if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
             $oldCustomer = Customer::query()
-                ->onlyOptionColumns()
+                ->onlyDeliveryFormColumns()
+                ->with('level:id,code,name')
                 ->whereKey($oldCustomerId)
                 ->first();
             if ($oldCustomer !== null) {
@@ -172,6 +178,9 @@ class SchoolBulkTransactionPageController extends Controller
                 })
                 ->values();
             $customerId = (int) $data['customer_id'];
+            $customer = Customer::query()
+                ->with('level:id,code,name')
+                ->findOrFail($customerId);
 
             $shipLocationIds = $locationRows
                 ->pluck('customer_ship_location_id')
@@ -218,7 +227,7 @@ class SchoolBulkTransactionPageController extends Controller
                 ->values()
                 ->map(fn ($rows): Collection => collect((array) $rows)->values())
                 ->first(fn (Collection $rows): bool => $rows->isNotEmpty(), collect());
-            $locationRows->each(function (array $row, int $index) use ($transaction, $shipLocations, $locationItemsMap, $defaultLocationItemRows, $products, &$totalItems): void {
+            $locationRows->each(function (array $row, int $index) use ($customer, $transaction, $shipLocations, $locationItemsMap, $defaultLocationItemRows, $products, &$totalItems): void {
                 $shipLocation = null;
                 $shipLocationId = (int) ($row['customer_ship_location_id'] ?? 0);
                 if ($shipLocationId > 0) {
@@ -251,7 +260,7 @@ class SchoolBulkTransactionPageController extends Controller
                     'sort_order' => $index,
                 ]);
 
-                $locationItemRows->each(function (array $itemRow, int $itemIndex) use ($transaction, $products, $createdLocation, &$totalItems): void {
+                $locationItemRows->each(function (array $itemRow, int $itemIndex) use ($customer, $transaction, $products, $createdLocation, &$totalItems): void {
                     $productId = (int) ($itemRow['product_id'] ?? 0);
                     $product = $productId > 0 ? $products->get($productId) : null;
                     $productName = trim((string) ($itemRow['product_name'] ?? ''));
@@ -261,7 +270,7 @@ class SchoolBulkTransactionPageController extends Controller
                         ? null
                         : (int) round((float) $unitPriceInput);
                     if ($unitPrice === null && $product !== null) {
-                        $unitPrice = (int) round((float) ($product->price_general ?? 0));
+                        $unitPrice = (int) $this->resolvePriceByCustomerLevel($product, $customer);
                     }
 
                     SchoolBulkTransactionItem::create([
@@ -307,10 +316,14 @@ class SchoolBulkTransactionPageController extends Controller
             'createdByUser:id,name',
             'locations',
             'items',
-            'generatedDeliveryNotes:id,note_number,note_date,school_bulk_location_id,is_canceled',
+            'generatedDeliveryNotes:id,school_bulk_transaction_id,note_number,note_date,school_bulk_location_id,is_canceled',
             'generatedDeliveryNotes.schoolBulkLocation:id,school_name',
-            'generatedInvoices:id,invoice_number,invoice_date,school_bulk_location_id,balance,payment_status,is_canceled',
+            'generatedInvoices:id,school_bulk_transaction_id,invoice_number,invoice_date,school_bulk_location_id,balance,payment_status,is_canceled',
             'generatedInvoices.schoolBulkLocation:id,school_name',
+        ]);
+        $schoolBulkTransaction->loadCount([
+            'generatedDeliveryNotes as generated_delivery_documents_count' => fn (Builder $query) => $query,
+            'generatedInvoices as generated_invoice_documents_count' => fn (Builder $query) => $query->withTrashed(),
         ]);
 
         return view('school_bulk_transactions.show', [
@@ -530,6 +543,40 @@ class SchoolBulkTransactionPageController extends Controller
             ]));
     }
 
+    public function destroy(Request $request, SchoolBulkTransaction $schoolBulkTransaction): RedirectResponse
+    {
+        $deletedNumber = (string) $schoolBulkTransaction->transaction_number;
+        $hasGeneratedDocuments = $schoolBulkTransaction->generatedDeliveryNotes()->exists()
+            || $schoolBulkTransaction->generatedInvoices()->withTrashed()->exists();
+
+        if ($hasGeneratedDocuments) {
+            return back()->with('error', __('school_bulk.bulk_transaction_delete_blocked'));
+        }
+
+        DB::transaction(function () use ($schoolBulkTransaction): void {
+            $schoolBulkTransaction->delete();
+        });
+
+        $this->auditLogService->log(
+            'school.bulk.delete',
+            null,
+            __('school_bulk.audit_bulk_deleted', ['number' => $deletedNumber]),
+            $request,
+            null,
+            null,
+            [
+                'school_bulk_transaction_id' => (int) $schoolBulkTransaction->id,
+                'transaction_number' => $deletedNumber,
+            ]
+        );
+        AppCache::bumpLookupVersion();
+
+        return redirect()
+            ->route('school-bulk-transactions.index')
+            ->with('success', __('school_bulk.bulk_transaction_deleted'))
+            ->with('success_type', 'decrease');
+    }
+
     public function print(SchoolBulkTransaction $schoolBulkTransaction): View
     {
         $schoolBulkTransaction->load([
@@ -646,6 +693,23 @@ class SchoolBulkTransactionPageController extends Controller
         }
 
         return sprintf('%s-%04d', $prefix, $sequence);
+    }
+
+    private function resolvePriceByCustomerLevel(Product $product, Customer $customer): float
+    {
+        $levelCode = mb_strtolower(trim((string) ($customer->level?->code ?? '')));
+        $levelName = mb_strtolower(trim((string) ($customer->level?->name ?? '')));
+        $combined = trim($levelCode.' '.$levelName);
+
+        if (str_contains($combined, 'agent') || str_contains($combined, 'agen')) {
+            return (float) round((float) ($product->price_agent ?? $product->price_general ?? 0));
+        }
+
+        if (str_contains($combined, 'sales') || str_contains($combined, 'sale') || str_contains($combined, 'penjualan')) {
+            return (float) round((float) ($product->price_sales ?? $product->price_general ?? 0));
+        }
+
+        return (float) round((float) ($product->price_general ?? 0));
     }
 
     private function generateDeliveryNoteNumber(string $noteDate): string

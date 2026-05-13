@@ -22,6 +22,7 @@
     </div>
 
     <div class="card">
+        <div class="transaction-list-scroll">
         <table>
             <thead>
             <tr>
@@ -61,6 +62,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>
 
         <div style="margin-top: 12px;">
             {{ $payments->links() }}

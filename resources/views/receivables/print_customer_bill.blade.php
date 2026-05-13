@@ -8,7 +8,7 @@
         @include('partials.print.paper_a4')
         body { font-family: "Courier New", Courier, monospace; font-size: 12px; line-height: 1.28; color: #111; font-weight: 600; }
         .container { max-width: 900px; margin: 0 auto; }
-        .head { display: grid; grid-template-columns: minmax(0, 47%) minmax(210px, 25%) minmax(0, 28%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 12px; }
+        .head { display: grid; grid-template-columns: minmax(0, 40%) minmax(220px, 28%) minmax(220px, 32%); align-items: flex-start; border-bottom: 1px solid #111; padding-bottom: 8px; margin-bottom: 10px; column-gap: 26px; row-gap: 8px; }
         .company-left { display: flex; gap: 6px; min-width: 0; }
         .logo { width: 40px; height: 60px; object-fit: contain; border: none; padding: 0; background: transparent; }
         .logo-fallback {
@@ -26,7 +26,7 @@
         }
         .company-name { font-size: 15px; font-weight: 800; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
         .company-meta { margin-top: 2px; white-space: pre-line; font-size: 12px; line-height: 1.35; font-weight: 600; }
-        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; margin-left: -32px; max-width: 250px; }
+        .doc-center { min-width: 0; text-align: center; align-self: center; justify-self: center; max-width: 250px; }
         .doc-title { font-size: 20px; font-weight: 800; text-transform: uppercase; line-height: 1.1; }
         .doc-subtitle { margin-top: 2px; line-height: 1.2; }
         .doc-number { margin-top: 2px; }
@@ -47,6 +47,8 @@
         .footer-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 10px; }
         .footer-box { border: 1px solid #111; padding: 8px; min-height: 64px; }
         .receivable-breakdown-page { page-break-before: always; break-before: page; margin-top: 0; }
+        .invoice-detail-table { margin-top: 8px; }
+        .invoice-detail-title { text-align: left; background: #f7f7f7; font-weight: 800; }
         .muted { color: #444; }
         @media print {
             .no-print { display: none; }
@@ -81,7 +83,7 @@
             $companyEmail !== '' ? 'Email: '.$companyEmail : '',
             $companyNotes,
         ])->filter(fn (string $line): bool => trim($line) !== '');
-        $schoolBreakdownRows = collect($schoolBreakdown ?? []);
+        $invoiceBreakdownRows = collect($invoiceBreakdown ?? []);
     @endphp
 
     @if(empty($isPdf))
@@ -197,60 +199,88 @@
             <td class="num">Rp {{ number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.') }}</td>
             <td class="num">Rp {{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
         </tr>
+        @php
+            $runningBalanceTotal = (int) round((float) ($totals['running_balance'] ?? 0));
+            $isCreditBalanceTotal = $runningBalanceTotal < 0;
+        @endphp
         <tr class="total-balance-row">
             <td colspan="5"></td>
-            <td colspan="2" style="text-align:right;">{{ __('receivable.bill_total_receivable') }}</td>
-            <td class="num">Rp {{ number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.') }}</td>
+            <td colspan="2" style="text-align:right;">{{ $isCreditBalanceTotal ? __('receivable.bill_total_credit_balance') : __('receivable.bill_total_receivable') }}</td>
+            <td class="num">Rp {{ number_format(abs($runningBalanceTotal), 0, ',', '.') }}</td>
         </tr>
         </tbody>
     </table>
 
-    @if($schoolBreakdownRows->isNotEmpty())
+    @if($invoiceBreakdownRows->isNotEmpty())
         <table class="receivable-breakdown-page">
             <thead>
             <tr>
-                <th colspan="7" style="text-align:left;">{{ __('receivable.school_breakdown_title') }}</th>
+                <th colspan="5" style="text-align:left;">{{ __('receivable.invoice_breakdown_title') }}</th>
             </tr>
             <tr>
-                <th style="width: 20%;">{{ __('receivable.school_name') }}</th>
-                <th style="width: 14%;">{{ __('receivable.school_city') }}</th>
-                <th style="width: 12%;">{{ __('receivable.bill_date') }}</th>
-                <th style="width: 20%;">{{ __('receivable.bill_proof_number') }}</th>
-                <th style="width: 12%;">{{ __('receivable.school_invoice_total') }}</th>
-                <th style="width: 11%;">{{ __('receivable.school_paid_total') }}</th>
-                <th style="width: 11%;">{{ __('receivable.school_balance_total') }}</th>
+                <th style="width: 28%;">{{ __('receivable.invoice_number') }}</th>
+                <th style="width: 18%;">{{ __('receivable.school_invoice_total') }}</th>
+                <th style="width: 18%;">{{ __('receivable.invoice_return_total') }}</th>
+                <th style="width: 18%;">{{ __('receivable.school_paid_total') }}</th>
+                <th style="width: 18%;">{{ __('receivable.school_balance_total') }}</th>
             </tr>
             </thead>
             <tbody>
-            @foreach($schoolBreakdownRows as $group)
-                @php
-                    $groupRows = collect($group['rows'] ?? []);
-                @endphp
-                @foreach($groupRows as $groupRow)
-                    @php
-                        $schoolName = (string) ($groupRow['school_name'] ?? '-');
-                        $schoolCity = (string) ($groupRow['school_city'] ?? '-');
-                    @endphp
-                    <tr>
-                        <td>{{ $schoolName }}</td>
-                        <td>{{ $schoolCity }}</td>
-                        <td>{{ $groupRow['date_label'] ?? '' }}</td>
-                        <td>{{ $groupRow['invoice_number'] ?? '' }}</td>
-                        <td class="num">Rp {{ number_format((int) round((float) ($groupRow['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
-                        <td class="num">Rp {{ number_format((int) round((float) ($groupRow['paid_total'] ?? 0)), 0, ',', '.') }}</td>
-                        <td class="num">Rp {{ number_format((int) round((float) ($groupRow['balance_total'] ?? 0)), 0, ',', '.') }}</td>
-                    </tr>
-                @endforeach
-                @php $groupTotals = (array) ($group['totals'] ?? []); @endphp
-                <tr class="total-row">
-                    <td colspan="4" style="text-align:right;">{{ __('receivable.bill_total') }}</td>
-                    <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
-                    <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['paid_total'] ?? 0)), 0, ',', '.') }}</td>
-                    <td class="num">Rp {{ number_format((int) round((float) ($groupTotals['balance_total'] ?? 0)), 0, ',', '.') }}</td>
+            @foreach($invoiceBreakdownRows as $invoiceRow)
+                <tr>
+                    <td>{{ $invoiceRow['invoice_number'] ?? '-' }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($invoiceRow['invoice_total'] ?? 0)), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($invoiceRow['return_total'] ?? 0)), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($invoiceRow['paid_total'] ?? 0)), 0, ',', '.') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($invoiceRow['balance_total'] ?? 0)), 0, ',', '.') }}</td>
                 </tr>
             @endforeach
+            @php
+                $breakdownInvoiceTotal = (int) $invoiceBreakdownRows->sum(fn (array $row): int => (int) ($row['invoice_total'] ?? 0));
+                $breakdownReturnTotal = (int) $invoiceBreakdownRows->sum(fn (array $row): int => (int) ($row['return_total'] ?? 0));
+                $breakdownPaidTotal = (int) $invoiceBreakdownRows->sum(fn (array $row): int => (int) ($row['paid_total'] ?? 0));
+                $breakdownBalanceTotal = (int) $invoiceBreakdownRows->sum(fn (array $row): int => (int) ($row['balance_total'] ?? 0));
+            @endphp
+            <tr class="total-row">
+                <td style="text-align:right;">{{ __('receivable.bill_total') }}</td>
+                <td class="num">Rp {{ number_format($breakdownInvoiceTotal, 0, ',', '.') }}</td>
+                <td class="num">Rp {{ number_format($breakdownReturnTotal, 0, ',', '.') }}</td>
+                <td class="num">Rp {{ number_format($breakdownPaidTotal, 0, ',', '.') }}</td>
+                <td class="num">Rp {{ number_format($breakdownBalanceTotal, 0, ',', '.') }}</td>
+            </tr>
             </tbody>
         </table>
+
+        @foreach($invoiceBreakdownRows as $invoiceRow)
+            <table class="invoice-detail-table">
+                <thead>
+                <tr>
+                    <th colspan="4" class="invoice-detail-title">{{ $invoiceRow['invoice_number'] ?? '-' }}</th>
+                </tr>
+                <tr>
+                    <th style="width: 18%;">{{ __('receivable.bill_date') }}</th>
+                    <th style="width: 22%;">{{ __('receivable.transaction_type') }}</th>
+                    <th style="width: 40%;">{{ __('receivable.bill_proof_number') }}</th>
+                    <th style="width: 20%;">{{ __('receivable.bill_amount') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach(collect($invoiceRow['details'] ?? []) as $detailRow)
+                    @php $detailAmount = (int) round((float) ($detailRow['amount'] ?? 0)); @endphp
+                    <tr>
+                        <td>{{ $detailRow['date_label'] ?? '' }}</td>
+                        <td>{{ $detailRow['type_label'] ?? '' }}</td>
+                        <td>{{ $detailRow['proof_number'] ?? '' }}</td>
+                        <td class="num">{{ $detailAmount < 0 ? '(' : '' }}Rp {{ number_format(abs($detailAmount), 0, ',', '.') }}{{ $detailAmount < 0 ? ')' : '' }}</td>
+                    </tr>
+                @endforeach
+                <tr class="total-row">
+                    <td colspan="3" style="text-align:right;">{{ __('receivable.school_balance_total') }}</td>
+                    <td class="num">Rp {{ number_format((int) round((float) ($invoiceRow['balance_total'] ?? 0)), 0, ',', '.') }}</td>
+                </tr>
+                </tbody>
+            </table>
+        @endforeach
     @endif
 
     @if($notesText !== '' || $transferText !== '')
