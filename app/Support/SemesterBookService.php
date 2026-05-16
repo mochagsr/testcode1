@@ -703,6 +703,13 @@ class SemesterBookService
             return true;
         }
 
+        // Current and previous semester are always active regardless of configured list,
+        // so a semester rollover never blocks transactions until admin updates settings.
+        $current = $this->currentSemester();
+        if ($normalized === $current || $normalized === $this->previousSemester($current)) {
+            return true;
+        }
+
         return in_array($normalized, $activeSemesters, true);
     }
 
