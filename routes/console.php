@@ -1,31 +1,32 @@
 <?php
 
-use App\Models\ReceivablePayment;
-use App\Models\ReceivableLedger;
+use App\Models\AppSetting;
 use App\Models\Customer;
-use App\Models\SupplierLedger;
-use App\Models\SupplierPayment;
-use App\Models\Supplier;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryTrip;
-use App\Models\OutgoingTransaction;
-use App\Models\OrderNote;
-use App\Models\SchoolBulkTransaction;
-use App\Models\SalesInvoice;
-use App\Models\SalesReturn;
-use App\Models\AppSetting;
-use App\Models\ReportExportTask;
+use App\Models\IntegrityCheckLog;
 use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
-use App\Models\IntegrityCheckLog;
+use App\Models\OrderNote;
+use App\Models\OutgoingTransaction;
 use App\Models\PerformanceProbeLog;
+use App\Models\ReceivableLedger;
+use App\Models\ReceivablePayment;
+use App\Models\ReportExportTask;
+use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
+use App\Models\SchoolBulkTransaction;
+use App\Models\Supplier;
+use App\Models\SupplierLedger;
+use App\Models\SupplierPayment;
 use App\Models\User;
+use App\Services\AccountingService;
 use App\Support\AppCache;
 use App\Support\DataArchiveRegistry;
 use App\Support\DataArchiveService;
 use App\Support\SemesterBookService;
-use App\Services\AccountingService;
 use Carbon\Carbon;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -48,17 +49,20 @@ Artisan::command('app:about-updates-refresh {--limit=120}', function () {
         File::ensureDirectoryExists(dirname($targetPath));
         File::put($targetPath, json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $this->warn('Folder .git tidak ditemukan. File update dibuat kosong.');
+
         return;
     }
 
     if (! function_exists('proc_open')) {
         $this->error('proc_open tidak aktif, tidak bisa membaca git log dari command ini.');
+
         return 1;
     }
 
     $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
     if (in_array('proc_open', $disabled, true)) {
         $this->error('proc_open ada di disable_functions, tidak bisa membaca git log dari command ini.');
+
         return 1;
     }
 
@@ -74,6 +78,7 @@ Artisan::command('app:about-updates-refresh {--limit=120}', function () {
 
     if (! $process->isSuccessful()) {
         $this->error(trim($process->getErrorOutput()) ?: 'Gagal membaca git log.');
+
         return 1;
     }
 
@@ -101,6 +106,12 @@ Artisan::command('app:about-updates-refresh {--limit=120}', function () {
 
     $this->info('About update history refreshed: '.count($updates).' commit.');
     $this->line($targetPath);
+})->purpose('Refresh About page update history from git log');
+
+Artisan::command('about:update {--limit=120}', function () {
+    return Artisan::call('app:about-updates-refresh', [
+        '--limit' => (int) $this->option('limit'),
+    ], $this->getOutput());
 })->purpose('Refresh About page update history from git log');
 
 Artisan::command('app:normalize-doc-prefixes {--dry-run}', function () {
@@ -146,6 +157,7 @@ Artisan::command('app:normalize-doc-prefixes {--dry-run}', function () {
 
     if ($dryRun) {
         $this->warn('Dry run mode, no data changed.');
+
         return;
     }
 
@@ -245,6 +257,7 @@ Artisan::command('app:renumber-doc-date-format {--dry-run}', function () {
 
     if ($replaceMap === []) {
         $this->info('Tidak ada nomor dokumen lama yang perlu diubah.');
+
         return;
     }
 
@@ -256,6 +269,7 @@ Artisan::command('app:renumber-doc-date-format {--dry-run}', function () {
 
     if ($dryRun) {
         $this->warn('Dry run mode, tidak ada data yang diubah.');
+
         return;
     }
 
@@ -351,7 +365,7 @@ Artisan::command('app:normalize-semester-codes {--dry-run}', function () {
         }
         try {
             return $semesterBookService->semesterFromDate(Carbon::parse($date)->format('Y-m-d'));
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     };
@@ -423,6 +437,7 @@ Artisan::command('app:normalize-semester-codes {--dry-run}', function () {
                 if ($semester === null) {
                     return null;
                 }
+
                 return $entityId.':'.$semester;
             })
             ->filter(fn (?string $item): bool => $item !== null)
@@ -451,6 +466,7 @@ Artisan::command('app:normalize-semester-codes {--dry-run}', function () {
 
     if ($dryRun) {
         $this->warn('Dry run mode, no data changed.');
+
         return;
     }
 
@@ -479,22 +495,25 @@ Artisan::command('app:db-backup {--path=} {--gzip}', function () {
 
     $backupDir = (string) ($this->option('path') ?: storage_path('app/backups/db'));
     File::ensureDirectoryExists($backupDir);
-    $filename = 'backup-' . now('Asia/Jakarta')->format('Ymd-His') . '.sql';
-    $target = rtrim($backupDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $filename;
+    $filename = 'backup-'.now('Asia/Jakarta')->format('Ymd-His').'.sql';
+    $target = rtrim($backupDir, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$filename;
 
     if ($driver === 'sqlite') {
         $dbPath = (string) ($config['database'] ?? '');
-        if ($dbPath === '' || !File::exists($dbPath)) {
+        if ($dbPath === '' || ! File::exists($dbPath)) {
             $this->error('SQLite database file not found.');
+
             return 1;
         }
-        File::copy($dbPath, $target . '.sqlite');
-        $this->info('SQLite backup created: ' . $target . '.sqlite');
+        File::copy($dbPath, $target.'.sqlite');
+        $this->info('SQLite backup created: '.$target.'.sqlite');
+
         return 0;
     }
 
     if ($driver !== 'mysql') {
         $this->error('Only mysql/sqlite backup command is supported.');
+
         return 1;
     }
 
@@ -514,20 +533,22 @@ Artisan::command('app:db-backup {--path=} {--gzip}', function () {
         $target
     );
     exec($command, $output, $exitCode);
-    if ($exitCode !== 0 || !File::exists($target)) {
+    if ($exitCode !== 0 || ! File::exists($target)) {
         $this->error('Backup failed. Ensure mysqldump is available in PATH.');
+
         return 1;
     }
 
     if ((bool) $this->option('gzip')) {
-        $gzTarget = $target . '.gz';
+        $gzTarget = $target.'.gz';
         $content = File::get($target);
         File::put($gzTarget, gzencode($content, 9));
         File::delete($target);
         $target = $gzTarget;
     }
 
-    $this->info('Backup created: ' . $target);
+    $this->info('Backup created: '.$target);
+
     return 0;
 })->purpose('Create database backup file');
 
@@ -543,6 +564,7 @@ Artisan::command('app:archive:scan {period?} {--semester=} {--dataset=*} {--json
 
     if ((bool) $this->option('json')) {
         $this->line(json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
         return 0;
     }
 
@@ -592,6 +614,7 @@ Artisan::command('app:archive:review {--dataset=*} {--json}', function () {
 
     if ((bool) $this->option('json')) {
         $this->line(json_encode($review, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
         return 0;
     }
 
@@ -641,6 +664,7 @@ Artisan::command('app:archive:export {period?} {--semester=} {--dataset=*} {--pa
         $result = $service->exportByScope($scope, $requestedDatasets, $path !== '' ? $path : null);
     } catch (Throwable $e) {
         $this->error('Export arsip gagal: '.$e->getMessage());
+
         return 1;
     }
 
@@ -685,6 +709,7 @@ Artisan::command('app:archive:prepare-financial {period?} {--semester=} {--datas
         );
     } catch (Throwable $e) {
         $this->error('Snapshot finansial gagal: '.$e->getMessage());
+
         return 1;
     }
 
@@ -722,6 +747,7 @@ Artisan::command('app:archive:purge {period?} {--semester=} {--dataset=*} {--man
         );
     } catch (Throwable $e) {
         $this->error('Purge arsip ditolak: '.$e->getMessage());
+
         return 1;
     }
 
@@ -764,7 +790,8 @@ Artisan::command('app:archive:purge {period?} {--semester=} {--dataset=*} {--man
 Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-db=} {--mysql-host=} {--mysql-port=} {--mysql-user=} {--mysql-password=}', function () {
     $source = (string) ($this->option('source') ?: database_path('database.sqlite'));
     if (! File::exists($source)) {
-        $this->error('SQLite source file not found: ' . $source);
+        $this->error('SQLite source file not found: '.$source);
+
         return 1;
     }
 
@@ -778,7 +805,7 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
     $password = (string) ($this->option('mysql-password') ?: ($mysqlConfig['password'] ?? ''));
     $tempDb = (string) ($this->option('temp-db') ?: 'tespgpos_test_snapshot');
 
-    $this->line('Preparing temporary MySQL database: ' . $tempDb);
+    $this->line('Preparing temporary MySQL database: '.$tempDb);
 
     try {
         $adminPdo = new PDO(
@@ -793,7 +820,8 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
         $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
         $adminPdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', str_replace('`', '``', $tempDb)));
     } catch (Throwable $e) {
-        $this->error('Failed preparing temporary MySQL database: ' . $e->getMessage());
+        $this->error('Failed preparing temporary MySQL database: '.$e->getMessage());
+
         return 1;
     }
 
@@ -816,12 +844,13 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
     $this->output->write(Artisan::output());
     if ($migrateExit !== 0) {
         $this->error('MySQL migrate:fresh failed.');
+
         return 1;
     }
 
     try {
         $sourcePdo = new PDO(
-            'sqlite:' . $source,
+            'sqlite:'.$source,
             null,
             null,
             [
@@ -851,7 +880,8 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
             $existsStmt = $destPdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?');
             $existsStmt->execute([$tempDb, $table]);
             if ((int) $existsStmt->fetchColumn() === 0) {
-                $this->warn('Skipping missing destination table: ' . $table);
+                $this->warn('Skipping missing destination table: '.$table);
+
                 continue;
             }
 
@@ -874,7 +904,8 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
             ));
 
             if ($commonColumns === []) {
-                $this->warn('Skipping table with no shared columns: ' . $table);
+                $this->warn('Skipping table with no shared columns: '.$table);
+
                 continue;
             }
 
@@ -919,7 +950,8 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
 
         $destPdo->exec('SET FOREIGN_KEY_CHECKS=1');
     } catch (Throwable $e) {
-        $this->error('Snapshot copy failed: ' . $e->getMessage());
+        $this->error('Snapshot copy failed: '.$e->getMessage());
+
         return 1;
     }
 
@@ -935,10 +967,12 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
     exec($dumpCommand, $dumpOutput, $dumpExitCode);
     if ($dumpExitCode !== 0 || ! File::exists($target)) {
         $this->error('mysqldump failed. Ensure mysqldump is available in PATH.');
+
         return 1;
     }
 
-    $this->info('MySQL test snapshot created: ' . $target);
+    $this->info('MySQL test snapshot created: '.$target);
+
     return 0;
 })->purpose('Build a MySQL SQL snapshot from the current SQLite database for test deployment');
 
@@ -953,7 +987,7 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
     $password = (string) ($this->option('mysql-password') ?: ($mysqlConfig['password'] ?? ''));
     $tempDb = (string) ($this->option('temp-db') ?: 'tespgpos_prod_bootstrap');
 
-    $this->line('Preparing temporary MySQL database: ' . $tempDb);
+    $this->line('Preparing temporary MySQL database: '.$tempDb);
 
     try {
         $adminPdo = new PDO(
@@ -968,7 +1002,8 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
         $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
         $adminPdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', str_replace('`', '``', $tempDb)));
     } catch (Throwable $e) {
-        $this->error('Failed preparing temporary MySQL database: ' . $e->getMessage());
+        $this->error('Failed preparing temporary MySQL database: '.$e->getMessage());
+
         return 1;
     }
 
@@ -991,6 +1026,7 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
     $this->output->write(Artisan::output());
     if ($migrateExit !== 0) {
         $this->error('MySQL migrate:fresh failed.');
+
         return 1;
     }
 
@@ -1001,6 +1037,7 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
     $this->output->write(Artisan::output());
     if ($seedExit !== 0) {
         $this->error('MySQL db:seed failed.');
+
         return 1;
     }
 
@@ -1016,6 +1053,7 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
     exec($dumpCommand, $dumpOutput, $dumpExitCode);
     if ($dumpExitCode !== 0 || ! File::exists($target)) {
         $this->error('mysqldump failed. Ensure mysqldump is available in PATH.');
+
         return 1;
     }
 
@@ -1024,7 +1062,8 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
         File::copy($target, $legacyTarget);
     }
 
-    $this->info('MySQL production bootstrap created: ' . $target);
+    $this->info('MySQL production bootstrap created: '.$target);
+
     return 0;
 })->purpose('Build a clean MySQL production bootstrap SQL from current migrations and seeders');
 
@@ -1045,18 +1084,19 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
         return 0;
     }
 
     $backupDir = storage_path('app/backups/db');
     $file = (string) ($this->option('file') ?: '');
     if ($file === '') {
-        $candidates = collect(File::glob($backupDir . DIRECTORY_SEPARATOR . '*.sql'))
+        $candidates = collect(File::glob($backupDir.DIRECTORY_SEPARATOR.'*.sql'))
             ->sortDesc()
             ->values();
         $file = (string) ($candidates->first() ?? '');
     }
-    if ($file === '' || !File::exists($file)) {
+    if ($file === '' || ! File::exists($file)) {
         $this->error('No SQL backup file found for restore test.');
         DB::table('restore_drill_logs')->insert([
             'backup_file' => $file !== '' ? $file : null,
@@ -1067,6 +1107,7 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
         return 1;
     }
 
@@ -1074,7 +1115,7 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
     $port = (string) ($config['port'] ?? '3306');
     $username = (string) ($config['username'] ?? '');
     $password = (string) ($config['password'] ?? '');
-    $tempDb = (string) ($this->option('temp-db') ?: ('restore_test_' . now()->format('YmdHis')));
+    $tempDb = (string) ($this->option('temp-db') ?: ('restore_test_'.now()->format('YmdHis')));
 
     try {
         $adminPdo = new PDO(
@@ -1089,7 +1130,7 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
         $adminPdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', str_replace('`', '``', $tempDb)));
         $adminPdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', str_replace('`', '``', $tempDb)));
     } catch (Throwable $e) {
-        $message = 'Failed preparing temporary database: ' . $e->getMessage();
+        $message = 'Failed preparing temporary database: '.$e->getMessage();
         $privilegeHint = str_contains(strtolower($e->getMessage()), 'denied')
             || str_contains(strtolower($e->getMessage()), 'access')
             || str_contains(strtolower($e->getMessage()), 'permission');
@@ -1107,6 +1148,7 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
         return $privilegeHint ? 0 : 1;
     }
 
@@ -1147,6 +1189,7 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
         return 1;
     }
 
@@ -1159,7 +1202,8 @@ Artisan::command('app:db-restore-test {--file=} {--temp-db=}', function () {
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-    $this->info('Restore test passed for backup: ' . $file);
+    $this->info('Restore test passed for backup: '.$file);
+
     return 0;
 })->purpose('Run restore validation test on latest backup');
 
@@ -1310,6 +1354,7 @@ Artisan::command('app:financial-rebuild {--rebuild-journal}', function () {
     }
 
     $this->info("Financial rebuild selesai. invoices={$invoiceUpdated}, receivable_ledgers={$receivableLedgerUpdated}, customers={$customerUpdated}, supplier_ledgers={$supplierLedgerUpdated}, suppliers={$supplierUpdated}, journals_rebuilt=".($journalRebuilt ? 'yes' : 'no'));
+
     return 0;
 })->purpose('Rebuild invoice totals, ledger running balances, customer/supplier aggregates, and optional journals');
 
@@ -1334,6 +1379,7 @@ Artisan::command('app:load-test-light {--loops=50} {--search=abc}', function () 
     $measure = static function (callable $callback): float {
         $started = microtime(true);
         $callback();
+
         return (microtime(true) - $started) * 1000;
     };
 
@@ -1416,6 +1462,7 @@ Artisan::command('app:load-test-light {--loops=50} {--search=abc}', function () 
         $avgLoopMs
     ));
     $this->line('Avg metrics(ms): '.json_encode($avgMetrics, JSON_UNESCAPED_UNICODE));
+
     return 0;
 })->purpose('Run lightweight DB load test for list/search endpoints');
 
@@ -1551,10 +1598,10 @@ Artisan::command('app:integrity-check', function () {
 
 Artisan::command('app:query-profile', function () {
     $queries = [
-        'customers_list' => "EXPLAIN SELECT id, name, city, phone FROM customers ORDER BY name LIMIT 20",
-        'products_list' => "EXPLAIN SELECT id, code, name, stock FROM products ORDER BY name LIMIT 20",
-        'sales_invoice_list' => "EXPLAIN SELECT id, invoice_number, customer_id, invoice_date FROM sales_invoices ORDER BY invoice_date DESC, id DESC LIMIT 20",
-        'receivable_ledger_customer' => "EXPLAIN SELECT id, customer_id, sales_invoice_id, entry_date, debit, credit FROM receivable_ledgers WHERE customer_id = 1 ORDER BY entry_date DESC, id DESC LIMIT 50",
+        'customers_list' => 'EXPLAIN SELECT id, name, city, phone FROM customers ORDER BY name LIMIT 20',
+        'products_list' => 'EXPLAIN SELECT id, code, name, stock FROM products ORDER BY name LIMIT 20',
+        'sales_invoice_list' => 'EXPLAIN SELECT id, invoice_number, customer_id, invoice_date FROM sales_invoices ORDER BY invoice_date DESC, id DESC LIMIT 20',
+        'receivable_ledger_customer' => 'EXPLAIN SELECT id, customer_id, sales_invoice_id, entry_date, debit, credit FROM receivable_ledgers WHERE customer_id = 1 ORDER BY entry_date DESC, id DESC LIMIT 50',
     ];
 
     foreach ($queries as $label => $sql) {
@@ -1562,7 +1609,7 @@ Artisan::command('app:query-profile', function () {
         try {
             $rows = DB::select($sql);
             $this->line(json_encode($rows, JSON_UNESCAPED_UNICODE));
-        } catch (\Throwable $throwable) {
+        } catch (Throwable $throwable) {
             $this->error("Query profile failed for {$label}: ".$throwable->getMessage());
         }
     }
@@ -1677,12 +1724,13 @@ Artisan::command('app:http-smoke-test', function () {
     $admin = User::query()->where('role', 'admin')->orderBy('id')->first();
     if ($admin === null) {
         $this->error('Tidak ada user admin untuk menjalankan HTTP smoke test.');
+
         return 1;
     }
 
     $user = User::query()->where('role', 'user')->orderBy('id')->first();
 
-    $kernel = app(\Illuminate\Contracts\Http\Kernel::class);
+    $kernel = app(Kernel::class);
     $rows = [];
     $failures = 0;
     $warnings = 0;
@@ -1720,13 +1768,14 @@ Artisan::command('app:http-smoke-test', function () {
             $responsePreview = trim(preg_replace('/\s+/', ' ', strip_tags((string) $response->getContent())) ?? '');
             $detail = 'HTTP '.$status;
             if ($status >= 500 && $responsePreview !== '') {
-                $detail .= ' - ' . mb_substr($responsePreview, 0, 180);
+                $detail .= ' - '.mb_substr($responsePreview, 0, 180);
             }
+
             return [
                 'ok' => $status >= 200 && $status < 300,
                 'detail' => $detail,
             ];
-        } catch (\Throwable $throwable) {
+        } catch (Throwable $throwable) {
             return [
                 'ok' => false,
                 'detail' => $throwable->getMessage(),
@@ -1753,6 +1802,7 @@ Artisan::command('app:http-smoke-test', function () {
 
             if ($url === '') {
                 $pushRow($group, $label, 'WARN', 'Route dilewati karena URL kosong.');
+
                 continue;
             }
 
@@ -2028,10 +2078,12 @@ Artisan::command('app:deploy-check {--skip-ops} {--full-suite}', function () {
 
     if ($failed) {
         $this->error('Deploy check selesai dengan masalah. Periksa output di atas.');
+
         return 1;
     }
 
     $this->info('Deploy check selesai tanpa FAIL.');
+
     return 0;
 })->purpose('Run operational smoke test plus HTTP page/document/report smoke tests before or after deploy');
 
@@ -2040,6 +2092,7 @@ Artisan::command('app:restore-document {type} {id}', function () {
     $id = (int) $this->argument('id');
     if ($id <= 0) {
         $this->error('ID tidak valid.');
+
         return 1;
     }
 
@@ -2053,21 +2106,25 @@ Artisan::command('app:restore-document {type} {id}', function () {
     };
     if ($modelClass === null) {
         $this->error('Type tidak valid. Gunakan: invoice|return|receivable_payment|outgoing|supplier_payment');
+
         return 1;
     }
 
     $record = $modelClass::withTrashed()->whereKey($id)->first();
     if ($record === null) {
         $this->error('Dokumen tidak ditemukan.');
+
         return 1;
     }
     if ($record->deleted_at === null) {
         $this->warn('Dokumen tidak dalam status terhapus.');
+
         return 0;
     }
 
     $record->restore();
     $this->info('Dokumen berhasil direstore.');
+
     return 0;
 })->purpose('Restore soft-deleted financial document by type and id');
 
@@ -2089,6 +2146,7 @@ Artisan::command('app:report-exports-prune {--days=14}', function () {
     });
 
     $this->info("Prune report export selesai. deleted={$count}");
+
     return 0;
 })->purpose('Prune old queued export files/tasks from storage and database');
 
@@ -2129,6 +2187,7 @@ Artisan::command('app:system-logs-cleanup {--json}', function () {
                 $datasetSummary['status'] = 'skipped';
                 $datasetSummary['message'] = 'Konfigurasi dataset tidak lengkap.';
                 $summary['datasets'][] = $datasetSummary;
+
                 continue;
             }
 
@@ -2141,6 +2200,7 @@ Artisan::command('app:system-logs-cleanup {--json}', function () {
                 $datasetSummary['status'] = 'skipped';
                 $datasetSummary['message'] = 'Tabel tidak ditemukan.';
                 $summary['datasets'][] = $datasetSummary;
+
                 continue;
             }
 
@@ -2184,7 +2244,7 @@ Artisan::command('app:system-logs-cleanup {--json}', function () {
                     $datasetSummary['deleted'] += $deleteByIds($table, $ids);
                 } while ($ids !== []);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $datasetSummary['status'] = 'failed';
             $datasetSummary['message'] = $e->getMessage();
             $summary['status'] = 'partial';
@@ -2231,6 +2291,7 @@ Artisan::command('app:report-exports-fix-stuck {--minutes=30}', function () {
         ]);
 
     $this->info("Fixed stuck export tasks: {$affected}");
+
     return 0;
 })->purpose('Mark processing export tasks as failed when stuck for too long');
 
