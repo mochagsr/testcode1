@@ -101,7 +101,7 @@
             <div class="meta-line"><strong>{{ __('txn.due_date') }}</strong><span>:</span><span class="meta-value">{{ $invoice->due_date?->format('d-m-Y') ?: '-' }}</span></div>
             <div class="meta-line"><strong>Pembayaran</strong><span>:</span><span class="meta-value">{{ $paymentMethodLabel }}</span></div>
             <div class="meta-line"><strong>Semester</strong><span>:</span><span class="meta-value">{{ $invoice->semester_period ?: '-' }}</span></div>
-            <div class="meta-line"><strong>{{ __('txn.customer') }}</strong><span>:</span><span class="meta-value">{{ $invoice->customer?->name ?: '-' }}</span></div>
+            <div class="meta-line"><strong>{{ __('ui.customer_name') }}</strong><span>:</span><span class="meta-value">{{ $invoice->customer?->name ?: '-' }}</span></div>
             <div class="meta-line"><strong>{{ __('txn.phone') }}</strong><span>:</span><span class="meta-value">{{ $invoice->customer?->phone ?: '-' }}</span></div>
             <div class="meta-line"><strong>{{ __('txn.city') }}</strong><span>:</span><span class="meta-value">{{ $invoice->customer?->city ?: '-' }}</span></div>
             <div class="meta-line"><strong>{{ __('txn.address') }}</strong><span>:</span><span class="meta-value">{{ $customerAddress !== '' ? $customerAddress : '-' }}</span></div>

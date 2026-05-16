@@ -112,7 +112,7 @@
                         </th>
                         <th>
                             <a class="sort-link" href="{{ $sortUrl('customer') }}">
-                                {{ __('txn.customer') }} <span class="sort-mark">{{ $sortMark('customer') }}</span>
+                                {{ __('ui.customer_name') }} <span class="sort-mark">{{ $sortMark('customer') }}</span>
                             </a>
                         </th>
                         <th>

@@ -113,10 +113,17 @@
         }
     </style>
 
+    @php
+        $supplierSortUrl = function () use ($search, $selectedSupplierId, $selectedYear, $selectedMonth, $direction): string {
+            $nextDir = $direction === 'asc' ? 'desc' : 'asc';
+            return route('supplier-payables.index', array_filter(['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== '' && $v !== 0));
+        };
+    @endphp
     <h1 class="page-title">{{ __('supplier_payable.title') }}</h1>
 
     <div class="card">
         <form method="get" class="filter-toolbar" id="supplier-payable-filter-form">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <div class="filter-field">
                 <label for="supplier-payable-search">{{ __('txn.search') }}</label>
                 <input id="supplier-payable-search" type="text" name="search" value="{{ $search }}" placeholder="{{ __('supplier_payable.search_placeholder') }}" style="max-width:320px;">
@@ -224,7 +231,7 @@
                     </colgroup>
                     <thead>
                     <tr>
-                        <th>{{ __('txn.supplier') }}</th>
+                        <th><a style="color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:3px;cursor:pointer;" href="{{ $supplierSortUrl() }}">{{ __('txn.supplier') }} <span style="font-size:11px;opacity:0.65;">{{ $direction === 'asc' ? '↑' : '↓' }}</span></a></th>
                         <th class="num">{{ __('supplier_payable.outstanding') }}</th>
                         <th class="action">{{ __('txn.action') }}</th>
                     </tr>

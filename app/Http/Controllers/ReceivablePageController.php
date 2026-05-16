@@ -53,6 +53,10 @@ class ReceivablePageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $customerId = $request->integer('customer_id');
         $selectedTransactionType = trim((string) $request->string('transaction_type', ''));
+        $allowedSorts = ['name', 'city'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '') : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
         if ($selectedTransactionType !== '' && ! in_array($selectedTransactionType, TransactionType::values(), true)) {
             $selectedTransactionType = '';
         }
@@ -100,9 +104,14 @@ class ReceivablePageController extends Controller
                 ->leftJoinSub($semesterLedger, 'semester_ledger', function ($join): void {
                     $join->on('customers.id', '=', 'semester_ledger.customer_id');
                 })
-                ->addSelect(DB::raw('COALESCE(semester_ledger.semester_outstanding, 0) as outstanding_receivable'))
-                ->orderByDesc(DB::raw('COALESCE(semester_ledger.semester_outstanding, 0)'))
-                ->orderBy('customers.name');
+                ->addSelect(DB::raw('COALESCE(semester_ledger.semester_outstanding, 0) as outstanding_receivable'));
+            if ($sort === 'name') {
+                $customersQuery->orderBy('customers.name', $direction)->orderBy('customers.id');
+            } elseif ($sort === 'city') {
+                $customersQuery->orderBy('customers.city', $direction)->orderBy('customers.name');
+            } else {
+                $customersQuery->orderByDesc(DB::raw('COALESCE(semester_ledger.semester_outstanding, 0)'))->orderBy('customers.name');
+            }
         } else {
             $totalLedger = ReceivableLedger::query()
                 ->selectRaw('customer_id, SUM(debit - credit) as total_outstanding')
@@ -112,9 +121,14 @@ class ReceivablePageController extends Controller
                 ->leftJoinSub($totalLedger, 'total_ledger', function ($join): void {
                     $join->on('customers.id', '=', 'total_ledger.customer_id');
                 })
-                ->addSelect(DB::raw('COALESCE(total_ledger.total_outstanding, 0) as outstanding_receivable'))
-                ->orderByDesc(DB::raw('COALESCE(total_ledger.total_outstanding, 0)'))
-                ->orderBy('customers.name');
+                ->addSelect(DB::raw('COALESCE(total_ledger.total_outstanding, 0) as outstanding_receivable'));
+            if ($sort === 'name') {
+                $customersQuery->orderBy('customers.name', $direction)->orderBy('customers.id');
+            } elseif ($sort === 'city') {
+                $customersQuery->orderBy('customers.city', $direction)->orderBy('customers.name');
+            } else {
+                $customersQuery->orderByDesc(DB::raw('COALESCE(total_ledger.total_outstanding, 0)'))->orderBy('customers.name');
+            }
         }
 
         $customers = $customersQuery
@@ -280,6 +294,8 @@ class ReceivablePageController extends Controller
             'paymentRefsWithAlloc' => $paymentRefsWithAlloc,
             'salesReturnLinkMap' => $salesReturnLinkMap,
             'selectedCustomerOption' => $selectedCustomerOption,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -688,6 +704,10 @@ class ReceivablePageController extends Controller
         $status = strtolower(trim((string) $request->string('status', 'all')));
         $selectedCustomerId = max(0, (int) $request->integer('customer_id'));
         $selectedTransactionType = trim((string) $request->string('transaction_type', ''));
+        $allowedSorts = ['name', 'city'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '') : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
         if ($selectedTransactionType !== '' && ! in_array($selectedTransactionType, TransactionType::values(), true)) {
             $selectedTransactionType = '';
         }
@@ -797,7 +817,9 @@ class ReceivablePageController extends Controller
             ->when($status === 'credit', function ($builder): void {
                 $builder->whereRaw('COALESCE(global_ledger.total_outstanding, 0) < 0');
             })
-            ->orderBy('name');
+            ->when($sort === 'name', fn ($q) => $q->orderBy('customers.name', $direction)->orderBy('customers.id'))
+            ->when($sort === 'city', fn ($q) => $q->orderBy('customers.city', $direction)->orderBy('customers.name'))
+            ->when($sort === '', fn ($q) => $q->orderBy('customers.name'));
 
         $customers = $paginate
             ? $customerQuery->paginate(10)->withQueryString()
@@ -899,6 +921,8 @@ class ReceivablePageController extends Controller
             'companyEmail' => $companySettings['companyEmail'] ?? '',
             'companyInvoiceNotes' => $companySettings['companyInvoiceNotes'] ?? '',
             'companyTransferAccounts' => $companySettings['companyTransferAccounts'] ?? '',
+            'sort' => $sort,
+            'direction' => $direction,
         ];
     }
 
@@ -1091,10 +1115,9 @@ class ReceivablePageController extends Controller
             $rowsOut = [[
                 __('receivable.bill_date'),
                 __('receivable.bill_proof_number'),
-                __('receivable.transaction_type'),
-                __('receivable.transaction_subtype'),
+                __('receivable.bill_transaction_note'),
                 __('receivable.bill_credit_sales'),
-                __('receivable.bill_installment_payment'),
+                __('receivable.bill_payment_or_deduction'),
                 __('receivable.bill_sales_return'),
                 __('receivable.bill_running_balance'),
             ]];
@@ -1112,10 +1135,9 @@ class ReceivablePageController extends Controller
                 $rowsOut[] = [
                     (string) ($row['date_label'] ?? ''),
                     $proofNumber,
-                    (string) ($row['transaction_type_label'] ?? __('receivable.transaction_type_none')),
-                    (string) ($row['transaction_subtype_label'] ?? __('receivable.printing_subtype_none')),
+                    $this->customerBillExcelTransactionNote($row),
                     number_format((int) round((float) ($row['credit_sales'] ?? 0)), 0, ',', '.'),
-                    number_format((int) round((float) ($row['installment_payment'] ?? 0)), 0, ',', '.'),
+                    number_format((int) round((float) ($row['installment_payment'] ?? 0) + (float) ($row['deduction_discount'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['sales_return'] ?? 0)), 0, ',', '.'),
                     number_format((int) round((float) ($row['running_balance'] ?? 0)), 0, ',', '.'),
                 ];
@@ -1126,9 +1148,8 @@ class ReceivablePageController extends Controller
                 '',
                 __('receivable.bill_total'),
                 '',
-                '',
                 number_format((int) round((float) ($totals['credit_sales'] ?? 0)), 0, ',', '.'),
-                number_format((int) round((float) ($totals['installment_payment'] ?? 0)), 0, ',', '.'),
+                number_format((int) round((float) ($totals['installment_payment'] ?? 0) + (float) ($totals['deduction_discount'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['sales_return'] ?? 0)), 0, ',', '.'),
                 number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
             ];
@@ -1137,17 +1158,18 @@ class ReceivablePageController extends Controller
                 '',
                 '',
                 '',
+                (int) round((float) ($totals['running_balance'] ?? 0)) < 0
+                    ? __('receivable.bill_total_credit_balance')
+                    : __('receivable.bill_total_receivable'),
                 '',
-                __('receivable.bill_total_receivable'),
-                '',
-                number_format((int) round((float) ($totals['running_balance'] ?? 0)), 0, ',', '.'),
+                number_format(abs((int) round((float) ($totals['running_balance'] ?? 0))), 0, ',', '.'),
             ];
 
             $tableStartRow = 10;
             $sheet->fromArray($rowsOut, null, 'A'.$tableStartRow);
-            ExcelExportStyler::styleTable($sheet, $tableStartRow, 8, count($rowsOut) - 1, true);
-            $sheet->getStyle('A'.$tableStartRow.':H'.($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
-            $sheet->getStyle('E'.($tableStartRow + 1).':H'.($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            ExcelExportStyler::styleTable($sheet, $tableStartRow, 7, count($rowsOut) - 1, true);
+            $sheet->getStyle('A'.$tableStartRow.':G'.($tableStartRow + count($rowsOut)))->getAlignment()->setWrapText(true);
+            $sheet->getStyle('D'.($tableStartRow + 1).':G'.($tableStartRow + count($rowsOut)))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             $rowCursor = $tableStartRow + count($rowsOut) + 2;
 
@@ -1364,6 +1386,10 @@ class ReceivablePageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $status = strtolower(trim((string) $request->string('status', 'all')));
         $selectedTransactionType = trim((string) $request->string('transaction_type', ''));
+        $allowedSorts = ['name', 'city'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '') : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
         if ($selectedTransactionType !== '' && ! in_array($selectedTransactionType, TransactionType::values(), true)) {
             $selectedTransactionType = '';
         }
@@ -1448,7 +1474,9 @@ class ReceivablePageController extends Controller
                 DB::raw('COALESCE(semester_ledger.return_total, 0) as return_total'),
                 DB::raw('COALESCE(semester_ledger.outstanding_total, 0) as outstanding_total'),
             ])
-            ->orderBy('customers.name');
+            ->when($sort === 'name', fn ($q) => $q->orderBy('customers.name', $direction)->orderBy('customers.id'))
+            ->when($sort === 'city', fn ($q) => $q->orderBy('customers.city', $direction)->orderBy('customers.name'))
+            ->when($sort === '', fn ($q) => $q->orderBy('customers.name'));
 
         $totalsRow = (clone $baseQuery)
             ->selectRaw('
@@ -1503,6 +1531,8 @@ class ReceivablePageController extends Controller
             ],
             'printTitle' => 'DAFTAR PIUTANG '.strtoupper($this->semesterDescriptionLabel($selectedSemester)).($selectedTransactionType !== '' ? ' - '.strtoupper($this->transactionTypeLabel($selectedTransactionType)) : ''),
             'totalItems' => $paginate ? (int) $rows->total() : (int) $rowCollection->count(),
+            'sort' => $sort,
+            'direction' => $direction,
         ];
     }
 
@@ -1634,7 +1664,7 @@ class ReceivablePageController extends Controller
                 'customer_id' => $customerId,
                 'semester' => (string) ($normalizedSemester ?? ''),
                 'transaction_type' => (string) ($normalizedTransactionType ?? ''),
-                'version' => 'v3',
+                'version' => 'v4',
             ]),
             now()->addSeconds(45),
             fn () => $this->buildCustomerBillStatement($customerId, $normalizedSemester, $normalizedTransactionType)
@@ -1692,6 +1722,7 @@ class ReceivablePageController extends Controller
                 'adjustment_amount' => 0,
                 'credit_sales' => 0,
                 'installment_payment' => 0,
+                'deduction_discount' => 0,
                 'sales_return' => 0,
                 'running_balance' => $openingBalance,
             ],
@@ -1700,6 +1731,7 @@ class ReceivablePageController extends Controller
         $totals = [
             'credit_sales' => 0,
             'installment_payment' => 0,
+            'deduction_discount' => 0,
             'sales_return' => 0,
             'adjustment_amount' => 0,
             'running_balance' => $openingBalance,
@@ -1715,14 +1747,18 @@ class ReceivablePageController extends Controller
             ->filter(fn (string $reference): bool => $reference !== '')
             ->unique()
             ->values();
-        $paymentIdMap = $paymentRefs->isEmpty()
+        $paymentMetaMap = $paymentRefs->isEmpty()
             ? collect()
             : ReceivablePayment::query()
                 ->where('customer_id', $customerId)
                 ->whereIn('payment_number', $paymentRefs->all())
-                ->get(['id', 'payment_number'])
+                ->get(['id', 'payment_number', 'amount', 'payment_description'])
                 ->mapWithKeys(fn (ReceivablePayment $payment): array => [
-                    strtoupper((string) $payment->payment_number) => (int) $payment->id,
+                    strtoupper((string) $payment->payment_number) => [
+                        'id' => (int) $payment->id,
+                        'amount' => (int) round((float) $payment->amount),
+                        'payment_description' => trim((string) ($payment->payment_description ?? '')),
+                    ],
                 ]);
         $legacyPaymentLookup = ReceivablePayment::query()
             ->where('customer_id', $customerId)
@@ -1735,7 +1771,7 @@ class ReceivablePageController extends Controller
             ->active()
             ->orderBy('payment_date')
             ->orderBy('id')
-            ->get(['id', 'payment_number', 'payment_date', 'amount'])
+            ->get(['id', 'payment_number', 'payment_date', 'amount', 'payment_description'])
             ->groupBy(fn (ReceivablePayment $payment): string => $payment->payment_date?->toDateString().'|'.(int) $payment->amount)
             ->map(function (Collection $group): ?array {
                 if ($group->count() !== 1) {
@@ -1750,6 +1786,8 @@ class ReceivablePageController extends Controller
                 return [
                     'id' => (int) $payment->id,
                     'payment_number' => strtoupper((string) $payment->payment_number),
+                    'amount' => (int) round((float) $payment->amount),
+                    'payment_description' => trim((string) ($payment->payment_description ?? '')),
                 ];
             })
             ->filter();
@@ -1793,7 +1831,6 @@ class ReceivablePageController extends Controller
                 || str_contains($description, 'penyesuaian nilai faktur')
                 || str_contains($description, 'invoice adjustment');
             $salesReturn = $isReturn ? $credit : 0;
-            $installment = ($isReturn || $isInvoiceCancellation) ? 0 : $credit;
             $entryType = 'payment';
             if ($debit > 0) {
                 $entryType = 'debit';
@@ -1814,8 +1851,15 @@ class ReceivablePageController extends Controller
             if ($invoiceNumber === '') {
                 $invoiceNumber = $this->extractDocumentReference($rawDescription, ['INV']);
             }
+            $invoiceId = $ledgerRow->invoice?->id;
+            if ($entryType === 'payment' && $invoiceId === null && $credit > 0) {
+                $entryType = 'overpayment';
+            }
+            $installment = in_array($entryType, ['payment', 'overpayment'], true) ? $credit : 0;
+            $deductionDiscount = in_array($entryType, ['writeoff', 'discount'], true) ? $credit : 0;
+
             $paymentNumber = $this->extractDocumentReference($rawDescription, ['KWT', 'PYT']);
-            if ($paymentNumber === '' && $entryType === 'payment') {
+            if ($paymentNumber === '' && in_array($entryType, ['payment', 'overpayment'], true)) {
                 $legacyPaymentKey = $ledgerRow->entry_date?->toDateString().'|'.$installment;
                 $legacyPayment = $legacyPaymentLookup->get($legacyPaymentKey);
                 if (is_array($legacyPayment)) {
@@ -1824,20 +1868,32 @@ class ReceivablePageController extends Controller
             }
             $returnNumber = $this->extractDocumentReference($rawDescription, ['RTR', 'RET', 'RTN']);
             $paymentId = 0;
+            $paymentTotalAmount = 0;
+            $paymentDescription = '';
             if ($paymentNumber !== '') {
-                $paymentId = (int) ($paymentIdMap[$paymentNumber] ?? 0);
-                if ($paymentId === 0 && $entryType === 'payment') {
+                $paymentMeta = $paymentMetaMap->get(strtoupper($paymentNumber));
+                if (is_array($paymentMeta)) {
+                    $paymentId = (int) ($paymentMeta['id'] ?? 0);
+                    $paymentTotalAmount = (int) ($paymentMeta['amount'] ?? 0);
+                    $paymentDescription = trim((string) ($paymentMeta['payment_description'] ?? ''));
+                }
+                if ($paymentId === 0 && in_array($entryType, ['payment', 'overpayment'], true)) {
                     $legacyPaymentKey = $ledgerRow->entry_date?->toDateString().'|'.$installment;
                     $legacyPayment = $legacyPaymentLookup->get($legacyPaymentKey);
                     if (is_array($legacyPayment) && (string) ($legacyPayment['payment_number'] ?? '') === $paymentNumber) {
                         $paymentId = (int) ($legacyPayment['id'] ?? 0);
+                        $paymentTotalAmount = (int) ($legacyPayment['amount'] ?? 0);
+                        $paymentDescription = trim((string) ($legacyPayment['payment_description'] ?? ''));
                     }
                 }
             }
             $salesReturnId = $returnNumber !== '' ? (int) ($salesReturnIdMap[$returnNumber] ?? 0) : 0;
+            $displayEntryType = in_array($entryType, ['payment', 'overpayment'], true) && $paymentNumber !== ''
+                ? 'account_payment'
+                : $entryType;
             $baseProofNumber = match ($entryType) {
                 'return' => $returnNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),
-                'payment' => $paymentNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),
+                'payment', 'overpayment' => $paymentNumber ?: ($invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-')),
                 default => $invoiceNumber !== '' ? $invoiceNumber : ($rawDescription !== '' ? $rawDescription : '-'),
             };
             $proofNumber = match ($entryType) {
@@ -1851,17 +1907,17 @@ class ReceivablePageController extends Controller
                     : $baseProofNumber,
                 default => $baseProofNumber,
             };
-            $invoiceId = $ledgerRow->invoice?->id;
-            if ($entryType === 'payment' && $invoiceId === null && $installment > 0) {
-                $entryType = 'overpayment';
-            }
             $typeKey = $transactionType ?? 'none';
             $subtypeKey = $printingSubtypeName !== '' ? mb_strtolower($printingSubtypeName, 'UTF-8') : 'none';
-            $groupKey = $isAdminInvoiceAdjustment
-                ? 'ledger:'.(int) $ledgerRow->id.':adjustment:'.$typeKey.':'.$subtypeKey
-                : ($invoiceId !== null
-                ? 'invoice:'.$invoiceId.':'.$entryType.':'.$typeKey.':'.$subtypeKey
-                : 'text:'.$baseProofNumber.':'.$entryType.':'.$typeKey.':'.$subtypeKey);
+            if (in_array($entryType, ['payment', 'overpayment'], true) && $paymentNumber !== '') {
+                $groupKey = 'payment:'.$paymentNumber;
+            } else {
+                $groupKey = $isAdminInvoiceAdjustment
+                    ? 'ledger:'.(int) $ledgerRow->id.':adjustment:'.$typeKey.':'.$subtypeKey
+                    : ($invoiceId !== null
+                    ? 'invoice:'.$invoiceId.':'.$entryType.':'.$typeKey.':'.$subtypeKey
+                    : 'text:'.$baseProofNumber.':'.$entryType.':'.$typeKey.':'.$subtypeKey);
+            }
             $dateValue = $debit > 0
                 ? ($ledgerRow->invoice?->invoice_date ?: $ledgerRow->entry_date)
                 : $ledgerRow->entry_date;
@@ -1875,21 +1931,44 @@ class ReceivablePageController extends Controller
                     'receivable_payment_id' => $paymentId > 0 ? $paymentId : null,
                     'sales_return_id' => $salesReturnId > 0 ? $salesReturnId : null,
                     'proof_number' => $proofNumber,
-                    'entry_type' => $entryType,
+                    'entry_type' => $displayEntryType,
+                    'payment_description' => $paymentDescription !== '' ? $paymentDescription : null,
+                    'payment_total_amount' => in_array($entryType, ['payment', 'overpayment'], true) ? $paymentTotalAmount : 0,
                     'transaction_type' => $transactionType,
                     'printing_subtype_name' => $printingSubtypeName !== '' ? $printingSubtypeName : null,
                     'adjustment_amount' => 0,
                     'credit_sales' => 0,
                     'installment_payment' => 0,
+                    'deduction_discount' => 0,
                     'sales_return' => 0,
                 ];
             }
 
+            if (($groupedRows[$groupKey]['receivable_payment_id'] ?? null) === null && $paymentId > 0) {
+                $groupedRows[$groupKey]['receivable_payment_id'] = $paymentId;
+            }
+            if (($groupedRows[$groupKey]['payment_description'] ?? null) === null && $paymentDescription !== '') {
+                $groupedRows[$groupKey]['payment_description'] = $paymentDescription;
+            }
+            if (
+                in_array($entryType, ['payment', 'overpayment'], true)
+                && $paymentTotalAmount > 0
+                && (int) ($groupedRows[$groupKey]['payment_total_amount'] ?? 0) === 0
+            ) {
+                $groupedRows[$groupKey]['payment_total_amount'] = $paymentTotalAmount;
+            }
+
             if (in_array($entryType, ['adjustment', 'cancel'], true)) {
                 $groupedRows[$groupKey]['adjustment_amount'] += ($debit - $credit);
+            } elseif (
+                in_array($entryType, ['payment', 'overpayment'], true)
+                && (int) ($groupedRows[$groupKey]['payment_total_amount'] ?? 0) > 0
+            ) {
+                $groupedRows[$groupKey]['installment_payment'] = (int) $groupedRows[$groupKey]['payment_total_amount'];
             } else {
                 $groupedRows[$groupKey]['credit_sales'] += $debit;
                 $groupedRows[$groupKey]['installment_payment'] += $installment;
+                $groupedRows[$groupKey]['deduction_discount'] += $deductionDiscount;
                 $groupedRows[$groupKey]['sales_return'] += $salesReturn;
             }
         }
@@ -1908,6 +1987,7 @@ class ReceivablePageController extends Controller
         foreach ($groupedRows as $groupedRow) {
             $delta = (int) $groupedRow['credit_sales']
                 - (int) $groupedRow['installment_payment']
+                - (int) $groupedRow['deduction_discount']
                 - (int) $groupedRow['sales_return']
                 + (int) ($groupedRow['adjustment_amount'] ?? 0);
             $runningBalance += $delta;
@@ -1926,10 +2006,14 @@ class ReceivablePageController extends Controller
                 ),
                 'entry_type' => (string) ($groupedRow['entry_type'] ?? 'payment'),
                 'transaction_type' => $groupedRow['transaction_type'] ?? null,
-                'transaction_type_label' => $this->customerBillEntryTransactionTypeLabel(
-                    $groupedRow['transaction_type'] ?? null,
-                    (string) ($groupedRow['entry_type'] ?? 'payment')
-                ),
+                'transaction_type_label' => (string) ($groupedRow['entry_type'] ?? '') === 'account_payment'
+                    && trim((string) ($groupedRow['payment_description'] ?? '')) !== ''
+                        ? trim((string) ($groupedRow['payment_description'] ?? ''))
+                        : $this->customerBillEntryTransactionTypeLabel(
+                            $groupedRow['transaction_type'] ?? null,
+                            (string) ($groupedRow['entry_type'] ?? 'payment')
+                        ),
+                'payment_description' => $groupedRow['payment_description'] ?? null,
                 'printing_subtype_name' => $groupedRow['printing_subtype_name'] ?? null,
                 'transaction_subtype_label' => $this->customerBillEntrySubtypeLabel(
                     $groupedRow['transaction_type'] ?? null,
@@ -1939,12 +2023,14 @@ class ReceivablePageController extends Controller
                 'adjustment_amount' => (int) ($groupedRow['adjustment_amount'] ?? 0),
                 'credit_sales' => (int) $groupedRow['credit_sales'],
                 'installment_payment' => (int) $groupedRow['installment_payment'],
+                'deduction_discount' => (int) $groupedRow['deduction_discount'],
                 'sales_return' => (int) $groupedRow['sales_return'],
                 'running_balance' => $runningBalance,
             ]);
 
             $totals['credit_sales'] += (int) $groupedRow['credit_sales'];
             $totals['installment_payment'] += (int) $groupedRow['installment_payment'];
+            $totals['deduction_discount'] += (int) $groupedRow['deduction_discount'];
             $totals['sales_return'] += (int) $groupedRow['sales_return'];
             $totals['adjustment_amount'] += (int) ($groupedRow['adjustment_amount'] ?? 0);
             $totals['running_balance'] = $runningBalance;
@@ -2102,9 +2188,25 @@ class ReceivablePageController extends Controller
         };
     }
 
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function customerBillExcelTransactionNote(array $row): string
+    {
+        $typeLabel = trim((string) ($row['transaction_type_label'] ?? __('receivable.transaction_type_none')));
+        $subtypeLabel = trim((string) ($row['transaction_subtype_label'] ?? __('receivable.printing_subtype_none')));
+
+        if ($subtypeLabel === '' || $subtypeLabel === __('receivable.printing_subtype_none')) {
+            return $typeLabel;
+        }
+
+        return "{$typeLabel} - {$subtypeLabel}";
+    }
+
     private function customerBillEntryTransactionTypeLabel(?string $transactionType, string $entryType): string
     {
         return match ($entryType) {
+            'account_payment' => __('receivable.bill_account_payment'),
             'payment' => __('receivable.transaction_type_invoice_payment'),
             'overpayment' => __('receivable.transaction_type_overpayment'),
             'writeoff', 'discount' => __('receivable.transaction_type_payment'),
@@ -2120,7 +2222,7 @@ class ReceivablePageController extends Controller
             return __('txn.status_canceled');
         }
 
-        if (in_array($entryType, ['payment', 'overpayment', 'writeoff', 'discount', 'return'], true)) {
+        if (in_array($entryType, ['account_payment', 'payment', 'overpayment', 'writeoff', 'discount', 'return'], true)) {
             return __('receivable.printing_subtype_none');
         }
 
@@ -2235,6 +2337,33 @@ class ReceivablePageController extends Controller
             ->orderByDate('asc')
             ->get(['id', 'sales_invoice_id', 'entry_date', 'description', 'credit']);
 
+        $legacyPaymentLookup = ReceivablePayment::query()
+            ->where('customer_id', $customerId)
+            ->when($ledgerRows->isNotEmpty(), function ($query) use ($ledgerRows): void {
+                $query->whereBetween('payment_date', [
+                    $ledgerRows->min('entry_date'),
+                    $ledgerRows->max('entry_date'),
+                ]);
+            })
+            ->active()
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get(['id', 'payment_number', 'payment_date', 'amount'])
+            ->groupBy(fn (ReceivablePayment $payment): string => $payment->payment_date?->toDateString().'|'.(int) $payment->amount)
+            ->map(function (Collection $group): ?string {
+                if ($group->count() !== 1) {
+                    return null;
+                }
+
+                $payment = $group->first();
+                if (! $payment instanceof ReceivablePayment) {
+                    return null;
+                }
+
+                return strtoupper((string) $payment->payment_number);
+            })
+            ->filter();
+
         foreach ($ledgerRows as $ledgerRow) {
             $amount = (int) round((float) ($ledgerRow->credit ?? 0));
             if ($amount <= 0) {
@@ -2244,10 +2373,19 @@ class ReceivablePageController extends Controller
             $description = trim((string) ($ledgerRow->description ?? ''));
             $entryType = $this->customerBillInvoiceBreakdownEntryType($description);
             $targetInvoiceId = (int) ($ledgerRow->sales_invoice_id ?? 0);
+            $proofNumber = $this->customerBillInvoiceBreakdownProofNumber($description, $entryType);
+            if ($entryType === 'payment' && $this->extractDocumentReference($proofNumber, ['KWT', 'PYT']) === '') {
+                $legacyPaymentKey = $ledgerRow->entry_date?->toDateString().'|'.$amount;
+                $legacyPaymentNumber = $legacyPaymentLookup->get($legacyPaymentKey);
+                if (is_string($legacyPaymentNumber) && $legacyPaymentNumber !== '') {
+                    $proofNumber = $legacyPaymentNumber;
+                }
+            }
+
             $detail = [
                 'date_label' => $this->formatBillDate($ledgerRow->entry_date),
                 'type_label' => $this->customerBillInvoiceBreakdownTypeLabel($entryType),
-                'proof_number' => $this->customerBillInvoiceBreakdownProofNumber($description, $entryType),
+                'proof_number' => $proofNumber,
                 'amount' => -$amount,
             ];
 
@@ -2455,7 +2593,21 @@ class ReceivablePageController extends Controller
             return $reference;
         }
 
-        return trim($description) !== '' ? trim($description) : '-';
+        $trimmedDescription = trim($description);
+        if ($trimmedDescription === '') {
+            return '-';
+        }
+
+        $normalizedDescription = mb_strtolower($trimmedDescription, 'UTF-8');
+        if (str_contains($normalizedDescription, 'batal faktur') || str_contains($normalizedDescription, 'pembatalan faktur')) {
+            return $this->formatCustomerBillCancellationDescription($trimmedDescription);
+        }
+
+        if (str_contains($normalizedDescription, 'admin edit faktur') || str_contains($normalizedDescription, 'penyesuaian nilai faktur')) {
+            return $this->formatCustomerBillAdjustmentDescription($trimmedDescription);
+        }
+
+        return $trimmedDescription;
     }
 
     /**

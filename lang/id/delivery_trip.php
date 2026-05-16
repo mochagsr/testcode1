@@ -45,7 +45,11 @@ return [
     'created_success' => 'Catatan perjalanan :number berhasil dibuat.',
     'updated_success' => 'Catatan perjalanan berhasil diperbarui.',
     'completed_success' => 'Perjalanan :number ditandai selesai.',
+    'delete_confirm' => 'Hapus catatan perjalanan ini? Entri akuntansi akan dibalik.',
+    'deleted_success' => 'Catatan perjalanan :number berhasil dihapus.',
+    'cannot_delete_completed' => 'Catatan perjalanan yang sudah selesai tidak dapat dihapus.',
     'audit_created' => 'Catatan perjalanan dibuat: :number',
     'audit_updated' => 'Catatan perjalanan diperbarui: :number',
     'audit_completed' => 'Catatan perjalanan selesai: :number',
+    'audit_deleted' => 'Catatan perjalanan dihapus: :number',
 ];

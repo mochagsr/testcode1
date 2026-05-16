@@ -12,6 +12,13 @@
             <a class="btn secondary" href="{{ route('delivery-trips.index') }}">{{ __('txn.back') }}</a>
             @if($canEditTransactions)
                 <a class="btn edit-btn" href="{{ route('delivery-trips.edit', $trip) }}">{{ __('ui.edit') }}</a>
+                @if($trip->is_active)
+                    <form method="post" action="{{ route('delivery-trips.destroy', $trip) }}" style="display:inline;" data-confirm-modal data-confirm-message="{{ __('delivery_trip.delete_confirm') }}">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn danger-btn js-disable-on-submit">{{ __('ui.delete') }}</button>
+                    </form>
+                @endif
             @endif
             <a class="btn info-btn" href="{{ route('delivery-trips.print', $trip) }}" target="_blank">{{ __('txn.print') }}</a>
             <a class="btn info-btn" href="{{ route('delivery-trips.export.pdf', $trip) }}">{{ __('txn.pdf') }}</a>

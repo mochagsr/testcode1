@@ -49,6 +49,12 @@ class ProductPageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $productType = $this->resolveProductType($request);
 
+        $allowedSorts = ['name', 'category', 'stock'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
         $products = Product::query()
             ->onlyListColumns()
             ->active()
@@ -56,7 +62,19 @@ class ProductPageController extends Controller
             ->searchKeyword($search)
             ->when($productType === 'raw_material', fn (Builder $query): Builder => $query->supplierSourced())
             ->when($productType === 'general', fn (Builder $query): Builder => $query->generalStock())
-            ->orderBy('name')
+            ->when($sort === 'category', function ($query) use ($direction): void {
+                $query->leftJoin('item_categories', 'products.item_category_id', '=', 'item_categories.id')
+                    ->select([
+                        'products.id', 'products.item_category_id', 'products.code',
+                        'products.name', 'products.unit', 'products.stock',
+                        'products.price_agent', 'products.price_sales', 'products.price_general', 'products.is_active',
+                    ])
+                    ->orderBy('item_categories.name', $direction)
+                    ->orderBy('products.id', 'desc');
+            })
+            ->when($sort === 'name', fn ($q) => $q->orderBy('name', $direction)->orderBy('id', 'desc'))
+            ->when($sort === 'stock', fn ($q) => $q->orderBy('stock', $direction)->orderBy('id', 'desc'))
+            ->when($sort === '', fn ($q) => $q->orderByDesc('id'))
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
@@ -65,6 +83,8 @@ class ProductPageController extends Controller
             'search' => $search,
             'productType' => $productType,
             'productTypeOptions' => $this->productTypeOptions(),
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 

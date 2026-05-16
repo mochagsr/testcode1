@@ -98,9 +98,20 @@
                 grid-template-columns: 1fr;
             }
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
     @php
         $canCompleteDeliveryTrips = auth()->user()?->canAccess('delivery_trips.edit') ?? false;
+        $sortUrl = function (string $field) use ($search, $selectedTripDate, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('delivery-trips.index', array_filter(['search' => $search, 'trip_date' => $selectedTripDate, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== ''));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('delivery_trip.title') }}</h1>
@@ -111,6 +122,8 @@
 
     <div class="card">
         <form id="delivery-trip-filter-form" method="get" class="flex">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <input id="delivery-trip-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('delivery_trip.search_placeholder') }}" style="max-width: 320px;">
             <input id="delivery-trip-date-input" type="date" name="trip_date" value="{{ $selectedTripDate ?? '' }}" style="max-width: 180px;">
             <button type="submit">{{ __('txn.search') }}</button>
@@ -189,10 +202,10 @@
             <thead>
                 <tr>
                     <th>{{ __('delivery_trip.trip_number') }}</th>
-                    <th>{{ __('txn.date') }}</th>
-                    <th>{{ __('delivery_trip.driver_name') }}</th>
-                    <th>{{ __('delivery_trip.assistant_name') }}</th>
-                    <th>{{ __('delivery_trip.vehicle_plate') }}</th>
+                    <th><a class="sort-link" href="{{ $sortUrl('date') }}">{{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('driver_name') }}">{{ __('delivery_trip.driver_name') }} <span class="sort-mark">{{ $sortMark('driver_name') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('assistant_name') }}">{{ __('delivery_trip.assistant_name') }} <span class="sort-mark">{{ $sortMark('assistant_name') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('vehicle_plate') }}">{{ __('delivery_trip.vehicle_plate') }} <span class="sort-mark">{{ $sortMark('vehicle_plate') }}</span></a></th>
                     <th>{{ __('delivery_trip.total_cost') }}</th>
                     <th>{{ __('delivery_trip.completed_at') }}</th>
                     <th>{{ __('txn.action') }}</th>

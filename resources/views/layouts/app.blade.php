@@ -1547,6 +1547,9 @@
         @if ($successMessage !== '')
             <div class="alert {{ $successType }} js-auto-hide-alert">{{ $successMessage }}</div>
         @endif
+        @if (session('error'))
+            <div class="alert error js-auto-hide-alert">{{ session('error') }}</div>
+        @endif
         @if ($errors->any())
             <div class="alert error">
                 <div><strong>{{ __('ui.errors_fix') }}</strong></div>
@@ -1983,6 +1986,26 @@
         });
 
         document.querySelectorAll('.js-auto-hide-alert').forEach(autoHide);
+    })();
+
+    (function () {
+        const savingLabel = @json(__('ui.saving'));
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement)) return;
+            if ((form.method || '').toLowerCase() === 'get') return;
+            if (form.hasAttribute('data-no-disable')) return;
+            if (!form.checkValidity()) return;
+            const btn = form.querySelector('button[type="submit"]:not([data-no-disable])');
+            if (!btn || btn.disabled) return;
+            setTimeout(() => {
+                if (form.checkValidity()) {
+                    btn.disabled = true;
+                    btn.dataset.originalText = btn.textContent;
+                    btn.textContent = savingLabel;
+                }
+            }, 0);
+        }, true);
     })();
 </script>
 </body>

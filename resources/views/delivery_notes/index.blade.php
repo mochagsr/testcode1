@@ -4,6 +4,9 @@
 
 @section('content')
     <style>
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
         .delivery-list-card {
             padding: 10px;
         }
@@ -24,7 +27,19 @@
     </div>
 
     <div class="card delivery-list-card">
+        @php
+            $sortUrl = function (string $field) use ($search, $selectedSemester, $selectedStatus, $selectedNoteDate, $sort, $direction): string {
+                $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+                return route('delivery-notes.index', array_filter(['search' => $search, 'semester' => $selectedSemester, 'status' => $selectedStatus, 'note_date' => $selectedNoteDate, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== ''));
+            };
+            $sortMark = function (string $field) use ($sort, $direction): string {
+                if ($sort !== $field) return '↕';
+                return $direction === 'asc' ? '↑' : '↓';
+            };
+        @endphp
         <form id="delivery-notes-filter-form" method="get" class="filter-toolbar">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <div class="filter-field">
                 <label for="delivery-notes-search-input">{{ __('txn.search') }}</label>
                 <input id="delivery-notes-search-input" type="text" name="search" placeholder="{{ __('txn.search_delivery_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
@@ -85,9 +100,9 @@
             <thead>
             <tr>
                 <th>{{ __('txn.no') }}</th>
-                <th>{{ __('txn.date') }}</th>
-                <th>{{ __('txn.recipient') }}</th>
-                <th>{{ __('txn.city') }}</th>
+                <th><a class="sort-link" href="{{ $sortUrl('date') }}">{{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span></a></th>
+                <th><a class="sort-link" href="{{ $sortUrl('recipient_name') }}">{{ __('txn.recipient') }} <span class="sort-mark">{{ $sortMark('recipient_name') }}</span></a></th>
+                <th><a class="sort-link" href="{{ $sortUrl('city') }}">{{ __('txn.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span></a></th>
                 <th>{{ __('txn.created_by') }}</th>
                 <th>{{ __('txn.status') }}</th>
                 <th>{{ __('txn.action') }}</th>

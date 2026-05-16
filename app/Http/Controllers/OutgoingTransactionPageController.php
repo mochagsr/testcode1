@@ -71,6 +71,11 @@ class OutgoingTransactionPageController extends Controller
         $selectedYear = $this->semesterBookService->normalizeYear($year)
             ?? ($selectedTransactionDateRange !== null ? Carbon::parse($selectedTransactionDateRange[0])->format('Y') : now()->format('Y'));
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
+        $allowedSorts = ['date', 'supplier'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $baseQuery = OutgoingTransaction::query()
             ->searchKeyword($search)
@@ -88,11 +93,27 @@ class OutgoingTransactionPageController extends Controller
             });
 
         $transactions = (clone $baseQuery)
-            ->onlyListColumns()
+            ->when($sort === 'supplier', function ($query) use ($direction): void {
+                $query->leftJoin('suppliers', 'outgoing_transactions.supplier_id', '=', 'suppliers.id')
+                    ->select([
+                        'outgoing_transactions.id', 'outgoing_transactions.transaction_number',
+                        'outgoing_transactions.transaction_date', 'outgoing_transactions.supplier_id',
+                        'outgoing_transactions.semester_period', 'outgoing_transactions.note_number',
+                        'outgoing_transactions.subtotal_before_tax', 'outgoing_transactions.total_tax',
+                        'outgoing_transactions.total', 'outgoing_transactions.created_by_user_id',
+                    ])
+                    ->orderBy('suppliers.name', $direction)
+                    ->orderByDesc('outgoing_transactions.id');
+            }, function ($query) use ($sort, $direction): void {
+                $query->onlyListColumns();
+                if ($sort === 'date') {
+                    $query->orderBy('transaction_date', $direction)->orderByDesc('id');
+                } else {
+                    $query->latest('transaction_date')->latest('id');
+                }
+            })
             ->withSupplierInfo()
             ->withSum('items as total_weight', 'weight')
-            ->latest('transaction_date')
-            ->latest('id')
             ->paginate(20)
             ->withQueryString();
 
@@ -168,6 +189,8 @@ class OutgoingTransactionPageController extends Controller
 
         return view('outgoing_transactions.index', [
             'transactions' => $transactions,
+            'sort' => $sort,
+            'direction' => $direction,
             'supplierRecap' => $supplierRecap,
             'supplierRecapSummary' => $supplierRecapSummary,
             'supplierRecapSummaryTotalWeight' => $supplierRecapSummaryTotalWeight,
@@ -1031,6 +1054,7 @@ class OutgoingTransactionPageController extends Controller
 
         $lastNumber = OutgoingTransaction::query()
             ->where('transaction_number', 'like', $prefix.'%')
+            ->lockForUpdate()
             ->max('transaction_number');
 
         $sequence = 1;

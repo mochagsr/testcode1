@@ -5,7 +5,7 @@
 @section('content')
     <h1 class="page-title">{{ __('receivable.create_payment') }}</h1>
 
-    <form method="post" action="{{ route('receivable-payments.store') }}">
+    <form method="post" action="{{ route('receivable-payments.store') }}" enctype="multipart/form-data">
         @csrf
         <input type="hidden" name="return_to" value="{{ old('return_to', $returnTo ?? null) }}">
 
@@ -63,6 +63,14 @@
                         <textarea id="amount-in-words" rows="2" readonly></textarea>
                     </div>
                     <div class="col-6">
+                        <label>{{ __('receivable.payment_description') }} <span class="label-required">*</span></label>
+                        <input type="text" name="payment_description" value="{{ old('payment_description') }}" maxlength="120" placeholder="{{ __('receivable.payment_description_placeholder') }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label>{{ __('receivable.payment_proof_photo') }}</label>
+                        <input type="file" name="payment_proof_photo" accept="image/*">
+                    </div>
+                    <div class="col-6">
                         <label>{{ __('receivable.customer_signature') }} <span class="label-required">*</span></label>
                         <input type="text" name="customer_signature" value="{{ old('customer_signature') }}" required>
                     </div>
@@ -73,7 +81,7 @@
                     <div class="col-12">
                         <input type="hidden" name="preferred_invoice_id" value="{{ old('preferred_invoice_id', $preferredInvoice?->id) }}">
                         <label>{{ __('txn.notes') }}</label>
-                        <textarea name="notes" rows="2">{{ old('notes') }}</textarea>
+                        <textarea name="notes" rows="2" placeholder="{{ __('receivable.notes_placeholder') }}">{{ old('notes') }}</textarea>
                     </div>
                 </div>
             </div>
@@ -465,6 +473,7 @@
         }
         updateAmountWords();
         validatePaymentAmount();
+
     </script>
 @endsection
 

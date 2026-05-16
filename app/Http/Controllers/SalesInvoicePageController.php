@@ -707,6 +707,7 @@ class SalesInvoicePageController extends Controller
                     'amount' => $initialPayment,
                     'method' => 'cash',
                     'notes' => __('txn.full_payment_on_create'),
+                    'is_synthetic' => true,
                 ]);
 
                 $balance = max(0, (float) $invoice->total - $initialPayment);
@@ -935,11 +936,8 @@ class SalesInvoicePageController extends Controller
             $selectedPaymentMethod = in_array((string) ($data['payment_method'] ?? ''), ['tunai', 'kredit'], true)
                 ? (string) $data['payment_method']
                 : (
-                    $invoice->payments->contains(function (InvoicePayment $payment) use ($invoice): bool {
-                        return strtolower((string) $payment->method) === 'cash'
-                            && optional($payment->payment_date)->format('Y-m-d') === optional($invoice->invoice_date)->format('Y-m-d')
-                            && (float) $payment->amount >= (float) $invoice->total;
-                    }) ? 'tunai' : 'kredit'
+                    $invoice->payments->contains(fn (InvoicePayment $payment): bool => (bool) $payment->is_synthetic)
+                        ? 'tunai' : 'kredit'
                 );
             $selectedTransactionType = TransactionType::normalize((string) ($data['transaction_type'] ?? (string) $invoice->transaction_type));
             $printingSubtype = CustomerPrintingSubtypeResolver::resolve(
@@ -1040,21 +1038,9 @@ class SalesInvoicePageController extends Controller
                 })
                 ->implode(' | ');
 
-            $paymentNotesForFull = array_unique(array_filter([
-                __('txn.full_payment_on_create'),
-                'Full payment on invoice creation',
-                'Pelunasan penuh saat membuat faktur',
-            ]));
-            $fullCashOnCreatePayments = $invoice->payments->filter(function (InvoicePayment $payment) use ($invoiceDateValue, $paymentNotesForFull, $invoice): bool {
-                $paymentDate = optional($payment->payment_date)->format('Y-m-d');
-                $isCash = strtolower((string) $payment->method) === 'cash';
-                $hasMarkerNote = in_array((string) ($payment->notes ?? ''), $paymentNotesForFull, true);
-
-                return $isCash && (
-                    $hasMarkerNote
-                    || ($paymentDate === $invoiceDateValue && (float) $payment->amount >= (float) $invoice->total)
-                );
-            })->values();
+            $fullCashOnCreatePayments = $invoice->payments->filter(
+                fn (InvoicePayment $payment): bool => (bool) $payment->is_synthetic
+            )->values();
             $fullCashIds = $fullCashOnCreatePayments->pluck('id')->map(fn ($id): int => (int) $id)->all();
             $nonSyntheticPaid = (float) $invoice->payments
                 ->filter(fn (InvoicePayment $payment): bool => ! in_array((int) $payment->id, $fullCashIds, true))
@@ -1088,6 +1074,7 @@ class SalesInvoicePageController extends Controller
                             'amount' => $syntheticAmount,
                             'method' => 'cash',
                             'notes' => __('txn.full_payment_on_create'),
+                            'is_synthetic' => true,
                         ]);
                     }
                 } elseif ($fullCashIds !== []) {
@@ -1207,7 +1194,7 @@ class SalesInvoicePageController extends Controller
 
         DB::transaction(function () use ($salesInvoice, $data): void {
             $invoice = SalesInvoice::query()
-                ->with('items')
+                ->with(['items', 'payments'])
                 ->whereKey($salesInvoice->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -1216,7 +1203,18 @@ class SalesInvoicePageController extends Controller
                 return;
             }
 
-            $openBalance = max(0, (float) $invoice->balance);
+            $hasActiveReceivablePayments = InvoicePayment::query()
+                ->where('sales_invoice_id', $invoice->id)
+                ->whereNotNull('receivable_payment_id')
+                ->whereHas('receivablePayment', fn ($q) => $q->where('is_canceled', false))
+                ->exists();
+
+            if ($hasActiveReceivablePayments) {
+                abort(422, __('txn.cannot_cancel_invoice_has_receivable_payments'));
+            }
+
+            $totalPaid = (float) $invoice->payments->sum('amount');
+            $openBalance = max(0, (float) $invoice->total - $totalPaid);
             if ($openBalance > 0) {
                 $this->receivableLedgerService->addCredit(
                     customerId: (int) $invoice->customer_id,
@@ -1562,6 +1560,7 @@ class SalesInvoicePageController extends Controller
                 'amount' => $initialPayment,
                 'method' => 'cash',
                 'notes' => __('txn.full_payment_on_create'),
+                'is_synthetic' => true,
             ]);
 
             $invoice->update([

@@ -926,11 +926,12 @@ class MassImportController extends Controller
     private function generateCustomerCode(): string
     {
         $prefix = 'CUS-'.now()->format('Ymd');
-        do {
-            $code = $prefix.'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
-        } while (Customer::query()->where('code', $code)->exists());
+        $count = Customer::query()
+            ->where('code', 'like', $prefix.'%')
+            ->lockForUpdate()
+            ->count() + 1;
 
-        return $code;
+        return $prefix.'-'.str_pad((string) $count, 4, '0', STR_PAD_LEFT);
     }
 
     private function generateInvoiceNumber(string $date): string

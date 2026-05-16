@@ -45,7 +45,11 @@ return [
     'created_success' => 'Delivery trip log :number created.',
     'updated_success' => 'Delivery trip log updated.',
     'completed_success' => 'Delivery trip :number marked as completed.',
+    'delete_confirm' => 'Delete this delivery trip log? The accounting entry will be reversed.',
+    'deleted_success' => 'Delivery trip log :number deleted.',
+    'cannot_delete_completed' => 'Completed delivery trips cannot be deleted.',
     'audit_created' => 'Delivery trip log created: :number',
     'audit_updated' => 'Delivery trip log updated: :number',
     'audit_completed' => 'Delivery trip log completed: :number',
+    'audit_deleted' => 'Delivery trip log deleted: :number',
 ];

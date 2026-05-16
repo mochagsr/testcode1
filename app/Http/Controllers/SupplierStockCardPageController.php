@@ -666,6 +666,10 @@ class SupplierStockCardPageController extends Controller
         $selectedProductId = max(0, (int) $request->integer('product_id'));
         $dateFrom = $this->normalizeDate((string) $request->string('date_from', ''));
         $dateTo = $this->normalizeDate((string) $request->string('date_to', ''));
+        $allowedSorts = ['supplier', 'category', 'name', 'balance'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '') : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $suppliers = Supplier::query()
             ->onlyOptionColumns()
@@ -704,8 +708,24 @@ class SupplierStockCardPageController extends Controller
             'balance' => $summaryRows->sum('balance'),
         ];
 
+        $sortedSummaryRows = match ($sort) {
+            'supplier' => $direction === 'asc'
+                ? $summaryRows->sortBy(fn ($r): string => mb_strtolower((string) ($r['supplier_name'] ?? '')))
+                : $summaryRows->sortByDesc(fn ($r): string => mb_strtolower((string) ($r['supplier_name'] ?? ''))),
+            'category' => $direction === 'asc'
+                ? $summaryRows->sortBy(fn ($r): string => mb_strtolower((string) ($r['category_name'] ?? '')))
+                : $summaryRows->sortByDesc(fn ($r): string => mb_strtolower((string) ($r['category_name'] ?? ''))),
+            'name' => $direction === 'asc'
+                ? $summaryRows->sortBy(fn ($r): string => mb_strtolower((string) ($r['product_name'] ?? '')))
+                : $summaryRows->sortByDesc(fn ($r): string => mb_strtolower((string) ($r['product_name'] ?? ''))),
+            'balance' => $direction === 'asc'
+                ? $summaryRows->sortBy(fn ($r): int => (int) ($r['balance'] ?? 0))
+                : $summaryRows->sortByDesc(fn ($r): int => (int) ($r['balance'] ?? 0)),
+            default => $summaryRows->sortBy('sort_key'),
+        };
+
         $summaryPaginator = $this->paginateCollection(
-            $summaryRows->sortBy('sort_key'),
+            $sortedSummaryRows->values(),
             (int) config('pagination.default_per_page', 20),
             'summary_page',
             $request
@@ -742,6 +762,8 @@ class SupplierStockCardPageController extends Controller
             'movementPaginator' => $movementPaginator,
             'summaryPaginator' => $summaryPaginator,
             'totals' => $totals,
+            'sort' => $sort,
+            'direction' => $direction,
         ];
     }
 

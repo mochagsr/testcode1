@@ -56,12 +56,27 @@
             min-width: 130px;
             max-width: 150px;
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
+    @php
+        $sortUrl = function (string $field) use ($search, $selectedSupplierId, $selectedProductId, $dateFrom, $dateTo, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('supplier-stock-cards.index', array_filter(['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== '' && $v !== 0));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
+    @endphp
 
     <h1 class="page-title">{{ __('supplier_stock.title') }}</h1>
 
     <div class="card">
         <form method="get" class="flex" id="supplier-stock-filter-form">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <select name="supplier_id" id="supplier-stock-supplier" style="max-width:260px;">
                 <option value="">{{ __('supplier_stock.select_supplier') }}</option>
                 @foreach($suppliers as $supplier)
@@ -107,10 +122,10 @@
                 </colgroup>
                 <thead>
                 <tr>
-                    <th>{{ __('txn.supplier') }}</th>
-                    <th>{{ __('ui.category') }}</th>
-                    <th>{{ __('txn.name') }}</th>
-                    <th class="num">{{ __('ui.stock') }}</th>
+                    <th><a class="sort-link" href="{{ $sortUrl('supplier') }}">{{ __('txn.supplier') }} <span class="sort-mark">{{ $sortMark('supplier') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('category') }}">{{ __('ui.category') }} <span class="sort-mark">{{ $sortMark('category') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('txn.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
+                    <th class="num"><a class="sort-link" style="justify-content:flex-end;" href="{{ $sortUrl('balance') }}">{{ __('ui.stock') }} <span class="sort-mark">{{ $sortMark('balance') }}</span></a></th>
                     <th class="action">{{ __('txn.action') }}</th>
                 </tr>
                 </thead>

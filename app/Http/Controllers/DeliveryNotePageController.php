@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesDateFilters;
 use App\Http\Controllers\Concerns\ResolvesSemesterOptions;
+use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\CustomerShipLocation;
 use App\Models\DeliveryNote;
@@ -18,6 +19,8 @@ use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\CustomerPrintingSubtypeResolver;
 use App\Support\ExcelExportStyler;
+use App\Support\PrintPaperSize;
+use App\Support\PrintTextFormatter;
 use App\Support\SemesterBookService;
 use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -72,6 +75,12 @@ class DeliveryNotePageController extends Controller
             $semesterRange = null;
         }
 
+        $allowedSorts = ['date', 'recipient_name', 'city'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
         $notes = DeliveryNote::query()
             ->onlyListColumns()
             ->withCustomerInfo()
@@ -84,8 +93,10 @@ class DeliveryNotePageController extends Controller
             ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
                 $query->betweenDates($selectedNoteDateRange[0], $selectedNoteDateRange[1]);
             })
-            ->latest('note_date')
-            ->latest('id')
+            ->when($sort === 'date', fn ($q) => $q->orderBy('note_date', $direction)->orderByDesc('id'))
+            ->when($sort === 'recipient_name', fn ($q) => $q->orderBy('recipient_name', $direction)->orderByDesc('id'))
+            ->when($sort === 'city', fn ($q) => $q->orderBy('city', $direction)->orderByDesc('id'))
+            ->when($sort === '', fn ($q) => $q->latest('note_date')->latest('id'))
             ->paginate(20)
             ->withQueryString();
 
@@ -124,6 +135,8 @@ class DeliveryNotePageController extends Controller
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -387,22 +400,11 @@ class DeliveryNotePageController extends Controller
 
                 $product = $this->resolveProductFromInput($productId, $productName);
                 if ($product) {
-                    $product = Product::query()
-                        ->whereKey((int) $product->id)
-                        ->lockForUpdate()
-                        ->first();
-                    if ($product && (int) $product->stock < $quantity) {
-                        throw ValidationException::withMessages([
-                            'items' => __('txn.insufficient_stock_for', ['product' => $product->name]),
-                        ]);
-                    }
-                    if ($product) {
-                        $productId = (int) $product->id;
-                        $productCode = $productCode ?: $product->code;
-                        $productName = trim((string) ($product->name ?: $productName));
-                        $unit = $unit ?: $product->unit;
-                        $stockUsageByProduct[$product->id] = ($stockUsageByProduct[$product->id] ?? 0) + $quantity;
-                    }
+                    $productId = (int) $product->id;
+                    $productCode = $productCode ?: $product->code;
+                    $productName = trim((string) ($product->name ?: $productName));
+                    $unit = $unit ?: $product->unit;
+                    $stockUsageByProduct[$productId] = ($stockUsageByProduct[$productId] ?? 0) + $quantity;
                 }
 
                 DeliveryNoteItem::create([
@@ -780,7 +782,7 @@ class DeliveryNotePageController extends Controller
         $pdf = Pdf::loadView('delivery_notes.print', [
             'note' => $deliveryNote,
             'isPdf' => true,
-        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x11());
+        ])->setPaper(PrintPaperSize::continuousForm95x11());
 
         return $pdf->download($filename);
     }
@@ -794,9 +796,9 @@ class DeliveryNotePageController extends Controller
             $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Surat Jalan');
-            $address = \App\Support\PrintTextFormatter::wrapWords((string) ($deliveryNote->address ?: ''), 5);
-            $notes = \App\Support\PrintTextFormatter::wrapWords(
-                trim((string) ($deliveryNote->notes ?: \App\Models\AppSetting::getValue('company_invoice_notes', ''))),
+            $address = PrintTextFormatter::wrapWords((string) ($deliveryNote->address ?: ''), 5);
+            $notes = PrintTextFormatter::wrapWords(
+                trim((string) ($deliveryNote->notes ?: AppSetting::getValue('company_invoice_notes', ''))),
                 4
             );
             $rows = [];

@@ -104,28 +104,28 @@
     </style>
     <h1 class="page-title">{{ __('ui.dashboard_title') }}</h1>
 
-    <div class="grid">
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_total_products') }}</div>
-            <div class="stat-value">{{ (int) round($summary['total_products']) }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_total_customers') }}</div>
-            <div class="stat-value">{{ (int) round($summary['total_customers']) }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_global_receivable') }}</div>
-            <div class="stat-value">Rp {{ number_format((int) round($summary['total_receivable']), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_total_supplier_payable') }}</div>
-            <div class="stat-value">Rp {{ number_format((int) round($summary['total_supplier_payable'] ?? 0), 0, ',', '.') }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">{{ __('ui.dashboard_invoice_this_month') }}</div>
-            <div class="stat-value">Rp {{ number_format((int) round($summary['invoice_this_month']), 0, ',', '.') }}</div>
-        </div>
-        @if($showAdminDashboard)
+    @if($showAdminDashboard)
+        <div class="grid">
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_total_products') }}</div>
+                <div class="stat-value">{{ (int) round($summary['total_products']) }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_total_customers') }}</div>
+                <div class="stat-value">{{ (int) round($summary['total_customers']) }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_global_receivable') }}</div>
+                <div class="stat-value">Rp {{ number_format((int) round($summary['total_receivable']), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_total_supplier_payable') }}</div>
+                <div class="stat-value">Rp {{ number_format((int) round($summary['total_supplier_payable'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">{{ __('ui.dashboard_invoice_this_month') }}</div>
+                <div class="stat-value">Rp {{ number_format((int) round($summary['invoice_this_month']), 0, ',', '.') }}</div>
+            </div>
             <div class="stat">
                 <div class="stat-label">{{ __('ui.dashboard_pending_approvals') }}</div>
                 <div class="stat-value">{{ number_format((int) ($summary['pending_approvals'] ?? 0), 0, ',', '.') }}</div>
@@ -150,11 +150,11 @@
                 <div class="stat-label">{{ __('ui.dashboard_archive_size') }}</div>
                 <div class="stat-value">{{ $archiveSnapshot['archiveSize'] ?? '0 B' }}</div>
             </div>
-        @endif
-    </div>
+        </div>
+    @endif
 
+    @if($showAdminDashboard)
     <div class="row" style="margin-top: 8px;">
-        @if($showAdminDashboard)
         <div class="col-6">
             <div class="card">
                 <h3>{{ __('ui.dashboard_ops_snapshot') }}</h3>
@@ -180,8 +180,7 @@
                 </table>
             </div>
         </div>
-        @endif
-        <div class="{{ $showAdminDashboard ? 'col-6' : 'col-12' }}">
+        <div class="col-6">
             <div class="card">
                 <h3>{{ __('ui.dashboard_quick_actions') }}</h3>
                 <div class="dashboard-quick-links">
@@ -197,6 +196,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     @if($showAdminDashboard)
         <div class="row" style="margin-top: 8px;">
@@ -349,7 +349,7 @@
                 <thead>
                 <tr>
                     <th>{{ __('receivable.semester_filter') }}</th>
-                    <th>{{ __('receivable.customer') }}</th>
+                    <th>{{ __('ui.customer_name') }}</th>
                     <th>{{ __('receivable.outstanding') }}</th>
                     <th>{{ __('txn.action') }}</th>
                 </tr>
@@ -384,7 +384,7 @@
                         <thead>
                         <tr>
                             <th>{{ __('ui.dashboard_order_note_number') }}</th>
-                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('ui.customer_name') }}</th>
                             <th>{{ __('txn.date') }}</th>
                             <th>{{ __('ui.dashboard_order_note_progress') }}</th>
                             <th>{{ __('ui.dashboard_order_note_remaining') }}</th>
@@ -426,7 +426,7 @@
                     <table>
                         <thead>
                         <tr>
-                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('ui.customer_name') }}</th>
                             <th>{{ __('ui.city') }}</th>
                             <th>{{ __('ui.dashboard_global_receivable') }}</th>
                         </tr>
@@ -461,7 +461,7 @@
                     <table>
                         <thead>
                         <tr>
-                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('ui.customer_name') }}</th>
                             <th>{{ __('ui.city') }}</th>
                             <th>{{ __('ui.dashboard_global_receivable') }}</th>
                         </tr>
@@ -494,7 +494,7 @@
                         <thead>
                         <tr>
                             <th>{{ __('ui.dashboard_order_note_number') }}</th>
-                            <th>{{ __('ui.customer') }}</th>
+                            <th>{{ __('ui.customer_name') }}</th>
                             <th>{{ __('txn.date') }}</th>
                             <th>{{ __('ui.dashboard_order_note_progress') }}</th>
                             <th>{{ __('ui.dashboard_order_note_remaining') }}</th>

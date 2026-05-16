@@ -71,6 +71,15 @@ class OrderNotePageController extends Controller
             $semesterRange = null;
         }
 
+        $allowedSorts = ['date', 'customer_name', 'city', 'progress', 'status'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        $orderedSub = '(SELECT COALESCE(SUM(quantity), 0) FROM order_note_items WHERE order_note_id = order_notes.id)';
+        $fulfilledSub = '(SELECT COALESCE(SUM(dni.quantity), 0) FROM delivery_note_items dni INNER JOIN delivery_notes dn ON dn.id = dni.delivery_note_id WHERE dn.is_canceled = 0 AND dn.order_note_id = order_notes.id)';
+
         $notes = OrderNote::query()
             ->onlyListColumns()
             ->withCustomerInfo()
@@ -83,8 +92,23 @@ class OrderNotePageController extends Controller
             ->when($selectedNoteDateRange !== null, function ($query) use ($selectedNoteDateRange): void {
                 $query->betweenDates($selectedNoteDateRange[0], $selectedNoteDateRange[1]);
             })
-            ->latest('note_date')
-            ->latest('id')
+            ->when($sort === 'date', fn ($q) => $q->orderBy('note_date', $direction)->orderByDesc('id'))
+            ->when($sort === 'customer_name', fn ($q) => $q->orderBy('customer_name', $direction)->orderByDesc('id'))
+            ->when($sort === 'city', fn ($q) => $q->orderBy('city', $direction)->orderByDesc('id'))
+            ->when($sort === 'progress', function ($q) use ($direction, $orderedSub, $fulfilledSub): void {
+                $q->orderByRaw("$fulfilledSub / NULLIF($orderedSub, 0) $direction, order_notes.id DESC");
+            })
+            ->when($sort === 'status', function ($q) use ($direction, $orderedSub, $fulfilledSub): void {
+                $q->orderByRaw("
+                    CASE
+                        WHEN order_notes.is_canceled = 1 THEN 3
+                        WHEN $fulfilledSub <= 0 THEN 0
+                        WHEN ($orderedSub - $fulfilledSub) > 0 THEN 1
+                        ELSE 2
+                    END $direction, order_notes.id DESC
+                ");
+            })
+            ->when($sort === '', fn ($q) => $q->latest('note_date')->latest('id'))
             ->paginate(20)
             ->withQueryString();
 
@@ -130,6 +154,8 @@ class OrderNotePageController extends Controller
             'currentSemester' => $currentSemester,
             'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -616,13 +642,42 @@ class OrderNotePageController extends Controller
             'cancel_reason' => FluentRule::string()->required()->max(1000),
         ]);
 
-        $orderNote->update([
-            'is_canceled' => true,
-            'canceled_at' => now(),
-            'canceled_by_user_id' => auth()->id(),
-            'cancel_reason' => $data['cancel_reason'],
-        ]);
+        $hasActiveDeliveries = false;
 
+        DB::transaction(function () use ($orderNote, $data, &$hasActiveDeliveries): void {
+            $note = OrderNote::query()
+                ->whereKey($orderNote->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($note->is_canceled) {
+                return;
+            }
+
+            $activeDeliveryCount = DB::table('delivery_notes')
+                ->where('order_note_id', $note->id)
+                ->where('is_canceled', false)
+                ->count();
+
+            if ($activeDeliveryCount > 0) {
+                $hasActiveDeliveries = true;
+
+                return;
+            }
+
+            $note->update([
+                'is_canceled' => true,
+                'canceled_at' => now(),
+                'canceled_by_user_id' => auth()->id(),
+                'cancel_reason' => $data['cancel_reason'],
+            ]);
+        });
+
+        if ($hasActiveDeliveries) {
+            return back()->with('error', __('txn.cannot_cancel_order_has_deliveries'));
+        }
+
+        $orderNote->refresh();
         $this->auditLogService->log(
             'order.note.cancel',
             $orderNote,

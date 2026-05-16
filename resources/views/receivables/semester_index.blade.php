@@ -59,11 +59,26 @@
                 width: 100%;
             }
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
+    @php
+        $sortUrl = function (string $field) use ($search, $selectedSemester, $selectedStatus, $selectedTransactionType, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('receivables.semester.index', array_filter(['search' => $search, 'semester' => $selectedSemester, 'status' => $selectedStatus !== 'all' ? $selectedStatus : null, 'transaction_type' => $selectedTransactionType, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== ''));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
+    @endphp
     <h1 class="page-title">{{ __('receivable.semester_page_title') }}</h1>
 
     <div class="card">
         <form method="get" class="receivable-semester-toolbar">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <div class="toolbar-left">
                 <div>
                     <label>{{ __('receivable.semester_filter') }}</label>
@@ -124,8 +139,8 @@
                 <thead>
                 <tr>
                     <th>{{ __('report.columns.no') }}</th>
-                    <th>{{ __('receivable.semester_customer_name') }}</th>
-                    <th>{{ __('receivable.city') }}</th>
+                    <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('receivable.semester_customer_name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('city') }}">{{ __('receivable.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span></a></th>
                     <th>{{ __('txn.address') }}</th>
                     <th>{{ __('receivable.semester_sales') }}</th>
                     <th>{{ __('receivable.semester_payment') }}</th>

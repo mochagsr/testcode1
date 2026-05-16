@@ -20,17 +20,26 @@ class ProductUnitPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
 
+        $allowedSorts = ['code', 'name'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
         $units = ProductUnit::query()
             ->onlyListColumns()
             ->searchKeyword($search)
-            ->orderByRaw("CASE WHEN code = 'exp' THEN 0 ELSE 1 END")
-            ->orderBy('code')
+            ->when($sort === 'code', fn ($q) => $q->orderBy('code', $direction)->orderBy('id', 'desc'))
+            ->when($sort === 'name', fn ($q) => $q->orderBy('name', $direction)->orderBy('id', 'desc'))
+            ->when($sort === '', fn ($q) => $q->orderByRaw("CASE WHEN code = 'exp' THEN 0 ELSE 1 END")->orderBy('code'))
             ->paginate(25)
             ->withQueryString();
 
         return view('product_units.index', [
             'units' => $units,
             'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 

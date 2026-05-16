@@ -164,9 +164,20 @@
                 max-width: min(100%, 280px);
             }
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
     @php
         $canManageShipLocations = auth()->user()?->canAccess('customer_ship_locations.create') ?? false;
+        $sortUrl = function (string $field) use ($search, $selectedCustomerId, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('customer-ship-locations.index', array_filter(['search' => $search, 'customer_id' => $selectedCustomerId, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== '' && $v !== 0));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('school_bulk.ship_location_master_title') }}</h1>
@@ -179,6 +190,8 @@
         <div class="ship-location-toolbar">
             <div class="toolbar-left">
                 <form method="get" class="search-form">
+                    <input type="hidden" name="sort" value="{{ $sort }}">
+                    <input type="hidden" name="direction" value="{{ $direction }}">
                     <select name="customer_id">
                         <option value="">{{ __('school_bulk.all_customers') }}</option>
                         @foreach($customers as $customer)
@@ -197,10 +210,10 @@
         <table class="ship-location-table">
             <thead>
             <tr>
-                <th>{{ __('txn.customer') }}</th>
-                <th>{{ __('school_bulk.school_name') }}</th>
+                <th><a class="sort-link" href="{{ $sortUrl('customer') }}">{{ __('ui.customer_name') }} <span class="sort-mark">{{ $sortMark('customer') }}</span></a></th>
+                <th><a class="sort-link" href="{{ $sortUrl('school_name') }}">{{ __('school_bulk.school_name') }} <span class="sort-mark">{{ $sortMark('school_name') }}</span></a></th>
                 <th>{{ __('txn.phone') }}</th>
-                <th>{{ __('txn.city') }}</th>
+                <th><a class="sort-link" href="{{ $sortUrl('city') }}">{{ __('txn.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span></a></th>
                 <th>{{ __('txn.address') }}</th>
                 <th>{{ __('txn.status') }}</th>
                 <th>{{ __('txn.action') }}</th>

@@ -28,11 +28,22 @@
             <div class="col-6"><strong>{{ __('txn.date') }}</strong><div>{{ $payment->payment_date?->format('d-m-Y') }}</div></div>
             <div class="col-6"><strong>{{ __('txn.no') }}</strong><div>{{ $payment->payment_number }}</div></div>
             <div class="col-6"><strong>{{ __('txn.status') }}</strong><div>{{ $payment->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</div></div>
-            <div class="col-6"><strong>{{ __('receivable.customer') }}</strong><div>{{ $payment->customer?->name }}</div></div>
+            <div class="col-6"><strong>{{ __('ui.customer_name') }}</strong><div>{{ $payment->customer?->name }}</div></div>
             <div class="col-6"><strong>{{ __('txn.city') }}</strong><div>{{ $payment->customer?->city ?: '-' }}</div></div>
             <div class="col-12"><strong>{{ __('txn.address') }}</strong><div>{{ $payment->customer_address ?: '-' }}</div></div>
             <div class="col-6"><strong>{{ __('receivable.amount_paid') }}</strong><div>Rp {{ number_format((int) round($payment->amount), 0, ',', '.') }}</div></div>
             <div class="col-6"><strong>{{ __('receivable.amount_in_words') }}</strong><div>{{ $payment->amount_in_words }}</div></div>
+            <div class="col-6"><strong>{{ __('receivable.payment_description') }}</strong><div>{{ $payment->payment_description ?: __('receivable.bill_account_payment') }}</div></div>
+            <div class="col-6">
+                <strong>{{ __('receivable.payment_proof_photo') }}</strong>
+                <div>
+                    @if($payment->payment_proof_photo_path)
+                        <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$payment->payment_proof_photo_path) }}">{{ __('receivable.view_payment_proof') }}</a>
+                    @else
+                        -
+                    @endif
+                </div>
+            </div>
             <div class="col-6"><strong>{{ __('receivable.customer_signature') }}</strong><div>{{ $payment->customer_signature }}</div></div>
             <div class="col-6"><strong>{{ __('receivable.user_signature') }}</strong><div>{{ $payment->user_signature }}</div></div>
             <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $payment->notes ?: '-' }}</div></div>
@@ -46,7 +57,7 @@
         <div class="card">
             <div class="form-section">
                 <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
-                <form method="post" action="{{ route('receivable-payments.admin-update', $payment) }}" class="row" style="margin-bottom: 12px;">
+                <form method="post" action="{{ route('receivable-payments.admin-update', $payment) }}" class="row" style="margin-bottom: 12px;" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')
                     <div class="col-4">
@@ -56,6 +67,14 @@
                     <div class="col-12">
                         <label>{{ __('txn.address') }}</label>
                         <textarea name="customer_address" rows="2">{{ old('customer_address', $payment->customer_address) }}</textarea>
+                    </div>
+                    <div class="col-6">
+                        <label>{{ __('receivable.payment_description') }}</label>
+                        <input type="text" name="payment_description" value="{{ old('payment_description', $payment->payment_description ?: __('receivable.bill_account_payment')) }}" maxlength="120" required>
+                    </div>
+                    <div class="col-6">
+                        <label>{{ __('receivable.payment_proof_photo') }}</label>
+                        <input type="file" name="payment_proof_photo" accept="image/*">
                     </div>
                     <div class="col-6">
                         <label>{{ __('receivable.customer_signature') }}</label>
@@ -88,6 +107,38 @@
             </div>
         </div>
     @endif
+
+    <div id="id-card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; align-items:center; justify-content:center;">
+        <img id="id-card-modal-image" src="" alt="{{ __('receivable.payment_proof_photo') }}" style="max-width:80vw; max-height:80vh; width:auto; height:auto; border:2px solid #fff; border-radius:8px; background:#fff;">
+    </div>
+
+    <script>
+        (function () {
+            const modal = document.getElementById('id-card-modal');
+            const modalImage = document.getElementById('id-card-modal-image');
+            const trigger = document.querySelector('.id-card-preview-trigger');
+            if (!modal || !modalImage || !trigger) {
+                return;
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+                modalImage.setAttribute('src', '');
+            }
+
+            trigger.addEventListener('click', (event) => {
+                event.preventDefault();
+                const image = trigger.getAttribute('data-image');
+                if (!image) {
+                    return;
+                }
+                modalImage.setAttribute('src', image);
+                modal.style.display = 'flex';
+            });
+
+            modal.addEventListener('click', closeModal);
+        })();
+    </script>
 @endsection
 
 

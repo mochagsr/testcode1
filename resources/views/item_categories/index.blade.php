@@ -4,6 +4,9 @@
 
 @section('content')
     <style>
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
         .item-categories-table {
             table-layout: fixed;
         }
@@ -85,6 +88,8 @@
         <div class="item-categories-toolbar">
             <div class="toolbar-left">
                 <form id="item-categories-search-form" method="get" class="search-form">
+                    <input type="hidden" name="sort" value="{{ $sort }}">
+                    <input type="hidden" name="direction" value="{{ $direction }}">
                     <input id="item-categories-search-input" type="text" name="search" placeholder="{{ __('ui.search_item_categories_placeholder') }}" value="{{ $search }}">
                     <button type="submit">{{ __('ui.search') }}</button>
                     @if($search !== '')
@@ -94,12 +99,22 @@
             </div>
         </div>
 
+        @php
+            $sortUrl = function (string $field) use ($search, $sort, $direction): string {
+                $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+                return route('item-categories.index', ['search' => $search, 'sort' => $field, 'direction' => $nextDir]);
+            };
+            $sortMark = function (string $field) use ($sort, $direction): string {
+                if ($sort !== $field) return '↕';
+                return $direction === 'asc' ? '↑' : '↓';
+            };
+        @endphp
         <div style="margin-top: 12px;" class="item-categories-table-wrap">
         <table class="item-categories-table">
             <thead>
             <tr>
-                <th>{{ __('ui.code') }}</th>
-                <th>{{ __('ui.name') }}</th>
+                <th><a class="sort-link" href="{{ $sortUrl('code') }}">{{ __('ui.code') }} <span class="sort-mark">{{ $sortMark('code') }}</span></a></th>
+                <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('ui.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
                 <th>{{ __('ui.description') }}</th>
                 <th class="action-col">{{ __('ui.actions') }}</th>
             </tr>

@@ -12,7 +12,20 @@
             padding-top: 6px;
             padding-bottom: 6px;
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
+    @php
+        $sortUrl = function (string $field) use ($search, $selectedSemester, $selectedStatus, $selectedReturnDate, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('sales-returns.index', array_filter(['search' => $search, 'semester' => $selectedSemester, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== ''));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
+    @endphp
 
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.sales_returns_title') }}</h1>
@@ -23,6 +36,8 @@
 
     <div class="card return-list-card">
         <form id="sales-returns-filter-form" method="get" class="flex">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <input id="sales-returns-search-input" type="text" name="search" placeholder="{{ __('txn.search_return_placeholder') }}" value="{{ $search }}" style="max-width: 320px;">
             <input id="sales-returns-date-input" type="date" name="return_date" value="{{ $selectedReturnDate }}" style="max-width: 180px;">
             <select id="sales-returns-semester-input" name="semester" style="max-width: 180px;">
@@ -65,8 +80,8 @@
             <thead>
             <tr>
                 <th>{{ __('txn.return') }}</th>
-                <th>{{ __('txn.date') }}</th>
-                <th>{{ __('txn.customer') }}</th>
+                <th><a class="sort-link" href="{{ $sortUrl('date') }}">{{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span></a></th>
+                <th><a class="sort-link" href="{{ $sortUrl('customer') }}">{{ __('ui.customer_name') }} <span class="sort-mark">{{ $sortMark('customer') }}</span></a></th>
                 <th>{{ __('txn.total_return') }}</th>
                 <th>{{ __('txn.action') }}</th>
             </tr>

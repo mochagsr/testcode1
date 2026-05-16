@@ -89,7 +89,7 @@
             </div>
             <div class="doc-meta-right">
                 <div class="meta-line"><strong>{{ __('txn.date') }}</strong><span>:</span><span class="meta-value">{{ $payment->payment_date?->format('d-m-Y') }}</span></div>
-                <div class="meta-line"><strong>{{ __('receivable.customer') }}</strong><span>:</span><span class="meta-value">{{ $payment->customer?->name ?: '-' }}</span></div>
+                <div class="meta-line"><strong>{{ __('ui.customer_name') }}</strong><span>:</span><span class="meta-value">{{ $payment->customer?->name ?: '-' }}</span></div>
                 <div class="meta-line"><strong>{{ __('txn.phone') }}</strong><span>:</span><span class="meta-value">{{ $payment->customer?->phone ?: '-' }}</span></div>
                 <div class="meta-line"><strong>{{ __('txn.city') }}</strong><span>:</span><span class="meta-value">{{ $payment->customer?->city ?: '-' }}</span></div>
                 <div class="meta-line"><strong>{{ __('txn.address') }}</strong><span>:</span><span class="meta-value">{{ $customerAddress !== '' ? $customerAddress : '-' }}</span></div>
@@ -100,24 +100,14 @@
         @endif
 
         <div class="line">
-            <div class="line-label">{{ __('receivable.customer') }}</div>
-            <div class="line-sep">:</div>
-            <div class="line-value">{{ $payment->customer?->name ?: '-' }}</div>
-        </div>
-        <div class="line">
-            <div class="line-label">{{ __('txn.city') }}</div>
-            <div class="line-sep">:</div>
-            <div class="line-value">{{ $payment->customer?->city ?: '-' }}</div>
-        </div>
-        <div class="line">
-            <div class="line-label">{{ __('txn.address') }}</div>
-            <div class="line-sep">:</div>
-            <div class="line-value">{{ $customerAddress !== '' ? $customerAddress : '-' }}</div>
-        </div>
-        <div class="line">
             <div class="line-label">{{ __('receivable.amount_in_words') }}</div>
             <div class="line-sep">:</div>
             <div class="line-value">{{ $payment->amount_in_words }}</div>
+        </div>
+        <div class="line">
+            <div class="line-label">{{ __('receivable.payment_description') }}</div>
+            <div class="line-sep">:</div>
+            <div class="line-value">{{ $payment->payment_description ?: __('receivable.bill_account_payment') }}</div>
         </div>
         <div class="amount-box">
             <div class="amount-label">{{ __('receivable.amount_paid') }}</div>

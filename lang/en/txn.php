@@ -310,4 +310,6 @@ return [
     'supplier_semester_closed_success' => 'Period :semester for supplier :supplier has been closed.',
     'supplier_semester_opened_success' => 'Period :semester for supplier :supplier has been reopened.',
     'supplier_semester_closed_error' => 'Period :semester for this supplier is closed. New goods receipts are not allowed.',
+    'cannot_cancel_order_has_deliveries' => 'Order note cannot be canceled because it has active delivery notes.',
+    'cannot_cancel_invoice_has_receivable_payments' => 'Invoice cannot be canceled because it has active receivable payments. Cancel the receivable payment first.',
 ];

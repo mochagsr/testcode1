@@ -484,4 +484,6 @@ return [
     'product_unit_updated_success' => 'Product unit updated successfully.',
     'product_unit_deleted_success' => 'Product unit deleted successfully.',
     'product_unit_delete_in_use' => 'This unit is still used by product data and cannot be deleted yet.',
+    'cannot_delete_customer_has_transactions' => 'Customer cannot be deleted because they still have related transactions (invoices, orders, or payments).',
+    'cannot_delete_supplier_has_transactions' => 'Supplier cannot be deleted because they still have related transactions or outstanding payables.',
 ];

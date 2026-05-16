@@ -59,7 +59,20 @@
             cursor: help;
             opacity: .55;
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
+    @php
+        $sortUrl = function (string $field) use ($search, $selectedCustomerId, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('school-bulk-transactions.index', array_filter(['search' => $search, 'customer_id' => $selectedCustomerId, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== '' && $v !== 0));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
+    @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('school_bulk.bulk_transaction_title') }}</h1>
         @if(auth()->user()?->canAccess('school_bulk_transactions.create'))
@@ -69,6 +82,8 @@
 
     <div class="card">
         <form method="get" class="flex">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <select name="customer_id" style="max-width: 280px;">
                 <option value="">{{ __('school_bulk.all_customers') }}</option>
                 @foreach($customers as $customer)
@@ -87,8 +102,8 @@
                 <thead>
                 <tr>
                     <th>{{ __('school_bulk.transaction_number') }}</th>
-                    <th>{{ __('txn.date') }}</th>
-                    <th>{{ __('txn.customer') }}</th>
+                    <th><a class="sort-link" href="{{ $sortUrl('date') }}">{{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('customer') }}">{{ __('ui.customer_name') }} <span class="sort-mark">{{ $sortMark('customer') }}</span></a></th>
                     <th>{{ __('txn.semester_period') }}</th>
                     <th>{{ __('school_bulk.total_schools') }}</th>
                     <th>{{ __('school_bulk.delivery_notes_created') }}</th>

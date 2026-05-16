@@ -53,6 +53,11 @@ class SalesReturnPageController extends Controller
         $semester = (string) $request->string('semester', '');
         $status = trim((string) $request->string('status', ''));
         $returnDate = trim((string) $request->string('return_date', ''));
+        $allowedSorts = ['date', 'customer'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
         $selectedStatus = in_array($status, ['active', 'canceled'], true) ? $status : null;
         $selectedSemester = $this->normalizedSemesterInput($semester);
         $selectedReturnDate = $this->selectedDateFilter($returnDate);
@@ -70,7 +75,24 @@ class SalesReturnPageController extends Controller
         $selectedSemester = $this->selectedSemesterIfAvailable($selectedSemester, $semesterOptions);
 
         $returns = SalesReturn::query()
-            ->onlyListColumns()
+            ->when($sort === 'customer', function ($query) use ($direction): void {
+                $query->leftJoin('customers', 'sales_returns.customer_id', '=', 'customers.id')
+                    ->select([
+                        'sales_returns.id', 'sales_returns.return_number', 'sales_returns.customer_id',
+                        'sales_returns.sales_invoice_id', 'sales_returns.return_date',
+                        'sales_returns.semester_period', 'sales_returns.transaction_type',
+                        'sales_returns.printing_subtype_name', 'sales_returns.total', 'sales_returns.is_canceled',
+                    ])
+                    ->orderBy('customers.name', $direction)
+                    ->orderByDesc('sales_returns.id');
+            }, function ($query) use ($sort, $direction): void {
+                $query->onlyListColumns();
+                if ($sort === 'date') {
+                    $query->orderBy('return_date', $direction)->orderByDesc('id');
+                } else {
+                    $query->orderByDate();
+                }
+            })
             ->withCustomerInfo()
             ->withInvoiceInfo()
             ->searchKeyword($search)
@@ -82,7 +104,6 @@ class SalesReturnPageController extends Controller
             ->when($selectedReturnDateRange !== null, function ($query) use ($selectedReturnDateRange): void {
                 $query->whereBetween('return_date', $selectedReturnDateRange);
             })
-            ->orderByDate()
             ->paginate(20)
             ->withQueryString();
 
@@ -175,6 +196,8 @@ class SalesReturnPageController extends Controller
             'todaySummary' => $todaySummary,
             'customerSemesterLockMap' => $customerSemesterLockMap,
             'returnAdminActionMap' => $returnAdminActionMap,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 

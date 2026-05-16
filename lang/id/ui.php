@@ -126,7 +126,7 @@ return [
     'customer_level' => 'Level Customer',
     'no_level' => 'Tanpa Level',
     'select_customer_level' => 'Pilih Level Customer',
-    'customer_name' => 'Nama Customer',
+    'customer_name' => 'Nama Pelanggan',
     'initial_receivable' => 'Piutang Awal',
     'id_card' => 'KTP',
     'id_card_photo' => 'Foto KTP',
@@ -484,4 +484,6 @@ return [
     'product_unit_updated_success' => 'Satuan barang berhasil diperbarui.',
     'product_unit_deleted_success' => 'Satuan barang berhasil dihapus.',
     'product_unit_delete_in_use' => 'Satuan ini masih dipakai oleh data barang, jadi belum bisa dihapus.',
+    'cannot_delete_customer_has_transactions' => 'Customer tidak dapat dihapus karena masih memiliki transaksi (faktur, pesanan, atau pembayaran) yang terkait.',
+    'cannot_delete_supplier_has_transactions' => 'Supplier tidak dapat dihapus karena masih memiliki transaksi atau hutang yang terkait.',
 ];

@@ -22,8 +22,10 @@ use App\Models\SalesReturnItem;
 use App\Models\User;
 use App\Support\SemesterBookService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ReceivableFlowsTest extends TestCase
@@ -392,6 +394,9 @@ class ReceivableFlowsTest extends TestCase
         ]));
         $response->assertOk();
         $response->assertSee('INV-DISC-001 - '.__('receivable.method_discount'));
+        $response->assertSee(__('receivable.bill_payment_or_deduction'));
+        $response->assertSee(__('receivable.bill_total_deduction_and_return'));
+        $response->assertSee('Rp 50.000');
     }
 
     public function test_receivable_index_uses_ledger_balance_as_single_source_of_truth(): void
@@ -1708,7 +1713,7 @@ class ReceivableFlowsTest extends TestCase
         $response->assertSee('KWT-06042026-0001');
         $response->assertSee('RTR-28022026-0001');
         $response->assertSee(__('receivable.transaction_type_sale'));
-        $response->assertSee(__('receivable.transaction_type_invoice_payment'));
+        $response->assertSee(__('receivable.bill_account_payment'));
         $response->assertSee(__('receivable.transaction_type_return'));
         $response->assertSee(__('receivable.transaction_subtype_product'));
         $response->assertSee(__('receivable.transaction_subtype_printing_named', ['name' => 'Brosur']));
@@ -1724,7 +1729,7 @@ class ReceivableFlowsTest extends TestCase
         $screenResponse->assertSee(route('receivable-payments.show', $receivablePayment), false);
         $screenResponse->assertSee(route('sales-returns.show', $salesReturn), false);
         $screenResponse->assertSee(__('receivable.transaction_type_sale'));
-        $screenResponse->assertSee(__('receivable.transaction_type_invoice_payment'));
+        $screenResponse->assertSee(__('receivable.bill_account_payment'));
         $screenResponse->assertSee(__('receivable.transaction_type_return'));
         $screenResponse->assertSee(__('receivable.transaction_subtype_product'));
         $screenResponse->assertSee(__('receivable.transaction_subtype_printing_named', ['name' => 'Brosur']));
@@ -1834,9 +1839,9 @@ class ReceivableFlowsTest extends TestCase
 
         $this->assertStringContainsString('KWT-06042026-0002', $workbookPayload);
         $this->assertStringContainsString('RTR-28022026-0002', $workbookPayload);
-        $this->assertStringContainsString(__('receivable.transaction_type'), $workbookPayload);
-        $this->assertStringContainsString(__('receivable.transaction_subtype'), $workbookPayload);
-        $this->assertStringContainsString(__('receivable.transaction_type_invoice_payment'), $workbookPayload);
+        $this->assertStringContainsString(__('receivable.bill_transaction_note'), $workbookPayload);
+        $this->assertStringContainsString(__('receivable.bill_account_payment'), $workbookPayload);
+        $this->assertStringContainsString(__('receivable.bill_payment_or_deduction'), $workbookPayload);
         $this->assertStringContainsString(__('receivable.transaction_type_return'), $workbookPayload);
     }
 
@@ -1917,10 +1922,11 @@ class ReceivableFlowsTest extends TestCase
 
         $printResponse->assertOk();
         $printResponse->assertSee('KWT-13052026-0001');
-        $printResponse->assertSee(__('receivable.transaction_type_invoice_payment'));
-        $printResponse->assertSee(__('receivable.transaction_type_overpayment'));
+        $printResponse->assertSee(__('receivable.bill_account_payment'));
+        $printResponse->assertSee('Rp 5.000.000');
         $printResponse->assertSee(__('receivable.bill_total_credit_balance'));
         $printResponse->assertSee('Rp 2.858.500');
+        $printResponse->assertDontSee(__('receivable.transaction_type_overpayment'));
 
         $screenResponse = $this->actingAs($user)->get(route('receivables.index', [
             'customer_id' => $customer->id,
@@ -1928,9 +1934,78 @@ class ReceivableFlowsTest extends TestCase
 
         $screenResponse->assertOk();
         $screenResponse->assertSee(route('receivable-payments.show', $payment), false);
-        $screenResponse->assertSee(__('receivable.transaction_type_invoice_payment'));
-        $screenResponse->assertSee(__('receivable.transaction_type_overpayment'));
+        $screenResponse->assertSee(__('receivable.bill_account_payment'));
+        $screenResponse->assertSee('Rp 5.000.000');
         $screenResponse->assertSee(__('receivable.bill_total_credit_balance'));
+        $screenResponse->assertDontSee(__('receivable.transaction_type_overpayment'));
+    }
+
+    public function test_receivable_payment_requires_description_stores_transfer_proof_and_prints_full_account_payment(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+        $customer = Customer::query()->create([
+            'code' => 'CUST-PAYDESC-001',
+            'name' => 'Eko Transfer',
+            'city' => 'Malang',
+            'address' => 'Jl Mergosono',
+        ]);
+        $invoice = SalesInvoice::query()->create([
+            'invoice_number' => 'INV-PAYDESC-001',
+            'customer_id' => $customer->id,
+            'invoice_date' => '2026-05-13',
+            'semester_period' => 'S1-2627',
+            'transaction_type' => 'product',
+            'subtotal' => 2141500,
+            'total' => 2141500,
+            'total_paid' => 0,
+            'balance' => 2141500,
+            'payment_status' => 'unpaid',
+        ]);
+        ReceivableLedger::query()->create([
+            'customer_id' => $customer->id,
+            'sales_invoice_id' => $invoice->id,
+            'entry_date' => '2026-05-13',
+            'period_code' => 'S1-2627',
+            'transaction_type' => 'product',
+            'description' => 'Invoice INV-PAYDESC-001',
+            'debit' => 2141500,
+            'credit' => 0,
+            'balance_after' => 2141500,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('receivable-payments.store'), [
+                'customer_id' => $customer->id,
+                'payment_date' => '2026-05-13',
+                'customer_address' => 'Jl Mergosono',
+                'amount' => 5000000,
+                'payment_description' => 'Transfer BCA',
+                'payment_proof_photo' => UploadedFile::fake()->image('bukti-transfer.png', 120, 120),
+                'customer_signature' => 'Eko',
+                'user_signature' => 'Kasir',
+                'notes' => 'Pembayaran lewat rekening',
+            ])
+            ->assertRedirect();
+
+        $payment = ReceivablePayment::query()->firstOrFail();
+        $this->assertSame('Transfer BCA', (string) $payment->payment_description);
+        $this->assertNotNull($payment->payment_proof_photo_path);
+        $this->assertStringStartsWith('receivable_payment_proofs/', (string) $payment->payment_proof_photo_path);
+        $this->assertStringEndsWith('.jpg', (string) $payment->payment_proof_photo_path);
+        Storage::disk('public')->assertExists((string) $payment->payment_proof_photo_path);
+
+        $printResponse = $this->actingAs($user)->get(route('receivables.print-customer-bill', [
+            'customer' => $customer->id,
+            'semester' => 'S1-2627',
+        ]));
+
+        $printResponse->assertOk();
+        $printResponse->assertSee('Transfer BCA');
+        $printResponse->assertSee('Rp 5.000.000');
+        $printResponse->assertSee(__('receivable.bill_total_credit_balance'));
+        $printResponse->assertDontSee(__('receivable.transaction_type_overpayment'));
     }
 
     public function test_customer_bill_resolves_legacy_payment_rows_to_kwt_number(): void

@@ -75,6 +75,9 @@
             white-space: normal;
             max-width: 0;
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
         .outgoing-main-grid .outgoing-col-list {
             grid-column: span 8;
         }
@@ -91,6 +94,14 @@
 
     @php
         $canCreateOutgoingTransaction = auth()->user()?->canAccess('outgoing_transactions.create') ?? false;
+        $sortUrl = function (string $field) use ($search, $selectedSemester, $selectedYear, $selectedTransactionDate, $selectedSupplierId, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('outgoing-transactions.index', array_filter(['search' => $search, 'semester' => $selectedSemester, 'year' => $selectedYear, 'transaction_date' => $selectedTransactionDate, 'supplier_id' => $selectedSupplierId, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== ''));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
     @endphp
     <div class="page-header-actions">
         <h1 class="page-title">{{ __('txn.outgoing_transactions_title') }}</h1>
@@ -103,6 +114,8 @@
 
     <div class="card">
         <form id="outgoing-filter-form" method="get" class="filter-toolbar">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <div class="filter-field">
                 <label for="outgoing-search-input">{{ __('txn.search') }}</label>
                 <input id="outgoing-search-input" type="text" name="search" value="{{ $search }}" placeholder="{{ __('txn.search_outgoing_placeholder') }}" style="max-width: 320px;">
@@ -174,8 +187,8 @@
                     <thead>
                     <tr>
                         <th>{{ __('txn.transaction_number') }}</th>
-                        <th>{{ __('txn.date') }}</th>
-                        <th class="supplier-col">{{ __('txn.supplier') }}</th>
+                        <th><a class="sort-link" href="{{ $sortUrl('date') }}">{{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span></a></th>
+                        <th class="supplier-col"><a class="sort-link" href="{{ $sortUrl('supplier') }}">{{ __('txn.supplier') }} <span class="sort-mark">{{ $sortMark('supplier') }}</span></a></th>
                         <th>{{ __('txn.note_number') }}</th>
                         <th>{{ __('txn.semester_period') }}</th>
                         <th class="num">{{ __('txn.total') }}</th>

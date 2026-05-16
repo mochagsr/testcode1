@@ -40,12 +40,27 @@
                 justify-content: flex-start;
             }
         }
+        .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
+    @php
+        $sortUrl = function (string $field) use ($search, $selectedStatus, $selectedCustomerId, $selectedTransactionType, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('receivables.global.index', array_filter(['search' => $search, 'status' => $selectedStatus, 'customer_id' => $selectedCustomerId ?: null, 'transaction_type' => $selectedTransactionType, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== '' && $v !== 0 && $v !== 'all'));
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
+    @endphp
     <div class="muted" style="font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:2px;">List</div>
     <h1 class="page-title">{{ __('receivable.global_page_title') }}</h1>
 
     <div class="card">
         <form method="get" class="receivable-global-toolbar">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
             <div class="toolbar-left">
                 <div>
                     <label>{{ __('receivable.customer') }}</label>
@@ -109,8 +124,8 @@
                 <thead>
                 <tr>
                     <th>{{ __('report.columns.no') }}</th>
-                    <th>{{ __('receivable.semester_customer_name') }}</th>
-                    <th>{{ __('receivable.city') }}</th>
+                    <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('receivable.semester_customer_name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
+                    <th><a class="sort-link" href="{{ $sortUrl('city') }}">{{ __('receivable.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span></a></th>
                     <th>{{ __('txn.address') }}</th>
                     @forelse($semesterHeaders as $semesterHeader)
                         <th>{{ $semesterHeader }}</th>

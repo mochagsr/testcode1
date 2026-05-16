@@ -175,6 +175,10 @@
             toggle.setAttribute('aria-label', show ? hideLabel : showLabel);
         });
     })();
+
+    // Auto-reload before session expires to prevent 419 CSRF errors.
+    // SESSION_LIFETIME=120 min — reload at 110 min so token stays fresh.
+    setTimeout(() => location.reload(), 110 * 60 * 1000);
 </script>
 </body>
 </html>

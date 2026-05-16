@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +26,8 @@ class ReceivablePayment extends Model
         'customer_address',
         'amount',
         'amount_in_words',
+        'payment_description',
+        'payment_proof_photo_path',
         'customer_signature',
         'user_signature',
         'notes',
@@ -142,8 +145,8 @@ class ReceivablePayment extends Model
     /**
      * Scope: Filter by date range.
      *
-     * @param  \Carbon\CarbonInterface  $startDate
-     * @param  \Carbon\CarbonInterface  $endDate
+     * @param  CarbonInterface  $startDate
+     * @param  CarbonInterface  $endDate
      */
     public function scopeBetweenDates(Builder $query, $startDate, $endDate): Builder
     {

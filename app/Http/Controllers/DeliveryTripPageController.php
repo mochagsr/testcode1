@@ -38,6 +38,12 @@ class DeliveryTripPageController extends Controller
         $tripDate = trim((string) $request->string('trip_date', ''));
         $selectedTripDate = $tripDate !== '' ? $tripDate : null;
 
+        $allowedSorts = ['date', 'driver_name', 'assistant_name', 'vehicle_plate'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
         $trips = DeliveryTrip::query()
             ->onlyListColumns()
             ->with('creator:id,name')
@@ -45,8 +51,11 @@ class DeliveryTripPageController extends Controller
             ->when($selectedTripDate !== null, function ($query) use ($selectedTripDate): void {
                 $query->whereDate('trip_date', $selectedTripDate);
             })
-            ->orderByDesc('trip_date')
-            ->orderByDesc('id')
+            ->when($sort === 'date', fn ($q) => $q->orderBy('trip_date', $direction)->orderByDesc('id'))
+            ->when($sort === 'driver_name', fn ($q) => $q->orderBy('driver_name', $direction)->orderByDesc('id'))
+            ->when($sort === 'assistant_name', fn ($q) => $q->orderBy('assistant_name', $direction)->orderByDesc('id'))
+            ->when($sort === 'vehicle_plate', fn ($q) => $q->orderBy('vehicle_plate', $direction)->orderByDesc('id'))
+            ->when($sort === '', fn ($q) => $q->orderByDesc('trip_date')->orderByDesc('id'))
             ->paginate(20)
             ->withQueryString();
 
@@ -62,6 +71,8 @@ class DeliveryTripPageController extends Controller
             'activeTrips' => $activeTrips,
             'search' => $search,
             'selectedTripDate' => $selectedTripDate,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -256,6 +267,56 @@ class DeliveryTripPageController extends Controller
         return redirect()
             ->route('delivery-trips.index')
             ->with('success', __('delivery_trip.completed_success', ['number' => $deliveryTrip->trip_number]));
+    }
+
+    public function destroy(Request $request, DeliveryTrip $deliveryTrip): RedirectResponse
+    {
+        $isCompleted = false;
+
+        DB::transaction(function () use ($request, $deliveryTrip, &$isCompleted): void {
+            $trip = DeliveryTrip::query()
+                ->whereKey($deliveryTrip->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $trip->is_active) {
+                $isCompleted = true;
+
+                return;
+            }
+
+            $totalCost = (int) $trip->total_cost;
+            $tripDate = $trip->trip_date ?? now();
+            $tripNumber = (string) $trip->trip_number;
+
+            if ($totalCost > 0) {
+                $this->accountingService->postDeliveryTripAdjustment(
+                    tripId: (int) $trip->id,
+                    date: $tripDate,
+                    difference: -$totalCost
+                );
+            }
+
+            $trip->members()->delete();
+            $trip->delete();
+
+            $this->auditLogService->log(
+                'delivery.trip.delete',
+                null,
+                __('delivery_trip.audit_deleted', ['number' => $tripNumber]),
+                $request
+            );
+        });
+
+        if ($isCompleted) {
+            return redirect()
+                ->route('delivery-trips.show', $deliveryTrip)
+                ->with('error', __('delivery_trip.cannot_delete_completed'));
+        }
+
+        return redirect()
+            ->route('delivery-trips.index')
+            ->with('success', __('delivery_trip.deleted_success', ['number' => $deliveryTrip->trip_number]));
     }
 
     public function print(DeliveryTrip $deliveryTrip): View

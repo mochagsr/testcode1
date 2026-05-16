@@ -76,7 +76,7 @@
                     <th>{{ __('txn.date') }}</th>
                     <th>{{ __('txn.type') }}</th>
                     <th>{{ __('txn.note_number') }}</th>
-                    <th>{{ __('txn.customer') }}/{{ __('menu.suppliers') }}</th>
+                    <th>{{ __('ui.customer_name') }}/{{ __('menu.suppliers') }}</th>
                     <th>{{ __('txn.city') }}</th>
                     <th>{{ __('txn.total') }}</th>
                     <th>{{ __('txn.status') }}</th>

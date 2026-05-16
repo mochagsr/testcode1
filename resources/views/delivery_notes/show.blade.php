@@ -66,7 +66,7 @@
             <p class="form-section-note">{{ __('txn.delivery_summary_note') }}</p>
             <div class="row">
                 <div class="col-4"><strong>{{ __('txn.date') }}</strong><div>{{ $note->note_date->format('d-m-Y') }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $note->recipient_name }}</div></div>
+                <div class="col-4"><strong>{{ __('ui.customer_name') }}</strong><div>{{ $note->recipient_name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $note->recipient_phone ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $note->city ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.address') }}</strong><div>{{ $note->address ?: '-' }}</div></div>

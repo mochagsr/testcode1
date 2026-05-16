@@ -132,6 +132,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/delivery-trips/{deliveryTrip}/edit', [DeliveryTripPageController::class, 'edit'])->middleware('perm:delivery_trips.edit')->name('delivery-trips.edit');
     Route::put('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'update'])->middleware(['finance.unlocked', 'perm:delivery_trips.edit'])->name('delivery-trips.update');
     Route::patch('/delivery-trips/{deliveryTrip}/status', [DeliveryTripPageController::class, 'complete'])->middleware('perm:delivery_trips.edit')->name('delivery-trips.complete');
+    Route::delete('/delivery-trips/{deliveryTrip}', [DeliveryTripPageController::class, 'destroy'])->middleware(['finance.unlocked', 'perm:delivery_trips.edit'])->name('delivery-trips.destroy');
     Route::get('/delivery-trips/{deliveryTrip}/print', [DeliveryTripPageController::class, 'print'])->middleware('perm:delivery_trips.export')->name('delivery-trips.print');
     Route::get('/delivery-trips/{deliveryTrip}/pdf', [DeliveryTripPageController::class, 'exportPdf'])->middleware('perm:delivery_trips.export')->name('delivery-trips.export.pdf');
     Route::get('/delivery-trips/{deliveryTrip}/excel', [DeliveryTripPageController::class, 'exportExcel'])->middleware('perm:delivery_trips.export')->name('delivery-trips.export.excel');

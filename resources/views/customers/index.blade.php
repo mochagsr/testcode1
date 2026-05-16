@@ -121,6 +121,16 @@
             padding: 5px 11px;
             line-height: 1.2;
         }
+        .sort-link {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+        }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
         @media (max-width: 1400px) {
             .customers-toolbar {
                 align-items: flex-start;
@@ -144,6 +154,14 @@
         $canManageCustomers = $currentUser?->canAccessAny(['customers.create', 'customers.edit', 'customers.delete', 'customers.import']) ?? false;
         $canImportCustomers = $currentUser?->canAccess('customers.import') ?? false;
         $customerExportQuery = ['search' => $search, 'level_id' => $selectedLevelId ?: null];
+        $sortUrl = function (string $field) use ($search, $selectedLevelId, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('customers-web.index', ['search' => $search, 'level_id' => $selectedLevelId ?: null, 'sort' => $field, 'direction' => $nextDir]);
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.customers_title') }}</h1>
@@ -155,6 +173,8 @@
     <div class="card">
         <div class="customers-toolbar">
             <form id="customers-search-form" method="get" class="search-form">
+                <input type="hidden" name="sort" value="{{ $sort }}">
+                <input type="hidden" name="direction" value="{{ $direction }}">
                 <input id="customers-search-input" type="text" name="search" placeholder="{{ __('ui.search_customers_placeholder') }}" value="{{ $search }}">
                 <select name="level_id" id="customers-level-filter">
                     <option value="">{{ __('ui.all_levels') }}</option>
@@ -217,10 +237,22 @@
         <table class="customers-table">
             <thead>
             <tr>
-                <th>{{ __('ui.name') }}</th>
-                <th>{{ __('ui.level') }}</th>
+                <th>
+                    <a class="sort-link" href="{{ $sortUrl('name') }}">
+                        {{ __('ui.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span>
+                    </a>
+                </th>
+                <th>
+                    <a class="sort-link" href="{{ $sortUrl('level') }}">
+                        {{ __('ui.level') }} <span class="sort-mark">{{ $sortMark('level') }}</span>
+                    </a>
+                </th>
                 <th>{{ __('ui.phone') }}</th>
-                <th>{{ __('ui.city') }}</th>
+                <th>
+                    <a class="sort-link" href="{{ $sortUrl('city') }}">
+                        {{ __('ui.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span>
+                    </a>
+                </th>
                 <th>{{ __('ui.address') }}</th>
                 <th>{{ __('ui.receivable') }}</th>
                 <th class="ktp-col">{{ __('ui.id_card') }}</th>

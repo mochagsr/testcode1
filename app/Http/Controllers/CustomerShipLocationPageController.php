@@ -24,23 +24,33 @@ class CustomerShipLocationPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $customerId = $request->integer('customer_id');
+        $allowedSorts = ['customer', 'school_name', 'city'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '') : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $locations = CustomerShipLocation::query()
-            ->select([
-                'id',
-                'customer_id',
-                'school_name',
-                'recipient_phone',
-                'city',
-                'address',
-                'is_active',
-                'updated_at',
-            ])
+            ->when($sort === 'customer', function ($query) use ($direction): void {
+                $query->leftJoin('customers', 'customer_ship_locations.customer_id', '=', 'customers.id')
+                    ->select([
+                        'customer_ship_locations.id', 'customer_ship_locations.customer_id',
+                        'customer_ship_locations.school_name', 'customer_ship_locations.recipient_phone',
+                        'customer_ship_locations.city', 'customer_ship_locations.address',
+                        'customer_ship_locations.is_active', 'customer_ship_locations.updated_at',
+                    ])
+                    ->orderBy('customers.name', $direction)
+                    ->orderBy('customer_ship_locations.school_name');
+            }, function ($query) use ($sort, $direction): void {
+                $query->select(['id', 'customer_id', 'school_name', 'recipient_phone', 'city', 'address', 'is_active', 'updated_at']);
+                match ($sort) {
+                    'school_name' => $query->orderBy('school_name', $direction)->orderBy('id'),
+                    'city' => $query->orderBy('city', $direction)->orderBy('school_name'),
+                    default => $query->orderBy('school_name')->orderBy('id'),
+                };
+            })
             ->with('customer:id,name,city')
-            ->when($customerId > 0, fn (Builder $query) => $query->where('customer_id', $customerId))
+            ->when($customerId > 0, fn (Builder $query) => $query->where('customer_ship_locations.customer_id', $customerId))
             ->searchKeyword($search)
-            ->orderBy('school_name')
-            ->orderBy('id')
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
@@ -55,6 +65,8 @@ class CustomerShipLocationPageController extends Controller
             'customers' => $customers,
             'search' => $search,
             'selectedCustomerId' => $customerId > 0 ? $customerId : null,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 

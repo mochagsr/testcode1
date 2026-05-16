@@ -310,4 +310,6 @@ return [
     'supplier_semester_closed_success' => 'Periode :semester untuk supplier :supplier berhasil ditutup.',
     'supplier_semester_opened_success' => 'Periode :semester untuk supplier :supplier berhasil dibuka.',
     'supplier_semester_closed_error' => 'Periode :semester untuk supplier ini sedang ditutup. Transaksi keluar baru tidak diizinkan.',
+    'cannot_cancel_order_has_deliveries' => 'Surat pesanan tidak dapat dibatalkan karena sudah memiliki surat jalan aktif.',
+    'cannot_cancel_invoice_has_receivable_payments' => 'Faktur tidak dapat dibatalkan karena masih ada pembayaran piutang aktif yang terkait. Batalkan pembayaran piutang terlebih dahulu.',
 ];

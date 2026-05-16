@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"g:\\\\laragon\\\\www\\\\tespgpos\" -Depth 2)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"g:\\\\laragon\\\\www\\\\tespgpos\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"g:\\\\laragon\\\\www\\\\tespgpos\\\\resources\\\\views\\\\reports\" -Filter \"*.blade.php\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(php artisan *)",
+      "Bash(Select-Object -First 20)",
+      "Bash(cd /d \"g:/laragon/www/tespgpos\")",
+      "Bash(Get-ChildItem -Path \"G:\\\\laragon\\\\www\\\\tespgpos\\\\app\\\\Http\\\\Controllers\" -Filter \"*.php\")",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Sort-Object)",
+      "Bash(Get-ChildItem -Path \"g:\\\\laragon\\\\www\\\\tespgpos\\\\app\\\\Http\\\\Controllers\" -Filter \"*PageController.php\" -File)"
+    ]
+  }
+}

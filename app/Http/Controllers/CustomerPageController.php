@@ -30,7 +30,13 @@ class CustomerPageController extends Controller
         $search = trim((string) $request->string('search', ''));
         $selectedLevelId = max(0, (int) $request->integer('level_id', 0));
 
-        $customerQuery = Customer::query()
+        $allowedSorts = ['name', 'level', 'city'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        $customers = Customer::query()
             ->select([
                 'id',
                 'customer_level_id',
@@ -44,11 +50,20 @@ class CustomerPageController extends Controller
             ])
             ->withLevel()
             ->when($selectedLevelId > 0, fn ($query) => $query->where('customer_level_id', $selectedLevelId))
-            ->searchKeyword($search);
-
-        $customerQuery->orderBy('name')->orderBy('id');
-
-        $customers = $customerQuery
+            ->searchKeyword($search)
+            ->when($sort === 'level', function ($query) use ($direction): void {
+                $query->leftJoin('customer_levels', 'customers.customer_level_id', '=', 'customer_levels.id')
+                    ->select([
+                        'customers.id', 'customers.customer_level_id', 'customers.name',
+                        'customers.phone', 'customers.phone_secondary', 'customers.city',
+                        'customers.address', 'customers.outstanding_receivable', 'customers.id_card_photo_path',
+                    ])
+                    ->orderBy('customer_levels.name', $direction)
+                    ->orderBy('customers.id', 'desc');
+            })
+            ->when($sort === 'name', fn ($q) => $q->orderBy('name', $direction)->orderBy('id', 'desc'))
+            ->when($sort === 'city', fn ($q) => $q->orderBy('city', $direction)->orderBy('id', 'desc'))
+            ->when($sort === '', fn ($q) => $q->orderByDesc('id'))
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
@@ -57,6 +72,8 @@ class CustomerPageController extends Controller
             'search' => $search,
             'levels' => CustomerLevel::query()->orderBy('name')->orderBy('code')->get(['id', 'code', 'name']),
             'selectedLevelId' => $selectedLevelId,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -253,10 +270,17 @@ class CustomerPageController extends Controller
 
     public function destroy(Customer $customer): RedirectResponse
     {
-        if ($customer->id_card_photo_path) {
-            Storage::disk('public')->delete($customer->id_card_photo_path);
+        $photoPath = $customer->id_card_photo_path;
+
+        try {
+            $customer->delete();
+        } catch (\Illuminate\Database\QueryException) {
+            return back()->with('error', __('ui.cannot_delete_customer_has_transactions'));
         }
-        $customer->delete();
+
+        if ($photoPath) {
+            Storage::disk('public')->delete($photoPath);
+        }
         AppCache::forgetAfterFinancialMutation();
 
         return redirect()->route('customers-web.index')->with('success', 'Customer deleted successfully.');

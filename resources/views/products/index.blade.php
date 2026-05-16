@@ -152,6 +152,16 @@
         .products-table td.price-col {
             text-align: left;
         }
+        .sort-link {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+        }
+        .sort-link:hover { color: var(--primary, #2563eb); }
+        .sort-mark { font-size: 11px; opacity: 0.65; }
         .product-actions {
             display: flex;
             flex-wrap: wrap;
@@ -230,6 +240,14 @@
         $canCreateProducts = $currentUser?->canAccess('products.create') ?? false;
         $canEditProducts = $currentUser?->canAccess('products.edit') ?? false;
         $canImportProducts = $currentUser?->canAccess('products.import') ?? false;
+        $sortUrl = function (string $field) use ($search, $productType, $sort, $direction): string {
+            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
+            return route('products.index', ['search' => $search, 'product_type' => $productType, 'sort' => $field, 'direction' => $nextDir]);
+        };
+        $sortMark = function (string $field) use ($sort, $direction): string {
+            if ($sort !== $field) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.products_title') }}</h1>
@@ -242,6 +260,8 @@
         <div class="products-toolbar">
             <div class="toolbar-left">
                 <form id="products-search-form" method="get" class="search-form">
+                    <input type="hidden" name="sort" value="{{ $sort }}">
+                    <input type="hidden" name="direction" value="{{ $direction }}">
                     <input id="products-search-input" type="text" name="search" placeholder="{{ __('ui.search_products_placeholder') }}" value="{{ $search }}">
                     <select id="products-type-filter" name="product_type" aria-label="{{ __('ui.product_type_label') }}">
                         @foreach($productTypeOptions as $typeValue => $typeLabel)
@@ -308,9 +328,21 @@
             <thead>
             <tr>
                 <th class="code-col">{{ __('ui.code') }}</th>
-                <th class="category-col">{{ __('ui.category') }}</th>
-                <th>{{ __('ui.name') }}</th>
-                <th class="stock-col">{{ __('ui.stock') }}</th>
+                <th class="category-col">
+                    <a class="sort-link" href="{{ $sortUrl('category') }}">
+                        {{ __('ui.category') }} <span class="sort-mark">{{ $sortMark('category') }}</span>
+                    </a>
+                </th>
+                <th>
+                    <a class="sort-link" href="{{ $sortUrl('name') }}">
+                        {{ __('ui.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span>
+                    </a>
+                </th>
+                <th class="stock-col">
+                    <a class="sort-link" href="{{ $sortUrl('stock') }}">
+                        {{ __('ui.stock') }} <span class="sort-mark">{{ $sortMark('stock') }}</span>
+                    </a>
+                </th>
                 <th class="price-col">{{ __('ui.price_agent') }}</th>
                 <th class="price-col">{{ __('ui.price_sales') }}</th>
                 <th class="price-col">{{ __('ui.price_general') }}</th>

@@ -13,19 +13,25 @@ use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
+use App\Support\PrintPaperSize;
 use App\Support\PrintTextFormatter;
+use App\Support\UploadedImageCompressor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class ReceivablePaymentPageController extends Controller
 {
@@ -128,6 +134,8 @@ class ReceivablePaymentPageController extends Controller
             'payment_date' => FluentRule::date()->required(),
             'customer_address' => FluentRule::string()->nullable()->max(255),
             'amount' => FluentRule::integer()->required()->min(1),
+            'payment_description' => FluentRule::string()->required()->max(120),
+            'payment_proof_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
             'preferred_invoice_id' => FluentRule::integer()->nullable()->exists('sales_invoices', 'id'),
             'return_to' => FluentRule::string()->nullable()->max(500),
             'customer_signature' => FluentRule::string()->required()->max(120),
@@ -135,118 +143,137 @@ class ReceivablePaymentPageController extends Controller
             'notes' => FluentRule::string()->nullable(),
         ]);
 
-        $payment = DB::transaction(function () use ($data): ReceivablePayment {
-            $customer = Customer::query()
-                ->lockForUpdate()
-                ->findOrFail((int) $data['customer_id']);
-
-            $amount = (float) $data['amount'];
-
-            $paymentDate = Carbon::parse((string) $data['payment_date']);
-            $payment = ReceivablePayment::create([
-                'payment_number' => $this->generatePaymentNumber($paymentDate->toDateString()),
-                'customer_id' => $customer->id,
-                'payment_date' => $paymentDate->toDateString(),
-                'customer_address' => $data['customer_address'] ?: $customer->address,
-                'amount' => $amount,
-                'amount_in_words' => $this->toIndonesianWords($amount),
-                'customer_signature' => $data['customer_signature'],
-                'user_signature' => $data['user_signature'],
-                'notes' => $data['notes'] ?? null,
-                'created_by_user_id' => auth()->id(),
-            ]);
-
-            $remaining = $amount;
-            $appliedToInvoices = 0.0;
-            $invoices = SalesInvoice::query()
-                ->where('customer_id', $customer->id)
-                ->active()
-                ->withOpenBalance()
-                ->orderByDate('asc')
-                ->lockForUpdate()
-                ->get();
-
-            $preferredInvoiceId = (int) ($data['preferred_invoice_id'] ?? 0);
-            if ($preferredInvoiceId > 0) {
-                $preferred = $invoices->firstWhere('id', $preferredInvoiceId);
-                if ($preferred) {
-                    $invoices = collect([$preferred])->concat(
-                        $invoices->reject(fn (SalesInvoice $invoice): bool => (int) $invoice->id === $preferredInvoiceId)
-                    )->values();
-                }
+        $paymentProofPhotoPath = null;
+        if ($request->hasFile('payment_proof_photo')) {
+            $uploadedProof = $request->file('payment_proof_photo');
+            if ($uploadedProof instanceof UploadedFile) {
+                $paymentProofPhotoPath = UploadedImageCompressor::storeJpeg($uploadedProof, 'receivable_payment_proofs');
             }
+        }
 
-            foreach ($invoices as $invoice) {
-                if ($remaining <= 0) {
-                    break;
-                }
+        try {
+            $payment = DB::transaction(function () use ($data, $paymentProofPhotoPath): ReceivablePayment {
+                $customer = Customer::query()
+                    ->lockForUpdate()
+                    ->findOrFail((int) $data['customer_id']);
 
-                $invoiceBalance = (float) $invoice->balance;
-                if ($invoiceBalance <= 0) {
-                    continue;
-                }
+                $amount = (float) $data['amount'];
 
-                $payAmount = min($remaining, $invoiceBalance);
-
-                InvoicePayment::create([
-                    'sales_invoice_id' => $invoice->id,
+                $paymentDate = Carbon::parse((string) $data['payment_date']);
+                $payment = ReceivablePayment::create([
+                    'payment_number' => $this->generatePaymentNumber($paymentDate->toDateString()),
+                    'customer_id' => $customer->id,
                     'payment_date' => $paymentDate->toDateString(),
-                    'amount' => $payAmount,
-                    'method' => 'cash',
-                    'notes' => __('receivable.receivable_payment', ['payment' => $payment->payment_number]),
+                    'customer_address' => $data['customer_address'] ?: $customer->address,
+                    'amount' => $amount,
+                    'amount_in_words' => $this->toIndonesianWords($amount),
+                    'payment_description' => trim((string) $data['payment_description']),
+                    'payment_proof_photo_path' => $paymentProofPhotoPath,
+                    'customer_signature' => $data['customer_signature'],
+                    'user_signature' => $data['user_signature'],
+                    'notes' => $data['notes'] ?? null,
+                    'created_by_user_id' => auth()->id(),
                 ]);
 
-                $newTotalPaid = (float) $invoice->total_paid + $payAmount;
-                $newBalance = max(0, (float) $invoice->total - $newTotalPaid);
-                $invoice->update([
-                    'total_paid' => $newTotalPaid,
-                    'balance' => $newBalance,
-                    'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
-                ]);
+                $remaining = $amount;
+                $appliedToInvoices = 0.0;
+                $invoices = SalesInvoice::query()
+                    ->where('customer_id', $customer->id)
+                    ->active()
+                    ->withOpenBalance()
+                    ->orderByDate('asc')
+                    ->lockForUpdate()
+                    ->get();
 
-                $this->receivableLedgerService->addCredit(
-                    customerId: (int) $invoice->customer_id,
-                    invoiceId: (int) $invoice->id,
-                    entryDate: $paymentDate,
-                    amount: $payAmount,
-                    periodCode: $invoice->semester_period,
-                    description: __('receivable.receivable_payment_for_invoice', [
-                        'payment' => $payment->payment_number,
-                        'invoice' => $invoice->invoice_number,
-                    ]),
-                    transactionType: (string) $invoice->transaction_type
+                $preferredInvoiceId = (int) ($data['preferred_invoice_id'] ?? 0);
+                if ($preferredInvoiceId > 0) {
+                    $preferred = $invoices->firstWhere('id', $preferredInvoiceId);
+                    if ($preferred) {
+                        $invoices = collect([$preferred])->concat(
+                            $invoices->reject(fn (SalesInvoice $invoice): bool => (int) $invoice->id === $preferredInvoiceId)
+                        )->values();
+                    }
+                }
+
+                foreach ($invoices as $invoice) {
+                    if ($remaining <= 0) {
+                        break;
+                    }
+
+                    $invoiceBalance = (float) $invoice->balance;
+                    if ($invoiceBalance <= 0) {
+                        continue;
+                    }
+
+                    $payAmount = min($remaining, $invoiceBalance);
+
+                    InvoicePayment::create([
+                        'sales_invoice_id' => $invoice->id,
+                        'receivable_payment_id' => $payment->id,
+                        'payment_date' => $paymentDate->toDateString(),
+                        'amount' => $payAmount,
+                        'method' => 'cash',
+                        'notes' => __('receivable.receivable_payment', ['payment' => $payment->payment_number]),
+                    ]);
+
+                    $newTotalPaid = (float) $invoice->total_paid + $payAmount;
+                    $newBalance = max(0, (float) $invoice->total - $newTotalPaid);
+                    $invoice->update([
+                        'total_paid' => $newTotalPaid,
+                        'balance' => $newBalance,
+                        'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+                    ]);
+
+                    $this->receivableLedgerService->addCredit(
+                        customerId: (int) $invoice->customer_id,
+                        invoiceId: (int) $invoice->id,
+                        entryDate: $paymentDate,
+                        amount: $payAmount,
+                        periodCode: $invoice->semester_period,
+                        description: __('receivable.receivable_payment_for_invoice', [
+                            'payment' => $payment->payment_number,
+                            'invoice' => $invoice->invoice_number,
+                        ]),
+                        transactionType: (string) $invoice->transaction_type
+                    );
+
+                    $remaining -= $payAmount;
+                    $appliedToInvoices += $payAmount;
+                }
+
+                if ($remaining > 0) {
+                    $newCreditBalance = (float) $customer->credit_balance + $remaining;
+                    $customer->update([
+                        'credit_balance' => $newCreditBalance,
+                    ]);
+
+                    $this->receivableLedgerService->addCredit(
+                        customerId: (int) $customer->id,
+                        invoiceId: null,
+                        entryDate: $paymentDate,
+                        amount: $remaining,
+                        periodCode: null,
+                        description: __('receivable.receivable_payment', ['payment' => $payment->payment_number]),
+                        transactionType: null
+                    );
+                }
+
+                $this->accountingService->postReceivablePayment(
+                    paymentId: (int) $payment->id,
+                    date: $paymentDate,
+                    appliedAmount: (int) round($appliedToInvoices),
+                    overPayment: (int) round(max(0, $remaining))
                 );
 
-                $remaining -= $payAmount;
-                $appliedToInvoices += $payAmount;
+                return $payment;
+            });
+        } catch (Throwable $exception) {
+            if ($paymentProofPhotoPath !== null) {
+                Storage::disk('public')->delete($paymentProofPhotoPath);
             }
 
-            if ($remaining > 0) {
-                $newCreditBalance = (float) $customer->credit_balance + $remaining;
-                $customer->update([
-                    'credit_balance' => $newCreditBalance,
-                ]);
-
-                $this->receivableLedgerService->addCredit(
-                    customerId: (int) $customer->id,
-                    invoiceId: null,
-                    entryDate: $paymentDate,
-                    amount: $remaining,
-                    periodCode: null,
-                    description: __('receivable.receivable_payment', ['payment' => $payment->payment_number]),
-                    transactionType: null
-                );
-            }
-
-            $this->accountingService->postReceivablePayment(
-                paymentId: (int) $payment->id,
-                date: $paymentDate,
-                appliedAmount: (int) round($appliedToInvoices),
-                overPayment: (int) round(max(0, $remaining))
-            );
-
-            return $payment;
-        });
+            throw $exception;
+        }
 
         $redirect = redirect()->route('receivable-payments.show', $payment);
         $returnTo = $this->sanitizeReturnPath((string) ($data['return_to'] ?? ''));
@@ -275,14 +302,29 @@ class ReceivablePaymentPageController extends Controller
         $data = $request->validate([
             'payment_date' => FluentRule::date()->required(),
             'customer_address' => FluentRule::string()->nullable()->max(255),
+            'payment_description' => FluentRule::string()->required()->max(120),
+            'payment_proof_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
             'customer_signature' => FluentRule::string()->required()->max(120),
             'user_signature' => FluentRule::string()->required()->max(120),
             'notes' => FluentRule::string()->nullable(),
         ]);
 
+        $proofPhotoPath = $receivablePayment->payment_proof_photo_path;
+        if ($request->hasFile('payment_proof_photo')) {
+            if ($proofPhotoPath) {
+                Storage::disk('public')->delete($proofPhotoPath);
+            }
+            $uploadedProof = $request->file('payment_proof_photo');
+            if ($uploadedProof instanceof UploadedFile) {
+                $proofPhotoPath = UploadedImageCompressor::storeJpeg($uploadedProof, 'receivable_payment_proofs');
+            }
+        }
+
         $receivablePayment->update([
             'payment_date' => $data['payment_date'],
             'customer_address' => $data['customer_address'] ?? null,
+            'payment_description' => trim((string) $data['payment_description']),
+            'payment_proof_photo_path' => $proofPhotoPath,
             'customer_signature' => $data['customer_signature'],
             'user_signature' => $data['user_signature'],
             'notes' => $data['notes'] ?? null,
@@ -315,13 +357,9 @@ class ReceivablePaymentPageController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $paymentRef = __('receivable.receivable_payment', ['payment' => $payment->payment_number]);
-
             $invoicePayments = InvoicePayment::query()
                 ->with('invoice:id,customer_id,total,total_paid,balance,payment_status,invoice_number,semester_period')
-                ->where('method', 'cash')
-                ->where('notes', $paymentRef)
-                ->whereDate('payment_date', $payment->payment_date?->toDateString())
+                ->where('receivable_payment_id', $payment->id)
                 ->lockForUpdate()
                 ->get();
 
@@ -339,26 +377,31 @@ class ReceivablePaymentPageController extends Controller
 
                 $appliedToInvoices += $amount;
 
-                $newTotalPaid = max(0, (float) $invoice->total_paid - $amount);
-                $newBalance = max(0, (float) $invoice->total - $newTotalPaid);
-                $invoice->update([
-                    'total_paid' => $newTotalPaid,
-                    'balance' => $newBalance,
-                    'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
-                ]);
+                // If the invoice is already canceled, skip balance restoration —
+                // the invoice cancel already zeroed out the outstanding via a ledger credit.
+                // Restoring balance on a void invoice would create phantom receivable.
+                if (! $invoice->is_canceled) {
+                    $newTotalPaid = max(0, (float) $invoice->total_paid - $amount);
+                    $newBalance = max(0, (float) $invoice->total - $newTotalPaid);
+                    $invoice->update([
+                        'total_paid' => $newTotalPaid,
+                        'balance' => $newBalance,
+                        'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+                    ]);
 
-                $this->receivableLedgerService->addDebit(
-                    customerId: (int) $customer->id,
-                    invoiceId: (int) $invoice->id,
-                    entryDate: now(),
-                    amount: $amount,
-                    periodCode: $invoice->semester_period,
-                    description: __('txn.cancel_receivable_payment_invoice_ledger_note', [
-                        'payment' => $payment->payment_number,
-                        'invoice' => $invoice->invoice_number,
-                    ]),
-                    transactionType: (string) $invoice->transaction_type,
-                );
+                    $this->receivableLedgerService->addDebit(
+                        customerId: (int) $customer->id,
+                        invoiceId: (int) $invoice->id,
+                        entryDate: now(),
+                        amount: $amount,
+                        periodCode: $invoice->semester_period,
+                        description: __('txn.cancel_receivable_payment_invoice_ledger_note', [
+                            'payment' => $payment->payment_number,
+                            'invoice' => $invoice->invoice_number,
+                        ]),
+                        transactionType: (string) $invoice->transaction_type,
+                    );
+                }
 
                 $invoicePayment->delete();
             }
@@ -413,7 +456,7 @@ class ReceivablePaymentPageController extends Controller
         $pdf = Pdf::loadView('receivable_payments.print', [
             'payment' => $receivablePayment,
             'isPdf' => true,
-        ])->setPaper(\App\Support\PrintPaperSize::continuousForm95x55());
+        ])->setPaper(PrintPaperSize::continuousForm95x55());
 
         return $pdf->download($filename);
     }
@@ -482,10 +525,8 @@ class ReceivablePaymentPageController extends Controller
 
             $detailHeaderRow = 8;
             $detailRows = [
-                [__('receivable.customer'), (string) ($receivablePayment->customer?->name ?? '-')],
-                [__('txn.city'), (string) ($receivablePayment->customer?->city ?? '-')],
-                [__('txn.address'), $customerAddress !== '' ? $customerAddress : '-'],
                 [__('receivable.amount_in_words'), (string) ($receivablePayment->amount_in_words ?? '-')],
+                [__('receivable.payment_description'), (string) ($receivablePayment->payment_description ?: __('receivable.bill_account_payment'))],
                 [__('receivable.amount_paid'), 'Rp '.number_format((int) round((float) $receivablePayment->amount), 0, ',', '.')],
                 [__('txn.notes'), $printNotes !== '' ? $printNotes : '-'],
             ];
@@ -507,8 +548,8 @@ class ReceivablePaymentPageController extends Controller
             $sheet->setCellValue('A'.($signatureRow + 2), (string) ($receivablePayment->customer_signature ?? '-'));
             $sheet->setCellValue('E'.($signatureRow + 2), (string) ($receivablePayment->user_signature ?? '-'));
             $sheet->getStyle('A'.($signatureRow + 2).':F'.($signatureRow + 2))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.($signatureRow + 1).':B'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle('E'.($signatureRow + 1).':F'.($signatureRow + 1))->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
 
             foreach (range('A', 'F') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);

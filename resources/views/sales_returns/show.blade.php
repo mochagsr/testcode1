@@ -55,7 +55,7 @@
             <h3 class="form-section-title">{{ __('txn.return_summary') }}</h3>
             <p class="form-section-note">{{ __('txn.return_summary_note') }}</p>
             <div class="row">
-                <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $salesReturn->customer->name }}</div></div>
+                <div class="col-4"><strong>{{ __('ui.customer_name') }}</strong><div>{{ $salesReturn->customer->name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $salesReturn->customer->city }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $salesReturn->customer->phone ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.return_date') }}</strong><div>{{ $salesReturn->return_date->format('d-m-Y') }}</div></div>

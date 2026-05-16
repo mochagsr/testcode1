@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,10 +17,12 @@ class InvoicePayment extends Model
      */
     protected $fillable = [
         'sales_invoice_id',
+        'receivable_payment_id',
         'payment_date',
         'amount',
         'method',
         'notes',
+        'is_synthetic',
     ];
 
     /**
@@ -32,6 +33,7 @@ class InvoicePayment extends Model
         return [
             'payment_date' => 'date',
             'amount' => 'integer',
+            'is_synthetic' => 'boolean',
         ];
     }
 
@@ -44,11 +46,11 @@ class InvoicePayment extends Model
     }
 
     /**
-     * Scope to filter active payments (not canceled).
+     * @return BelongsTo<ReceivablePayment, $this>
      */
-    public function scopeActive(Builder $query): Builder
+    public function receivablePayment(): BelongsTo
     {
-        return $query->where('is_canceled', false);
+        return $this->belongsTo(ReceivablePayment::class, 'receivable_payment_id');
     }
 
     /**

@@ -89,7 +89,7 @@
             <h3 class="form-section-title">{{ __('txn.invoice_summary') }}</h3>
             <p class="form-section-note">{{ __('txn.invoice_summary_note') }}</p>
             <div class="row">
-                <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $invoice->customer->name }}</div></div>
+                <div class="col-4"><strong>{{ __('ui.customer_name') }}</strong><div>{{ $invoice->customer->name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.city') }}</strong><div>{{ $invoice->customer->city }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $invoice->customer->phone ?: '-' }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.invoice_date') }}</strong><div>{{ $invoice->invoice_date->format('d-m-Y') }}</div></div>

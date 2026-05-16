@@ -68,7 +68,7 @@ class CustomerLevelPageController extends Controller
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         $data = $request->validate([
-            'code' => FluentRule::string()->required()->max(30)->unique('customer_levels', 'code', fn ($rule) => $rule->ignore($ignoreId))->unique('customer_levels', 'name', fn ($rule) => $rule->ignore($ignoreId)),
+            'code' => FluentRule::string()->required()->max(30)->unique('customer_levels', 'code', fn ($rule) => $rule->ignore($ignoreId)),
             'description' => FluentRule::string()->nullable(),
         ]);
 

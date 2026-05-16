@@ -43,16 +43,35 @@ class SchoolBulkTransactionPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
         $customerId = $request->integer('customer_id');
+        $allowedSorts = ['date', 'customer'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '') : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $transactions = SchoolBulkTransaction::query()
-            ->select([
-                'id',
-                'transaction_number',
-                'transaction_date',
-                'customer_id',
-                'semester_period',
-                'total_locations',
-            ])
+            ->when($sort === 'customer', function ($query) use ($direction): void {
+                $query->leftJoin('customers', 'school_bulk_transactions.customer_id', '=', 'customers.id')
+                    ->select([
+                        'school_bulk_transactions.id',
+                        'school_bulk_transactions.transaction_number',
+                        'school_bulk_transactions.transaction_date',
+                        'school_bulk_transactions.customer_id',
+                        'school_bulk_transactions.semester_period',
+                        'school_bulk_transactions.total_locations',
+                    ])
+                    ->orderBy('customers.name', $direction)
+                    ->orderByDesc('school_bulk_transactions.id');
+            }, function ($query) use ($sort, $direction): void {
+                $query->select([
+                    'id', 'transaction_number', 'transaction_date',
+                    'customer_id', 'semester_period', 'total_locations',
+                ]);
+                if ($sort === 'date') {
+                    $query->orderBy('transaction_date', $direction)->orderByDesc('id');
+                } else {
+                    $query->orderByDesc('transaction_date')->orderByDesc('id');
+                }
+            })
             ->with('customer:id,name,city')
             ->withCount([
                 'generatedDeliveryNotes as generated_delivery_notes_count' => fn (Builder $query) => $query
@@ -62,10 +81,8 @@ class SchoolBulkTransactionPageController extends Controller
                     ->whereNotNull('school_bulk_location_id'),
                 'generatedInvoices as generated_invoice_documents_count' => fn (Builder $query) => $query->withTrashed(),
             ])
-            ->when($customerId > 0, fn (Builder $query) => $query->where('customer_id', $customerId))
+            ->when($customerId > 0, fn (Builder $query) => $query->where('school_bulk_transactions.customer_id', $customerId))
             ->searchKeyword($search)
-            ->orderByDesc('transaction_date')
-            ->orderByDesc('id')
             ->paginate((int) config('pagination.default_per_page', 20))
             ->withQueryString();
 
@@ -80,6 +97,8 @@ class SchoolBulkTransactionPageController extends Controller
             'customers' => $customers,
             'search' => $search,
             'selectedCustomerId' => $customerId > 0 ? $customerId : null,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 

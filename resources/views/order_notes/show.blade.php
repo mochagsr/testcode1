@@ -220,7 +220,7 @@
             <p class="form-section-note">{{ __('txn.order_summary_note') }}</p>
             <div class="row">
                 <div class="col-4"><strong>{{ __('txn.date') }}</strong><div>{{ $note->note_date->format('d-m-Y') }}</div></div>
-                <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $note->customer_name }}</div></div>
+                <div class="col-4"><strong>{{ __('ui.customer_name') }}</strong><div>{{ $note->customer_name }}</div></div>
                 <div class="col-4"><strong>{{ __('txn.phone') }}</strong><div>{{ $note->customer_phone ?: '-' }}</div></div>
                 @php
                     $progressLabel = rtrim(rtrim(number_format((float) ($noteProgress['progress_percent'] ?? 0), 2, '.', ''), '0'), '.');

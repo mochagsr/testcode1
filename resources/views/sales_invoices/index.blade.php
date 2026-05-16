@@ -86,7 +86,7 @@
             <tr>
                 <th>{{ __('txn.invoice') }}</th>
                 <th>{{ __('txn.date') }}</th>
-                <th>{{ __('txn.customer') }}</th>
+                <th>{{ __('ui.customer_name') }}</th>
                 <th>{{ __('txn.total') }}</th>
                 <th>{{ __('txn.action') }}</th>
             </tr>
@@ -122,7 +122,7 @@
                         </div>
                     </td>
                     <td data-label="{{ __('txn.date') }}">{{ $invoice->invoice_date->format('d-m-Y') }}</td>
-                    <td data-label="{{ __('txn.customer') }}">
+                    <td data-label="{{ __('ui.customer_name') }}">
                         {{ $invoice->customer->name }} <span class="muted">({{ $invoice->customer->city }})</span>
                     </td>
                     <td data-label="{{ __('txn.total') }}">Rp {{ number_format((int) round($invoice->total), 0, ',', '.') }}</td>

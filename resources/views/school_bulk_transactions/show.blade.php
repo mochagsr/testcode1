@@ -37,7 +37,7 @@
             <div class="col-4"><strong>{{ __('school_bulk.transaction_number') }}</strong><div>{{ $transaction->transaction_number }}</div></div>
             <div class="col-4"><strong>{{ __('txn.date') }}</strong><div>{{ optional($transaction->transaction_date)->format('d-m-Y') ?: '-' }}</div></div>
             <div class="col-4"><strong>{{ __('txn.semester_period') }}</strong><div>{{ $transaction->semester_period ?: '-' }}</div></div>
-            <div class="col-4"><strong>{{ __('txn.customer') }}</strong><div>{{ $transaction->customer?->name ?: '-' }}</div></div>
+            <div class="col-4"><strong>{{ __('ui.customer_name') }}</strong><div>{{ $transaction->customer?->name ?: '-' }}</div></div>
             <div class="col-4"><strong>{{ __('school_bulk.total_schools') }}</strong><div>{{ (int) $transaction->locations->count() }}</div></div>
             <div class="col-4"><strong>{{ __('school_bulk.total_items') }}</strong><div>{{ (int) $transaction->items->count() }}</div></div>
             <div class="col-12"><strong>{{ __('txn.notes') }}</strong><div>{{ $transaction->notes ?: '-' }}</div></div>

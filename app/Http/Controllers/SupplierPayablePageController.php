@@ -66,6 +66,7 @@ class SupplierPayablePageController extends Controller
             'mutationBalance' => $pageData['mutationBalance'],
             'finalOutstanding' => $pageData['finalOutstanding'],
             'selectedSupplierMonthClosed' => $pageData['selectedSupplierMonthClosed'],
+            'direction' => $pageData['direction'],
         ]);
     }
 
@@ -118,7 +119,7 @@ class SupplierPayablePageController extends Controller
             $supplier = Supplier::query()->lockForUpdate()->findOrFail((int) $data['supplier_id']);
             $amount = (int) $data['amount'];
             $beforeOutstanding = (int) $supplier->outstanding_payable;
-            if ($amount > $beforeOutstanding && $beforeOutstanding > 0) {
+            if ($amount > $beforeOutstanding) {
                 throw ValidationException::withMessages([
                     'amount' => __('supplier_payable.amount_exceeds_outstanding'),
                 ]);
@@ -681,11 +682,12 @@ class SupplierPayablePageController extends Controller
         $selectedMonth = $this->normalizeMonth((string) $request->string('month', ''));
         $supplierId = $request->integer('supplier_id');
         $selectedSupplierId = $supplierId > 0 ? $supplierId : null;
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $suppliers = Supplier::query()
             ->onlyListColumns()
             ->searchKeyword($search)
-            ->orderBy('name')
+            ->orderBy('name', $direction)
             ->paginate(20)
             ->withQueryString();
 
@@ -782,6 +784,7 @@ class SupplierPayablePageController extends Controller
             'mutationBalance',
             'finalOutstanding',
             'selectedSupplierMonthClosed',
+            'direction',
         );
     }
 

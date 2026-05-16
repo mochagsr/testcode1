@@ -47,6 +47,25 @@ class DashboardOpsTest extends TestCase
         $this->assertLessThan($uncollectedReceivablePosition, $pendingOrderPosition);
     }
 
+    public function test_user_dashboard_hides_admin_summary_and_quick_actions(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertDontSee(__('ui.dashboard_total_products'));
+        $response->assertDontSee(__('ui.dashboard_total_customers'));
+        $response->assertDontSee(__('ui.dashboard_total_supplier_payable'));
+        $response->assertDontSee(__('ui.dashboard_invoice_this_month'));
+        $response->assertDontSee(__('ui.dashboard_quick_actions'));
+        $response->assertDontSee(__('ui.dashboard_quick_receivable_global'));
+        $response->assertDontSee(__('ui.dashboard_quick_receivable_semester'));
+        $response->assertDontSee(__('ui.dashboard_quick_supplier_payable'));
+        $response->assertDontSee(__('ui.dashboard_quick_audit'));
+        $response->assertDontSee(__('ui.dashboard_quick_reports'));
+    }
+
     public function test_audit_log_page_shows_extended_module_filters(): void
     {
         $user = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);

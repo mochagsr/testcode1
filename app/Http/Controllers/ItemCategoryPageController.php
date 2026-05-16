@@ -17,16 +17,26 @@ class ItemCategoryPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
 
+        $allowedSorts = ['code', 'name'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
         $categories = ItemCategory::query()
             ->onlyListColumns()
             ->searchKeyword($search)
-            ->orderBy('code')
+            ->when($sort === 'code', fn ($q) => $q->orderBy('code', $direction)->orderBy('id', 'desc'))
+            ->when($sort === 'name', fn ($q) => $q->orderBy('name', $direction)->orderBy('id', 'desc'))
+            ->when($sort === '', fn ($q) => $q->orderBy('code')->orderBy('id', 'desc'))
             ->paginate(25)
             ->withQueryString();
 
         return view('item_categories.index', [
             'categories' => $categories,
             'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 

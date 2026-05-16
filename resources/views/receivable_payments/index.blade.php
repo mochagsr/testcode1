@@ -28,7 +28,7 @@
             <tr>
                 <th>{{ __('txn.no') }}</th>
                 <th>{{ __('txn.date') }}</th>
-                <th>{{ __('receivable.customer') }}</th>
+                <th>{{ __('ui.customer_name') }}</th>
                 <th>{{ __('receivable.amount_paid') }}</th>
                 <th>{{ __('txn.status') }}</th>
                 <th>{{ __('receivable.action') }}</th>

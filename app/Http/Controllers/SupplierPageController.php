@@ -27,16 +27,26 @@ class SupplierPageController extends Controller
     {
         $search = trim((string) $request->string('search', ''));
 
+        $allowedSorts = ['name', 'company_name'];
+        $sort = in_array((string) $request->string('sort', ''), $allowedSorts, true)
+            ? (string) $request->string('sort', '')
+            : '';
+        $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
         $suppliers = Supplier::query()
             ->onlyListColumns()
             ->searchKeyword($search)
-            ->orderBy('name')
+            ->when($sort === 'name', fn ($q) => $q->orderBy('name', $direction)->orderBy('id', 'desc'))
+            ->when($sort === 'company_name', fn ($q) => $q->orderBy('company_name', $direction)->orderBy('id', 'desc'))
+            ->when($sort === '', fn ($q) => $q->orderBy('name')->orderBy('id', 'desc'))
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
         return view('suppliers.index', [
             'suppliers' => $suppliers,
             'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -129,7 +139,12 @@ class SupplierPageController extends Controller
     public function destroy(Request $request, Supplier $supplier): RedirectResponse
     {
         $name = (string) $supplier->name;
-        $supplier->delete();
+
+        try {
+            $supplier->delete();
+        } catch (\Illuminate\Database\QueryException) {
+            return back()->with('error', __('ui.cannot_delete_supplier_has_transactions'));
+        }
 
         $this->auditLogService->log(
             'master.supplier.delete',
