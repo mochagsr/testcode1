@@ -79,7 +79,16 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-12">
+                    <div class="col-4">
+                        <label>{{ __('ui.product_type_label') }} <span class="label-required">*</span></label>
+                        @php $resolvedProductType = old('product_type', $product?->product_type ?? 'general'); @endphp
+                        <select name="product_type" required>
+                            @foreach(($productTypeOptions ?? []) as $typeKey => $typeLabel)
+                                <option value="{{ $typeKey }}" @selected($resolvedProductType === $typeKey)>{{ $typeLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-8">
                         <label>{{ __('ui.name') }} <span class="label-required">*</span></label>
                         <input id="product-name" type="text" name="name" value="{{ old('name', $product?->name) }}" required>
                     </div>

@@ -27,6 +27,7 @@ class Product extends Model
         'price_sales',
         'price_general',
         'is_active',
+        'product_type',
     ];
 
     /**
@@ -110,6 +111,7 @@ class Product extends Model
             'price_sales',
             'price_general',
             'is_active',
+            'product_type',
         ]);
     }
 
@@ -237,22 +239,18 @@ class Product extends Model
      */
     public function scopeSupplierSourced(Builder $query): Builder
     {
-        return $query->whereHas('outgoingTransactionItems', function (Builder $itemQuery): void {
-            $itemQuery->whereHas('outgoingTransaction');
-        });
+        return $query->where('product_type', 'raw_material');
     }
 
     /**
-     * Scope: Products that are not tied to any active supplier receipt.
+     * Scope: Products that are not raw materials.
      *
      * @param  Builder<Product>  $query
      * @return Builder<Product>
      */
     public function scopeGeneralStock(Builder $query): Builder
     {
-        return $query->whereDoesntHave('outgoingTransactionItems', function (Builder $itemQuery): void {
-            $itemQuery->whereHas('outgoingTransaction');
-        });
+        return $query->where('product_type', 'general');
     }
 
     /**

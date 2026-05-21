@@ -334,6 +334,7 @@ class ProductPageController extends Controller
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
             'unitOptions' => $this->configuredProductUnitOptions(),
             'defaultUnit' => $this->defaultProductUnitCode(),
+            'productTypeOptions' => $this->productTypeOptions(),
         ]);
     }
 
@@ -390,6 +391,7 @@ class ProductPageController extends Controller
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
             'unitOptions' => $this->configuredProductUnitOptions(),
             'defaultUnit' => $this->defaultProductUnitCode(),
+            'productTypeOptions' => $this->productTypeOptions(),
             'stockMutations' => $stockMutations,
             'mutationReferenceMap' => $mutationReferenceMap,
         ]);
@@ -603,6 +605,7 @@ class ProductPageController extends Controller
             'code' => FluentRule::string()->nullable()->max(60)->unique('products', 'code', fn ($rule) => $rule->ignore($ignoreId)),
             'name' => FluentRule::string()->required()->max(200),
             'unit' => FluentRule::string()->required()->max(30),
+            'product_type' => FluentRule::string()->required()->in(['general', 'raw_material']),
             'stock' => FluentRule::integer()->required()->min(0),
             'price_agent' => FluentRule::numeric()->required()->min(0),
             'price_sales' => FluentRule::numeric()->required()->min(0),
