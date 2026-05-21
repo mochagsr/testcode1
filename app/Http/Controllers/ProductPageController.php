@@ -608,9 +608,9 @@ class ProductPageController extends Controller
             'unit' => FluentRule::string()->required()->max(30),
             'product_type' => FluentRule::string()->required()->in(['general', 'raw_material']),
             'stock' => FluentRule::integer()->required()->min(0),
-            'price_agent' => FluentRule::numeric()->required()->min(0),
-            'price_sales' => FluentRule::numeric()->required()->min(0),
-            'price_general' => FluentRule::numeric()->required()->min(0),
+            'price_agent' => $request->input('product_type') === 'raw_material' ? FluentRule::numeric()->nullable()->min(0) : FluentRule::numeric()->required()->min(0),
+            'price_sales' => $request->input('product_type') === 'raw_material' ? FluentRule::numeric()->nullable()->min(0) : FluentRule::numeric()->required()->min(0),
+            'price_general' => $request->input('product_type') === 'raw_material' ? FluentRule::numeric()->nullable()->min(0) : FluentRule::numeric()->required()->min(0),
         ], [
             'code.unique' => __('ui.product_code_unique_error'),
         ]);

@@ -82,7 +82,7 @@
                     <div class="col-4">
                         <label>{{ __('ui.product_type_label') }} <span class="label-required">*</span></label>
                         @php $resolvedProductType = old('product_type', $product?->product_type ?? 'general'); @endphp
-                        <select name="product_type" required>
+                        <select id="product-type" name="product_type" required>
                             @foreach(($productTypeOptions ?? []) as $typeKey => $typeLabel)
                                 <option value="{{ $typeKey }}" @selected($resolvedProductType === $typeKey)>{{ $typeLabel }}</option>
                             @endforeach
@@ -108,22 +108,22 @@
                         <input id="product-stock" type="hidden" name="stock" value="{{ $stockValue !== null ? (int) round((float) $stockValue) : '' }}" required>
                     </div>
                     <div class="col-4">
-                        <label>{{ __('ui.price_agent') }} <span class="label-required">*</span></label>
+                        <label>{{ __('ui.price_agent') }} <span class="label-required js-price-required">*</span></label>
                         @php $priceAgentValue = old('price_agent', $product?->price_agent ?? 0); @endphp
                         <input id="product-price-agent-display" type="text" inputmode="numeric" value="{{ $priceAgentValue !== null ? number_format((int) round((float) $priceAgentValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
-                        <input id="product-price-agent" type="hidden" name="price_agent" value="{{ $priceAgentValue !== null ? (int) round((float) $priceAgentValue) : '' }}" required>
+                        <input id="product-price-agent" type="hidden" name="price_agent" value="{{ $priceAgentValue !== null ? (int) round((float) $priceAgentValue) : '' }}">
                     </div>
                     <div class="col-4">
-                        <label>{{ __('ui.price_sales') }} <span class="label-required">*</span></label>
+                        <label>{{ __('ui.price_sales') }} <span class="label-required js-price-required">*</span></label>
                         @php $priceSalesValue = old('price_sales', $product?->price_sales ?? 0); @endphp
                         <input id="product-price-sales-display" type="text" inputmode="numeric" value="{{ $priceSalesValue !== null ? number_format((int) round((float) $priceSalesValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
-                        <input id="product-price-sales" type="hidden" name="price_sales" value="{{ $priceSalesValue !== null ? (int) round((float) $priceSalesValue) : '' }}" required>
+                        <input id="product-price-sales" type="hidden" name="price_sales" value="{{ $priceSalesValue !== null ? (int) round((float) $priceSalesValue) : '' }}">
                     </div>
                     <div class="col-4">
-                        <label>{{ __('ui.price_general') }} <span class="label-required">*</span></label>
+                        <label>{{ __('ui.price_general') }} <span class="label-required js-price-required">*</span></label>
                         @php $priceGeneralValue = old('price_general', $product?->price_general ?? 0); @endphp
                         <input id="product-price-general-display" type="text" inputmode="numeric" value="{{ $priceGeneralValue !== null ? number_format((int) round((float) $priceGeneralValue), 0, ',', '.') : '' }}" placeholder="0" style="max-width: 140px;" required>
-                        <input id="product-price-general" type="hidden" name="price_general" value="{{ $priceGeneralValue !== null ? (int) round((float) $priceGeneralValue) : '' }}" required>
+                        <input id="product-price-general" type="hidden" name="price_general" value="{{ $priceGeneralValue !== null ? (int) round((float) $priceGeneralValue) : '' }}">
                     </div>
                 </div>
             </div>
@@ -608,6 +608,34 @@
 
         renderCategoryOptions(categorySearchInput.value);
         currencyMappings.forEach(bindCurrencyInput);
+
+        const productTypeSelect = document.getElementById('product-type');
+        const priceDisplayInputs = [
+            document.getElementById('product-price-agent-display'),
+            document.getElementById('product-price-sales-display'),
+            document.getElementById('product-price-general-display'),
+        ];
+        const priceRequiredSpans = Array.from(document.querySelectorAll('.js-price-required'));
+
+        function syncPriceRequired() {
+            const isRawMaterial = (productTypeSelect?.value || '') === 'raw_material';
+            priceDisplayInputs.forEach((input) => {
+                if (!input) return;
+                if (isRawMaterial) {
+                    input.removeAttribute('required');
+                } else {
+                    input.setAttribute('required', '');
+                }
+            });
+            priceRequiredSpans.forEach((span) => {
+                span.style.display = isRawMaterial ? 'none' : '';
+            });
+        }
+
+        if (productTypeSelect) {
+            productTypeSelect.addEventListener('change', syncPriceRequired);
+        }
+        syncPriceRequired();
 
         if (form) {
             form.addEventListener('submit', function (event) {
