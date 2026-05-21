@@ -180,6 +180,8 @@ return [
     'order_note_pick_customer_first' => 'Pilih customer terlebih dulu untuk melihat surat pesanan.',
     'order_note_auto_fill_hint' => 'Pilih surat pesanan untuk mengisi item otomatis.',
     'no_order_note_available' => 'Customer ini tidak memiliki surat pesanan terbuka.',
+    'order_note_suggest_title' => 'Surat Pesanan Ditemukan',
+    'order_note_suggest_message' => 'Barang "__PRODUCT__" ada di Surat Pesanan __NOTE_NUMBER__ (__NOTE_DATE__). Hubungkan surat jalan ini ke surat pesanan tersebut?',
     'order_note_customer_mismatch' => 'Surat pesanan tidak sesuai dengan customer transaksi ini.',
     'order_note_unavailable' => 'Surat pesanan tidak bisa dipakai (sudah dibatalkan).',
     'order_note_item_invalid' => 'Item surat pesanan tidak valid untuk transaksi ini.',

@@ -501,6 +501,46 @@
             input?.classList.toggle('input-inline-error', hasMessage);
         }
 
+        const ORDER_NOTE_SUGGEST_TITLE = @json(__('txn.order_note_suggest_title'));
+        const ORDER_NOTE_SUGGEST_MESSAGE = @json(__('txn.order_note_suggest_message'));
+
+        function findOrderNotesForProduct(productId) {
+            const results = [];
+            for (const [, note] of orderNoteById) {
+                if (!Array.isArray(note.items)) continue;
+                const item = note.items.find(
+                    (it) => Number(it.product_id || 0) === Number(productId) && Number(it.remaining_qty || 0) > 0
+                );
+                if (item) results.push({ note, item });
+            }
+            return results;
+        }
+
+        function suggestOrderNoteForProduct(productId, row) {
+            if (!orderNoteField || String(orderNoteField.value || '') !== '') return;
+            const matches = findOrderNotesForProduct(productId);
+            if (matches.length === 0) return;
+            const { note, item } = matches[0];
+            const productName = String(item.product_name || '').trim();
+            const rawDate = String(note.note_date || '');
+            const noteDate = rawDate
+                ? new Date(rawDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : '-';
+            const message = ORDER_NOTE_SUGGEST_MESSAGE
+                .replace('__PRODUCT__', productName)
+                .replace('__NOTE_NUMBER__', String(note.note_number || ''))
+                .replace('__NOTE_DATE__', noteDate);
+            window.PgposDialog.showConfirm(message, () => {
+                orderNoteField.value = String(note.id || '');
+                updateOrderNoteInfoSelection(note);
+                const orderNoteItemField = row.querySelector('input[name*="order_note_item_id"]');
+                if (orderNoteItemField && item.id) {
+                    orderNoteItemField.value = String(item.id);
+                }
+                renderOrderNoteOptions(String(note.id || ''));
+            }, ORDER_NOTE_SUGGEST_TITLE);
+        }
+
         function applyCustomerFields(customer) {
             currentCustomer = customer || null;
             customerIdField.value = customer ? customer.id : '';
@@ -948,6 +988,7 @@
                 tr.querySelector('.product-search').value = productLabel(product);
                 setRowUnit(tr, product.unit || '');
                 setProductFieldError(tr, '');
+                suggestOrderNoteForProduct(product.id, tr);
             });
             tr.querySelector('.product-search').addEventListener('blur', async (event) => {
                 const value = String(event.currentTarget.value || '').trim();
@@ -963,6 +1004,7 @@
                     tr.querySelector('.product-search').value = productLabel(product);
                     setRowUnit(tr, product.unit || tr.querySelector('.unit')?.value || '');
                     setProductFieldError(tr, '');
+                    suggestOrderNoteForProduct(product.id, tr);
                 } else {
                     setProductFieldError(tr, @json(__('txn.product_not_registered')));
                 }

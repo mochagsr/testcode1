@@ -180,6 +180,8 @@ return [
     'order_note_pick_customer_first' => 'Select a customer first to view available order notes.',
     'order_note_auto_fill_hint' => 'Select an order note to auto-fill items.',
     'no_order_note_available' => 'This customer has no open order notes.',
+    'order_note_suggest_title' => 'Order Note Found',
+    'order_note_suggest_message' => 'Item "__PRODUCT__" is in Order Note __NOTE_NUMBER__ (__NOTE_DATE__). Link this delivery note to that order note?',
     'order_note_customer_mismatch' => 'The selected order note does not match this transaction customer.',
     'order_note_unavailable' => 'The selected order note is unavailable (already canceled).',
     'order_note_item_invalid' => 'The selected order note item is invalid for this transaction.',
