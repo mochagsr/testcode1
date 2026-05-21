@@ -67,7 +67,8 @@ class ProductPageController extends Controller
                     ->select([
                         'products.id', 'products.item_category_id', 'products.code',
                         'products.name', 'products.unit', 'products.stock',
-                        'products.price_agent', 'products.price_sales', 'products.price_general', 'products.is_active',
+                        'products.price_agent', 'products.price_sales', 'products.price_general',
+                        'products.is_active', 'products.product_type',
                     ])
                     ->orderBy('item_categories.name', $direction)
                     ->orderBy('products.id', 'desc');
