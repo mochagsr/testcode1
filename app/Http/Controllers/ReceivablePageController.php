@@ -1698,6 +1698,7 @@ class ReceivablePageController extends Controller
             $allCustomerSemesters = ReceivableLedger::query()
                 ->forCustomer($customerId)
                 ->whereNotNull('semester_period')
+                ->select('semester_period')
                 ->distinct()
                 ->pluck('semester_period')
                 ->map(fn (mixed $s): string => (string) $s)
