@@ -251,6 +251,17 @@ final class DataArchiveRegistry
                     ['table' => 'school_bulk_transaction_items', 'foreign_key' => 'school_bulk_transaction_id'],
                 ],
             ],
+            'stock_mutations' => [
+                'label' => 'Mutasi Stok',
+                'basis' => 'year',
+                'scope_modes' => ['year', 'semester'],
+                'purge_allowed' => true,
+                'purge_mode' => 'standard',
+                'financial' => false,
+                'tables' => [
+                    ['table' => 'stock_mutations', 'date_column' => 'created_at'],
+                ],
+            ],
         ];
     }
 

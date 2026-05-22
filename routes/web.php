@@ -363,5 +363,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::post('/archive-data/prepare-financial', [ArchiveDataPageController::class, 'prepareFinancial'])->middleware('perm:settings.admin')->name('archive-data.prepare-financial');
     Route::post('/archive-data/check-financial', [ArchiveDataPageController::class, 'checkFinancial'])->middleware('perm:settings.admin')->name('archive-data.check-financial');
     Route::post('/archive-data/purge', [ArchiveDataPageController::class, 'purge'])->middleware('perm:settings.admin')->name('archive-data.purge');
+    Route::post('/archive-data/quick-scan', [ArchiveDataPageController::class, 'quickScan'])->middleware('perm:settings.admin')->name('archive-data.quick-scan');
+    Route::post('/archive-data/quick-export', [ArchiveDataPageController::class, 'quickExport'])->middleware('perm:settings.admin')->name('archive-data.quick-export');
+    Route::post('/archive-data/quick-snapshot', [ArchiveDataPageController::class, 'quickSnapshot'])->middleware('perm:settings.admin')->name('archive-data.quick-snapshot');
+    Route::post('/archive-data/quick-purge', [ArchiveDataPageController::class, 'quickPurge'])->middleware('perm:settings.admin')->name('archive-data.quick-purge');
     Route::get('/about', [AboutPageController::class, 'index'])->name('about.index');
 });

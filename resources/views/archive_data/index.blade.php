@@ -247,6 +247,161 @@
             </div>
         @endif
 
+        @php
+            $quickScanResult    = session('quick_scan_result');
+            $quickExportResult  = session('quick_export_result');
+            $quickSnapshotResult = session('quick_snapshot_result');
+            $quickPurgeResult   = session('quick_purge_result');
+        @endphp
+
+        @if (session('quick_success'))
+            <div class="archive-col-12 archive-flash success">{{ session('quick_success') }}</div>
+        @endif
+        @if (session('quick_error'))
+            <div class="archive-col-12 archive-flash error">{{ session('quick_error') }}</div>
+        @endif
+
+        @if (!empty($semesterOptions))
+            <div class="archive-col-12" style="background:color-mix(in srgb,#fff8e1 88%,var(--card));border:1px solid #f0c040;border-radius:10px;padding:12px 14px;font-size:13px;">
+                <strong>Pengingat:</strong> Ada {{ count($semesterOptions) }} semester yang sudah ditutup.
+                Gunakan <strong>Mode Mudah</strong> di bawah untuk mengarsipkan data lama secara berkala.
+            </div>
+        @endif
+
+        {{-- ===== MODE MUDAH ===== --}}
+        <div class="card archive-col-12">
+            <h2 style="margin:0 0 4px;font-size:18px;">Arsipkan Semester — Mode Mudah</h2>
+            <p class="archive-muted" style="margin:0 0 16px;">
+                Pilih semester lalu ikuti 4 langkah. Semua dataset bisnis diproses sekaligus — tidak perlu pilih satu-satu.
+            </p>
+
+            <form id="quick-archive-form" method="post">
+                @csrf
+                <input type="hidden" name="confirm_purge" id="quick-confirm-purge" value="0">
+
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+                    <label style="font-weight:600;white-space:nowrap;">Semester target:</label>
+                    @if (empty($semesterOptions))
+                        <span class="archive-muted">Belum ada semester yang ditutup. Tutup semester dulu di menu Pengaturan.</span>
+                    @else
+                        <select name="quick_semester" style="min-width:160px;">
+                            @foreach ($semesterOptions as $opt)
+                                <option value="{{ $opt }}" @selected(old('quick_semester', $semesterOptions[0] ?? '') === $opt)>{{ $opt }}</option>
+                            @endforeach
+                        </select>
+                    @endif
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+
+                    {{-- Langkah 1 --}}
+                    <div class="archive-step-box">
+                        <h4>① Cek Data</h4>
+                        <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                            Hitung berapa baris data yang ada di semester ini sebelum dihapus.
+                        </p>
+                        @if ($quickScanResult)
+                            <div style="font-size:13px;margin-bottom:10px;">
+                                <strong>{{ number_format((int) ($quickScanResult['grand_total'] ?? 0), 0, ',', '.') }} baris</strong>
+                                dari {{ count($quickScanResult['datasets'] ?? []) }} dataset.
+                                @foreach ($quickScanResult['datasets'] ?? [] as $dsKey => $ds)
+                                    @if ((int)($ds['total_rows'] ?? 0) > 0)
+                                        <br><span class="archive-muted" style="font-size:11px;">
+                                            {{ $ds['label'] ?? $dsKey }}: {{ number_format((int)$ds['total_rows'], 0, ',', '.') }}
+                                        </span>
+                                    @endif
+                                @endforeach
+                            </div>
+                        @endif
+                        <button type="submit" class="btn secondary"
+                            formaction="{{ route('archive-data.quick-scan') }}"
+                            {{ empty($semesterOptions) ? 'disabled' : '' }}>
+                            Cek Semua Data
+                        </button>
+                    </div>
+
+                    {{-- Langkah 2 --}}
+                    <div class="archive-step-box">
+                        <h4>② Buat File Arsip</h4>
+                        <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                            Simpan semua data ke file SQL sebagai cadangan sebelum dihapus.
+                        </p>
+                        @if ($quickExportResult)
+                            @php
+                                $qSqlEnc = !empty($quickExportResult['sql_file'])
+                                    ? rtrim(strtr(base64_encode((string)$quickExportResult['sql_file']), '+/', '-_'), '=')
+                                    : null;
+                                $qManEnc = !empty($quickExportResult['manifest_file'])
+                                    ? rtrim(strtr(base64_encode((string)$quickExportResult['manifest_file']), '+/', '-_'), '=')
+                                    : null;
+                            @endphp
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+                                @if ($qSqlEnc)
+                                    <a href="{{ route('archive-data.download', ['file' => $qSqlEnc]) }}"
+                                       class="btn secondary" style="font-size:12px;">Unduh SQL</a>
+                                @endif
+                                @if ($qManEnc)
+                                    <a href="{{ route('archive-data.download', ['file' => $qManEnc]) }}"
+                                       class="btn secondary" style="font-size:12px;">Unduh Manifest</a>
+                                @endif
+                            </div>
+                        @endif
+                        <button type="submit" class="btn secondary"
+                            formaction="{{ route('archive-data.quick-export') }}"
+                            {{ empty($semesterOptions) ? 'disabled' : '' }}>
+                            Buat File Arsip
+                        </button>
+                    </div>
+
+                    {{-- Langkah 3 --}}
+                    <div class="archive-step-box">
+                        <h4>③ Snapshot Finansial</h4>
+                        <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                            Simpan ringkasan saldo piutang dan hutang sebelum data dihapus.
+                        </p>
+                        @if ($quickSnapshotResult)
+                            <div style="font-size:13px;margin-bottom:10px;color:#0f6b2f;">✓ Snapshot tersimpan</div>
+                        @endif
+                        <button type="submit" class="btn secondary"
+                            formaction="{{ route('archive-data.quick-snapshot') }}"
+                            {{ empty($semesterOptions) ? 'disabled' : '' }}>
+                            Buat Snapshot
+                        </button>
+                    </div>
+
+                    {{-- Langkah 4 --}}
+                    <div class="archive-step-box">
+                        <h4>④ Hapus Data</h4>
+                        <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                            Simulasi dulu. Kalau sudah yakin, klik Hapus Permanen.
+                        </p>
+                        @if ($quickPurgeResult)
+                            <div style="font-size:13px;margin-bottom:10px;">
+                                <strong>{{ number_format((int)($quickPurgeResult['total'] ?? 0), 0, ',', '.') }} baris</strong>
+                                {{ (int)($quickPurgeResult['total'] ?? 0) > 0 ? 'berhasil dihapus' : 'akan dihapus (simulasi)' }}.
+                            </div>
+                        @endif
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button type="submit" class="btn secondary"
+                                formaction="{{ route('archive-data.quick-purge') }}"
+                                onclick="document.getElementById('quick-confirm-purge').value='0';"
+                                {{ empty($semesterOptions) ? 'disabled' : '' }}>
+                                Simulasi
+                            </button>
+                            <button type="submit" class="btn danger"
+                                formaction="{{ route('archive-data.quick-purge') }}"
+                                onclick="if(!confirm('Yakin hapus semua data semester ini? Pastikan file arsip sudah diunduh dan disimpan.')){return false;} document.getElementById('quick-confirm-purge').value='1';"
+                                {{ empty($semesterOptions) ? 'disabled' : '' }}>
+                                Hapus Permanen
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+        {{-- ===== AKHIR MODE MUDAH ===== --}}
+
         <div class="card archive-col-6">
             <h3 style="margin-top:0;">Status Backup dan Pemeriksaan</h3>
             <p class="archive-muted" style="margin:0 0 12px;">

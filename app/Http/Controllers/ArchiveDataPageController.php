@@ -334,6 +334,137 @@ class ArchiveDataPageController extends Controller
                 : 'Simulasi hapus selesai. Belum ada data yang dihapus.');
     }
 
+    public function quickScan(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        [$scope, $standardDatasets, $financialDatasets] = $this->quickValidatedInput($request, $archiveService);
+
+        try {
+            $result = $archiveService->scanByScope($scope, array_merge($standardDatasets, $financialDatasets), true);
+        } catch (\Throwable $e) {
+            return back()->withInput($request->all())->with('quick_error', $e->getMessage());
+        }
+
+        $total = number_format((int) ($result['grand_total'] ?? 0), 0, ',', '.');
+
+        return back()
+            ->withInput($request->all())
+            ->with('quick_scan_result', $result)
+            ->with('quick_success', "Scan selesai: {$total} baris data ditemukan untuk semester ini.");
+    }
+
+    public function quickExport(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        [$scope, $standardDatasets, $financialDatasets] = $this->quickValidatedInput($request, $archiveService);
+
+        try {
+            $result = $archiveService->exportByScope($scope, array_merge($standardDatasets, $financialDatasets));
+        } catch (\Throwable $e) {
+            return back()->withInput($request->all())->with('quick_error', $e->getMessage());
+        }
+
+        return back()
+            ->withInput($request->all())
+            ->with('quick_export_result', $result)
+            ->with('quick_success', 'File arsip berhasil dibuat. Unduh dan simpan file-nya.');
+    }
+
+    public function quickSnapshot(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        [$scope, , $financialDatasets] = $this->quickValidatedInput($request, $archiveService);
+
+        if ($financialDatasets === []) {
+            return back()->withInput($request->all())->with('quick_success', 'Tidak ada dataset finansial, snapshot tidak diperlukan.');
+        }
+
+        try {
+            $result = $archiveService->prepareFinancialSnapshotByScope($scope, $financialDatasets, null, false);
+        } catch (\Throwable $e) {
+            return back()->withInput($request->all())->with('quick_error', $e->getMessage());
+        }
+
+        return back()
+            ->withInput($request->all())
+            ->with('quick_snapshot_result', $result)
+            ->with('quick_success', 'Snapshot finansial berhasil dibuat.');
+    }
+
+    public function quickPurge(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        [$scope, $standardDatasets, $financialDatasets] = $this->quickValidatedInput($request, $archiveService);
+        $confirm = $request->boolean('confirm_purge');
+        $allowSkipped = $request->boolean('allow_skipped_restore');
+
+        $allDeleted = [];
+        $errors = [];
+
+        if ($standardDatasets !== []) {
+            try {
+                $stdResult = $archiveService->purgeByScope($scope, $standardDatasets, $confirm, null, $allowSkipped);
+                $allDeleted = array_merge($allDeleted, (array) ($stdResult['deleted'] ?? []));
+            } catch (\Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+
+        if ($financialDatasets !== [] && $errors === []) {
+            try {
+                $finResult = $archiveService->purgeByScope($scope, $financialDatasets, $confirm, null, $allowSkipped);
+                $allDeleted = array_merge($allDeleted, (array) ($finResult['deleted'] ?? []));
+            } catch (\Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+
+        if ($errors !== []) {
+            return back()->withInput($request->all())->with('quick_error', implode(' — ', $errors));
+        }
+
+        $totalDeleted = array_sum($allDeleted);
+        $totalFormatted = number_format($totalDeleted, 0, ',', '.');
+
+        return back()
+            ->withInput($request->all())
+            ->with('quick_purge_result', ['deleted' => $allDeleted, 'total' => $totalDeleted])
+            ->with('quick_success', $confirm
+                ? "Selesai. {$totalFormatted} baris data semester ini berhasil dihapus."
+                : "Simulasi selesai: {$totalFormatted} baris akan dihapus. Belum ada yang dihapus.");
+    }
+
+    /**
+     * @return array{
+     *   0: array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string},
+     *   1: list<string>,
+     *   2: list<string>
+     * }
+     */
+    private function quickValidatedInput(Request $request, DataArchiveService $archiveService): array
+    {
+        $semester = trim((string) $request->input('quick_semester', ''));
+        if ($semester === '') {
+            abort(422, 'Semester wajib dipilih.');
+        }
+
+        $scope = $archiveService->resolveScope('semester', null, $semester);
+        $definitions = DataArchiveRegistry::businessDefinitions();
+
+        $standardDatasets = [];
+        $financialDatasets = [];
+
+        foreach ($definitions as $key => $def) {
+            if (! ($def['purge_allowed'] ?? false)) {
+                continue;
+            }
+            $mode = (string) ($def['purge_mode'] ?? 'locked');
+            if ($mode === 'standard') {
+                $standardDatasets[] = $key;
+            } elseif ($mode === 'financial_guarded') {
+                $financialDatasets[] = $key;
+            }
+        }
+
+        return [$scope, $standardDatasets, $financialDatasets];
+    }
+
     /**
      * @return array{0:array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string},1:list<string>}
      */
