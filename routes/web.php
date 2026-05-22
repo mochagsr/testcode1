@@ -367,5 +367,6 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::post('/archive-data/quick-export', [ArchiveDataPageController::class, 'quickExport'])->middleware('perm:settings.admin')->name('archive-data.quick-export');
     Route::post('/archive-data/quick-snapshot', [ArchiveDataPageController::class, 'quickSnapshot'])->middleware('perm:settings.admin')->name('archive-data.quick-snapshot');
     Route::post('/archive-data/quick-purge', [ArchiveDataPageController::class, 'quickPurge'])->middleware('perm:settings.admin')->name('archive-data.quick-purge');
+    Route::post('/archive-data/import', [ArchiveDataPageController::class, 'importArchive'])->middleware('perm:settings.admin')->name('archive-data.import');
     Route::get('/about', [AboutPageController::class, 'index'])->name('about.index');
 });

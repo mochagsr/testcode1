@@ -29,7 +29,7 @@ class ArchiveDataPageController extends Controller
             ->values();
 
         $definitions = DataArchiveRegistry::businessDefinitions();
-        $selectedScopeType = (string) ($request->old('archive_scope_type', 'year') ?: 'year');
+        $selectedScopeType = 'year';
         $semesterOptions = $semesterBookService
             ->buildSemesterOptionCollection([], false, true)
             ->values()
@@ -110,6 +110,7 @@ class ArchiveDataPageController extends Controller
                 'php artisan app:archive:prepare-financial 2526 --dataset=sales_invoices',
                 'php artisan app:system-logs-cleanup',
             ],
+            'archiveSqlFiles' => $this->listArchiveSqlFiles(),
             'plannedArchiveFlow' => [
                 'Preview kandidat arsip per tahun atau semester.',
                 'Backup penuh ke managed DB AWS lewat command aplikasi.',
@@ -134,6 +135,33 @@ class ArchiveDataPageController extends Controller
     /**
      * @return array<string, mixed>|null
      */
+    /**
+     * @return list<array{name:string, path:string, size:string, modified:string}>
+     */
+    private function listArchiveSqlFiles(): array
+    {
+        $files = collect(File::glob(storage_path('app/archives/sql').DIRECTORY_SEPARATOR.'*.sql') ?: [])
+            ->sortDesc()
+            ->take(20)
+            ->values();
+
+        return $files->map(static function (string $path): array {
+            $bytes = File::size($path);
+            $size = $bytes >= 1048576
+                ? number_format($bytes / 1048576, 1).' MB'
+                : number_format($bytes / 1024, 0, ',', '.').' KB';
+
+            return [
+                'name' => basename($path),
+                'path' => $path,
+                'size' => $size,
+                'modified' => \Illuminate\Support\Carbon::createFromTimestamp(
+                    (int) File::lastModified($path)
+                )->timezone(config('app.timezone', 'Asia/Jakarta'))->format('d-m-Y H:i'),
+            ];
+        })->all();
+    }
+
     private function latestSystemCleanupSummary(): ?array
     {
         $files = collect(File::glob(storage_path('app/system-cleanups').DIRECTORY_SEPARATOR.'*.json') ?: [])
@@ -382,10 +410,91 @@ class ArchiveDataPageController extends Controller
             return back()->withInput($request->all())->with('quick_error', $e->getMessage());
         }
 
+        // Auto-run integrity check after snapshot
+        $integrityOk = null;
+        try {
+            Artisan::call('app:integrity-check');
+            $latest = \App\Models\IntegrityCheckLog::query()
+                ->latest('checked_at')->latest('id')->first();
+            $integrityOk = $latest instanceof \App\Models\IntegrityCheckLog
+                ? (bool) $latest->is_ok
+                : null;
+        } catch (\Throwable) {
+            // non-fatal: snapshot still succeeded
+        }
+
+        $integrityMsg = is_null($integrityOk)
+            ? 'Snapshot berhasil. Cek kondisi keuangan tidak dapat dijalankan.'
+            : ($integrityOk
+                ? 'Snapshot berhasil. Kondisi keuangan: Aman — siap lanjut ke Langkah ④.'
+                : 'Snapshot berhasil, tetapi ditemukan ketidaksesuaian keuangan. Periksa sebelum hapus data.');
+
         return back()
             ->withInput($request->all())
             ->with('quick_snapshot_result', $result)
-            ->with('quick_success', 'Snapshot finansial berhasil dibuat.');
+            ->with('quick_integrity_ok', $integrityOk)
+            ->with('quick_success', $integrityMsg);
+    }
+
+    public function importArchive(Request $request): RedirectResponse
+    {
+        $allowedBase = realpath(storage_path('app/archives'));
+
+        // From existing archive file on server
+        if ($request->has('archive_file')) {
+            $filePath = trim((string) $request->input('archive_file', ''));
+            $realPath = realpath($filePath);
+            if ($realPath === false || $allowedBase === false
+                || (! str_starts_with($realPath, $allowedBase.DIRECTORY_SEPARATOR) && $realPath !== $allowedBase)
+                || ! File::exists($realPath)
+                || ! str_ends_with(strtolower($realPath), '.sql')
+            ) {
+                return back()->with('import_error', 'File arsip tidak ditemukan atau tidak valid.');
+            }
+        } elseif ($request->hasFile('archive_upload')) {
+            $uploaded = $request->file('archive_upload');
+            if (! $uploaded || $uploaded->getClientOriginalExtension() !== 'sql') {
+                return back()->with('import_error', 'Hanya file .sql yang diizinkan.');
+            }
+            $realPath = $uploaded->getRealPath();
+            if (! is_string($realPath) || $realPath === '') {
+                return back()->with('import_error', 'File upload gagal dibaca.');
+            }
+        } else {
+            return back()->with('import_error', 'Tidak ada file yang dipilih.');
+        }
+
+        try {
+            $sql = (string) File::get($realPath);
+            // Safety: only allow INSERT, CREATE TEMPORARY TABLE, SET, LOCK, UNLOCK statements
+            $statements = array_filter(
+                array_map('trim', explode(';', $sql)),
+                static function (string $stmt): bool {
+                    if ($stmt === '') {
+                        return false;
+                    }
+                    $upper = strtoupper(ltrim($stmt));
+
+                    return str_starts_with($upper, 'INSERT')
+                        || str_starts_with($upper, 'SET ')
+                        || str_starts_with($upper, 'LOCK ')
+                        || str_starts_with($upper, 'UNLOCK')
+                        || str_starts_with($upper, '/*!');
+                }
+            );
+
+            $count = 0;
+            DB::transaction(static function () use ($statements, &$count): void {
+                foreach ($statements as $stmt) {
+                    DB::statement($stmt);
+                    $count++;
+                }
+            });
+
+            return back()->with('import_success', "Import selesai: {$count} statement berhasil dijalankan.");
+        } catch (\Throwable $e) {
+            return back()->with('import_error', 'Import gagal: '.$e->getMessage());
+        }
     }
 
     public function quickPurge(Request $request, DataArchiveService $archiveService): RedirectResponse

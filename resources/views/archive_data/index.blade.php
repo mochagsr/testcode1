@@ -4,23 +4,11 @@
 
 @section('content')
     @php
-        $scanResult = session('archive_scan_result');
-        $exportResult = session('archive_export_result');
-        $financialResult = session('archive_financial_result');
-        $integrityResult = session('archive_integrity_result');
-        $purgeResult = session('archive_purge_result');
-        $selected = collect(old('datasets', $selectedDatasets ?? []))->map(fn ($value) => strtolower((string) $value))->all();
-        $scopeType = old('archive_scope_type', $selectedScopeType ?? 'year');
-        $selectedDatasetKey = old('dataset_key', $selectedDatasetKey ?? ($selected[0] ?? 'sales_invoices'));
-        $selectedDataset = $datasets[$selectedDatasetKey] ?? null;
-        $selectedDatasetMode = (string) ($selectedDataset['purge_mode'] ?? 'locked');
-        $selectedDatasetLabel = (string) ($selectedDataset['label'] ?? $selectedDatasetKey);
-        $selectedDatasetIsFinancial = (bool) ($selectedDataset['financial'] ?? false);
-        $encodedExportSqlFile = !empty($exportResult['sql_file']) ? rtrim(strtr(base64_encode((string) $exportResult['sql_file']), '+/', '-_'), '=') : null;
-        $encodedExportManifestFile = !empty($exportResult['manifest_file']) ? rtrim(strtr(base64_encode((string) $exportResult['manifest_file']), '+/', '-_'), '=') : null;
-        $encodedFinancialSnapshotFile = !empty($financialResult['snapshot_file']) ? rtrim(strtr(base64_encode((string) $financialResult['snapshot_file']), '+/', '-_'), '=') : null;
-        $encodedFinancialManifestFile = !empty($financialResult['manifest_file']) ? rtrim(strtr(base64_encode((string) $financialResult['manifest_file']), '+/', '-_'), '=') : null;
-        $selectedYearNote = $datasetMeta[$selectedDatasetKey]['year_note'] ?? 'Tahun target hanya diambil dari tahun ajaran yang semester-nya sudah ditutup di menu Pengaturan.';
+        $quickScanResult     = session('quick_scan_result');
+        $quickExportResult   = session('quick_export_result');
+        $quickSnapshotResult = session('quick_snapshot_result');
+        $quickPurgeResult    = session('quick_purge_result');
+        $quickIntegrityOk    = session('quick_integrity_ok');   // null|bool
     @endphp
 
     <style>
@@ -355,17 +343,22 @@
 
                     {{-- Langkah 3 --}}
                     <div class="archive-step-box">
-                        <h4>③ Snapshot Finansial</h4>
+                        <h4>③ Snapshot + Cek Kondisi</h4>
                         <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
-                            Simpan ringkasan saldo piutang dan hutang sebelum data dihapus.
+                            Simpan saldo piutang/hutang, lalu otomatis cek kondisi keuangan.
                         </p>
                         @if ($quickSnapshotResult)
-                            <div style="font-size:13px;margin-bottom:10px;color:#0f6b2f;">✓ Snapshot tersimpan</div>
+                            <div style="font-size:13px;margin-bottom:6px;color:#0f6b2f;">✓ Snapshot tersimpan</div>
+                        @endif
+                        @if (!is_null($quickIntegrityOk))
+                            <div style="font-size:13px;margin-bottom:10px;{{ $quickIntegrityOk ? 'color:#0f6b2f' : 'color:#8e1d1d' }}">
+                                {{ $quickIntegrityOk ? '✓ Kondisi keuangan: Aman' : '✗ Ditemukan ketidaksesuaian keuangan' }}
+                            </div>
                         @endif
                         <button type="submit" class="btn secondary"
                             formaction="{{ route('archive-data.quick-snapshot') }}"
                             {{ empty($semesterOptions) ? 'disabled' : '' }}>
-                            Buat Snapshot
+                            Snapshot + Cek Otomatis
                         </button>
                     </div>
 
@@ -419,17 +412,8 @@
             </table>
         </div>
 
-        <div class="card archive-col-6">
-            <h3 style="margin-top:0;">Prinsip Aman</h3>
-            <ol class="archive-list">
-                <li>Arsip transaksi utama sekarang bisa dibaca berdasarkan tahun atau semester, sesuai kebutuhan periode bersih-bersih data.</li>
-                <li>Backup penuh wajib dibuat dulu sebelum ekspor atau pembersihan data production.</li>
-                <li>Restore drill wajib lulus dulu, terutama karena database berada di AWS Lightsail Managed MySQL.</li>
-                <li>Dataset finansial yang sudah dibuka tetap harus melalui snapshot finansial dan rebuild setelah pembersihan data.</li>
-            </ol>
-        </div>
-
-        <div class="card archive-col-12">
+        {{-- REMOVED: Prinsip Aman + Aksi Arsip (complex mode) --}}
+        <div class="card archive-col-12" style="display:none;">
             <h3 style="margin-top:0;">Aksi Arsip</h3>
             <form id="archive-action-form" method="post">
                 @csrf
@@ -561,35 +545,6 @@
         </div>
 
         <div class="card archive-col-12">
-            <h3 style="margin-top:0;">Cek Finansial</h3>
-            @php
-                $financialStatus = is_array($integrityResult)
-                    ? (bool) ($integrityResult['is_ok'] ?? false)
-                    : ((bool) ($latestIntegrityLog?->is_ok ?? false));
-            @endphp
-            <table class="archive-kv">
-                <tbody>
-                <tr>
-                    <th>Status Terakhir</th>
-                    <td>
-                        <span class="archive-mode-pill {{ $financialStatus ? 'standard' : 'locked' }}">
-                            {{ $financialStatus ? 'Aman' : 'Perlu Dicek' }}
-                        </span>
-                    </td>
-                </tr>
-                <tr><th>Waktu Cek</th><td>{{ $integrityResult['checked_at'] ?? (optional($latestIntegrityLog?->checked_at)->format('d-m-Y H:i:s') ?: '-') }}</td></tr>
-                <tr><th>Mismatch Piutang Customer</th><td>{{ number_format((int) ($integrityResult['customer_mismatch_count'] ?? $latestIntegrityLog?->customer_mismatch_count ?? 0), 0, ',', '.') }}</td></tr>
-                <tr><th>Mismatch Hutang Supplier</th><td>{{ number_format((int) ($integrityResult['supplier_mismatch_count'] ?? $latestIntegrityLog?->supplier_mismatch_count ?? 0), 0, ',', '.') }}</td></tr>
-                <tr><th>Invalid Link Piutang</th><td>{{ number_format((int) ($integrityResult['invalid_receivable_links'] ?? $latestIntegrityLog?->invalid_receivable_links ?? 0), 0, ',', '.') }}</td></tr>
-                <tr><th>Invalid Link Hutang</th><td>{{ number_format((int) ($integrityResult['invalid_supplier_links'] ?? $latestIntegrityLog?->invalid_supplier_links ?? 0), 0, ',', '.') }}</td></tr>
-                </tbody>
-            </table>
-            <p class="archive-muted" style="margin:10px 0 0;">
-                Tombol <strong>Cek Finansial</strong> ini aman dijalankan. Fungsinya hanya memeriksa apakah saldo piutang, hutang supplier, dan relasi penting masih konsisten sebelum atau sesudah arsip data.
-            </p>
-        </div>
-
-        <div class="card archive-col-12">
             <h3 style="margin-top:0;">Window Retention yang Dipakai Sekarang</h3>
             <div class="archive-window-grid">
                 @foreach($retentionWindows as $window)
@@ -667,7 +622,7 @@
             </div>
         @endif
 
-        @if (is_array($scanResult))
+        @if (false) {{-- removed old scan result --}}
             <div class="card archive-col-8">
                 <h3 style="margin-top:0;">Hasil Preview Scan</h3>
                 <table class="archive-table">
@@ -777,40 +732,74 @@
             </div>
         @endif
 
-        <div class="card archive-col-6">
-            <h3 style="margin-top:0;">Command yang Dipakai Sekarang</h3>
-            <ul class="archive-list">
-                @foreach($archiveCommands as $command)
-                    <li><code>{{ $command }}</code></li>
-                @endforeach
-            </ul>
-            <p class="archive-muted" style="margin:10px 0 0;">
-                Tiga command ini tetap berjalan dari folder project Laravel di aaPanel, tetapi target database-nya tetap managed DB AWS lewat `.env`.
+        {{-- ===== IMPORT ARSIP ===== --}}
+        <div class="card archive-col-12">
+            <h3 style="margin-top:0;">Import Arsip ke Database Lokal</h3>
+            <p class="archive-muted" style="margin:0 0 12px;">
+                Pilih file arsip yang sudah dibuat, lalu import ke database yang aktif sekarang.
+                Gunakan ini di <strong>environment lokal</strong> untuk melihat atau menganalisis data lama.
             </p>
-        </div>
 
-        <div class="card archive-col-6">
-            <h3 style="margin-top:0;">Alur Semi-Manual yang Disepakati</h3>
-            <ol class="archive-list">
-                @foreach($plannedArchiveFlow as $step)
-                    <li>{{ $step }}</li>
-                @endforeach
-            </ol>
-            <p class="archive-muted" style="margin:10px 0 0;">
-                Untuk transaksi ERP, operator sekarang bisa memilih scope yang paling masuk akal: `tahun` untuk sapuan besar atau `semester` untuk periode yang sudah benar-benar selesai.
-            </p>
-        </div>
+            @if (!empty($archiveSqlFiles))
+                <div class="archive-scroll-box" style="max-height:220px; margin-bottom:14px;">
+                    <table class="archive-table">
+                        <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Ukuran</th>
+                            <th>Tanggal</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($archiveSqlFiles as $sqlFile)
+                            @php
+                                $sqlEnc = rtrim(strtr(base64_encode($sqlFile['path']), '+/', '-_'), '=');
+                            @endphp
+                            <tr>
+                                <td style="font-size:12px;"><code>{{ $sqlFile['name'] }}</code></td>
+                                <td style="font-size:12px;">{{ $sqlFile['size'] }}</td>
+                                <td style="font-size:12px;">{{ $sqlFile['modified'] }}</td>
+                                <td>
+                                    <div style="display:flex;gap:6px;">
+                                        <a href="{{ route('archive-data.download', ['file' => $sqlEnc]) }}" class="btn secondary" style="font-size:11px;padding:4px 8px;">Unduh</a>
+                                        <form method="post" action="{{ route('archive-data.import') }}" style="display:inline;" onsubmit="return confirm('Import file ini ke database sekarang?');">
+                                            @csrf
+                                            <input type="hidden" name="archive_file" value="{{ $sqlFile['path'] }}">
+                                            <button type="submit" class="btn secondary" style="font-size:11px;padding:4px 8px;">Import</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <p class="archive-muted">Belum ada file arsip SQL. Buat dulu lewat Mode Mudah → Langkah ②.</p>
+            @endif
 
-        <div class="card archive-col-6">
-            <h3 style="margin-top:0;">Checklist UAT Arsip Nyata</h3>
-            <ol class="archive-list">
-                @foreach($archiveUatChecklist as $item)
-                    <li>{{ $item }}</li>
-                @endforeach
-            </ol>
-        </div>
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+                <p class="archive-muted" style="margin:0 0 8px; font-size:12px;">Atau upload file SQL dari komputer:</p>
+                <form method="post" action="{{ route('archive-data.import') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <input type="file" name="archive_upload" accept=".sql" style="font-size:13px;">
+                        <button type="submit" class="btn secondary" onclick="return confirm('Import file SQL yang dipilih ke database sekarang?');">Upload & Import</button>
+                    </div>
+                </form>
+            </div>
 
-        <div class="card archive-col-6">
+            @if (session('import_success'))
+                <div class="archive-flash success" style="margin-top:12px;">{{ session('import_success') }}</div>
+            @endif
+            @if (session('import_error'))
+                <div class="archive-flash error" style="margin-top:12px;">{{ session('import_error') }}</div>
+            @endif
+        </div>
+        {{-- ===== AKHIR IMPORT ARSIP ===== --}}
+
+        <div class="card archive-col-12">
             <h3 style="margin-top:0;">Histori Eksekusi Arsip Data Bisnis</h3>
             @if (!empty($archiveHistory))
                 <div class="archive-scroll-box">
@@ -841,114 +830,7 @@
             @endif
         </div>
 
-        <div class="card archive-col-12">
-            <h3 style="margin-top:0;">Catatan Command Arsip Data Bisnis</h3>
-            <pre class="archive-code">php artisan app:archive:scan 2526 --dataset=sales_invoices
-php artisan app:archive:scan --semester=S1-2526 --dataset=sales_invoices
-php artisan app:archive:export 2526 --dataset=sales_invoices
-php artisan app:archive:export --semester=S1-2526 --dataset=sales_returns
-php artisan app:archive:prepare-financial 2526 --dataset=sales_invoices --rebuild-journal
-php artisan app:archive:review
-php artisan app:archive:purge 2526 --dataset=sales_returns --confirm</pre>
-            <p class="archive-muted" style="margin:10px 0 0;">
-                Arsip manual sekarang difokuskan ke data bisnis. Bersihkan data finansial tahap lanjut sekarang juga dibuka untuk `sales_returns` dan `receivable_payments`, tetapi tetap wajib snapshot + rebuild agar saldo dan jurnal tetap konsisten. Untuk tahun ajaran atau semester lama yang mau disimpan, backup dari server tetap perlu diunduh dan disimpan juga di lokal operator.
-            </p>
-        </div>
     </div>
 
-    <script>
-        window.archiveDatasetMeta = @json($datasetMeta ?? []);
-
-        window.toggleArchiveScope = function (value) {
-            const yearField = document.getElementById('archive-year-field');
-            const semesterField = document.getElementById('archive-semester-field');
-            if (!yearField || !semesterField) {
-                return;
-            }
-            const isSemester = value === 'semester';
-            yearField.style.display = isSemester ? 'none' : '';
-            semesterField.style.display = isSemester ? '' : 'none';
-        };
-
-        window.updateArchiveDataset = function (value) {
-            const meta = (window.archiveDatasetMeta || {})[value];
-            if (!meta) {
-                return;
-            }
-
-            const label = document.getElementById('archive-selected-label');
-            const mode = document.getElementById('archive-selected-mode');
-            const note = document.getElementById('archive-selected-note');
-            const basis = document.getElementById('archive-selected-basis');
-            const scope = document.getElementById('archive-selected-scope');
-            const yearSelect = document.getElementById('archive_year');
-            const yearNote = document.getElementById('archive-year-note');
-            const financialButton = document.getElementById('archive-financial-button');
-            const dryRunButton = document.getElementById('archive-dry-run-button');
-            const purgeButton = document.getElementById('archive-purge-button');
-            const steps = document.getElementById('archive-selected-steps');
-
-            if (label) label.textContent = meta.label;
-            if (basis) basis.textContent = meta.basis === 'year' ? 'Tahun ajaran' : 'Bulan';
-            if (scope) scope.textContent = meta.scope;
-            if (yearNote) yearNote.textContent = meta.year_note || 'Tahun target disesuaikan dengan data yang tersedia.';
-
-            if (yearSelect) {
-                const options = Array.isArray(meta.year_options) ? meta.year_options : [];
-                const currentValue = yearSelect.value;
-                yearSelect.innerHTML = '';
-                if (options.length === 0) {
-                    const option = document.createElement('option');
-                    option.value = '';
-                    option.textContent = 'Kosong / belum ada';
-                    yearSelect.appendChild(option);
-                    yearSelect.disabled = true;
-                } else {
-                    options.forEach(function (item) {
-                        const option = document.createElement('option');
-                        option.value = item;
-                        option.textContent = item;
-                        if (item === currentValue) {
-                            option.selected = true;
-                        }
-                        yearSelect.appendChild(option);
-                    });
-                    if (!options.includes(currentValue)) {
-                        yearSelect.selectedIndex = 0;
-                    }
-                    yearSelect.disabled = false;
-                }
-            }
-
-            if (mode) {
-                mode.className = 'archive-mode-pill ' + meta.mode;
-                mode.textContent = meta.mode === 'standard'
-                    ? 'Langsung bisa export lalu bersihkan data'
-                    : (meta.mode === 'financial_guarded'
-                        ? 'Butuh snapshot finansial dulu'
-                        : 'Baru bisa scan dan export');
-            }
-
-            if (note) {
-                note.textContent = meta.mode === 'standard'
-                    ? 'Untuk data bisnis seperti ini, langkahnya cukup: Cek Dulu -> Buat File Arsip -> Coba Simulasi Hapus -> Hapus Data.'
-                    : (meta.mode === 'financial_guarded'
-                        ? 'Untuk data finansial seperti ini, langkahnya: Cek Dulu -> Buat File Arsip -> Snapshot Finansial -> Coba Simulasi Hapus -> Hapus Data.'
-                        : 'Untuk data ini, pembersihan data masih dikunci. Saat ini pakai dulu: Cek Dulu dan Buat File Arsip.');
-            }
-
-            if (steps) {
-                steps.innerHTML = meta.mode === 'standard'
-                    ? '<li>Klik <strong>1. Cek Dulu</strong>.</li><li>Klik <strong>2. Buat File Arsip</strong>.</li><li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li><li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>'
-                    : (meta.mode === 'financial_guarded'
-                        ? '<li>Klik <strong>1. Cek Dulu</strong>.</li><li>Klik <strong>2. Buat File Arsip</strong>.</li><li>Klik <strong>3. Snapshot Finansial</strong>.</li><li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li><li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>'
-                        : '<li>Klik <strong>1. Cek Dulu</strong>.</li><li>Klik <strong>2. Buat File Arsip</strong>.</li><li>Untuk jenis data ini, pembersihan masih dikunci.</li>');
-            }
-
-            if (financialButton) financialButton.disabled = meta.mode !== 'financial_guarded';
-            if (dryRunButton) dryRunButton.disabled = meta.mode === 'locked';
-            if (purgeButton) purgeButton.disabled = meta.mode === 'locked';
-        };
-    </script>
 @endsection
 
