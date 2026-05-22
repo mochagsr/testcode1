@@ -72,7 +72,7 @@
                     </div>
                     <div class="col-6">
                         <label>{{ __('receivable.customer_signature') }} <span class="label-required">*</span></label>
-                        <input type="text" name="customer_signature" value="{{ old('customer_signature') }}" required>
+                        <input type="text" id="customer-signature" name="customer_signature" value="{{ old('customer_signature') }}" required>
                     </div>
                     <div class="col-6">
                         <label>{{ __('receivable.user_signature') }} <span class="label-required">*</span></label>
@@ -103,6 +103,7 @@
         const customerIdField = document.getElementById('customer-id');
         const customerSearchError = document.getElementById('customer-search-error');
         const customerAddressField = document.getElementById('customer-address');
+        const customerSignatureField = document.getElementById('customer-signature');
         const customerOutstandingField = document.getElementById('customer-outstanding');
         const paymentAmountDisplayField = document.getElementById('payment-amount-display');
         const paymentAmountField = document.getElementById('payment-amount');
@@ -356,6 +357,9 @@
                 customerIdField.value = '';
                 customerOutstandingField.value = money(0);
                 customerAddressField.value = '';
+                if (customerSignatureField && !customerSignatureField.value) {
+                    customerSignatureField.value = '';
+                }
                 if (!preserveAmount) {
                     paymentAmountField.value = '';
                     if (paymentAmountDisplayField) {
@@ -368,6 +372,9 @@
             setCustomerFieldError('');
             customerIdField.value = customer.id;
             customerAddressField.value = customer.address || '';
+            if (customerSignatureField && !customerSignatureField.value) {
+                customerSignatureField.value = customer.name || '';
+            }
             const outstanding = Number(customer.outstanding_receivable || 0);
             customerOutstandingField.value = money(outstanding);
             if (!preserveAmount) {
