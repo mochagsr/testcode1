@@ -759,20 +759,6 @@ class SalesInvoicePageController extends Controller
                 $customer->update([
                     'credit_balance' => max(0, $availableCustomerBalance - $appliedFromBalance),
                 ]);
-
-                $this->receivableLedgerService->addCredit(
-                    customerId: (int) $invoice->customer_id,
-                    invoiceId: (int) $invoice->id,
-                    entryDate: $invoiceDate,
-                    amount: $appliedFromBalance,
-                    periodCode: $invoice->semester_period,
-                    description: __('txn.customer_balance_applied_for_invoice', [
-                        'invoice' => $invoice->invoice_number,
-                    ]),
-                    transactionType: (string) $invoice->transaction_type,
-                    printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
-                    printingSubtypeName: $invoice->printing_subtype_name,
-                );
             }
 
             $this->accountingService->postSalesInvoice(
@@ -1609,20 +1595,6 @@ class SalesInvoicePageController extends Controller
             $customer->update([
                 'credit_balance' => max(0, $availableCustomerBalance - $appliedFromBalance),
             ]);
-
-            $this->receivableLedgerService->addCredit(
-                customerId: (int) $invoice->customer_id,
-                invoiceId: (int) $invoice->id,
-                entryDate: $invoiceDate,
-                amount: $appliedFromBalance,
-                periodCode: $invoice->semester_period,
-                description: __('txn.customer_balance_applied_for_invoice', [
-                    'invoice' => $invoice->invoice_number,
-                ]),
-                transactionType: (string) $invoice->transaction_type,
-                printingSubtypeId: $invoice->customer_printing_subtype_id ? (int) $invoice->customer_printing_subtype_id : null,
-                printingSubtypeName: $invoice->printing_subtype_name,
-            );
         }
 
         $this->accountingService->postSalesInvoice(
