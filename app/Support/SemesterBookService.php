@@ -1211,7 +1211,7 @@ class SemesterBookService
             ->values();
     }
 
-    private function semesterSortKey(string $semester): string
+    public function semesterSortKey(string $semester): string
     {
         $normalized = $this->normalizeSemester($semester) ?? strtoupper(trim($semester));
         if (preg_match('/^S([12])-(\d{2})(\d{2})$/', $normalized, $matches) === 1) {

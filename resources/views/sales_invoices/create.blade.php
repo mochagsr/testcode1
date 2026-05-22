@@ -1144,6 +1144,50 @@
         initializeInvoiceForm();
         autoSelectSemesterByDate();
         invoiceDateInput?.addEventListener('change', autoSelectSemesterByDate);
+
+        // Popup: warn if user manually selects a past semester
+        let autoChangingSemester = false;
+        const origAutoSelect = autoSelectSemesterByDate;
+        autoSelectSemesterByDate = function () {
+            autoChangingSemester = true;
+            origAutoSelect();
+            autoChangingSemester = false;
+        };
+
+        if (semesterPeriodSelect) {
+            semesterPeriodSelect.addEventListener('change', function () {
+                if (autoChangingSemester) return;
+
+                const deriveSemesterFromDate = window.PgposAutoSearch?.deriveSemesterFromDate ?? (() => '');
+                const semesterSortKey = window.PgposAutoSearch?.semesterSortKey ?? (() => '');
+                const expected = deriveSemesterFromDate(invoiceDateInput?.value ?? '');
+                const selected = semesterPeriodSelect.value;
+
+                if (!expected || !selected) return;
+                if (semesterSortKey(selected) >= semesterSortKey(expected)) return;
+
+                // Selected semester is earlier than what the date suggests
+                const lanjutkan = window.confirm(
+                    'Kamu menambahkan ke semester ' + selected + ' yang telah lewat.\n' +
+                    'Seharusnya masuk semester ' + expected + '.\n\n' +
+                    'Bersedia melanjutkan? (pilih Batal untuk kembali ke ' + expected + ')'
+                );
+
+                if (!lanjutkan) {
+                    autoChangingSemester = true;
+                    // Ensure expected option exists
+                    const hasOption = Array.from(semesterPeriodSelect.options).some((o) => o.value === expected);
+                    if (!hasOption) {
+                        const opt = document.createElement('option');
+                        opt.value = expected;
+                        opt.textContent = expected;
+                        semesterPeriodSelect.appendChild(opt);
+                    }
+                    semesterPeriodSelect.value = expected;
+                    autoChangingSemester = false;
+                }
+            });
+        }
     </script>
 
     <datalist id="products-list">

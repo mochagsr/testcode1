@@ -1876,11 +1876,18 @@
             return `S2-${String(startYear).slice(-2)}${String(year).slice(-2)}`;
         }
 
+        function semesterSortKey(semester) {
+            const m = String(semester || '').match(/^S([12])-(\d{2})(\d{2})$/i);
+            if (!m) return '9999999' + semester;
+            return m[2].padStart(2, '0') + m[3].padStart(2, '0') + m[1];
+        }
+
         window.PgposAutoSearch = Object.assign({}, window.PgposAutoSearch || {}, {
             debounce,
             escapeAttribute,
             canSearchInput,
             deriveSemesterFromDate,
+            semesterSortKey,
         });
 
         const mobileBreakpoint = window.matchMedia('(max-width: 900px)');

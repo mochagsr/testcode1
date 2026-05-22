@@ -1691,21 +1691,43 @@ class ReceivablePageController extends Controller
             ->orderByDate('asc')
             ->get();
 
-        if ($ledgerRows->isNotEmpty()) {
+        if ($semester !== '') {
+            // Opening balance = sum of all ledger entries in semesters BEFORE this one,
+            // ordered by semester sort key (not by date), so manually-assigned past-semester
+            // entries don't bleed into the wrong opening balance.
+            $allCustomerSemesters = ReceivableLedger::query()
+                ->forCustomer($customerId)
+                ->whereNotNull('semester_period')
+                ->distinct()
+                ->pluck('semester_period')
+                ->map(fn (mixed $s): string => (string) $s)
+                ->filter(fn (string $s): bool => $s !== '')
+                ->sortBy(fn (string $s): string => $this->semesterBookService->semesterSortKey($s))
+                ->values()
+                ->all();
+
+            $currentSortKey = $this->semesterBookService->semesterSortKey($semester);
+            $priorSemesters = array_values(array_filter(
+                $allCustomerSemesters,
+                fn (string $s): bool => $this->semesterBookService->semesterSortKey($s) < $currentSortKey
+            ));
+
+            $openingBalance = (int) round((float) (ReceivableLedger::query()
+                ->forCustomer($customerId)
+                ->when($transactionType !== '', fn ($q) => $q->where('transaction_type', $transactionType))
+                ->where(function ($q) use ($priorSemesters, $transactionType): void {
+                    $q->whereIn('semester_period', $priorSemesters);
+                    if ($transactionType === '') {
+                        $q->orWhereNull('semester_period');
+                    }
+                })
+                ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as net')
+                ->value('net') ?? 0));
+        } elseif ($ledgerRows->isNotEmpty()) {
             $first = $ledgerRows->first();
             $openingBalance = (int) round((float) $first->balance_after - (float) $first->debit + (float) $first->credit);
         } else {
-            $openingBalance = (int) round((float) SalesInvoice::query()
-                ->forCustomer($customerId)
-                ->active()
-                ->withOpenBalance()
-                ->when($transactionType !== '', function ($query) use ($transactionType): void {
-                    $query->where('transaction_type', $transactionType);
-                })
-                ->when($semester !== '', function ($query) use ($semester): void {
-                    $query->forSemester($semester);
-                })
-                ->sum('balance'));
+            $openingBalance = 0;
         }
 
         $statementRows = collect([
