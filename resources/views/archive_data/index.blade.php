@@ -4,11 +4,15 @@
 
 @section('content')
     @php
-        $quickScanResult     = session('quick_scan_result');
-        $quickExportResult   = session('quick_export_result');
-        $quickSnapshotResult = session('quick_snapshot_result');
-        $quickPurgeResult    = session('quick_purge_result');
-        $quickIntegrityOk    = session('quick_integrity_ok');   // null|bool
+        $quickScanResult       = session('quick_scan_result');
+        $quickExportResult     = session('quick_export_result');
+        $quickSnapshotResult   = session('quick_snapshot_result');
+        $quickPurgeResult      = session('quick_purge_result');
+        $quickIntegrityOk      = session('quick_integrity_ok');      // null|bool
+        $eligibleScanResult    = session('eligible_scan_result');
+        $eligibleExportResult  = session('eligible_export_result');
+        $eligibleSoftDelResult = session('eligible_soft_delete_result');
+        $eligibleHardDelResult = session('eligible_hard_delete_result');
     @endphp
 
     <style>
@@ -235,13 +239,6 @@
             </div>
         @endif
 
-        @php
-            $quickScanResult    = session('quick_scan_result');
-            $quickExportResult  = session('quick_export_result');
-            $quickSnapshotResult = session('quick_snapshot_result');
-            $quickPurgeResult   = session('quick_purge_result');
-        @endphp
-
         @if (session('quick_success'))
             <div class="archive-col-12 archive-flash success">{{ session('quick_success') }}</div>
         @endif
@@ -250,7 +247,7 @@
         @endif
 
         @if (!empty($semesterOptions))
-            <div class="archive-col-12" style="background:color-mix(in srgb,#fff8e1 88%,var(--card));border:1px solid #f0c040;border-radius:10px;padding:12px 14px;font-size:13px;">
+            <div class="archive-col-12" style="background:#fff8e1;border:1px solid #f0c040;border-radius:10px;padding:12px 14px;font-size:13px;color:#5a4000;">
                 <strong>Pengingat:</strong> Ada {{ count($semesterOptions) }} semester yang sudah ditutup.
                 Gunakan <strong>Mode Mudah</strong> di bawah untuk mengarsipkan data lama secara berkala.
             </div>
@@ -395,6 +392,185 @@
         </div>
         {{-- ===== AKHIR MODE MUDAH ===== --}}
 
+        {{-- ===== ARSIP LUNAS 5 TAHUN ===== --}}
+        <div class="card archive-col-12">
+            <h2 style="margin:0 0 4px;font-size:18px;">Arsipkan Data Lunas — 5 Langkah</h2>
+            <p class="archive-muted" style="margin:0 0 16px;">
+                Arsipkan transaksi yang sudah lunas dan berusia minimal 5 tahun. Berbeda dari Mode Mudah yang berbasis semester,
+                metode ini memilih berdasarkan status pembayaran (<strong>lunas</strong>) dan tanggal lunas yang sebenarnya.
+                Partial payment, data belum lunas, dan customer <em>tidak</em> dihapus.
+            </p>
+
+            @if (session('eligible_success'))
+                <div class="archive-flash success" style="margin-bottom:14px;">{{ session('eligible_success') }}</div>
+            @endif
+            @if (session('eligible_error'))
+                <div class="archive-flash error" style="margin-bottom:14px;">{{ session('eligible_error') }}</div>
+            @endif
+
+            @php
+                $defaultCutoff = old('cutoff_years', 5);
+            @endphp
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+
+                {{-- Langkah 1: Scan --}}
+                <div class="archive-step-box">
+                    <h4>① Cek Data Eligible</h4>
+                    <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                        Hitung berapa baris data yang sudah lunas ≥ N tahun dan siap diarsipkan.
+                    </p>
+                    @if ($eligibleScanResult)
+                        <div style="font-size:13px;margin-bottom:10px;">
+                            <strong>Cutoff:</strong> {{ $eligibleScanResult['cutoff_date'] ?? '-' }}<br>
+                            <strong>Total:</strong> {{ number_format((int)($eligibleScanResult['grand_total'] ?? 0), 0, ',', '.') }} baris
+                            @foreach (($eligibleScanResult['datasets'] ?? []) as $dsKey => $ds)
+                                @if ((int)($ds['count'] ?? 0) > 0)
+                                    <br><span class="archive-muted" style="font-size:11px;">
+                                        {{ $ds['label'] ?? $dsKey }}: {{ number_format((int)$ds['count'], 0, ',', '.') }}
+                                    </span>
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
+                    <form method="post" action="{{ route('archive-data.eligible-scan') }}">
+                        @csrf
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                            <label style="font-size:12px;white-space:nowrap;">Minimal usia:</label>
+                            <select name="cutoff_years" style="font-size:12px;width:80px;">
+                                @foreach ([3,4,5,6,7,8,10] as $yr)
+                                    <option value="{{ $yr }}" @selected((int)$defaultCutoff === $yr)>{{ $yr }} tahun</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="submit" class="btn secondary">Cek Data Eligible</button>
+                    </form>
+                </div>
+
+                {{-- Langkah 2: Export --}}
+                <div class="archive-step-box">
+                    <h4>② Buat File Arsip</h4>
+                    <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                        Ekspor semua data eligible ke file SQL sebagai cadangan sebelum dihapus.
+                    </p>
+                    @if ($eligibleExportResult)
+                        @php
+                            $elSqlEnc = !empty($eligibleExportResult['sql_file'])
+                                ? rtrim(strtr(base64_encode((string)$eligibleExportResult['sql_file']), '+/', '-_'), '=')
+                                : null;
+                            $elManEnc = !empty($eligibleExportResult['manifest_file'])
+                                ? rtrim(strtr(base64_encode((string)$eligibleExportResult['manifest_file']), '+/', '-_'), '=')
+                                : null;
+                        @endphp
+                        <div style="margin-bottom:10px;font-size:13px;">
+                            <strong>{{ number_format((int)($eligibleExportResult['grand_total'] ?? 0), 0, ',', '.') }} baris</strong>
+                            tersimpan. Cutoff: {{ $eligibleExportResult['cutoff_date'] ?? '-' }}
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+                            @if ($elSqlEnc)
+                                <a href="{{ route('archive-data.download', ['file' => $elSqlEnc]) }}"
+                                   class="btn secondary" style="font-size:12px;">Unduh SQL</a>
+                            @endif
+                            @if ($elManEnc)
+                                <a href="{{ route('archive-data.download', ['file' => $elManEnc]) }}"
+                                   class="btn secondary" style="font-size:12px;">Unduh Manifest</a>
+                            @endif
+                        </div>
+                    @endif
+                    <form method="post" action="{{ route('archive-data.eligible-export') }}">
+                        @csrf
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                            <label style="font-size:12px;white-space:nowrap;">Minimal usia:</label>
+                            <select name="cutoff_years" style="font-size:12px;width:80px;">
+                                @foreach ([3,4,5,6,7,8,10] as $yr)
+                                    <option value="{{ $yr }}" @selected((int)$defaultCutoff === $yr)>{{ $yr }} tahun</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="submit" class="btn secondary">Buat File Arsip</button>
+                    </form>
+                </div>
+
+                {{-- Langkah 3: Download --}}
+                <div class="archive-step-box">
+                    <h4>③ Unduh & Simpan</h4>
+                    <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                        Unduh file SQL ke komputer lokal. Simpan di hardisk sebelum lanjut ke langkah berikutnya.
+                    </p>
+                    @if (!empty($archiveSqlFiles))
+                        @php $latestSql = collect($archiveSqlFiles)->first(fn($f) => str_contains($f['name'], 'eligible-archive')); @endphp
+                        @if ($latestSql)
+                            @php $latestSqlEnc = rtrim(strtr(base64_encode($latestSql['path']), '+/', '-_'), '='); @endphp
+                            <div style="font-size:12px;margin-bottom:8px;color:var(--muted);">
+                                File terbaru: <code>{{ $latestSql['name'] }}</code> ({{ $latestSql['size'] }})
+                            </div>
+                            <a href="{{ route('archive-data.download', ['file' => $latestSqlEnc]) }}"
+                               class="btn secondary" style="font-size:12px;">Unduh File Terbaru</a>
+                        @else
+                            <p class="archive-muted" style="margin:0;font-size:12px;">Belum ada file eligible-archive. Jalankan Langkah ② dulu.</p>
+                        @endif
+                    @else
+                        <p class="archive-muted" style="margin:0;font-size:12px;">Belum ada file arsip SQL.</p>
+                    @endif
+                </div>
+
+                {{-- Langkah 4: Soft Delete --}}
+                <div class="archive-step-box">
+                    <h4>④ Soft Delete</h4>
+                    <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                        Tandai data eligible sebagai terhapus. Data masih ada di database sampai Langkah ⑤.
+                    </p>
+                    @if ($eligibleSoftDelResult)
+                        <div style="font-size:13px;margin-bottom:10px;color:#0f6b2f;">
+                            ✓ {{ number_format((int)($eligibleSoftDelResult['total'] ?? 0), 0, ',', '.') }} baris ditandai terhapus.
+                        </div>
+                    @endif
+                    <form method="post" action="{{ route('archive-data.eligible-soft-delete') }}"
+                          onsubmit="return confirm('Tandai data eligible sebagai terhapus (soft delete)? Data belum benar-benar hilang.');">
+                        @csrf
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                            <label style="font-size:12px;white-space:nowrap;">Minimal usia:</label>
+                            <select name="cutoff_years" style="font-size:12px;width:80px;">
+                                @foreach ([3,4,5,6,7,8,10] as $yr)
+                                    <option value="{{ $yr }}" @selected((int)$defaultCutoff === $yr)>{{ $yr }} tahun</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;margin-bottom:10px;cursor:pointer;">
+                            <input type="checkbox" name="confirm_soft_delete" value="1" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;accent-color:var(--primary,#3b82f6);">
+                            <span>Saya sudah unduh dan simpan file arsip (Langkah ③)</span>
+                        </label>
+                        <button type="submit" class="btn secondary">Soft Delete</button>
+                    </form>
+                </div>
+
+                {{-- Langkah 5: Hard Delete --}}
+                <div class="archive-step-box" style="border-color:color-mix(in srgb,#e53e3e 40%,var(--border));">
+                    <h4 style="color:#c0392b;">⑤ Hapus Permanen</h4>
+                    <p class="archive-muted" style="margin:0 0 10px;font-size:12px;">
+                        Hapus <strong>semua data yang sudah di-soft-delete</strong> dari database secara permanen.
+                        Tidak bisa dibatalkan.
+                    </p>
+                    @if ($eligibleHardDelResult)
+                        <div style="font-size:13px;margin-bottom:10px;color:#8e1d1d;">
+                            ✓ {{ number_format((int)($eligibleHardDelResult['total'] ?? 0), 0, ',', '.') }} baris dihapus permanen.
+                        </div>
+                    @endif
+                    <form method="post" action="{{ route('archive-data.eligible-hard-delete') }}"
+                          onsubmit="return confirm('HAPUS PERMANEN semua data yang sudah di-soft-delete? Tindakan ini TIDAK BISA dibatalkan.');">
+                        @csrf
+                        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;margin-bottom:10px;cursor:pointer;">
+                            <input type="checkbox" name="confirm_hard_delete" value="1" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;accent-color:var(--primary,#3b82f6);">
+                            <span>Saya yakin ingin menghapus permanen semua data yang sudah di-soft-delete</span>
+                        </label>
+                        <button type="submit" class="btn danger">Hapus Permanen</button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+        {{-- ===== AKHIR ARSIP LUNAS 5 TAHUN ===== --}}
+
         <div class="card archive-col-6">
             <h3 style="margin-top:0;">Status Backup dan Pemeriksaan</h3>
             <p class="archive-muted" style="margin:0 0 12px;">
@@ -412,137 +588,6 @@
             </table>
         </div>
 
-        {{-- REMOVED: Prinsip Aman + Aksi Arsip (complex mode) --}}
-        <div class="card archive-col-12" style="display:none;">
-            <h3 style="margin-top:0;">Aksi Arsip</h3>
-            <form id="archive-action-form" method="post">
-                @csrf
-                <div class="archive-form-grid">
-                    <div>
-                        <label for="archive_scope_type" class="archive-muted" style="display:block;margin-bottom:6px;">Basis arsip</label>
-                        <select id="archive_scope_type" name="archive_scope_type" onchange="window.toggleArchiveScope && window.toggleArchiveScope(this.value)">
-                            <option value="year" {{ $scopeType === 'year' ? 'selected' : '' }}>Tahun</option>
-                            <option value="semester" {{ $scopeType === 'semester' ? 'selected' : '' }}>Semester</option>
-                        </select>
-
-                        <div id="archive-year-field" style="{{ $scopeType === 'semester' ? 'display:none;' : '' }} margin-top:12px;">
-                            <label for="archive_year" class="archive-muted" style="display:block;margin-bottom:6px;">Tahun target</label>
-                            <select id="archive_year" name="archive_year" {{ empty($yearOptions ?? []) ? 'disabled' : '' }}>
-                                @if(empty($yearOptions ?? []))
-                                    <option value="">Kosong / belum ada</option>
-                                @else
-                                    @foreach(($yearOptions ?? []) as $yearOption)
-                                        <option value="{{ $yearOption }}" {{ (string) old('archive_year', $selectedYear) === (string) $yearOption ? 'selected' : '' }}>{{ $yearOption }}</option>
-                                    @endforeach
-                                @endif
-                            </select>
-                            <div id="archive-year-note" class="archive-muted" style="margin-top:8px;">{{ $selectedYearNote }}</div>
-                        </div>
-
-                        <div id="archive-semester-field" style="{{ $scopeType === 'semester' ? '' : 'display:none;' }} margin-top:12px;">
-                            <label for="archive_semester" class="archive-muted" style="display:block;margin-bottom:6px;">Semester target</label>
-                            <select id="archive_semester" name="archive_semester">
-                                @foreach(($semesterOptions ?? []) as $semesterOption)
-                                    <option value="{{ $semesterOption }}" {{ old('archive_semester', $selectedSemester) === $semesterOption ? 'selected' : '' }}>{{ $semesterOption }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="archive-muted" style="margin-top:8px;">Untuk managed DB AWS, file arsip dibuat di server dulu lalu sebaiknya diunduh dan disimpan juga di komputer lokal.</div>
-
-                        <input type="hidden" id="confirm_purge" name="confirm_purge" value="{{ old('confirm_purge') ? '1' : '0' }}">
-
-                        <details style="margin-top:12px;">
-                            <summary class="archive-muted" style="cursor:pointer;">Pengaturan tambahan</summary>
-                            <label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;">
-                                <input type="checkbox" name="rebuild_journal" value="1" {{ old('rebuild_journal') ? 'checked' : '' }}>
-                                <span class="archive-muted">Saat snapshot finansial, siapkan rebuild journal juga.</span>
-                            </label>
-
-                            <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
-                                <input type="checkbox" name="allow_skipped_restore" value="1" {{ old('allow_skipped_restore') ? 'checked' : '' }}>
-                                <span class="archive-muted">Izinkan restore drill terakhir berstatus `SKIPPED` bila alasannya memang dipahami.</span>
-                            </label>
-                        </details>
-                    </div>
-
-                    <div>
-                        <div class="archive-simple-grid">
-                            <div>
-                                <label for="dataset_key" class="archive-muted" style="display:block;margin-bottom:6px;">Jenis data bisnis</label>
-                                <select id="dataset_key" name="dataset_key" onchange="window.updateArchiveDataset && window.updateArchiveDataset(this.value)">
-                                    @foreach($datasets as $key => $dataset)
-                                        <option value="{{ $key }}" {{ $selectedDatasetKey === $key ? 'selected' : '' }}>{{ $dataset['label'] }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="archive-muted" style="margin-top:8px;">
-                                    Pilih satu jenis data bisnis dulu agar langkahnya lebih mudah dibaca.
-                                </div>
-                            </div>
-
-                            <div class="archive-step-box">
-                                <h4 id="archive-selected-label">{{ $selectedDatasetLabel }}</h4>
-                                <div id="archive-selected-mode" class="archive-mode-pill {{ $selectedDatasetMode }}">
-                                    @if($selectedDatasetMode === 'standard')
-                                        Langsung bisa export lalu bersihkan data
-                                    @elseif($selectedDatasetMode === 'financial_guarded')
-                                        Butuh snapshot finansial dulu
-                                    @else
-                                        Baru bisa scan dan export
-                                    @endif
-                                </div>
-                                <div id="archive-selected-note" class="archive-muted">
-                                    @if($selectedDatasetMode === 'standard')
-                                        Untuk data bisnis seperti ini, langkahnya cukup: `Cek Dulu` -> `Buat File Arsip` -> `Coba Simulasi Hapus` -> `Hapus Data`.
-                                    @elseif($selectedDatasetMode === 'financial_guarded')
-                                        Untuk data finansial seperti ini, langkahnya: `Cek Dulu` -> `Buat File Arsip` -> `Snapshot Finansial` -> `Coba Simulasi Hapus` -> `Hapus Data`.
-                                    @else
-                                        Untuk data ini, pembersihan data masih dikunci. Saat ini pakai dulu: `Cek Dulu` dan `Buat File Arsip`.
-                                    @endif
-                                </div>
-                                <div class="archive-muted" style="margin-top:8px;">
-                                    Basis data ini: <strong id="archive-selected-basis">{{ ($selectedDataset['basis'] ?? 'year') === 'year' ? 'Tahun ajaran' : 'Bulan' }}</strong>.
-                                    Scope yang boleh dipakai: <strong id="archive-selected-scope">{{ implode(' / ', array_map(fn ($item) => $item === 'semester' ? 'semester' : 'tahun', $selectedDataset['scope_modes'] ?? ['year'])) }}</strong>.
-                                </div>
-                                <div class="archive-help-box" style="margin-top:12px;">
-                                    <h4>Urutan klik yang aman</h4>
-                                    <ol id="archive-selected-steps" class="archive-list">
-                                        @if($selectedDatasetMode === 'standard')
-                                            <li>Klik <strong>1. Cek Dulu</strong>.</li>
-                                            <li>Klik <strong>2. Buat File Arsip</strong>.</li>
-                                            <li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li>
-                                            <li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>
-                                        @elseif($selectedDatasetMode === 'financial_guarded')
-                                            <li>Klik <strong>1. Cek Dulu</strong>.</li>
-                                            <li>Klik <strong>2. Buat File Arsip</strong>.</li>
-                                            <li>Klik <strong>3. Snapshot Finansial</strong>.</li>
-                                            <li>Klik <strong>4. Coba Simulasi Hapus</strong>.</li>
-                                            <li>Kalau hasilnya sudah sesuai, klik <strong>5. Hapus Data</strong>.</li>
-                                        @else
-                                            <li>Klik <strong>1. Cek Dulu</strong>.</li>
-                                            <li>Klik <strong>2. Buat File Arsip</strong>.</li>
-                                            <li>Untuk jenis data ini, pembersihan masih dikunci.</li>
-                                        @endif
-                                    </ol>
-                                </div>
-                                <div class="archive-muted" style="margin-top:10px;">
-                                    Kalau kamu pilih <strong>Faktur Penjualan</strong> lalu export per tahun atau semester, file SQL yang dibuat berisi tabel utama dan tabel terkait untuk periode itu. File itu bisa diunduh lalu diimport ke MySQL lokal di komputer kamu sebagai arsip periode tersebut.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="archive-action-row">
-                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.scan') }}">1. Cek Dulu</button>
-                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.export') }}">2. Buat File Arsip</button>
-                            <button type="submit" class="btn secondary" formaction="{{ route('archive-data.check-financial') }}">3. Cek Finansial</button>
-                            <button type="submit" id="archive-financial-button" class="btn secondary" formaction="{{ route('archive-data.prepare-financial') }}" {{ $selectedDatasetMode !== 'financial_guarded' ? 'disabled' : '' }}>4. Snapshot Finansial</button>
-                            <button type="submit" id="archive-dry-run-button" class="btn secondary" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='0';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>5. Coba Simulasi Hapus</button>
-                            <button type="submit" id="archive-purge-button" class="btn danger" formaction="{{ route('archive-data.purge') }}" onclick="document.getElementById('confirm_purge').value='1';" {{ $selectedDatasetMode === 'locked' ? 'disabled' : '' }}>6. Hapus Data</button>
-                        </div>
-                    </div>
-                </div>
-            </form>
-        </div>
 
         <div class="card archive-col-12">
             <h3 style="margin-top:0;">Window Retention yang Dipakai Sekarang</h3>
@@ -666,71 +711,6 @@
             </div>
         @endif
 
-        @if (is_array($exportResult))
-            <div class="card archive-col-12">
-                <h3 style="margin-top:0;">Hasil File Arsip</h3>
-                <table class="archive-kv">
-                    <tbody>
-                    <tr><th>SQL file</th><td><code>{{ $exportResult['sql_file'] ?? '-' }}</code></td></tr>
-                    <tr><th>Manifest file</th><td><code>{{ $exportResult['manifest_file'] ?? '-' }}</code></td></tr>
-                    <tr><th>Scope</th><td>{{ (($exportResult['summary']['period_type'] ?? 'year') === 'semester') ? 'Semester' : 'Tahun' }} {{ $exportResult['summary']['period_value'] ?? (($exportResult['summary']['year'] ?? '-')) }}</td></tr>
-                    <tr><th>Total row</th><td>{{ number_format((int) (($exportResult['summary']['grand_total'] ?? 0)), 0, ',', '.') }}</td></tr>
-                    </tbody>
-                </table>
-                <div class="archive-download-row">
-                    @if($encodedExportSqlFile)
-                        <a href="{{ route('archive-data.download', ['file' => $encodedExportSqlFile]) }}" class="btn secondary">Download SQL</a>
-                    @endif
-                    @if($encodedExportManifestFile)
-                        <a href="{{ route('archive-data.download', ['file' => $encodedExportManifestFile]) }}" class="btn secondary">Download Manifest</a>
-                    @endif
-                </div>
-                <p class="archive-muted" style="margin:10px 0 0;">Kalau mau lanjut hapus data, simpan dulu file ini di komputer lokal.</p>
-            </div>
-        @endif
-
-        @if (is_array($financialResult))
-            <div class="card archive-col-12">
-                <h3 style="margin-top:0;">Snapshot Finansial</h3>
-                <table class="archive-kv">
-                    <tbody>
-                    <tr><th>Snapshot file</th><td><code>{{ $financialResult['snapshot_file'] ?? '-' }}</code></td></tr>
-                    <tr><th>Manifest file</th><td><code>{{ $financialResult['manifest_file'] ?? '-' }}</code></td></tr>
-                    <tr><th>Scope</th><td>{{ (($financialResult['period_type'] ?? 'year') === 'semester') ? 'Semester' : 'Tahun' }} {{ $financialResult['period_value'] ?? (($financialResult['year'] ?? '-')) }}</td></tr>
-                    <tr><th>Customer terdampak</th><td>{{ number_format(count($financialResult['customer_snapshots'] ?? []), 0, ',', '.') }}</td></tr>
-                    <tr><th>Supplier terdampak</th><td>{{ number_format(count($financialResult['supplier_snapshots'] ?? []), 0, ',', '.') }}</td></tr>
-                    </tbody>
-                </table>
-                <div class="archive-download-row">
-                    @if($encodedFinancialSnapshotFile)
-                        <a href="{{ route('archive-data.download', ['file' => $encodedFinancialSnapshotFile]) }}" class="btn secondary">Download Snapshot</a>
-                    @endif
-                    @if($encodedFinancialManifestFile)
-                        <a href="{{ route('archive-data.download', ['file' => $encodedFinancialManifestFile]) }}" class="btn secondary">Download Manifest</a>
-                    @endif
-                </div>
-            </div>
-        @endif
-
-        @if (is_array($purgeResult))
-            <div class="card archive-col-12">
-                <h3 style="margin-top:0;">Hasil Bersihkan Data</h3>
-                <table class="archive-kv">
-                    <tbody>
-                    <tr><th>Backup file</th><td><code>{{ $purgeResult['backup_file'] ?? '-' }}</code></td></tr>
-                    <tr><th>Manifest file</th><td><code>{{ $purgeResult['manifest_file'] ?? '-' }}</code></td></tr>
-                    <tr><th>Snapshot file</th><td><code>{{ $purgeResult['snapshot_file'] ?? '-' }}</code></td></tr>
-                    <tr><th>Restore status</th><td>{{ strtoupper((string) ($purgeResult['restore_status'] ?? '-')) }}</td></tr>
-                    <tr><th>Total kandidat</th><td>{{ number_format((int) (($purgeResult['summary']['grand_total'] ?? 0)), 0, ',', '.') }}</td></tr>
-                    @if (!empty($purgeResult['post_check']) && is_array($purgeResult['post_check']))
-                        <tr><th>Financial rebuild exit</th><td>{{ $purgeResult['post_check']['rebuild_exit'] ?? '-' }}</td></tr>
-                        <tr><th>Integrity exit</th><td>{{ $purgeResult['post_check']['integrity_exit'] ?? '-' }}</td></tr>
-                        <tr><th>Integrity latest ok</th><td>{{ var_export($purgeResult['post_check']['latest_integrity_status'] ?? null, true) }}</td></tr>
-                    @endif
-                    </tbody>
-                </table>
-            </div>
-        @endif
 
         {{-- ===== IMPORT ARSIP ===== --}}
         <div class="card archive-col-12">

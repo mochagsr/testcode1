@@ -150,6 +150,14 @@ class SupplierPayablePageController extends Controller
             );
 
             $afterOutstanding = (int) $ledger->balance_after;
+
+            if ($afterOutstanding === 0) {
+                \App\Models\OutgoingTransaction::query()
+                    ->where('supplier_id', (int) $supplier->id)
+                    ->whereNull('settled_at')
+                    ->update(['settled_at' => $paymentDate->toDateString()]);
+            }
+
             $this->auditLogService->log(
                 'supplier.payment.create',
                 $payment,

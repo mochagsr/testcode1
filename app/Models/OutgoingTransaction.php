@@ -30,6 +30,7 @@ class OutgoingTransaction extends Model
         'total_tax',
         'total',
         'notes',
+        'settled_at',
         'created_by_user_id',
     ];
 
@@ -40,6 +41,7 @@ class OutgoingTransaction extends Model
     {
         return [
             'transaction_date' => 'date',
+            'settled_at' => 'date',
             'subtotal_before_tax' => 'integer',
             'total_tax' => 'integer',
             'total' => 'integer',

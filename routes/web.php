@@ -368,5 +368,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::post('/archive-data/quick-snapshot', [ArchiveDataPageController::class, 'quickSnapshot'])->middleware('perm:settings.admin')->name('archive-data.quick-snapshot');
     Route::post('/archive-data/quick-purge', [ArchiveDataPageController::class, 'quickPurge'])->middleware('perm:settings.admin')->name('archive-data.quick-purge');
     Route::post('/archive-data/import', [ArchiveDataPageController::class, 'importArchive'])->middleware('perm:settings.admin')->name('archive-data.import');
+    Route::post('/archive-data/eligible-scan', [ArchiveDataPageController::class, 'eligibleScan'])->middleware('perm:settings.admin')->name('archive-data.eligible-scan');
+    Route::post('/archive-data/eligible-export', [ArchiveDataPageController::class, 'eligibleExport'])->middleware('perm:settings.admin')->name('archive-data.eligible-export');
+    Route::post('/archive-data/eligible-soft-delete', [ArchiveDataPageController::class, 'eligibleSoftDelete'])->middleware('perm:settings.admin')->name('archive-data.eligible-soft-delete');
+    Route::post('/archive-data/eligible-hard-delete', [ArchiveDataPageController::class, 'eligibleHardDelete'])->middleware('perm:settings.admin')->name('archive-data.eligible-hard-delete');
     Route::get('/about', [AboutPageController::class, 'index'])->name('about.index');
 });

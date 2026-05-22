@@ -574,6 +574,81 @@ class ArchiveDataPageController extends Controller
         return [$scope, $standardDatasets, $financialDatasets];
     }
 
+    public function eligibleScan(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        $cutoffYears = max(1, (int) $request->input('cutoff_years', 5));
+
+        try {
+            $result = $archiveService->scanEligible($cutoffYears);
+        } catch (\Throwable $e) {
+            return back()->with('eligible_error', $e->getMessage());
+        }
+
+        $total = number_format($result['grand_total'], 0, ',', '.');
+
+        return back()
+            ->with('eligible_scan_result', $result)
+            ->with('eligible_success', "Scan selesai: ditemukan {$total} baris data yang sudah lunas dan berusia ≥ {$cutoffYears} tahun.");
+    }
+
+    public function eligibleExport(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        $cutoffYears = max(1, (int) $request->input('cutoff_years', 5));
+
+        try {
+            $result = $archiveService->exportEligibleToSql($cutoffYears);
+        } catch (\Throwable $e) {
+            return back()->with('eligible_error', $e->getMessage());
+        }
+
+        $total = number_format($result['grand_total'], 0, ',', '.');
+        $fileName = basename($result['sql_file']);
+
+        return back()
+            ->with('eligible_export_result', $result)
+            ->with('eligible_success', "Export berhasil: {$total} baris disimpan ke file {$fileName}. Unduh dan simpan sebelum hapus.");
+    }
+
+    public function eligibleSoftDelete(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        $cutoffYears = max(1, (int) $request->input('cutoff_years', 5));
+
+        if (! $request->boolean('confirm_soft_delete')) {
+            return back()->with('eligible_error', 'Centang konfirmasi sebelum melanjutkan soft delete.');
+        }
+
+        try {
+            $result = $archiveService->softDeleteEligible($cutoffYears);
+        } catch (\Throwable $e) {
+            return back()->with('eligible_error', $e->getMessage());
+        }
+
+        $total = number_format($result['total'], 0, ',', '.');
+
+        return back()
+            ->with('eligible_soft_delete_result', $result)
+            ->with('eligible_success', "Soft delete selesai: {$total} baris ditandai terhapus. Data belum benar-benar hilang.");
+    }
+
+    public function eligibleHardDelete(Request $request, DataArchiveService $archiveService): RedirectResponse
+    {
+        if (! $request->boolean('confirm_hard_delete')) {
+            return back()->with('eligible_error', 'Centang konfirmasi sebelum menghapus permanen.');
+        }
+
+        try {
+            $result = $archiveService->hardDeleteAllArchived();
+        } catch (\Throwable $e) {
+            return back()->with('eligible_error', $e->getMessage());
+        }
+
+        $total = number_format($result['total'], 0, ',', '.');
+
+        return back()
+            ->with('eligible_hard_delete_result', $result)
+            ->with('eligible_success', "Hapus permanen selesai: {$total} baris dihapus dari database.");
+    }
+
     /**
      * @return array{0:array{type:string,value:string,year:?int,semester:?string,start:?string,end:?string},1:list<string>}
      */

@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\Customer;
+use App\Models\DeliveryNote;
+use App\Models\OrderNote;
+use App\Models\OutgoingTransaction;
 use App\Models\ReceivablePayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Models\SchoolBulkTransaction;
+use App\Models\StockMutation;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
+use App\Models\SupplierPayment;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Artisan;
@@ -1761,5 +1767,460 @@ class DataArchiveService
             'title' => $title,
             'summary' => $summary,
         ];
+    }
+
+    // =========================================================
+    // Eligibility-based archive (lunas + X tahun)
+    // =========================================================
+
+    /**
+     * Scan candidate records eligible for archive: lunas + X years old.
+     *
+     * @return array{cutoff_date:string, grand_total:int, datasets:array<string, array{label:string, count:int}>}
+     */
+    public function scanEligible(int $cutoffYears = 5): array
+    {
+        $cutoff = now('Asia/Jakarta')->subYears($cutoffYears)->endOfDay();
+        $invoiceIdQuery = $this->eligibleInvoiceIdSubquery($cutoff);
+        $outgoingIdQuery = $this->eligibleOutgoingIdSubquery($cutoff);
+        $orderNoteIdQuery = $this->eligibleOrderNoteIdSubquery($cutoff, clone $invoiceIdQuery);
+        $schoolBulkIdQuery = $this->eligibleSchoolBulkIdSubquery($cutoff);
+
+        $datasets = [
+            'sales_invoices' => [
+                'label' => 'Faktur Penjualan',
+                'count' => (int) (clone $invoiceIdQuery)->count(),
+            ],
+            'sales_returns' => [
+                'label' => 'Retur Penjualan',
+                'count' => (int) DB::table('sales_returns')
+                    ->whereNull('deleted_at')
+                    ->whereIn('sales_invoice_id', clone $invoiceIdQuery)
+                    ->count(),
+            ],
+            'delivery_notes' => [
+                'label' => 'Surat Jalan',
+                'count' => (int) DB::table('delivery_notes')
+                    ->whereNull('deleted_at')
+                    ->where(function ($q) use ($orderNoteIdQuery, $cutoff): void {
+                        $q->whereIn('order_note_id', clone $orderNoteIdQuery)
+                          ->orWhere(function ($q2) use ($cutoff): void {
+                              $q2->whereNull('order_note_id')
+                                 ->where('note_date', '<=', $cutoff->toDateString());
+                          });
+                    })
+                    ->count(),
+            ],
+            'order_notes' => [
+                'label' => 'Surat Pesanan',
+                'count' => (int) (clone $orderNoteIdQuery)->count(),
+            ],
+            'outgoing_transactions' => [
+                'label' => 'Tanda Terima Barang',
+                'count' => (int) (clone $outgoingIdQuery)->count(),
+            ],
+            'receivable_payments' => [
+                'label' => 'Pembayaran Piutang',
+                'count' => (int) DB::table('receivable_payments')
+                    ->whereNull('deleted_at')
+                    ->where('payment_date', '<=', $cutoff->toDateString())
+                    ->count(),
+            ],
+            'supplier_payments' => [
+                'label' => 'Pembayaran Hutang Supplier',
+                'count' => (int) DB::table('supplier_payments')
+                    ->whereNull('deleted_at')
+                    ->where('payment_date', '<=', $cutoff->toDateString())
+                    ->count(),
+            ],
+            'school_bulk_transactions' => [
+                'label' => 'Transaksi Sebar Sekolah',
+                'count' => (int) (clone $schoolBulkIdQuery)->count(),
+            ],
+            'stock_mutations' => [
+                'label' => 'Mutasi Stok',
+                'count' => (int) DB::table('stock_mutations')
+                    ->whereNull('deleted_at')
+                    ->where('created_at', '<=', $cutoff->toDateTimeString())
+                    ->count(),
+            ],
+        ];
+
+        $grandTotal = collect($datasets)->sum(static fn (array $ds): int => $ds['count']);
+
+        return [
+            'cutoff_date' => $cutoff->toDateString(),
+            'grand_total' => (int) $grandTotal,
+            'datasets' => $datasets,
+        ];
+    }
+
+    /**
+     * Export eligible records to SQL file.
+     *
+     * @return array{sql_file:string, manifest_file:string, grand_total:int, cutoff_date:string}
+     */
+    public function exportEligibleToSql(int $cutoffYears = 5, ?string $directory = null): array
+    {
+        $cutoff = now('Asia/Jakarta')->subYears($cutoffYears)->endOfDay();
+        $timestamp = now('Asia/Jakarta')->format('Ymd-His');
+        $baseDir = $directory ?: storage_path('app/archives');
+        $sqlDir = $baseDir.DIRECTORY_SEPARATOR.'sql';
+        $manifestDir = $baseDir.DIRECTORY_SEPARATOR.'manifests';
+        File::ensureDirectoryExists($sqlDir);
+        File::ensureDirectoryExists($manifestDir);
+
+        $sqlFile = $sqlDir.DIRECTORY_SEPARATOR.sprintf('eligible-archive-%s.sql', $timestamp);
+        $manifestFile = $manifestDir.DIRECTORY_SEPARATOR.sprintf('eligible-archive-%s.json', $timestamp);
+
+        $handle = fopen($sqlFile, 'wb');
+        if ($handle === false) {
+            throw new \RuntimeException('Gagal membuat file SQL: '.$sqlFile);
+        }
+
+        fwrite($handle, '-- '.config('app.name')." eligible archive export\n");
+        fwrite($handle, '-- Generated: '.now('Asia/Jakarta')->toDateTimeString()."\n");
+        fwrite($handle, '-- Criteria: lunas + '.$cutoffYears." tahun (cutoff: ".$cutoff->toDateString().")\n");
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n\n");
+
+        $pdo = DB::connection()->getPdo();
+        $grandTotal = 0;
+        $manifest = ['cutoff_date' => $cutoff->toDateString(), 'tables' => []];
+
+        $invoiceIdQuery  = $this->eligibleInvoiceIdSubquery($cutoff);
+        $outgoingIdQuery = $this->eligibleOutgoingIdSubquery($cutoff);
+        $orderNoteIdQuery = $this->eligibleOrderNoteIdSubquery($cutoff, clone $invoiceIdQuery);
+
+        $tableDumps = [
+            'sales_invoices'                    => DB::table('sales_invoices')->whereIn('id', clone $invoiceIdQuery),
+            'sales_invoice_items'               => DB::table('sales_invoice_items')->whereIn('sales_invoice_id', clone $invoiceIdQuery),
+            'invoice_payments'                  => DB::table('invoice_payments')->whereIn('sales_invoice_id', clone $invoiceIdQuery),
+            'receivable_ledgers'                => DB::table('receivable_ledgers')->whereIn('sales_invoice_id', clone $invoiceIdQuery),
+            'sales_returns'                     => DB::table('sales_returns')->whereNull('deleted_at')->whereIn('sales_invoice_id', clone $invoiceIdQuery),
+            'sales_return_items'                => DB::table('sales_return_items')->whereIn('sales_return_id',
+                DB::table('sales_returns')->whereNull('deleted_at')->whereIn('sales_invoice_id', clone $invoiceIdQuery)->select('id')),
+            'order_notes'                       => DB::table('order_notes')->whereNull('deleted_at')->whereIn('id', clone $orderNoteIdQuery),
+            'order_note_items'                  => DB::table('order_note_items')->whereIn('order_note_id', clone $orderNoteIdQuery),
+            'delivery_notes'                    => DB::table('delivery_notes')->whereNull('deleted_at')->where(function ($q) use ($orderNoteIdQuery, $cutoff): void {
+                $q->whereIn('order_note_id', clone $orderNoteIdQuery)
+                  ->orWhere(function ($q2) use ($cutoff): void {
+                      $q2->whereNull('order_note_id')->where('note_date', '<=', $cutoff->toDateString());
+                  });
+            }),
+            'delivery_note_items'               => DB::table('delivery_note_items')->whereIn('delivery_note_id',
+                DB::table('delivery_notes')->whereNull('deleted_at')->where(function ($q) use ($orderNoteIdQuery, $cutoff): void {
+                    $q->whereIn('order_note_id', clone $orderNoteIdQuery)
+                      ->orWhere(function ($q2) use ($cutoff): void {
+                          $q2->whereNull('order_note_id')->where('note_date', '<=', $cutoff->toDateString());
+                      });
+                })->select('id')),
+            'outgoing_transactions'             => DB::table('outgoing_transactions')->whereNull('deleted_at')->whereIn('id', clone $outgoingIdQuery),
+            'outgoing_transaction_items'        => DB::table('outgoing_transaction_items')->whereIn('outgoing_transaction_id', clone $outgoingIdQuery),
+            'supplier_ledgers'                  => DB::table('supplier_ledgers')->whereNull('deleted_at')->whereIn('outgoing_transaction_id', clone $outgoingIdQuery),
+            'receivable_payments'               => DB::table('receivable_payments')->whereNull('deleted_at')->where('payment_date', '<=', $cutoff->toDateString()),
+            'supplier_payments'                 => DB::table('supplier_payments')->whereNull('deleted_at')->where('payment_date', '<=', $cutoff->toDateString()),
+            'school_bulk_transactions'          => DB::table('school_bulk_transactions')->whereNull('deleted_at')->where('transaction_date', '<=', $cutoff->toDateString()),
+            'school_bulk_transaction_locations' => DB::table('school_bulk_transaction_locations')->whereIn('school_bulk_transaction_id',
+                DB::table('school_bulk_transactions')->whereNull('deleted_at')->where('transaction_date', '<=', $cutoff->toDateString())->select('id')),
+            'school_bulk_transaction_items'     => DB::table('school_bulk_transaction_items')->whereIn('school_bulk_transaction_id',
+                DB::table('school_bulk_transactions')->whereNull('deleted_at')->where('transaction_date', '<=', $cutoff->toDateString())->select('id')),
+            'stock_mutations'                   => DB::table('stock_mutations')->whereNull('deleted_at')->where('created_at', '<=', $cutoff->toDateTimeString()),
+        ];
+
+        foreach ($tableDumps as $table => $query) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            $columns = Schema::getColumnListing($table);
+            if ($columns === []) {
+                continue;
+            }
+
+            $count = (clone $query)->count();
+            if ((int) $count === 0) {
+                continue;
+            }
+
+            fwrite($handle, sprintf("-- Table: %s | rows: %d\n", $table, $count));
+            $grandTotal += (int) $count;
+            $manifest['tables'][$table] = (int) $count;
+
+            $selectedQuery = (clone $query)->select($columns);
+            if (in_array('id', $columns, true)) {
+                $selectedQuery->orderBy('id');
+            }
+
+            $page = 1;
+            $perPage = 250;
+            do {
+                $rows = (clone $selectedQuery)->forPage($page, $perPage)->get();
+                if ($rows->isEmpty()) {
+                    break;
+                }
+                $valueLines = [];
+                foreach ($rows as $row) {
+                    $record = (array) $row;
+                    $values = [];
+                    foreach ($columns as $col) {
+                        $values[] = $this->sqlValue($pdo, $record[$col] ?? null);
+                    }
+                    $valueLines[] = '('.implode(', ', $values).')';
+                }
+                $columnList = implode(', ', array_map(static fn (string $c): string => '`'.$c.'`', $columns));
+                fwrite($handle, sprintf("INSERT INTO `%s` (%s) VALUES\n%s;\n", $table, $columnList, implode(",\n", $valueLines)));
+                $page++;
+            } while ($rows->count() === $perPage);
+
+            fwrite($handle, "\n");
+        }
+
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
+        fclose($handle);
+
+        $manifest['generated_at'] = now('Asia/Jakarta')->toIso8601String();
+        $manifest['grand_total'] = $grandTotal;
+        $manifest['sql_file'] = $sqlFile;
+        File::put($manifestFile, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return [
+            'sql_file' => $sqlFile,
+            'manifest_file' => $manifestFile,
+            'grand_total' => $grandTotal,
+            'cutoff_date' => $cutoff->toDateString(),
+        ];
+    }
+
+    /**
+     * Soft-delete all records eligible for archive.
+     *
+     * @return array{cutoff_date:string, deleted:array<string, int>, total:int}
+     */
+    public function softDeleteEligible(int $cutoffYears = 5): array
+    {
+        $cutoff = now('Asia/Jakarta')->subYears($cutoffYears)->endOfDay();
+        $now = now('Asia/Jakarta');
+        $deleted = [];
+
+        DB::transaction(function () use ($cutoff, $now, &$deleted): void {
+            $invoiceIds = $this->eligibleInvoiceIdSubquery($cutoff)->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)->all();
+
+            if ($invoiceIds !== []) {
+                SalesInvoice::query()->whereIn('id', $invoiceIds)->update(['deleted_at' => $now]);
+                SalesReturn::query()->whereIn('sales_invoice_id', $invoiceIds)->update(['deleted_at' => $now]);
+                $deleted['sales_invoices'] = count($invoiceIds);
+            }
+
+            $outgoingIds = $this->eligibleOutgoingIdSubquery($cutoff)->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)->all();
+
+            if ($outgoingIds !== []) {
+                OutgoingTransaction::query()->whereIn('id', $outgoingIds)->update(['deleted_at' => $now]);
+                $deleted['outgoing_transactions'] = count($outgoingIds);
+            }
+
+            $orderNoteIds = $this->eligibleOrderNoteIdSubquery($cutoff, DB::table('sales_invoices')->whereIn('id', $invoiceIds))->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)->all();
+
+            if ($orderNoteIds !== []) {
+                OrderNote::query()->whereIn('id', $orderNoteIds)->update(['deleted_at' => $now]);
+                $deleted['order_notes'] = count($orderNoteIds);
+            }
+
+            $dnDeleted = DeliveryNote::query()
+                ->where(function ($q) use ($orderNoteIds, $cutoff): void {
+                    $q->whereIn('order_note_id', $orderNoteIds)
+                      ->orWhere(function ($q2) use ($cutoff): void {
+                          $q2->whereNull('order_note_id')
+                             ->where('note_date', '<=', $cutoff->toDateString());
+                      });
+                })
+                ->update(['deleted_at' => now('Asia/Jakarta')]);
+            if ($dnDeleted > 0) {
+                $deleted['delivery_notes'] = $dnDeleted;
+            }
+
+            $rpDeleted = ReceivablePayment::query()
+                ->where('payment_date', '<=', $cutoff->toDateString())
+                ->update(['deleted_at' => $now]);
+            if ($rpDeleted > 0) {
+                $deleted['receivable_payments'] = $rpDeleted;
+            }
+
+            $spDeleted = SupplierPayment::query()
+                ->where('payment_date', '<=', $cutoff->toDateString())
+                ->update(['deleted_at' => $now]);
+            if ($spDeleted > 0) {
+                $deleted['supplier_payments'] = $spDeleted;
+            }
+
+            $sbDeleted = SchoolBulkTransaction::query()
+                ->where('transaction_date', '<=', $cutoff->toDateString())
+                ->update(['deleted_at' => $now]);
+            if ($sbDeleted > 0) {
+                $deleted['school_bulk_transactions'] = $sbDeleted;
+            }
+
+            $smDeleted = StockMutation::query()
+                ->where('created_at', '<=', $cutoff->toDateTimeString())
+                ->update(['deleted_at' => $now]);
+            if ($smDeleted > 0) {
+                $deleted['stock_mutations'] = $smDeleted;
+            }
+        });
+
+        return [
+            'cutoff_date' => $cutoff->toDateString(),
+            'deleted' => $deleted,
+            'total' => array_sum($deleted),
+        ];
+    }
+
+    /**
+     * Permanently delete all soft-deleted archive records and their children.
+     *
+     * @return array{total:int, tables:array<string, int>}
+     */
+    public function hardDeleteAllArchived(): array
+    {
+        $tables = [];
+
+        DB::transaction(function () use (&$tables): void {
+            // Invoice cascade
+            $invoiceIds = SalesInvoice::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+
+            if ($invoiceIds !== []) {
+                $tables['receivable_ledgers'] = DB::table('receivable_ledgers')->whereIn('sales_invoice_id', $invoiceIds)->delete();
+                $tables['invoice_payments'] = DB::table('invoice_payments')->whereIn('sales_invoice_id', $invoiceIds)->delete();
+                $returnIds = DB::table('sales_returns')->whereIn('sales_invoice_id', $invoiceIds)->pluck('id')
+                    ->map(static fn (mixed $id): int => (int) $id)->all();
+                if ($returnIds !== []) {
+                    $tables['sales_return_items'] = DB::table('sales_return_items')->whereIn('sales_return_id', $returnIds)->delete();
+                    DB::table('sales_returns')->whereIn('id', $returnIds)->delete();
+                }
+                $tables['sales_invoice_items'] = DB::table('sales_invoice_items')->whereIn('sales_invoice_id', $invoiceIds)->delete();
+                $tables['sales_invoices'] = SalesInvoice::withTrashed()->whereIn('id', $invoiceIds)->forceDelete();
+            }
+
+            // Order notes + delivery notes cascade
+            $orderNoteIds = OrderNote::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+
+            if ($orderNoteIds !== []) {
+                $dnIds = DeliveryNote::withTrashed()->whereIn('order_note_id', $orderNoteIds)
+                    ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+                if ($dnIds !== []) {
+                    $tables['delivery_note_items'] = DB::table('delivery_note_items')->whereIn('delivery_note_id', $dnIds)->delete();
+                    $tables['delivery_notes'] = DeliveryNote::withTrashed()->whereIn('id', $dnIds)->forceDelete();
+                }
+                $tables['order_note_items'] = DB::table('order_note_items')->whereIn('order_note_id', $orderNoteIds)->delete();
+                $tables['order_notes'] = OrderNote::withTrashed()->whereIn('id', $orderNoteIds)->forceDelete();
+            }
+
+            // Standalone soft-deleted delivery notes
+            $standaloneDnIds = DeliveryNote::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+            if ($standaloneDnIds !== []) {
+                $existing = (int) ($tables['delivery_note_items'] ?? 0);
+                $tables['delivery_note_items'] = $existing + DB::table('delivery_note_items')->whereIn('delivery_note_id', $standaloneDnIds)->delete();
+                $existing = (int) ($tables['delivery_notes'] ?? 0);
+                $tables['delivery_notes'] = $existing + DeliveryNote::withTrashed()->whereIn('id', $standaloneDnIds)->forceDelete();
+            }
+
+            // Outgoing transactions cascade
+            $outgoingIds = OutgoingTransaction::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+
+            if ($outgoingIds !== []) {
+                $tables['supplier_ledgers'] = DB::table('supplier_ledgers')->whereIn('outgoing_transaction_id', $outgoingIds)->delete();
+                $tables['outgoing_transaction_items'] = DB::table('outgoing_transaction_items')->whereIn('outgoing_transaction_id', $outgoingIds)->delete();
+                $tables['outgoing_transactions'] = OutgoingTransaction::withTrashed()->whereIn('id', $outgoingIds)->forceDelete();
+            }
+
+            // Receivable payments
+            $rpIds = ReceivablePayment::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+            if ($rpIds !== []) {
+                $tables['receivable_payments'] = ReceivablePayment::withTrashed()->whereIn('id', $rpIds)->forceDelete();
+            }
+
+            // Supplier payments
+            $spIds = SupplierPayment::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+            if ($spIds !== []) {
+                $tables['supplier_ledgers'] = ((int) ($tables['supplier_ledgers'] ?? 0))
+                    + DB::table('supplier_ledgers')->whereIn('supplier_payment_id', $spIds)->delete();
+                $tables['supplier_payments'] = SupplierPayment::withTrashed()->whereIn('id', $spIds)->forceDelete();
+            }
+
+            // School bulk transactions
+            $sbIds = SchoolBulkTransaction::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+            if ($sbIds !== []) {
+                $tables['school_bulk_transaction_items'] = DB::table('school_bulk_transaction_items')->whereIn('school_bulk_transaction_id', $sbIds)->delete();
+                $tables['school_bulk_transaction_locations'] = DB::table('school_bulk_transaction_locations')->whereIn('school_bulk_transaction_id', $sbIds)->delete();
+                $tables['school_bulk_transactions'] = SchoolBulkTransaction::withTrashed()->whereIn('id', $sbIds)->forceDelete();
+            }
+
+            // Stock mutations
+            $smIds = StockMutation::withTrashed()->whereNotNull('deleted_at')
+                ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+            if ($smIds !== []) {
+                $tables['stock_mutations'] = StockMutation::withTrashed()->whereIn('id', $smIds)->forceDelete();
+            }
+        });
+
+        return [
+            'total' => (int) array_sum($tables),
+            'tables' => $tables,
+        ];
+    }
+
+    private function eligibleInvoiceIdSubquery(Carbon $cutoff): Builder
+    {
+        return DB::table('sales_invoices')
+            ->where('payment_status', 'paid')
+            ->where('is_canceled', false)
+            ->where(static function ($q) use ($cutoff): void {
+                $q->where(static function ($q2) use ($cutoff): void {
+                    $q2->whereNotNull('paid_at')->where('paid_at', '<=', $cutoff->toDateString());
+                })->orWhere(static function ($q2) use ($cutoff): void {
+                    $q2->whereNull('paid_at')->where('invoice_date', '<=', $cutoff->toDateString());
+                });
+            })
+            ->whereNull('deleted_at')
+            ->select('id');
+    }
+
+    private function eligibleOutgoingIdSubquery(Carbon $cutoff): Builder
+    {
+        return DB::table('outgoing_transactions')
+            ->whereNotNull('settled_at')
+            ->where('settled_at', '<=', $cutoff->toDateString())
+            ->whereNull('deleted_at')
+            ->select('id');
+    }
+
+    private function eligibleOrderNoteIdSubquery(Carbon $cutoff, Builder $eligibleInvoiceQuery): Builder
+    {
+        return DB::table('order_notes')
+            ->whereNull('deleted_at')
+            ->whereIn('id',
+                DB::table('sales_invoices')
+                    ->whereIn('id', $eligibleInvoiceQuery)
+                    ->whereNotNull('order_note_id')
+                    ->select('order_note_id')
+            )
+            ->select('id');
+    }
+
+    private function eligibleSchoolBulkIdSubquery(Carbon $cutoff): Builder
+    {
+        return DB::table('school_bulk_transactions')
+            ->whereNull('deleted_at')
+            ->where('transaction_date', '<=', $cutoff->toDateString())
+            ->select('id');
     }
 }

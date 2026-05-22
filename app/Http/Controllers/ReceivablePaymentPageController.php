@@ -222,6 +222,7 @@ class ReceivablePaymentPageController extends Controller
                         'total_paid' => $newTotalPaid,
                         'balance' => $newBalance,
                         'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+                        'paid_at' => $newBalance <= 0 ? $paymentDate : null,
                     ]);
 
                     $this->receivableLedgerService->addCredit(
@@ -387,6 +388,7 @@ class ReceivablePaymentPageController extends Controller
                         'total_paid' => $newTotalPaid,
                         'balance' => $newBalance,
                         'payment_status' => $newBalance <= 0 ? 'paid' : 'unpaid',
+                        'paid_at' => $newBalance <= 0 ? $invoice->paid_at : null,
                     ]);
 
                     $this->receivableLedgerService->addDebit(
