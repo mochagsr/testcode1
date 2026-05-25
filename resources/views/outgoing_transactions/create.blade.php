@@ -87,6 +87,13 @@
             padding: 7px 10px;
         }
 
+        .table-mobile-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-mobile-scroll #items-table {
+            min-width: 860px;
+        }
         @media (max-width: 900px) {
             #items-table .outgoing-category-select,
             #items-table .outgoing-unit-select,

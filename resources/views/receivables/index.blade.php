@@ -948,7 +948,25 @@
                                 $billRemainingReceivable = max(0, $billRunningBalanceTotal);
                             @endphp
                             <div class="receivable-subcard" style="margin-top: 10px;">
-                                <strong>{{ __('receivable.bill_final_summary_title') }}</strong>
+                                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                    <strong>{{ __('receivable.bill_final_summary_title') }}</strong>
+                                    @if($selectedSemester !== null && $billRunningBalanceTotal <= 0)
+                                        <span style="display:inline-block; padding:2px 12px; border:2px solid #16a34a; color:#16a34a; border-radius:4px; font-size:13px; font-weight:800; letter-spacing:1px;">LUNAS</span>
+                                        @if((auth()->user()?->canAccess('receivables.lock') ?? false) && !($selectedCustomerSemesterClosed ?? false))
+                                            <form method="post" action="{{ route('receivables.customer-semester.close', ['customer' => $selectedCustomerId]) }}" style="display:inline;">
+                                                @csrf
+                                                <input type="hidden" name="semester" value="{{ $selectedSemester }}">
+                                                <input type="hidden" name="search" value="{{ $search }}">
+                                                <input type="hidden" name="customer_id" value="{{ $selectedCustomerId }}">
+                                                <button type="submit" class="btn" style="font-size:12px; padding:2px 10px; border-color:#16a34a; color:#16a34a;" title="Semester lunas — klik untuk menutup semester ini">
+                                                    Tutup Semester
+                                                </button>
+                                            </form>
+                                        @elseif($selectedCustomerSemesterClosed ?? false)
+                                            <span style="font-size:11px; color:#6b7280; font-style:italic;">Semester telah ditutup</span>
+                                        @endif
+                                    @endif
+                                </div>
                                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 14px; margin-top: 8px;">
                                     <div>{{ __('receivable.bill_total_purchase') }}: <strong>Rp {{ number_format($billTotalPurchase, 0, ',', '.') }}</strong></div>
                                     <div>{{ __('receivable.bill_total_account_payment') }}: <strong>Rp {{ number_format($billTotalAccountPayment, 0, ',', '.') }}</strong></div>

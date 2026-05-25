@@ -1665,7 +1665,7 @@ class ReceivablePageController extends Controller
                 'customer_id' => $customerId,
                 'semester' => (string) ($normalizedSemester ?? ''),
                 'transaction_type' => (string) ($normalizedTransactionType ?? ''),
-                'version' => 'v4',
+                'version' => 'v5',
             ]),
             now()->addSeconds(45),
             fn () => $this->buildCustomerBillStatement($customerId, $normalizedSemester, $normalizedTransactionType)
@@ -1695,12 +1695,14 @@ class ReceivablePageController extends Controller
             // Opening balance = sum of all ledger entries in semesters BEFORE this one,
             // ordered by semester sort key (not by date), so manually-assigned past-semester
             // entries don't bleed into the wrong opening balance.
-            $allCustomerSemesters = ReceivableLedger::query()
-                ->forCustomer($customerId)
-                ->whereNotNull('semester_period')
-                ->select('semester_period')
-                ->distinct()
-                ->pluck('semester_period')
+            $allCustomerSemesters = \Illuminate\Support\Facades\DB::table('receivable_ledgers')
+                ->where('customer_id', $customerId)
+                ->whereNull('deleted_at')
+                ->whereNotNull('period_code')
+                ->select('period_code')
+                ->get()
+                ->pluck('period_code')
+                ->unique()
                 ->map(fn (mixed $s): string => (string) $s)
                 ->filter(fn (string $s): bool => $s !== '')
                 ->sortBy(fn (string $s): string => $this->semesterBookService->semesterSortKey($s))
@@ -1713,15 +1715,10 @@ class ReceivablePageController extends Controller
                 fn (string $s): bool => $this->semesterBookService->semesterSortKey($s) < $currentSortKey
             ));
 
-            $openingBalance = (int) round((float) (ReceivableLedger::query()
+            $openingBalance = empty($priorSemesters) ? 0 : (int) round((float) (ReceivableLedger::query()
                 ->forCustomer($customerId)
                 ->when($transactionType !== '', fn ($q) => $q->where('transaction_type', $transactionType))
-                ->where(function ($q) use ($priorSemesters, $transactionType): void {
-                    $q->whereIn('semester_period', $priorSemesters);
-                    if ($transactionType === '') {
-                        $q->orWhereNull('semester_period');
-                    }
-                })
+                ->whereIn('period_code', $priorSemesters)
                 ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as net')
                 ->value('net') ?? 0));
         } elseif ($ledgerRows->isNotEmpty()) {
@@ -1984,11 +1981,8 @@ class ReceivablePageController extends Controller
 
             if (in_array($entryType, ['adjustment', 'cancel'], true)) {
                 $groupedRows[$groupKey]['adjustment_amount'] += ($debit - $credit);
-            } elseif (
-                in_array($entryType, ['payment', 'overpayment'], true)
-                && (int) ($groupedRows[$groupKey]['payment_total_amount'] ?? 0) > 0
-            ) {
-                $groupedRows[$groupKey]['installment_payment'] = (int) $groupedRows[$groupKey]['payment_total_amount'];
+            } elseif (in_array($entryType, ['payment', 'overpayment'], true)) {
+                $groupedRows[$groupKey]['installment_payment'] += $installment;
             } else {
                 $groupedRows[$groupKey]['credit_sales'] += $debit;
                 $groupedRows[$groupKey]['installment_payment'] += $installment;

@@ -15,6 +15,7 @@
     </div>
 
     <div class="card">
+        <div class="transaction-list-scroll">
         <table>
             <thead>
             <tr>
@@ -86,6 +87,7 @@
             @endforelse
             </tbody>
         </table>
+        </div>{{-- .transaction-list-scroll --}}
         {{ $requests->links() }}
     </div>
 @endsection

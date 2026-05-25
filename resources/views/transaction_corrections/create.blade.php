@@ -55,6 +55,7 @@
                     </div>
                     <div class="col-12">
                         <div id="stock-impact-wrapper" style="display:none;">
+                            <div class="table-mobile-scroll">
                             <table id="stock-impact-table">
                                 <thead>
                                 <tr>
@@ -66,6 +67,7 @@
                                 </thead>
                                 <tbody></tbody>
                             </table>
+                            </div>{{-- .table-mobile-scroll --}}
                         </div>
                     </div>
                 @endif

@@ -47,6 +47,20 @@
         .footer-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 10px; }
         .footer-box { border: 1px solid #111; padding: 8px; min-height: 64px; }
         .receivable-breakdown-page { page-break-before: always; break-before: page; margin-top: 0; }
+        .lunas-stamp-wrap { position: relative; }
+        .lunas-stamp {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 64px; font-weight: 900; letter-spacing: 6px;
+            color: rgba(22, 163, 74, 0.18);
+            border: 6px solid rgba(22, 163, 74, 0.18);
+            padding: 4px 24px;
+            border-radius: 8px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 10;
+        }
         .invoice-detail-table { margin-top: 8px; }
         .invoice-detail-title { text-align: left; background: #f7f7f7; font-weight: 800; }
         .muted { color: #444; }
@@ -112,6 +126,8 @@
                 <div class="doc-subtitle">{{ $selectedSemester }}</div>
             @elseif(!empty($selectedTransactionType))
                 <div class="doc-subtitle">{{ strtoupper($selectedTransactionType) }}</div>
+            @else
+                <div class="doc-subtitle">GLOBAL</div>
             @endif
             <div class="doc-number">{{ __('txn.no') }}: {{ $customer->code ?: $customer->id }}</div>
         </div>
@@ -219,6 +235,11 @@
         $totalDeductionAndReturn = (int) round((float) ($totals['deduction_discount'] ?? 0)) + (int) round((float) ($totals['sales_return'] ?? 0));
         $remainingReceivable = max(0, $runningBalanceTotal);
     @endphp
+    @php $isLunas = $selectedSemester && $runningBalanceTotal <= 0; @endphp
+    <div class="{{ $isLunas ? 'lunas-stamp-wrap' : '' }}" style="position:relative;">
+    @if($isLunas)
+        <div class="lunas-stamp">LUNAS</div>
+    @endif
     <table style="margin-top: 8px;">
         <tbody>
         <tr>
@@ -242,6 +263,37 @@
         </tr>
         </tbody>
     </table>
+    </div>{{-- end lunas-stamp-wrap --}}
+
+    @if($isLunas)
+        <div style="text-align:center; margin-top:10px; font-size:13px; color:#16a34a; font-weight:700; letter-spacing:1px;">
+            ✓ {{ $isCreditBalanceTotal ? 'LUNAS — Kelebihan dibawa ke semester berikutnya' : 'LUNAS' }}
+        </div>
+    @endif
+
+    @php
+        $catatanLines = collect();
+        foreach (preg_split('/\r\n|\r|\n/', $notesText) ?: [] as $line) {
+            if (trim($line) !== '') $catatanLines->push($line);
+        }
+        foreach (preg_split('/\r\n|\r|\n/', $transferText) ?: [] as $line) {
+            $catatanLines->push($line); // keep blank lines between sections
+        }
+        $hasCatatan = $catatanLines->filter(fn($l) => trim($l) !== '')->isNotEmpty();
+    @endphp
+    <div class="footer-summary" style="margin-top: 14px;">
+        <div class="footer-box">
+            @if($hasCatatan)
+                <div class="notes-title">{{ __('receivable.note_label') }} :</div>
+                @foreach($catatanLines as $line)
+                    <div class="notes-line">{{ $line }}</div>
+                @endforeach
+            @else
+                <div class="notes-title">{{ __('receivable.note_label') }} :</div>
+            @endif
+        </div>
+        <div class="footer-box" style="min-height: 80px;">&nbsp;</div>
+    </div>
 
     @if($invoiceBreakdownRows->isNotEmpty())
         <table class="receivable-breakdown-page">
@@ -315,30 +367,6 @@
         @endforeach
     @endif
 
-    @if($notesText !== '' || $transferText !== '')
-        <div class="footer-summary">
-            <div class="footer-box">
-                @if($notesText !== '')
-                    <div class="notes-title">{{ __('receivable.note_label') }} :</div>
-                    @foreach(preg_split('/\r\n|\r|\n/', $notesText) ?: [] as $line)
-                        @if(trim($line) !== '')
-                            <div class="notes-line">{{ $line }}</div>
-                        @endif
-                    @endforeach
-                @endif
-            </div>
-            <div class="footer-box">
-                @if($transferText !== '')
-                    <div class="transfer-title">{{ __('receivable.transfer_via_label') }} :</div>
-                    @foreach(preg_split('/\r\n|\r|\n/', $transferText) ?: [] as $line)
-                        @if(trim($line) !== '')
-                            <div class="transfer-line">{{ $line }}</div>
-                        @endif
-                    @endforeach
-                @endif
-            </div>
-        </div>
-    @endif
 
 </div>
 </body>

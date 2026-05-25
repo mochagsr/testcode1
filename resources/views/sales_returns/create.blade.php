@@ -96,7 +96,8 @@
                 <h3 style="margin: 0;">{{ __('txn.return_items') }}</h3>
                 <button type="button" id="add-item" class="btn process-soft-btn">{{ __('txn.add_row') }}</button>
             </div>
-            <table id="items-table" style="margin-top: 12px;">
+            <div class="table-mobile-scroll" style="margin-top: 12px;">
+            <table id="items-table">
                 <thead>
                 <tr>
                     <th style="width: 36%">{{ __('txn.product') }} *</th>
@@ -109,6 +110,7 @@
                 </thead>
                 <tbody></tbody>
             </table>
+            </div>{{-- .table-mobile-scroll --}}
             <div style="margin-top: 10px; text-align: right;">
                 <strong>{{ __('txn.total_return') }}: Rp <span id="grand-total">0</span></strong>
             </div>

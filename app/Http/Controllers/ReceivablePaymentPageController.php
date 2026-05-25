@@ -12,6 +12,7 @@ use App\Services\AccountingService;
 use App\Services\ReceivableLedgerService;
 use App\Support\AppCache;
 use App\Support\AppSetting;
+use App\Support\SemesterBookService;
 use App\Support\ExcelExportStyler;
 use App\Support\PrintPaperSize;
 use App\Support\PrintTextFormatter;
@@ -37,7 +38,8 @@ class ReceivablePaymentPageController extends Controller
 {
     public function __construct(
         private readonly ReceivableLedgerService $receivableLedgerService,
-        private readonly AccountingService $accountingService
+        private readonly AccountingService $accountingService,
+        private readonly SemesterBookService $semesterBookService
     ) {}
 
     public function index(Request $request): View
@@ -253,7 +255,7 @@ class ReceivablePaymentPageController extends Controller
                         invoiceId: null,
                         entryDate: $paymentDate,
                         amount: $remaining,
-                        periodCode: null,
+                        periodCode: $this->semesterBookService->semesterFromDate($paymentDate->toDateString()),
                         description: __('receivable.receivable_payment', ['payment' => $payment->payment_number]),
                         transactionType: null
                     );
