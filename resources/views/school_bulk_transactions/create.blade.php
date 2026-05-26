@@ -91,6 +91,35 @@
                 min-width: 760px;
             }
         }
+        .product-ac-dropdown {
+            position: fixed;
+            z-index: 9999;
+            background: #fff;
+            border: 1px solid #b0bec5;
+            border-radius: 4px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+            max-height: 300px;
+            overflow-y: scroll;
+            min-width: 260px;
+            font-size: 0.97em;
+        }
+        .product-ac-dropdown::-webkit-scrollbar { width: 6px; }
+        .product-ac-dropdown::-webkit-scrollbar-track { background: #f1f1f1; }
+        .product-ac-dropdown::-webkit-scrollbar-thumb { background: #b0bec5; border-radius: 3px; }
+        .product-ac-dropdown::-webkit-scrollbar-thumb:hover { background: #78909c; }
+        .product-ac-item {
+            padding: 7px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .product-ac-item:hover,
+        .product-ac-item.active { background: #e3f0ff; }
+        .product-ac-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .product-ac-item-stock { font-size: 0.88em; color: #526173; white-space: nowrap; }
+        .product-ac-empty { padding: 8px 12px; color: #888; }
     </style>
 
     <form method="post" action="{{ route('school-bulk-transactions.store') }}">
@@ -174,11 +203,6 @@
         <a class="btn secondary" href="{{ route('school-bulk-transactions.index') }}">{{ __('txn.cancel') }}</a>
     </form>
 
-    <datalist id="products-list">
-        @foreach($products as $product)
-            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
-        @endforeach
-    </datalist>
     <datalist id="school-locations-list">
         @foreach($shipLocations as $shipLocation)
             <option value="{{ $shipLocation->school_name }}{{ $shipLocation->city ? ' ('.$shipLocation->city.')' : '' }}"></option>
@@ -469,33 +493,13 @@
                 rebuildProductIndexes();
             }
 
-            function renderProductSuggestions(query) {
-                const productsList = document.getElementById('products-list');
-                if (!productsList) {
-                    return;
-                }
-                const normalized = (query || '').trim().toLowerCase();
-                const matches = products.filter((product) => {
-                    const label = productLabel(product).toLowerCase();
-                    const code = (product.code || '').toLowerCase();
-                    const name = (product.name || '').toLowerCase();
-                    return normalized === '' || label.includes(normalized) || code.includes(normalized) || name.includes(normalized);
-                }).slice(0, 60);
-
-                productsList.innerHTML = matches
-                    .map((product) => `<option value="${escapeAttribute(productLabel(product))}"></option>`)
-                    .join('');
-            }
-
             async function fetchProductSuggestions(query) {
                 const normalizedQuery = normalizeLookup(query);
                 if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
                     lastProductLookupQuery = '';
-                    renderProductSuggestions(query);
                     return;
                 }
                 if (normalizedQuery !== '' && normalizedQuery === lastProductLookupQuery) {
-                    renderProductSuggestions(query);
                     return;
                 }
                 try {
@@ -511,7 +515,6 @@
                     const payload = await response.json();
                     lastProductLookupQuery = normalizedQuery;
                     upsertProducts(payload.data || []);
-                    renderProductSuggestions(query);
                 } catch (error) {
                     if (error && error.name === 'AbortError') {
                         return;
@@ -538,6 +541,154 @@
                 return products.find((product) => productLabel(product).toLowerCase().includes(normalized))
                     || products.find((product) => String(product.name || '').toLowerCase().includes(normalized))
                     || null;
+            }
+
+            async function resolveProductFromInput(value) {
+                const trimmed = String(value || '').trim();
+                if (!trimmed) return null;
+                let product = findProductByLabel(trimmed) || findProductLoose(trimmed);
+                if (product) return product;
+                await fetchProductSuggestions(trimmed);
+                return findProductByLabel(trimmed) || findProductLoose(trimmed) || null;
+            }
+
+            function createProductAutocomplete(inputEl, hiddenEl, onSelect) {
+                let dropdown = null;
+                let activeIndex = -1;
+                let debounceTimer = null;
+
+                function getMatches(query) {
+                    const q = (query || '').trim().toLowerCase();
+                    if (!q) return products.slice(0, 60);
+                    return products.filter((p) => {
+                        const label = productLabel(p).toLowerCase();
+                        return label.includes(q) || (p.code || '').toLowerCase().includes(q) || (p.name || '').toLowerCase().includes(q);
+                    }).slice(0, 60);
+                }
+
+                function closeDropdown() {
+                    if (dropdown) { dropdown.remove(); dropdown = null; }
+                    activeIndex = -1;
+                }
+
+                function positionDropdown() {
+                    if (!dropdown) return;
+                    const rect = inputEl.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const dropH = Math.min(300, dropdown.scrollHeight);
+                    if (spaceBelow >= dropH || spaceBelow >= 120) {
+                        dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+                        dropdown.style.left = (rect.left + window.scrollX) + 'px';
+                        dropdown.style.width = Math.max(rect.width, 260) + 'px';
+                        dropdown.style.maxHeight = Math.min(300, spaceBelow - 8) + 'px';
+                    } else {
+                        const spaceAbove = rect.top;
+                        dropdown.style.top = (rect.top + window.scrollY - Math.min(dropH, spaceAbove - 8)) + 'px';
+                        dropdown.style.left = (rect.left + window.scrollX) + 'px';
+                        dropdown.style.width = Math.max(rect.width, 260) + 'px';
+                        dropdown.style.maxHeight = Math.min(300, spaceAbove - 8) + 'px';
+                    }
+                }
+
+                function renderDropdown(matches) {
+                    if (!dropdown) {
+                        dropdown = document.createElement('div');
+                        dropdown.className = 'product-ac-dropdown';
+                        document.body.appendChild(dropdown);
+                    }
+                    activeIndex = -1;
+                    if (matches.length === 0) {
+                        dropdown.innerHTML = `<div class="product-ac-empty">Tidak ada hasil</div>`;
+                        positionDropdown();
+                        return;
+                    }
+                    dropdown.innerHTML = matches.map((p, i) =>
+                        `<div class="product-ac-item" data-idx="${i}">
+                            <span class="product-ac-item-label">${escapeHtml(productLabel(p))}</span>
+                            <span class="product-ac-item-stock">stok: ${p.stock != null ? p.stock : '-'}</span>
+                        </div>`
+                    ).join('');
+                    dropdown.querySelectorAll('.product-ac-item').forEach((el, i) => {
+                        el.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            selectItem(matches[i]);
+                        });
+                        el.addEventListener('mouseover', () => {
+                            setActive(i);
+                        });
+                    });
+                    positionDropdown();
+                }
+
+                function setActive(idx) {
+                    if (!dropdown) return;
+                    const items = dropdown.querySelectorAll('.product-ac-item');
+                    items.forEach((el, i) => el.classList.toggle('active', i === idx));
+                    activeIndex = idx;
+                    if (items[idx]) items[idx].scrollIntoView({ block: 'nearest' });
+                }
+
+                function selectItem(product) {
+                    inputEl.value = productLabel(product);
+                    hiddenEl.value = product.id;
+                    closeDropdown();
+                    onSelect(product);
+                }
+
+                function escapeHtml(str) {
+                    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                }
+
+                async function handleInput() {
+                    const query = inputEl.value;
+                    hiddenEl.value = '';
+                    onSelect(null);
+                    if (query.length < 2) { closeDropdown(); return; }
+                    await fetchProductSuggestions(query);
+                    const matches = getMatches(query);
+                    renderDropdown(matches);
+                }
+
+                inputEl.addEventListener('input', () => {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(handleInput, 250);
+                });
+                inputEl.addEventListener('focus', () => {
+                    const matches = getMatches(inputEl.value);
+                    if (matches.length > 0 || inputEl.value.length >= 2) renderDropdown(matches);
+                });
+                inputEl.addEventListener('keydown', (e) => {
+                    if (!dropdown) return;
+                    const items = dropdown.querySelectorAll('.product-ac-item');
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.min(activeIndex + 1, items.length - 1)); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(activeIndex - 1, 0)); }
+                    else if (e.key === 'Enter') {
+                        if (activeIndex >= 0 && items[activeIndex]) {
+                            e.preventDefault();
+                            items[activeIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        }
+                    }
+                    else if (e.key === 'Escape') { closeDropdown(); }
+                });
+                inputEl.addEventListener('blur', async () => {
+                    setTimeout(async () => {
+                        closeDropdown();
+                        const value = String(inputEl.value || '').trim();
+                        if (!value) { hiddenEl.value = ''; onSelect(null); return; }
+                        if (hiddenEl.value) return;
+                        const product = await resolveProductFromInput(value);
+                        if (product) {
+                            inputEl.value = productLabel(product);
+                            hiddenEl.value = product.id;
+                            onSelect(product);
+                        } else {
+                            hiddenEl.value = '';
+                            onSelect(null);
+                        }
+                    }, 200);
+                });
+                window.addEventListener('scroll', positionDropdown, true);
+                window.addEventListener('resize', positionDropdown);
             }
 
             function shipLocationLabel(location) {
@@ -800,7 +951,7 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <input type="text" list="products-list" class="product-name" value="${initial.product_name || ''}" autocomplete="off" required>
+                        <input type="text" class="product-name" value="${initial.product_name || ''}" autocomplete="off" required>
                         <input type="hidden" class="product-id" value="${initial.product_id || ''}">
                         <div class="field-inline-error product-name-error" style="display:block; margin-top:4px;"></div>
                     </td>
@@ -820,52 +971,18 @@
                 const productNameInput = tr.querySelector('.product-name');
                 const productIdInput = tr.querySelector('.product-id');
                 const productPriceInput = tr.querySelector('.product-price');
-                const applyProduct = (product) => {
-                    productIdInput.value = product ? product.id : '';
+                createProductAutocomplete(productNameInput, productIdInput, (product) => {
                     if (!product) {
+                        setSchoolItemProductError(tr, String(productNameInput.value || '').trim()
+                            ? @json(__('txn.product_not_registered')) : '');
                         return;
                     }
-                    productNameInput.value = productLabel(product);
                     setSchoolItemProductError(tr, '');
                     updateSchoolItemUnit(tr, product);
                     if (!productPriceInput.value) {
                         productPriceInput.value = Math.round(productPriceForCurrentCustomer(product));
                         window.PgposNumberFormat.formatInput(productPriceInput);
                     }
-                };
-                const onProductInput = debounce(async (event) => {
-                    setSchoolItemProductError(tr, '');
-                    await fetchProductSuggestions(event.currentTarget.value);
-                    const product = findProductByLabel(event.currentTarget.value);
-                    applyProduct(product);
-                });
-                productNameInput?.addEventListener('input', onProductInput);
-                productNameInput?.addEventListener('focus', (event) => {
-                    renderProductSuggestions(event.currentTarget.value);
-                });
-                productNameInput?.addEventListener('change', (event) => {
-                    const product = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
-                    applyProduct(product);
-                    if (!product && String(event.currentTarget.value || '').trim() !== '') {
-                        setSchoolItemProductError(tr, @json(__('txn.product_not_registered')));
-                    } else if (!product) {
-                        setSchoolItemProductError(tr, '');
-                    }
-                });
-                productNameInput?.addEventListener('blur', async (event) => {
-                    const value = String(event.currentTarget.value || '').trim();
-                    if (value === '') {
-                        productIdInput.value = '';
-                        setSchoolItemProductError(tr, '');
-                        return;
-                    }
-                    const product = await resolveProductFromInput(value);
-                    if (!product) {
-                        productIdInput.value = '';
-                        setSchoolItemProductError(tr, @json(__('txn.product_not_registered')));
-                        return;
-                    }
-                    applyProduct(product);
                 });
                 tr.querySelector('.remove-item').addEventListener('click', () => {
                     tr.remove();
@@ -1182,7 +1299,6 @@
             rebuildProductIndexes();
             renderCustomerSuggestions('');
             renderShipLocationSuggestions('');
-            renderProductSuggestions('');
             syncSemesterFromDate();
             transactionDateInput?.addEventListener('change', syncSemesterFromDate);
         })();
