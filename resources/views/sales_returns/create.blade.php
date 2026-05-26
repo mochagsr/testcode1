@@ -120,6 +120,12 @@
         <a class="btn secondary" href="{{ route('sales-returns.index') }}">{{ __('txn.cancel') }}</a>
     </form>
 
+    <datalist id="products-list">
+        @foreach($products as $product)
+            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
+        @endforeach
+    </datalist>
+
     <script>
         let products = @json($products);
         let customers = @json($customers);
@@ -671,11 +677,6 @@
         returnDateInput?.addEventListener('change', autoSelectSemesterByDate);
     </script>
 
-    <datalist id="products-list">
-        @foreach($products as $product)
-            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
-        @endforeach
-    </datalist>
     @include('partials.printing_subtype_script')
 @endsection
 
