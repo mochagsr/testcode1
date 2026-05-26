@@ -460,7 +460,7 @@
                     return;
                 }
                 form.requestSubmit();
-            }, 100);
+            }, 420);
             searchInput.addEventListener('input', onSearchInput);
             typeFilter?.addEventListener('change', () => form.requestSubmit());
         })();

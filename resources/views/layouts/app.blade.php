@@ -1847,7 +1847,7 @@
                 return true;
             }
 
-            return words.every((word) => word.length >= 3);
+            return words.every((word) => word.length >= 2);
         }
 
         function deriveSemesterFromDate(dateValue) {
