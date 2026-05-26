@@ -6,6 +6,34 @@
     <h1 class="page-title">{{ __('txn.create_order_note_title') }}</h1>
 
     <style>
+        .product-ac-dropdown {
+            position: fixed;
+            z-index: 9999;
+            background: var(--card, #fff);
+            border: 1px solid var(--border, #d0d7de);
+            border-radius: 6px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.16);
+            min-width: 300px;
+            max-height: 280px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+        .product-ac-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 2px 12px;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border, #d0d7de);
+            line-height: 1.35;
+        }
+        .product-ac-item:last-child { border-bottom: none; }
+        .product-ac-item.is-active, .product-ac-item:hover { background: var(--hover-bg, rgba(59,130,246,0.08)); }
+        .product-ac-item.out-of-stock { opacity: 0.4; }
+        .product-ac-name { font-weight: 700; }
+        .product-ac-code { font-size: 11px; color: var(--muted, #6b7280); }
+        .product-ac-meta { font-size: 11px; color: var(--muted, #6b7280); text-align: right; white-space: nowrap; align-self: center; }
+        .product-ac-empty { padding: 10px 12px; color: var(--muted, #6b7280); font-style: italic; }
         #items-table input[type=number].qty-input::-webkit-outer-spin-button,
         #items-table input[type=number].qty-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -137,12 +165,6 @@
         <a class="btn secondary" href="{{ route('order-notes.index') }}">{{ __('txn.cancel') }}</a>
     </form>
 
-    <datalist id="products-list">
-        @foreach($products as $product)
-            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
-        @endforeach
-    </datalist>
-
     <script>
         let customers = @json($customers->values());
         let products = @json($products);
@@ -156,7 +178,6 @@
         const PRODUCT_LOOKUP_URL = @json(route('api.products.index'));
         const LOOKUP_LIMIT = 20;
         const tbody = document.querySelector('#items-table tbody');
-        const productsList = document.getElementById('products-list');
         const customersList = document.getElementById('customers-list');
         const addBtn = document.getElementById('add-item');
         const itemsTotalQty = document.getElementById('items-total-qty');
@@ -397,32 +418,12 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
 
-        function renderProductSuggestions(query) {
-            if (!productsList) {
-                return;
-            }
-            const normalized = (query || '').trim().toLowerCase();
-            const matches = products.filter((product) => {
-                const label = productLabel(product).toLowerCase();
-                const code = (product.code || '').toLowerCase();
-                const name = (product.name || '').toLowerCase();
-                return normalized === '' || label.includes(normalized) || code.includes(normalized) || name.includes(normalized);
-            }).slice(0, 60);
-
-            productsList.innerHTML = matches
-                .map((product) => `<option value="${escapeAttribute(productLabel(product))}"></option>`)
-                .join('');
-        }
-
         async function fetchProductSuggestions(query) {
             const normalizedQuery = normalizeLookup(query);
             if (!(window.PgposAutoSearch && window.PgposAutoSearch.canSearchInput({ value: query }))) {
-                lastProductLookupQuery = '';
-                renderProductSuggestions(query);
                 return;
             }
             if (normalizedQuery !== '' && normalizedQuery === lastProductLookupQuery) {
-                renderProductSuggestions(query);
                 return;
             }
             try {
@@ -438,12 +439,181 @@
                 const payload = await response.json();
                 lastProductLookupQuery = normalizedQuery;
                 upsertProducts(payload.data || []);
-                renderProductSuggestions(query);
             } catch (error) {
                 if (error && error.name === 'AbortError') {
                     return;
                 }
             }
+        }
+
+        async function resolveProductFromInput(rawValue) {
+            const input = String(rawValue || '').trim();
+            if (input === '') return null;
+            const variants = [input];
+            const match = input.match(/^(.+?)\s*-\s*(.+)\s*$/);
+            if (match) {
+                const a = String(match[1] || '').trim();
+                const b = String(match[2] || '').trim();
+                if (a) variants.push(a);
+                if (b) variants.push(b);
+            }
+            for (const v of Array.from(new Set(variants))) {
+                const p = findProductByLabel(v) || findProductLoose(v);
+                if (p) return p;
+            }
+            for (const v of Array.from(new Set(variants))) {
+                await fetchProductSuggestions(v);
+                const p = findProductByLabel(v) || findProductLoose(v);
+                if (p) return p;
+            }
+            return null;
+        }
+
+        function createProductAutocomplete(inputEl, hiddenEl, onSelect) {
+            let dropdown = null;
+            let activeIdx = -1;
+            let currentMatches = [];
+            let blurTimer = null;
+
+            function esc(s) {
+                return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            }
+
+            function getMatches(query) {
+                const q = (query || '').trim().toLowerCase();
+                if (q.length < 2) return [];
+                return products.filter(p => {
+                    const label = productLabel(p).toLowerCase();
+                    const code = (p.code || '').toLowerCase();
+                    const name = (p.name || '').toLowerCase();
+                    return label.includes(q) || code.includes(q) || name.includes(q);
+                }).slice(0, 10);
+            }
+
+            function position() {
+                if (!dropdown) return;
+                const r = inputEl.getBoundingClientRect();
+                const dropH = Math.min(280, currentMatches.length * 52 + 12);
+                const below = window.innerHeight - r.bottom;
+                dropdown.style.left = r.left + 'px';
+                dropdown.style.width = Math.max(r.width, 300) + 'px';
+                dropdown.style.top = (below >= dropH || below >= r.top)
+                    ? (r.bottom + 2) + 'px'
+                    : (r.top - dropH - 2) + 'px';
+            }
+
+            function close() {
+                dropdown?.remove();
+                dropdown = null;
+                currentMatches = [];
+                activeIdx = -1;
+            }
+
+            function setActive(idx) {
+                activeIdx = idx;
+                dropdown?.querySelectorAll('.product-ac-item').forEach((el, i) => {
+                    el.classList.toggle('is-active', i === idx);
+                });
+            }
+
+            function pick(idx) {
+                const product = currentMatches[idx];
+                if (!product) return;
+                inputEl.value = productLabel(product);
+                hiddenEl.value = product.id;
+                close();
+                onSelect(product);
+            }
+
+            function open(matches) {
+                close();
+                currentMatches = matches;
+                dropdown = document.createElement('div');
+                dropdown.className = 'product-ac-dropdown';
+                if (matches.length === 0) {
+                    dropdown.innerHTML = '<div class="product-ac-empty">Barang tidak ditemukan</div>';
+                } else {
+                    dropdown.innerHTML = matches.map((p, i) => {
+                        const outOfStock = Number(p.stock ?? 1) <= 0;
+                        const unit = productUnitLabel(p);
+                        return `<div class="product-ac-item${outOfStock ? ' out-of-stock' : ''}" data-idx="${i}">
+                            <div>
+                                <div class="product-ac-name">${esc(p.name)}</div>
+                                ${p.code ? `<div class="product-ac-code">${esc(p.code)}</div>` : ''}
+                            </div>
+                            <div class="product-ac-meta">Stok: ${p.stock ?? '?'} ${esc(unit)}</div>
+                        </div>`;
+                    }).join('');
+                }
+                document.body.appendChild(dropdown);
+                position();
+                dropdown.addEventListener('mousedown', e => {
+                    const item = e.target.closest('.product-ac-item');
+                    if (!item) return;
+                    e.preventDefault();
+                    pick(parseInt(item.dataset.idx, 10));
+                    inputEl.closest('tr')?.querySelector('.qty-input')?.focus();
+                });
+                dropdown.addEventListener('mousemove', e => {
+                    const item = e.target.closest('.product-ac-item');
+                    if (item) setActive(parseInt(item.dataset.idx, 10));
+                });
+            }
+
+            async function suggest(query) {
+                if ((query || '').trim().length < 2) { close(); return; }
+                await fetchProductSuggestions(query);
+                open(getMatches(query));
+            }
+
+            const onInput = debounce(async e => {
+                hiddenEl.value = '';
+                onSelect(null);
+                await suggest(e.target.value);
+            }, 250);
+
+            inputEl.addEventListener('input', onInput);
+            inputEl.addEventListener('focus', async e => {
+                clearTimeout(blurTimer);
+                await suggest(e.target.value);
+            });
+            inputEl.addEventListener('blur', () => {
+                blurTimer = setTimeout(async () => {
+                    close();
+                    const val = inputEl.value.trim();
+                    if (val === '') { hiddenEl.value = ''; onSelect(null); return; }
+                    const product = await resolveProductFromInput(val);
+                    const row = inputEl.closest('tr');
+                    hiddenEl.value = product ? product.id : '';
+                    if (product) {
+                        inputEl.value = productLabel(product);
+                        onSelect(product);
+                        setProductFieldError(row, '');
+                    } else {
+                        onSelect(null);
+                        setProductFieldError(row, @json(__('txn.product_not_registered')));
+                    }
+                }, 200);
+            });
+            inputEl.addEventListener('keydown', e => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (!dropdown) { suggest(inputEl.value).then(() => setActive(0)); return; }
+                    setActive(Math.min(activeIdx + 1, currentMatches.length - 1));
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setActive(Math.max(activeIdx - 1, 0));
+                } else if (e.key === 'Enter' && dropdown && activeIdx >= 0) {
+                    e.preventDefault();
+                    pick(activeIdx);
+                    inputEl.closest('tr')?.querySelector('.qty-input')?.focus();
+                } else if (e.key === 'Escape') {
+                    close();
+                }
+            });
+            const repos = () => position();
+            window.addEventListener('scroll', repos, { passive: true });
+            window.addEventListener('resize', repos, { passive: true });
         }
 
         function findProductByLabel(label) {
@@ -480,7 +650,7 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" autocomplete="off" required>
+                    <input type="text" class="product-search" name="items[${index}][product_name]" placeholder="Pilih barang..." autocomplete="off" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>
@@ -497,51 +667,12 @@
             tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
             tr.querySelector('.qty-input')?.addEventListener('input', recalcItemsTotal);
 
-            const onProductInput = debounce(async (event) => {
-                setProductFieldError(tr, '');
-                await fetchProductSuggestions(event.currentTarget.value);
-                const product = findProductByLabel(event.currentTarget.value);
-                tr.querySelector('.product-id').value = product ? product.id : '';
-                updateRowUnit(tr, product);
-            });
-            tr.querySelector('.product-search').addEventListener('input', onProductInput);
-            tr.querySelector('.product-search').addEventListener('focus', async (event) => {
-                await fetchProductSuggestions(event.currentTarget.value);
-            });
-            tr.querySelector('.product-search').addEventListener('change', (event) => {
-                const product = findProductByLabel(event.currentTarget.value) || findProductLoose(event.currentTarget.value);
-                tr.querySelector('.product-id').value = product ? product.id : '';
-                if (product) {
-                    tr.querySelector('.product-search').value = productLabel(product);
-                    updateRowUnit(tr, product);
-                    setProductFieldError(tr, '');
-                } else if (String(event.currentTarget.value || '').trim() !== '') {
-                    updateRowUnit(tr, null);
-                    setProductFieldError(tr, @json(__('txn.product_not_registered')));
-                } else {
-                    updateRowUnit(tr, null);
-                    setProductFieldError(tr, '');
-                }
-            });
-            tr.querySelector('.product-search').addEventListener('blur', async (event) => {
-                const value = String(event.currentTarget.value || '').trim();
-                if (value === '') {
-                    tr.querySelector('.product-id').value = '';
-                    updateRowUnit(tr, null);
-                    setProductFieldError(tr, '');
-                    return;
-                }
-                const product = await resolveProductFromInput(value);
-                tr.querySelector('.product-id').value = product ? product.id : '';
-                if (product) {
-                    tr.querySelector('.product-search').value = productLabel(product);
-                    updateRowUnit(tr, product);
-                    setProductFieldError(tr, '');
-                } else {
-                    updateRowUnit(tr, null);
-                    setProductFieldError(tr, @json(__('txn.product_not_registered')));
-                }
-            });
+            createProductAutocomplete(
+                tr.querySelector('.product-search'),
+                tr.querySelector('.product-id'),
+                (product) => { updateRowUnit(tr, product); if (product) setProductFieldError(tr, ''); }
+            );
+
             tr.querySelector('.remove').addEventListener('click', () => {
                 tr.remove();
                 recalcItemsTotal();
@@ -635,7 +766,6 @@
         rebuildProductIndexes();
         addBtn.addEventListener('click', addRow);
         renderCustomerSuggestions('');
-        renderProductSuggestions('');
         addRow();
         recalcItemsTotal();
     </script>
