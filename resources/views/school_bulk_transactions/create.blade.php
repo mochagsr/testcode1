@@ -800,7 +800,7 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <input type="text" list="products-list" class="product-name" value="${initial.product_name || ''}" required>
+                        <input type="text" list="products-list" class="product-name" value="${initial.product_name || ''}" autocomplete="off" required>
                         <input type="hidden" class="product-id" value="${initial.product_id || ''}">
                         <div class="field-inline-error product-name-error" style="display:block; margin-top:4px;"></div>
                     </td>

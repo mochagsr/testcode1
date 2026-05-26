@@ -500,7 +500,7 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" list="products-list" placeholder="{{ __('txn.select_product') }}" required>
+                    <input type="text" class="product-search" list="products-list" placeholder="{{ __('txn.select_product') }}" autocomplete="off" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id">
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
                 </td>

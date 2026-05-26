@@ -170,6 +170,12 @@
         <a class="btn secondary" href="{{ route('delivery-notes.index') }}">{{ __('txn.cancel') }}</a>
     </form>
 
+    <datalist id="products-list">
+        @foreach($products as $product)
+            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
+        @endforeach
+    </datalist>
+
     <script>
         let customers = @json($customers->values());
         let shipLocations = @json($shipLocations->values());
@@ -939,7 +945,7 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" value="${escapeAttribute(productText)}" required>
+                    <input type="text" class="product-search" name="items[${index}][product_name]" list="products-list" placeholder="Pilih barang terdaftar" autocomplete="off" value="${escapeAttribute(productText)}" required>
                     <input type="hidden" name="items[${index}][product_id]" class="product-id" value="${escapeAttribute(String(prefill?.product_id || ''))}">
                     <input type="hidden" name="items[${index}][order_note_item_id]" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
                     <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
@@ -1181,11 +1187,6 @@
         recalcItemsTotal();
     </script>
 
-    <datalist id="products-list">
-        @foreach($products as $product)
-            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
-        @endforeach
-    </datalist>
     @include('partials.printing_subtype_script')
 @endsection
 

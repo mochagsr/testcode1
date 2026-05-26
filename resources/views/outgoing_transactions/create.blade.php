@@ -259,6 +259,12 @@
         <div class="muted" id="outgoing-category-status" style="margin-top:6px;">{{ __('txn.category_modal_hint') }}</div>
     </div>
 
+    <datalist id="outgoing-products-list">
+        @foreach($products as $product)
+            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
+        @endforeach
+    </datalist>
+
     <script>
         (function () {
             let suppliers = @json($suppliers);
@@ -859,7 +865,7 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <input type="text" class="product-search" list="outgoing-products-list" value="${escapeAttribute(productSearchValue)}" placeholder="{{ __('txn.select_product') }}">
+                        <input type="text" class="product-search" list="outgoing-products-list" value="${escapeAttribute(productSearchValue)}" placeholder="{{ __('txn.select_product') }}" autocomplete="off">
                         <input type="hidden" class="product-id" name="items[${index}][product_id]" value="${escapeAttribute(prefillProductId)}">
                         <input type="hidden" class="product-name" name="items[${index}][product_name]" value="${escapeAttribute(prefillProductName)}">
                         <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
@@ -1190,10 +1196,5 @@
         })();
     </script>
 
-    <datalist id="outgoing-products-list">
-        @foreach($products as $product)
-            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
-        @endforeach
-    </datalist>
 @endsection
 

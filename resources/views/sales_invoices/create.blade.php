@@ -174,6 +174,12 @@
         </div>
     </form>
 
+    <datalist id="products-list">
+        @foreach($products as $product)
+            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
+        @endforeach
+    </datalist>
+
     <script>
         let products = @json($products);
         let customers = @json($customers);
@@ -811,7 +817,7 @@
             const tr = document.createElement('tr');
               tr.innerHTML = `
                   <td>
-                      <input type="text" class="product-search" list="products-list" placeholder="${selectProductLabel}" required value="${escapeAttribute(productText)}">
+                      <input type="text" class="product-search" list="products-list" placeholder="${selectProductLabel}" autocomplete="off" required value="${escapeAttribute(productText)}">
                       <input type="hidden" name="items[${index}][product_id]" class="product-id">
                       <input type="hidden" name="items[${index}][order_note_item_id]" class="order-note-item-id" value="${escapeAttribute(String(prefill?.order_note_item_id || ''))}">
                       <div class="field-inline-error product-search-error" style="display:block; margin-top:4px;"></div>
@@ -1190,11 +1196,6 @@
         }
     </script>
 
-    <datalist id="products-list">
-        @foreach($products as $product)
-            <option value="{{ $product->code ? $product->code.' - '.$product->name : $product->name }}"></option>
-        @endforeach
-    </datalist>
     @include('partials.printing_subtype_script')
 @endsection
 
