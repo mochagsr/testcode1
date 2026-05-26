@@ -162,7 +162,7 @@ class Product extends Model
      */
     public function scopeOnlyOrderFormColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'code', 'name', 'unit']);
+        return $query->select(['id', 'code', 'name', 'unit', 'stock']);
     }
 
     /**

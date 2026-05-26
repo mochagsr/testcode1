@@ -14,10 +14,14 @@
             border-radius: 6px;
             box-shadow: 0 6px 24px rgba(0,0,0,0.16);
             min-width: 300px;
-            max-height: 280px;
-            overflow-y: auto;
+            max-height: 300px;
+            overflow-y: scroll;
             font-size: 13px;
         }
+        .product-ac-dropdown::-webkit-scrollbar { width: 6px; }
+        .product-ac-dropdown::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 0 6px 6px 0; }
+        .product-ac-dropdown::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 3px; }
+        .product-ac-dropdown::-webkit-scrollbar-thumb:hover { background: #999; }
         .product-ac-item {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
