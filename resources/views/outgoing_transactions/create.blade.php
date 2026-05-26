@@ -92,7 +92,11 @@
             -webkit-overflow-scrolling: touch;
         }
         .table-mobile-scroll #items-table {
-            min-width: 860px;
+            min-width: 1040px;
+        }
+        #items-table .product-search {
+            min-width: 180px;
+            width: 100%;
         }
         @media (max-width: 900px) {
             #items-table .outgoing-category-select,
