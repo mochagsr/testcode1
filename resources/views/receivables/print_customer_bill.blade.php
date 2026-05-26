@@ -53,8 +53,8 @@
             top: 50%; left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
             font-size: 64px; font-weight: 900; letter-spacing: 6px;
-            color: rgba(22, 163, 74, 0.18);
-            border: 6px solid rgba(22, 163, 74, 0.18);
+            color: rgba(194, 24, 91, 0.18);
+            border: 6px solid rgba(194, 24, 91, 0.18);
             padding: 4px 24px;
             border-radius: 8px;
             white-space: nowrap;
@@ -266,7 +266,7 @@
     </div>{{-- end lunas-stamp-wrap --}}
 
     @if($isLunas)
-        <div style="text-align:center; margin-top:10px; font-size:13px; color:#16a34a; font-weight:700; letter-spacing:1px;">
+        <div style="text-align:center; margin-top:10px; font-size:13px; color:#c2185b; font-weight:700; letter-spacing:1px;">
             ✓ {{ $isCreditBalanceTotal ? 'LUNAS — Kelebihan dibawa ke semester berikutnya' : 'LUNAS' }}
         </div>
     @endif
