@@ -270,6 +270,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::put('/products/{product}', [ProductPageController::class, 'update'])->middleware('perm:products.edit')->name('products.update');
     Route::post('/products/{product}/quick-stock', [ProductPageController::class, 'quickUpdateStock'])->middleware('perm:products.edit')->name('products.quick-stock');
     Route::delete('/products/{product}', [ProductPageController::class, 'destroy'])->middleware('perm:products.delete')->name('products.destroy');
+    Route::post('/products/bulk-delete', [ProductPageController::class, 'bulkDestroy'])->middleware('admin')->name('products.bulk-destroy');
     Route::get('/customer-levels-web', [CustomerLevelPageController::class, 'index'])->middleware('perm:transactions.view')->name('customer-levels-web.index');
     Route::get('/customer-levels-web/create', [CustomerLevelPageController::class, 'create'])->middleware('perm:customers.create')->name('customer-levels-web.create');
     Route::post('/customer-levels-web', [CustomerLevelPageController::class, 'store'])->middleware('perm:customers.create')->name('customer-levels-web.store');

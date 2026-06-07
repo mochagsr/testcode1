@@ -596,6 +596,62 @@ class ProductPageController extends Controller
             ->with('success_type', 'decrease');
     }
 
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'product_ids' => FluentRule::array()->required()->min(1),
+            'product_ids.*' => FluentRule::integer()->required(),
+        ]);
+
+        $productIds = collect($data['product_ids'])
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $deleted = 0;
+        $deactivated = 0;
+        $codes = [];
+
+        foreach ($productIds as $productId) {
+            $product = Product::query()->find($productId);
+            if ($product === null) {
+                continue;
+            }
+
+            $result = $this->productDeletionService->deleteOrDeactivate($product);
+            $status = (string) ($result['status'] ?? 'deleted');
+            $code = (string) ($result['code'] ?? '-');
+            $codes[] = $code;
+
+            if ($status === 'deactivated') {
+                $deactivated++;
+            } else {
+                $deleted++;
+            }
+        }
+
+        $this->auditLogService->log(
+            'master.product.bulk_delete',
+            null,
+            __('ui.audit_desc_product_bulk_deleted', [
+                'deleted' => $deleted,
+                'deactivated' => $deactivated,
+                'codes' => implode(', ', $codes),
+            ]),
+            $request
+        );
+        AppCache::forgetAfterFinancialMutation();
+
+        return redirect()
+            ->route('products.index')
+            ->with('success', __('ui.bulk_delete_products_result', [
+                'deleted' => $deleted,
+                'deactivated' => $deactivated,
+            ]))
+            ->with('success_type', 'decrease');
+    }
+
     /**
      * @return array<string, mixed>
      */

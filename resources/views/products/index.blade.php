@@ -240,6 +240,7 @@
         $canCreateProducts = $currentUser?->canAccess('products.create') ?? false;
         $canEditProducts = $currentUser?->canAccess('products.edit') ?? false;
         $canImportProducts = $currentUser?->canAccess('products.import') ?? false;
+        $isAdmin = ($currentUser?->role ?? '') === 'admin';
         $sortUrl = function (string $field) use ($search, $productType, $sort, $direction): string {
             $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
             return route('products.index', ['search' => $search, 'product_type' => $productType, 'sort' => $field, 'direction' => $nextDir]);
@@ -272,6 +273,11 @@
                 </form>
             </div>
             <div class="toolbar-right">
+                @if($isAdmin)
+                    <button type="button" class="btn danger-btn product-action-btn" id="product-bulk-delete-open" disabled>
+                        {{ __('ui.bulk_delete_products') }} (<span id="product-bulk-delete-count">0</span>)
+                    </button>
+                @endif
                 @if($canImportProducts)
                     <button type="button" class="btn process-btn product-action-btn" id="product-import-open">Import Data</button>
                 @endif
@@ -327,6 +333,11 @@
         <table class="products-table">
             <thead>
             <tr>
+                @if($isAdmin)
+                    <th class="bulk-select-col" style="width: 36px; text-align: center;">
+                        <input type="checkbox" id="product-bulk-select-all" aria-label="{{ __('ui.bulk_delete_products') }}">
+                    </th>
+                @endif
                 <th class="code-col">{{ __('ui.code') }}</th>
                 <th class="category-col">
                     <a class="sort-link" href="{{ $sortUrl('category') }}">
@@ -352,6 +363,11 @@
             <tbody>
             @forelse($products as $product)
                 <tr>
+                    @if($isAdmin)
+                        <td class="bulk-select-col" style="text-align: center;">
+                            <input type="checkbox" class="js-product-bulk-checkbox" value="{{ (int) $product->id }}" data-product-code="{{ (string) ($product->code ?? '-') }}" data-product-name="{{ (string) $product->name }}" aria-label="{{ __('ui.bulk_delete_products') }}">
+                        </td>
+                    @endif
                     <td class="code-col">
                         @if($product->code)
                             <a href="{{ route('products.mutations', ['product' => $product, 'mutation_page' => 1]) }}#stock-mutations">{{ $product->code }}</a>
@@ -395,7 +411,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="muted">{{ __('ui.no_products') }}</td></tr>
+                <tr><td colspan="{{ $isAdmin ? 9 : 8 }}" class="muted">{{ __('ui.no_products') }}</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -405,6 +421,26 @@
             {{ $products->links() }}
         </div>
     </div>
+
+    @if($isAdmin)
+        <div id="product-bulk-delete-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1220;"></div>
+        <div id="product-bulk-delete-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(560px, calc(100vw - 24px)); max-height: 86vh; overflow:auto; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:1221;">
+            <div class="flex" style="justify-content:space-between; margin-bottom:10px;">
+                <strong>{{ __('ui.bulk_delete_products_title') }}</strong>
+                <button type="button" id="product-bulk-delete-close" class="btn info-btn product-action-btn" style="min-height:30px; padding:4px 10px;">&times;</button>
+            </div>
+            <p class="muted" style="margin-top:0;">{{ __('ui.bulk_delete_products_modal_note') }}</p>
+            <ul id="product-bulk-delete-list" style="margin: 0 0 12px 18px; max-height: 260px; overflow:auto;"></ul>
+            <form id="product-bulk-delete-form" method="post" action="{{ route('products.bulk-destroy') }}">
+                @csrf
+                <div id="product-bulk-delete-inputs"></div>
+                <div class="flex" style="gap:8px; justify-content:flex-end;">
+                    <button type="button" id="product-bulk-delete-cancel" class="btn secondary">{{ __('ui.cancel') }}</button>
+                    <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
+                </div>
+            </form>
+        </div>
+    @endif
 
     <div id="product-stock-edit-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1200;"></div>
     <div id="product-stock-edit-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:1201;">
@@ -492,6 +528,80 @@
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && importModal.classList.contains('is-open')) {
                     closeImportModal();
+                }
+            });
+        })();
+
+        (function () {
+            const selectAll = document.getElementById('product-bulk-select-all');
+            const checkboxes = Array.from(document.querySelectorAll('.js-product-bulk-checkbox'));
+            const openBtn = document.getElementById('product-bulk-delete-open');
+            const countEl = document.getElementById('product-bulk-delete-count');
+            const modal = document.getElementById('product-bulk-delete-modal');
+            const overlay = document.getElementById('product-bulk-delete-modal-overlay');
+            const closeBtn = document.getElementById('product-bulk-delete-close');
+            const cancelBtn = document.getElementById('product-bulk-delete-cancel');
+            const list = document.getElementById('product-bulk-delete-list');
+            const inputsWrap = document.getElementById('product-bulk-delete-inputs');
+
+            if (!openBtn || !countEl || !modal || !overlay || !closeBtn || !cancelBtn || !list || !inputsWrap) {
+                return;
+            }
+
+            const selectedCheckboxes = () => checkboxes.filter((checkbox) => checkbox.checked);
+
+            const refreshState = () => {
+                const selected = selectedCheckboxes();
+                countEl.textContent = String(selected.length);
+                openBtn.disabled = selected.length === 0;
+                if (selectAll) {
+                    selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+                    selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+                }
+            };
+
+            selectAll?.addEventListener('change', () => {
+                checkboxes.forEach((checkbox) => { checkbox.checked = selectAll.checked; });
+                refreshState();
+            });
+            checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refreshState));
+            refreshState();
+
+            const escapeHtml = (value) => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            const closeModal = () => {
+                modal.style.display = 'none';
+                overlay.style.display = 'none';
+            };
+
+            openBtn.addEventListener('click', () => {
+                const selected = selectedCheckboxes();
+                if (selected.length === 0) {
+                    window.PgposDialog?.showMessage(@json(__('ui.bulk_delete_products_none_selected')));
+                    return;
+                }
+
+                list.innerHTML = selected.map((checkbox) => {
+                    const code = escapeHtml(checkbox.getAttribute('data-product-code') || '-');
+                    const name = escapeHtml(checkbox.getAttribute('data-product-name') || '-');
+                    return `<li>${code} — ${name}</li>`;
+                }).join('');
+
+                inputsWrap.innerHTML = selected.map((checkbox) =>
+                    `<input type="hidden" name="product_ids[]" value="${escapeHtml(checkbox.value)}">`
+                ).join('');
+
+                modal.style.display = 'block';
+                overlay.style.display = 'block';
+                setTimeout(() => cancelBtn.focus(), 50);
+            });
+
+            closeBtn.addEventListener('click', closeModal);
+            cancelBtn.addEventListener('click', closeModal);
+            overlay.addEventListener('click', closeModal);
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal.style.display === 'block') {
+                    closeModal();
                 }
             });
         })();
