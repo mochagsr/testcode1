@@ -55,6 +55,8 @@ class ProductCodeGenerator
         preg_match('/\b(?:edisi|ed)\s*(\d+)\b/i', $normalized, $editionMatch);
         $edition = isset($editionMatch[1]) ? 'e'.$editionMatch[1] : '';
 
+        $page = $this->extractPageToken($normalized);
+
         preg_match('/\b(?:semester|smt)\s*(\d+)\b/i', $normalized, $semesterMatch);
         $semester = isset($semesterMatch[1]) ? 's'.$semesterMatch[1] : '';
 
@@ -62,7 +64,7 @@ class ProductCodeGenerator
 
         $categoryPrefix = $this->categoryPrefix($categoryName);
 
-        return substr($categoryPrefix.$subject.$level.$edition.$semester.$yearSuffix, 0, 60);
+        return substr($categoryPrefix.$subject.$level.$edition.$page.$semester.$yearSuffix, 0, 60);
     }
 
     private function usesAcademicCodePattern(string $normalized, string $rawNormalized): bool
@@ -71,7 +73,20 @@ class ProductCodeGenerator
             return true;
         }
 
+        if ($this->extractPageToken($normalized) !== '') {
+            return true;
+        }
+
         return $this->extractYearSuffix($rawNormalized) !== '';
+    }
+
+    private function extractPageToken(string $normalized): string
+    {
+        if (preg_match('/\b(?:halaman|hal)\s*(\d+)\b/i', $normalized, $pageMatch) === 1) {
+            return 'h'.$pageMatch[1];
+        }
+
+        return '';
     }
 
     private function extractYearSuffix(string $rawNormalized): string
