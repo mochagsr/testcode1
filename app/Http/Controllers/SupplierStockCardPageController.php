@@ -35,7 +35,13 @@ class SupplierStockCardPageController extends Controller
 
     public function index(Request $request): View
     {
-        return view('supplier_stock_cards.index', $this->buildPageData($request));
+        $viewData = $this->buildPageData($request);
+
+        if ($request->ajax()) {
+            return view('supplier_stock_cards.partials.results', $viewData);
+        }
+
+        return view('supplier_stock_cards.index', $viewData);
     }
 
     public function printReport(Request $request): View

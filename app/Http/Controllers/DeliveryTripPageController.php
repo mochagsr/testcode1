@@ -66,13 +66,20 @@ class DeliveryTripPageController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        return view('delivery_trips.index', [
+        $viewData = [
             'trips' => $trips,
-            'activeTrips' => $activeTrips,
             'search' => $search,
             'selectedTripDate' => $selectedTripDate,
             'sort' => $sort,
             'direction' => $direction,
+        ];
+
+        if ($request->ajax()) {
+            return view('delivery_trips.partials.results', $viewData);
+        }
+
+        return view('delivery_trips.index', $viewData + [
+            'activeTrips' => $activeTrips,
         ]);
     }
 

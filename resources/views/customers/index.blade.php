@@ -151,17 +151,7 @@
     @php
         $currentUser = auth()->user();
         $canCreateCustomers = $currentUser?->canAccess('customers.create') ?? false;
-        $canManageCustomers = $currentUser?->canAccessAny(['customers.create', 'customers.edit', 'customers.delete', 'customers.import']) ?? false;
         $canImportCustomers = $currentUser?->canAccess('customers.import') ?? false;
-        $customerExportQuery = ['search' => $search, 'level_id' => $selectedLevelId ?: null];
-        $sortUrl = function (string $field) use ($search, $selectedLevelId, $sort, $direction): string {
-            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
-            return route('customers-web.index', ['search' => $search, 'level_id' => $selectedLevelId ?: null, 'sort' => $field, 'direction' => $nextDir]);
-        };
-        $sortMark = function (string $field) use ($sort, $direction): string {
-            if ($sort !== $field) return '↕';
-            return $direction === 'asc' ? '↑' : '↓';
-        };
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.customers_title') }}</h1>
@@ -190,8 +180,18 @@
                 @endif
                 <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                     <option value="" selected disabled>Export</option>
-                    <option value="{{ route('customers-web.export.pdf', $customerExportQuery) }}">Export PDF</option>
-                    <option value="{{ route('customers-web.export.csv', $customerExportQuery) }}">Export Excel</option>
+                    <option
+                        data-ajax-sync
+                        data-href-base="{{ route('customers-web.export.pdf') }}"
+                        data-href-params="search,level_id"
+                        value="{{ route('customers-web.export.pdf', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}"
+                    >Export PDF</option>
+                    <option
+                        data-ajax-sync
+                        data-href-base="{{ route('customers-web.export.csv') }}"
+                        data-href-params="search,level_id"
+                        value="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}"
+                    >Export Excel</option>
                 </select>
             </div>
         </div>
@@ -232,96 +232,8 @@
         </div>
     @endif
 
-    <div class="card">
-        <div class="customers-table-wrap">
-        <table class="customers-table">
-            <thead>
-            <tr>
-                <th>
-                    <a class="sort-link" href="{{ $sortUrl('name') }}">
-                        {{ __('ui.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span>
-                    </a>
-                </th>
-                <th>
-                    <a class="sort-link" href="{{ $sortUrl('level') }}">
-                        {{ __('ui.level') }} <span class="sort-mark">{{ $sortMark('level') }}</span>
-                    </a>
-                </th>
-                <th>{{ __('ui.phone') }}</th>
-                <th>
-                    <a class="sort-link" href="{{ $sortUrl('city') }}">
-                        {{ __('ui.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span>
-                    </a>
-                </th>
-                <th>{{ __('ui.address') }}</th>
-                <th>{{ __('ui.receivable') }}</th>
-                <th class="ktp-col">{{ __('ui.id_card') }}</th>
-                <th class="action-col">{{ __('ui.actions') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse($customers as $customer)
-                <tr>
-                    <td>{{ $customer->name }}</td>
-                    <td>
-                        @if($customer->level)
-                            <a href="#"
-                               class="customer-level-link"
-                               data-level-id="{{ (int) $customer->level->id }}"
-                               data-level-label="{{ $customer->level->name }}">
-                                {{ $customer->level->name }}
-                            </a>
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td>
-                        @php
-                            $phoneDisplay = collect([
-                                (string) ($customer->phone ?? ''),
-                                (string) ($customer->phone_secondary ?? ''),
-                            ])->map(fn (string $value) => trim($value))->filter()->values();
-                        @endphp
-                        {{ $phoneDisplay->isNotEmpty() ? $phoneDisplay->implode(' / ') : '-' }}
-                    </td>
-                    <td>{{ $customer->city ?: '-' }}</td>
-                    <td>{{ $customer->address ?: '-' }}</td>
-                    <td>Rp {{ number_format((int) round($customer->outstanding_receivable), 0, ',', '.') }}</td>
-                    <td class="ktp-col">
-                        @if($customer->id_card_photo_path)
-                            <div class="compact-actions">
-                                <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$customer->id_card_photo_path) }}">{{ __('ui.view') }}</a>
-                                <a class="btn info-btn" href="{{ route('customers-web.id-card-photo.print', $customer) }}" target="_blank">{{ __('txn.print') }}</a>
-                            </div>
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td class="action-col">
-                        @if($canManageCustomers)
-                            <div class="compact-actions">
-                                <a class="btn edit-btn" href="{{ route('customers-web.edit', $customer) }}">{{ __('ui.edit') }}</a>
-                                <form method="post" action="{{ route('customers-web.destroy', $customer) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_customer') }}">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
-                                </form>
-                            </div>
-                        @else
-                            -
-                        @endif
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="8" class="muted">{{ __('ui.no_customers') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        </div>
-
-        <div style="margin-top: 12px;">
-            {{ $customers->links() }}
-        </div>
+    <div id="customers-results">
+        @include('customers.partials.results')
     </div>
 
     <div id="id-card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; align-items:center; justify-content:center;">
@@ -350,33 +262,10 @@
     </div>
 
     <script>
-        (function () {
-            const searchForm = document.getElementById('customers-search-form');
-            const searchInput = document.getElementById('customers-search-input');
-            const modal = document.getElementById('id-card-modal');
-            const modalImage = document.getElementById('id-card-modal-image');
-            const triggers = document.querySelectorAll('.id-card-preview-trigger');
+        document.addEventListener('DOMContentLoaded', function () {
             const importModal = document.getElementById('customer-import-modal');
             const importOpen = document.getElementById('customer-import-open');
             const importClose = document.getElementById('customer-import-close');
-            if (searchForm && searchInput) {
-                const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                    ? window.PgposAutoSearch.debounce
-                    : (fn, wait = 100) => {
-                        let timeoutId = null;
-                        return (...args) => {
-                            clearTimeout(timeoutId);
-                            timeoutId = setTimeout(() => fn(...args), wait);
-                        };
-                    };
-                const onSearchInput = debounce(() => {
-                    if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                        return;
-                    }
-                    searchForm.requestSubmit();
-                }, 100);
-                searchInput.addEventListener('input', onSearchInput);
-            }
             if (importModal && importOpen && importClose) {
                 const closeImportModal = () => {
                     importModal.classList.remove('is-open');
@@ -399,43 +288,42 @@
                     }
                 });
             }
-            if (!modal || !modalImage || !triggers.length) {
-                return;
+
+            const idCardModal = document.getElementById('id-card-modal');
+            const idCardModalImage = document.getElementById('id-card-modal-image');
+
+            function closeIdCardModal() {
+                idCardModal.style.display = 'none';
+                idCardModalImage.setAttribute('src', '');
             }
 
-            function closeModal() {
-                modal.style.display = 'none';
-                modalImage.setAttribute('src', '');
-            }
-
-            triggers.forEach((trigger) => {
-                trigger.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    const image = trigger.getAttribute('data-image');
-                    if (!image) {
-                        return;
-                    }
-                    modalImage.setAttribute('src', image);
-                    modal.style.display = 'flex';
+            function initCustomerIdCardPreview() {
+                if (!idCardModal || !idCardModalImage) {
+                    return;
+                }
+                document.querySelectorAll('.id-card-preview-trigger').forEach((trigger) => {
+                    trigger.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        const image = trigger.getAttribute('data-image');
+                        if (!image) {
+                            return;
+                        }
+                        idCardModalImage.setAttribute('src', image);
+                        idCardModal.style.display = 'flex';
+                    });
                 });
-            });
+            }
 
-            modal.addEventListener('click', closeModal);
-            modalImage.addEventListener('click', closeModal);
-        })();
-    </script>
-    <script>
-        (function () {
-            const levelLinks = document.querySelectorAll('.customer-level-link');
+            if (idCardModal && idCardModalImage) {
+                idCardModal.addEventListener('click', closeIdCardModal);
+                idCardModalImage.addEventListener('click', closeIdCardModal);
+            }
+
             const levelModal = document.getElementById('customer-level-modal');
             const levelModalClose = document.getElementById('customer-level-modal-close');
             const levelModalTitle = document.getElementById('customer-level-modal-title');
             const levelModalBody = document.getElementById('customer-level-modal-body');
-            const endpointTemplate = @json(route('customers-web.level-customers', ['customerLevel' => '__LEVEL__']));
-
-            if (!levelLinks.length || !levelModal || !levelModalClose || !levelModalTitle || !levelModalBody) {
-                return;
-            }
+            const levelEndpointTemplate = @json(route('customers-web.level-customers', ['customerLevel' => '__LEVEL__']));
 
             const escapeHtml = (value) => String(value || '')
                 .replace(/&/g, '&amp;')
@@ -449,7 +337,7 @@
                 levelModalBody.innerHTML = '<tr><td colspan="4" class="muted">{{ __('ui.loading') }}</td></tr>';
             };
 
-            const renderRows = (rows) => {
+            const renderLevelRows = (rows) => {
                 if (!Array.isArray(rows) || rows.length === 0) {
                     levelModalBody.innerHTML = '<tr><td colspan="4" class="muted">{{ __('ui.no_customers') }}</td></tr>';
                     return;
@@ -472,7 +360,7 @@
                 levelModalBody.innerHTML = '<tr><td colspan="4" class="muted">{{ __('ui.loading') }}</td></tr>';
                 levelModal.style.display = 'flex';
                 try {
-                    const endpoint = endpointTemplate.replace('__LEVEL__', encodeURIComponent(String(levelId)));
+                    const endpoint = levelEndpointTemplate.replace('__LEVEL__', encodeURIComponent(String(levelId)));
                     const response = await fetch(endpoint, {
                         headers: {
                             'Accept': 'application/json',
@@ -484,25 +372,53 @@
                         return;
                     }
                     const payload = await response.json();
-                    renderRows(payload.customers || []);
+                    renderLevelRows(payload.customers || []);
                 } catch (error) {
                     levelModalBody.innerHTML = '<tr><td colspan="4" class="muted">{{ __('ui.no_data') }}</td></tr>';
                 }
             };
 
-            levelLinks.forEach((link) => {
-                link.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    openLevelModal(link.dataset.levelId, link.dataset.levelLabel);
-                });
-            });
-            levelModalClose.addEventListener('click', closeLevelModal);
-            levelModal.addEventListener('click', (event) => {
-                if (event.target === levelModal) {
-                    closeLevelModal();
+            function initCustomerLevelLinks() {
+                if (!levelModal || !levelModalTitle || !levelModalBody) {
+                    return;
                 }
+                document.querySelectorAll('.customer-level-link').forEach((link) => {
+                    link.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        openLevelModal(link.dataset.levelId, link.dataset.levelLabel);
+                    });
+                });
+            }
+
+            if (levelModal && levelModalClose) {
+                levelModalClose.addEventListener('click', closeLevelModal);
+                levelModal.addEventListener('click', (event) => {
+                    if (event.target === levelModal) {
+                        closeLevelModal();
+                    }
+                });
+            }
+
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'customers-search-form',
+                container: 'customers-results',
+                onSwap: () => {
+                    initCustomerIdCardPreview();
+                    initCustomerLevelLinks();
+                },
             });
-        })();
+
+            initCustomerIdCardPreview();
+            initCustomerLevelLinks();
+
+            if (!ajax) {
+                return;
+            }
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('customers-search-input'), () => ajax.submit(), 100);
+            window.PgposAutoSearch.bindChangeFilters([
+                document.getElementById('customers-level-filter'),
+            ], () => ajax.submit());
+        });
     </script>
 @endsection
 

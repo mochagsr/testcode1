@@ -60,17 +60,6 @@
         .sort-link:hover { color: var(--primary, #2563eb); }
         .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
-    @php
-        $sortUrl = function (string $field) use ($search, $selectedSupplierId, $selectedProductId, $dateFrom, $dateTo, $sort, $direction): string {
-            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
-            return route('supplier-stock-cards.index', array_filter(['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== '' && $v !== 0));
-        };
-        $sortMark = function (string $field) use ($sort, $direction): string {
-            if ($sort !== $field) return '↕';
-            return $direction === 'asc' ? '↑' : '↓';
-        };
-    @endphp
-
     <h1 class="page-title">{{ __('supplier_stock.title') }}</h1>
 
     <div class="card">
@@ -83,165 +72,41 @@
                     <option value="{{ $supplier->id }}" @selected((int) ($selectedSupplierId ?? 0) === (int) $supplier->id)>{{ $supplier->name }}</option>
                 @endforeach
             </select>
-            @if($selectedProductId)
-                <input type="hidden" name="product_id" value="{{ (int) $selectedProductId }}">
-            @endif
             <input id="supplier-stock-search" type="text" name="search" value="{{ $search }}" placeholder="{{ __('supplier_stock.search_placeholder') }}" style="max-width:280px;">
-            <input type="date" name="date_from" value="{{ $dateFrom }}" style="max-width:180px;">
-            <input type="date" name="date_to" value="{{ $dateTo }}" style="max-width:180px;">
+            <input id="supplier-stock-date-from" type="date" name="date_from" value="{{ $dateFrom }}" style="max-width:180px;">
+            <input id="supplier-stock-date-to" type="date" name="date_to" value="{{ $dateTo }}" style="max-width:180px;">
             <button type="submit">{{ __('txn.search') }}</button>
-            <a class="btn info-btn" href="{{ route('supplier-stock-cards.print', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}" target="_blank">{{ __('txn.print') }}</a>
+            <a
+                class="btn info-btn"
+                data-ajax-sync
+                data-href-base="{{ route('supplier-stock-cards.print') }}"
+                data-href-params="supplier_id,product_id,search,date_from,date_to"
+                href="{{ route('supplier-stock-cards.print', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}"
+                target="_blank"
+            >{{ __('txn.print') }}</a>
             <select class="supplier-stock-toolbar-export" aria-label="Export" onchange="if (this.value) { window.location.href = this.value; this.selectedIndex = 0; }">
                 <option value="">Export</option>
-                <option value="{{ route('supplier-stock-cards.export.pdf', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">Export PDF</option>
-                <option value="{{ route('supplier-stock-cards.export.excel', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}">Export Excel</option>
+                <option
+                    data-ajax-sync
+                    data-href-base="{{ route('supplier-stock-cards.export.pdf') }}"
+                    data-href-params="supplier_id,product_id,search,date_from,date_to"
+                    value="{{ route('supplier-stock-cards.export.pdf', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}"
+                >Export PDF</option>
+                <option
+                    data-ajax-sync
+                    data-href-base="{{ route('supplier-stock-cards.export.excel') }}"
+                    data-href-params="supplier_id,product_id,search,date_from,date_to"
+                    value="{{ route('supplier-stock-cards.export.excel', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}"
+                >Export Excel</option>
             </select>
             <a class="btn process-btn" href="{{ route('products.index') }}?search=&product_type=raw_material">Lihat Stok</a>
             <a class="btn secondary" href="{{ route('supplier-stock-cards.index') }}">{{ __('txn.all') }}</a>
         </form>
     </div>
 
-    @if($selectedProductId)
-        <div class="card" style="padding:10px 12px;">
-            <span class="muted">{{ __('txn.product') }} ID: {{ (int) $selectedProductId }}</span>
-            <a class="btn secondary" style="margin-left:8px;" href="{{ route('supplier-stock-cards.index', array_merge(request()->except('product_id'), ['supplier_id' => $selectedSupplierId])) }}">{{ __('txn.all') }}</a>
-        </div>
-    @endif
-
-    @if(!$selectedSupplier)
-        <div class="card">
-            <h3 style="margin-top:0;">{{ __('supplier_stock.product_summary') }}</h3>
-            <div class="supplier-stock-scroll-wrap">
-            <table class="supplier-stock-summary-table">
-                <colgroup>
-                    <col style="width: 22%;">
-                    <col style="width: 16%;">
-                    <col style="width: 30%;">
-                    <col style="width: 16%;">
-                    <col style="width: 16%;">
-                </colgroup>
-                <thead>
-                <tr>
-                    <th><a class="sort-link" href="{{ $sortUrl('supplier') }}">{{ __('txn.supplier') }} <span class="sort-mark">{{ $sortMark('supplier') }}</span></a></th>
-                    <th><a class="sort-link" href="{{ $sortUrl('category') }}">{{ __('ui.category') }} <span class="sort-mark">{{ $sortMark('category') }}</span></a></th>
-                    <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('txn.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
-                    <th class="num"><a class="sort-link" style="justify-content:flex-end;" href="{{ $sortUrl('balance') }}">{{ __('ui.stock') }} <span class="sort-mark">{{ $sortMark('balance') }}</span></a></th>
-                    <th class="action">{{ __('txn.action') }}</th>
-                </tr>
-                </thead>
-                <tbody>
-                @php
-                    $lastSupplierId = null;
-                @endphp
-                @forelse($summaryPaginator as $row)
-                    @php
-                        $supplierId = (int) ($row['supplier_id'] ?? 0);
-                        $stockBalance = (int) ($row['balance'] ?? 0);
-                        $editableProductId = (int) ($row['editable_product_id'] ?? 0);
-                        $rowKey = md5(($row['product_code'] ?? '').'|'.($row['product_name'] ?? '').'|'.$supplierId.'|'.$editableProductId);
-                    @endphp
-                    <tr>
-                        <td>
-                            @if($supplierId > 0 && $lastSupplierId !== $supplierId)
-                                <a href="{{ route('supplier-stock-cards.index', array_merge(request()->query(), ['supplier_id' => $supplierId])) }}">
-                                    {{ $row['supplier_name'] ?? '-' }}
-                                </a>
-                                @php
-                                    $lastSupplierId = $supplierId;
-                                @endphp
-                            @endif
-                        </td>
-                        <td>{{ $row['category_name'] ?? '-' }}</td>
-                        <td>{{ $row['product_name'] }}</td>
-                        <td class="num">
-                            <strong
-                                class="js-stock-value"
-                                data-row-key="{{ $rowKey }}"
-                                style="{{ $stockBalance <= 10 ? 'color:#b91c1c;' : '' }}"
-                            >
-                                {{ number_format($stockBalance, 0, ',', '.') }}
-                            </strong>
-                        </td>
-                        <td class="action">
-                            <button
-                                type="button"
-                                class="btn process-soft-btn js-open-stock-modal"
-                                style="min-height:30px; padding:5px 9px; margin-left:4px; font-size:11px; position:relative; z-index:1;"
-                                data-row-key="{{ $rowKey }}"
-                                data-product-id="{{ $editableProductId }}"
-                                data-product-code="{{ $row['product_code'] ?? '' }}"
-                                data-product-name="{{ $row['product_name'] ?? '' }}"
-                                data-supplier-id="{{ $supplierId }}"
-                                data-supplier-name="{{ $row['supplier_name'] ?? '-' }}"
-                                data-current-stock="{{ $stockBalance }}"
-                            >
-                                {{ __('supplier_stock.edit_stock') }}
-                            </button>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="5" class="muted">{{ __('supplier_stock.no_data') }}</td></tr>
-                @endforelse
-                </tbody>
-            </table>
-            </div>
-            <div style="margin-top:12px;">{{ $summaryPaginator->links() }}</div>
-        </div>
-    @endif
-
-    @if($selectedSupplier)
-        <div class="card">
-            <h3 style="margin-top:0;">{{ __('supplier_stock.mutation_title') }} ({{ $selectedSupplier->name }})</h3>
-            <div class="supplier-stock-scroll-wrap">
-            <table class="supplier-stock-mutation-table">
-                <colgroup>
-                    <col style="width: 11%;">
-                    <col style="width: 24%;">
-                    <col style="width: 33%;">
-                    <col style="width: 10%;">
-                    <col style="width: 10%;">
-                    <col style="width: 12%;">
-                </colgroup>
-                <thead>
-                <tr>
-                    <th>{{ __('txn.date') }}</th>
-                    <th>{{ __('txn.product') }}</th>
-                    <th>{{ __('supplier_stock.description') }}</th>
-                    <th class="num">{{ __('supplier_stock.in') }}</th>
-                    <th class="num">{{ __('supplier_stock.out') }}</th>
-                    <th class="num">{{ __('supplier_stock.balance') }}</th>
-                </tr>
-                </thead>
-                <tbody>
-                @forelse($movementPaginator as $row)
-                    <tr>
-                        <td>{{ \Illuminate\Support\Carbon::parse($row['event_date'])->format('d-m-Y') }}</td>
-                        <td>
-                            <div class="muted">{{ $row['category_name'] ?? '-' }}</div>
-                            <div>{{ $row['product_name'] }}</div>
-                            <div class="muted">{{ $row['product_code'] !== '' ? $row['product_code'] : '-' }}</div>
-                        </td>
-                        <td>
-                            {{ $row['description'] }}
-                            @if((int) ($row['reference_id'] ?? 0) > 0 && (string) ($row['reference_number'] ?? '') !== '' && (string) ($row['reference_route'] ?? '') !== '')
-                                <div>
-                                    <a href="{{ route($row['reference_route'], $row['reference_id']) }}" target="_blank">{{ $row['reference_number'] }}</a>
-                                </div>
-                            @endif
-                        </td>
-                        <td class="num" style="color:#1f6b3d;">{{ (int) $row['qty_in'] > 0 ? number_format((int) $row['qty_in'], 0, ',', '.') : '-' }}</td>
-                        <td class="num" style="color:#8d1f1f;">{{ (int) $row['qty_out'] > 0 ? number_format((int) $row['qty_out'], 0, ',', '.') : '-' }}</td>
-                        <td class="num"><strong>{{ number_format((int) $row['balance_after'], 0, ',', '.') }}</strong></td>
-                    </tr>
-                @empty
-                    <tr><td colspan="6" class="muted">{{ __('supplier_stock.no_mutation') }}</td></tr>
-                @endforelse
-                </tbody>
-            </table>
-            </div>
-            <div style="margin-top:12px;">{{ $movementPaginator->links() }}</div>
-        </div>
-    @endif
+    <div id="supplier-stock-results">
+        @include('supplier_stock_cards.partials.results')
+    </div>
 
     <div id="stock-edit-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1200;"></div>
     <div id="stock-edit-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:1201;">
@@ -284,26 +149,7 @@
     </div>
 
     <script>
-        (function () {
-            const form = document.getElementById('supplier-stock-filter-form');
-            const searchInput = document.getElementById('supplier-stock-search');
-            const supplierSelect = document.getElementById('supplier-stock-supplier');
-            if (!form || !searchInput || !supplierSelect) return;
-
-            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                ? window.PgposAutoSearch.debounce
-                : (fn, wait = 100) => { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), wait); }; };
-
-            const onInput = debounce(() => {
-                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) return;
-                form.requestSubmit();
-            }, 100);
-
-            searchInput.addEventListener('input', onInput);
-            supplierSelect.addEventListener('change', () => form.requestSubmit());
-        })();
-
-        (function () {
+        document.addEventListener('DOMContentLoaded', function () {
             const modal = document.getElementById('stock-edit-modal');
             const overlay = document.getElementById('stock-edit-modal-overlay');
             const closeBtn = document.getElementById('stock-edit-close');
@@ -318,14 +164,12 @@
             const currentStockInput = document.getElementById('stock-edit-current-stock');
             const newStockInput = document.getElementById('stock-edit-new-stock');
             const rowKeyInput = document.getElementById('stock-edit-row-key');
-            if (!modal || !overlay || !closeBtn || !form || !newStockInput) return;
 
             let saveTimer = null;
             let isSubmitting = false;
             let originalStock = 0;
             const AUTO_SAVE_DELAY_MS = 5000;
 
-            const openButtons = document.querySelectorAll('.js-open-stock-modal');
             const openModal = (button) => {
                 const productId = Number(button.getAttribute('data-product-id') || '0');
                 const supplierId = Number(button.getAttribute('data-supplier-id') || '0');
@@ -452,23 +296,51 @@
                 saveTimer = setTimeout(triggerAutoSave, AUTO_SAVE_DELAY_MS);
             };
 
-            openButtons.forEach((button) => {
-                button.addEventListener('click', () => openModal(button));
+            function initStockEditModalTriggers() {
+                document.querySelectorAll('.js-open-stock-modal').forEach((button) => {
+                    button.addEventListener('click', () => openModal(button));
+                });
+            }
+
+            if (modal && overlay && closeBtn && form && newStockInput) {
+                closeBtn.addEventListener('click', requestCloseModal);
+                overlay.addEventListener('click', requestCloseModal);
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && modal.style.display === 'block') {
+                        requestCloseModal();
+                    }
+                    if (event.key === 'Enter' && modal.style.display === 'block') {
+                        event.preventDefault();
+                        scheduleAutoSave();
+                    }
+                });
+                newStockInput.addEventListener('input', scheduleAutoSave);
+                newStockInput.addEventListener('change', scheduleAutoSave);
+                initStockEditModalTriggers();
+            }
+
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'supplier-stock-filter-form',
+                container: 'supplier-stock-results',
+                onSwap: () => {
+                    const params = new URLSearchParams(window.location.search);
+                    const supplierSelect = document.getElementById('supplier-stock-supplier');
+                    if (supplierSelect) {
+                        supplierSelect.value = params.get('supplier_id') || '';
+                    }
+                    initStockEditModalTriggers();
+                },
             });
-            closeBtn.addEventListener('click', requestCloseModal);
-            overlay.addEventListener('click', requestCloseModal);
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && modal.style.display === 'block') {
-                    requestCloseModal();
-                }
-                if (event.key === 'Enter' && modal.style.display === 'block') {
-                    event.preventDefault();
-                    scheduleAutoSave();
-                }
-            });
-            newStockInput.addEventListener('input', scheduleAutoSave);
-            newStockInput.addEventListener('change', scheduleAutoSave);
-        })();
+            if (!ajax) {
+                return;
+            }
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('supplier-stock-search'), () => ajax.submit(), 100);
+            window.PgposAutoSearch.bindChangeFilters([
+                document.getElementById('supplier-stock-supplier'),
+                document.getElementById('supplier-stock-date-from'),
+                document.getElementById('supplier-stock-date-to'),
+            ], () => ajax.submit());
+        });
     </script>
 @endsection
 

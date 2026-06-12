@@ -67,13 +67,20 @@ class CustomerPageController extends Controller
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
-        return view('customers.index', [
+        $viewData = [
             'customers' => $customers,
             'search' => $search,
-            'levels' => CustomerLevel::query()->orderBy('name')->orderBy('code')->get(['id', 'code', 'name']),
             'selectedLevelId' => $selectedLevelId,
             'sort' => $sort,
             'direction' => $direction,
+        ];
+
+        if ($request->ajax()) {
+            return view('customers.partials.results', $viewData);
+        }
+
+        return view('customers.index', $viewData + [
+            'levels' => CustomerLevel::query()->orderBy('name')->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
 
