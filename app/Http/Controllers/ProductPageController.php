@@ -79,14 +79,20 @@ class ProductPageController extends Controller
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
-        return view('products.index', [
+        $viewData = [
             'products' => $products,
             'search' => $search,
             'productType' => $productType,
             'productTypeOptions' => $this->productTypeOptions(),
             'sort' => $sort,
             'direction' => $direction,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('products.partials.results', $viewData);
+        }
+
+        return view('products.index', $viewData);
     }
 
     public function exportCsv(Request $request): StreamedResponse

@@ -269,7 +269,7 @@ class ReceivablePageController extends Controller
             }
         }
 
-        return view('receivables.index', [
+        $viewData = [
             'customers' => $customers,
             'ledgerRows' => $ledgerRows,
             'search' => $search,
@@ -296,7 +296,13 @@ class ReceivablePageController extends Controller
             'selectedCustomerOption' => $selectedCustomerOption,
             'sort' => $sort,
             'direction' => $direction,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('receivables.partials.results', $viewData);
+        }
+
+        return view('receivables.index', $viewData);
     }
 
     public function semesterIndex(Request $request): View

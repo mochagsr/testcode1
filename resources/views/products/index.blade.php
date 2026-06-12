@@ -241,14 +241,6 @@
         $canEditProducts = $currentUser?->canAccess('products.edit') ?? false;
         $canImportProducts = $currentUser?->canAccess('products.import') ?? false;
         $isAdmin = ($currentUser?->role ?? '') === 'admin';
-        $sortUrl = function (string $field) use ($search, $productType, $sort, $direction): string {
-            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
-            return route('products.index', ['search' => $search, 'product_type' => $productType, 'sort' => $field, 'direction' => $nextDir]);
-        };
-        $sortMark = function (string $field) use ($sort, $direction): string {
-            if ($sort !== $field) return '↕';
-            return $direction === 'asc' ? '↑' : '↓';
-        };
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('ui.products_title') }}</h1>
@@ -282,11 +274,28 @@
                     <button type="button" class="btn process-btn product-action-btn" id="product-import-open">Import Data</button>
                 @endif
                 <div class="report-actions">
-                    <a class="btn info-btn product-action-btn" href="{{ route('products.print', ['search' => $search, 'product_type' => $productType]) }}" target="_blank">{{ __('txn.print') }}</a>
+                    <a
+                        class="btn info-btn product-action-btn"
+                        data-ajax-sync
+                        data-href-base="{{ route('products.print') }}"
+                        data-href-params="search,product_type"
+                        href="{{ route('products.print', ['search' => $search, 'product_type' => $productType]) }}"
+                        target="_blank"
+                    >{{ __('txn.print') }}</a>
                     <select class="action-menu action-menu-md product-action-btn" aria-label="Export" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                         <option value="" selected disabled>Export</option>
-                        <option value="{{ route('products.export.pdf', ['search' => $search, 'product_type' => $productType]) }}">Export PDF</option>
-                        <option value="{{ route('products.export.csv', ['search' => $search, 'product_type' => $productType]) }}">Export Excel</option>
+                        <option
+                            data-ajax-sync
+                            data-href-base="{{ route('products.export.pdf') }}"
+                            data-href-params="search,product_type"
+                            value="{{ route('products.export.pdf', ['search' => $search, 'product_type' => $productType]) }}"
+                        >Export PDF</option>
+                        <option
+                            data-ajax-sync
+                            data-href-base="{{ route('products.export.csv') }}"
+                            data-href-params="search,product_type"
+                            value="{{ route('products.export.csv', ['search' => $search, 'product_type' => $productType]) }}"
+                        >Export Excel</option>
                     </select>
                 </div>
             </div>
@@ -328,98 +337,8 @@
         </div>
     @endif
 
-    <div class="card">
-        <div class="products-table-wrap">
-        <table class="products-table">
-            <thead>
-            <tr>
-                @if($isAdmin)
-                    <th class="bulk-select-col" style="width: 36px; text-align: center;">
-                        <input type="checkbox" id="product-bulk-select-all" aria-label="{{ __('ui.bulk_delete_products') }}">
-                    </th>
-                @endif
-                <th class="code-col">{{ __('ui.code') }}</th>
-                <th class="category-col">
-                    <a class="sort-link" href="{{ $sortUrl('category') }}">
-                        {{ __('ui.category') }} <span class="sort-mark">{{ $sortMark('category') }}</span>
-                    </a>
-                </th>
-                <th>
-                    <a class="sort-link" href="{{ $sortUrl('name') }}">
-                        {{ __('ui.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span>
-                    </a>
-                </th>
-                <th class="stock-col">
-                    <a class="sort-link" href="{{ $sortUrl('stock') }}">
-                        {{ __('ui.stock') }} <span class="sort-mark">{{ $sortMark('stock') }}</span>
-                    </a>
-                </th>
-                <th class="price-col">{{ __('ui.price_agent') }}</th>
-                <th class="price-col">{{ __('ui.price_sales') }}</th>
-                <th class="price-col">{{ __('ui.price_general') }}</th>
-                <th class="action-col">{{ __('ui.actions') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse($products as $product)
-                <tr>
-                    @if($isAdmin)
-                        <td class="bulk-select-col" style="text-align: center;">
-                            <input type="checkbox" class="js-product-bulk-checkbox" value="{{ (int) $product->id }}" data-product-code="{{ (string) ($product->code ?? '-') }}" data-product-name="{{ (string) $product->name }}" aria-label="{{ __('ui.bulk_delete_products') }}">
-                        </td>
-                    @endif
-                    <td class="code-col">
-                        @if($product->code)
-                            <a href="{{ route('products.mutations', ['product' => $product, 'mutation_page' => 1]) }}#stock-mutations">{{ $product->code }}</a>
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td class="category-col">{{ $product->category?->name ?: '-' }}</td>
-                    <td class="name-col">{{ $product->name }}</td>
-                    <td class="stock-col">
-                        <strong class="js-product-stock-value" data-product-id="{{ (int) $product->id }}">
-                            {{ number_format((int) round($product->stock), 0, ',', '.') }}
-                        </strong>
-                    </td>
-                    <td class="price-col">Rp {{ number_format((int) round($product->price_agent), 0, ',', '.') }}</td>
-                    <td class="price-col">Rp {{ number_format((int) round($product->price_sales), 0, ',', '.') }}</td>
-                    <td class="price-col">Rp {{ number_format((int) round($product->price_general), 0, ',', '.') }}</td>
-                    <td class="action-col">
-                        <div class="product-actions">
-                            @if($productType === 'raw_material')
-                                <a class="btn info-btn product-action-btn" href="{{ route('products.show', $product) }}">{{ __('ui.view') }}</a>
-                            @endif
-                            @if($canEditProducts)
-                                <a class="btn edit-btn product-action-btn" href="{{ route('products.edit', $product) }}">{{ __('ui.edit') }}</a>
-                            @endif
-                            @if($canEditProducts)
-                                <button
-                                    type="button"
-                                    class="btn process-soft-btn product-action-btn js-open-product-stock-modal"
-                                    data-product-id="{{ (int) $product->id }}"
-                                    data-product-code="{{ (string) ($product->code ?? '') }}"
-                                    data-product-name="{{ (string) ($product->name ?? '') }}"
-                                    data-current-stock="{{ (int) round($product->stock) }}"
-                                    data-update-url="{{ route('products.quick-stock', $product) }}"
-                                >
-                                    {{ __('ui.edit_stock') }}
-                                </button>
-                            @endif
-                            <a class="btn process-btn product-action-btn" href="{{ route('products.mutations', $product) }}">{{ __('ui.stock_mutations_title') }}</a>
-                        </div>
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="{{ $isAdmin ? 9 : 8 }}" class="muted">{{ __('ui.no_products') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        </div>
-
-        <div style="margin-top: 12px;">
-            {{ $products->links() }}
-        </div>
+    <div id="products-results">
+        @include('products.partials.results')
     </div>
 
     @if($isAdmin)
@@ -473,303 +392,300 @@
     </div>
 
     <script>
-        (function () {
-            const form = document.getElementById('products-search-form');
-            const searchInput = document.getElementById('products-search-input');
-            const typeFilter = document.getElementById('products-type-filter');
+        document.addEventListener('DOMContentLoaded', function () {
+            let initProductBulkSelect = function () {};
+            let initProductStockModalTriggers = function () {};
 
-            if (!form || !searchInput) {
-                return;
-            }
+            (function () {
+                const importModal = document.getElementById('product-import-modal');
+                const importOpen = document.getElementById('product-import-open');
+                const importClose = document.getElementById('product-import-close');
+                if (!importModal || !importOpen || !importClose) {
+                    return;
+                }
 
-            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                ? window.PgposAutoSearch.debounce
-                : (fn, wait = 100) => {
-                    let timeoutId = null;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), wait);
-                    };
+                const closeImportModal = () => {
+                    importModal.classList.remove('is-open');
+                    importModal.setAttribute('aria-hidden', 'true');
                 };
-            const onSearchInput = debounce(() => {
-                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                    return;
-                }
-                form.requestSubmit();
-            }, 420);
-            searchInput.addEventListener('input', onSearchInput);
-            typeFilter?.addEventListener('change', () => form.requestSubmit());
-        })();
 
-        (function () {
-            const importModal = document.getElementById('product-import-modal');
-            const importOpen = document.getElementById('product-import-open');
-            const importClose = document.getElementById('product-import-close');
-            if (!importModal || !importOpen || !importClose) {
-                return;
-            }
-
-            const closeImportModal = () => {
-                importModal.classList.remove('is-open');
-                importModal.setAttribute('aria-hidden', 'true');
-            };
-
-            importOpen.addEventListener('click', () => {
-                importModal.classList.add('is-open');
-                importModal.setAttribute('aria-hidden', 'false');
-                document.getElementById('product-import-file')?.focus();
-            });
-            importClose.addEventListener('click', closeImportModal);
-            importModal.addEventListener('click', (event) => {
-                if (event.target === importModal) {
-                    closeImportModal();
-                }
-            });
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && importModal.classList.contains('is-open')) {
-                    closeImportModal();
-                }
-            });
-        })();
-
-        (function () {
-            const selectAll = document.getElementById('product-bulk-select-all');
-            const checkboxes = Array.from(document.querySelectorAll('.js-product-bulk-checkbox'));
-            const openBtn = document.getElementById('product-bulk-delete-open');
-            const countEl = document.getElementById('product-bulk-delete-count');
-            const modal = document.getElementById('product-bulk-delete-modal');
-            const overlay = document.getElementById('product-bulk-delete-modal-overlay');
-            const closeBtn = document.getElementById('product-bulk-delete-close');
-            const cancelBtn = document.getElementById('product-bulk-delete-cancel');
-            const list = document.getElementById('product-bulk-delete-list');
-            const inputsWrap = document.getElementById('product-bulk-delete-inputs');
-
-            if (!openBtn || !countEl || !modal || !overlay || !closeBtn || !cancelBtn || !list || !inputsWrap) {
-                return;
-            }
-
-            const selectedCheckboxes = () => checkboxes.filter((checkbox) => checkbox.checked);
-
-            const refreshState = () => {
-                const selected = selectedCheckboxes();
-                countEl.textContent = String(selected.length);
-                openBtn.disabled = selected.length === 0;
-                if (selectAll) {
-                    selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
-                    selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
-                }
-            };
-
-            selectAll?.addEventListener('change', () => {
-                checkboxes.forEach((checkbox) => { checkbox.checked = selectAll.checked; });
-                refreshState();
-            });
-            checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refreshState));
-            refreshState();
-
-            const escapeHtml = (value) => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-            const closeModal = () => {
-                modal.style.display = 'none';
-                overlay.style.display = 'none';
-            };
-
-            openBtn.addEventListener('click', () => {
-                const selected = selectedCheckboxes();
-                if (selected.length === 0) {
-                    window.PgposDialog?.showMessage(@json(__('ui.bulk_delete_products_none_selected')));
-                    return;
-                }
-
-                list.innerHTML = selected.map((checkbox) => {
-                    const code = escapeHtml(checkbox.getAttribute('data-product-code') || '-');
-                    const name = escapeHtml(checkbox.getAttribute('data-product-name') || '-');
-                    return `<li>${code} — ${name}</li>`;
-                }).join('');
-
-                inputsWrap.innerHTML = selected.map((checkbox) =>
-                    `<input type="hidden" name="product_ids[]" value="${escapeHtml(checkbox.value)}">`
-                ).join('');
-
-                modal.style.display = 'block';
-                overlay.style.display = 'block';
-                setTimeout(() => cancelBtn.focus(), 50);
-            });
-
-            closeBtn.addEventListener('click', closeModal);
-            cancelBtn.addEventListener('click', closeModal);
-            overlay.addEventListener('click', closeModal);
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && modal.style.display === 'block') {
-                    closeModal();
-                }
-            });
-        })();
-
-        (function () {
-            const modal = document.getElementById('product-stock-edit-modal');
-            const overlay = document.getElementById('product-stock-edit-modal-overlay');
-            const closeBtn = document.getElementById('product-stock-edit-close');
-            const form = document.getElementById('product-stock-edit-form');
-            const statusText = document.getElementById('product-stock-edit-status');
-            const codeInput = document.getElementById('product-stock-edit-code');
-            const nameInput = document.getElementById('product-stock-edit-name');
-            const currentStockInput = document.getElementById('product-stock-edit-current-stock');
-            const newStockInput = document.getElementById('product-stock-edit-new-stock');
-            if (!modal || !overlay || !closeBtn || !form || !newStockInput) {
-                return;
-            }
-
-            let saveTimer = null;
-            let isSubmitting = false;
-            let originalStock = 0;
-            let selectedProductId = 0;
-            const AUTO_SAVE_DELAY_MS = 5000;
-
-            const setRowStock = (productId, value) => {
-                const stockValue = Number(value);
-                const stockEl = document.querySelector('.js-product-stock-value[data-product-id="' + String(productId) + '"]');
-                if (stockEl) {
-                    stockEl.textContent = stockValue.toLocaleString('id-ID', { maximumFractionDigits: 0 });
-                }
-
-                const editBtn = document.querySelector('.js-open-product-stock-modal[data-product-id="' + String(productId) + '"]');
-                if (editBtn) {
-                    editBtn.setAttribute('data-current-stock', String(stockValue));
-                }
-            };
-
-            const openModal = (button) => {
-                selectedProductId = Number(button.getAttribute('data-product-id') || '0');
-                originalStock = Number(button.getAttribute('data-current-stock') || '0');
-                form.action = String(button.getAttribute('data-update-url') || '');
-                codeInput.value = String(button.getAttribute('data-product-code') || '-');
-                nameInput.value = String(button.getAttribute('data-product-name') || '-');
-                currentStockInput.value = String(originalStock);
-                newStockInput.value = String(originalStock);
-                window.PgposNumberFormat.formatInput(currentStockInput);
-                window.PgposNumberFormat.formatInput(newStockInput);
-                statusText.textContent = @json(__('ui.auto_save_hint'));
-                modal.style.display = 'block';
-                overlay.style.display = 'block';
-                setTimeout(() => newStockInput.focus(), 50);
-            };
-
-            const closeModal = () => {
-                modal.style.display = 'none';
-                overlay.style.display = 'none';
-                if (saveTimer) {
-                    clearTimeout(saveTimer);
-                    saveTimer = null;
-                }
-            };
-            const hasPendingStockChange = () => {
-                const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
-                const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
-                return !Number.isNaN(next) && next >= 0 && current !== next;
-            };
-            const requestCloseModal = () => {
-                if (saveTimer) {
-                    clearTimeout(saveTimer);
-                    saveTimer = null;
-                }
-                if (isSubmitting) {
-                    return;
-                }
-                if (hasPendingStockChange()) {
-                    triggerAutoSave();
-                    return;
-                }
-                closeModal();
-            };
-
-            const triggerAutoSave = () => {
-                const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
-                const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
-                if (Number.isNaN(next) || next < 0) return;
-                if (current === next) return;
-                if (isSubmitting) return;
-                if (!form.action) return;
-
-                isSubmitting = true;
-                statusText.textContent = @json(__('ui.saving'));
-                const payload = new FormData(form);
-                payload.set('stock', String(next));
-                fetch(form.action, {
-                    method: 'POST',
-                    body: payload,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
+                importOpen.addEventListener('click', () => {
+                    importModal.classList.add('is-open');
+                    importModal.setAttribute('aria-hidden', 'false');
+                    document.getElementById('product-import-file')?.focus();
+                });
+                importClose.addEventListener('click', closeImportModal);
+                importModal.addEventListener('click', (event) => {
+                    if (event.target === importModal) {
+                        closeImportModal();
                     }
-                })
-                    .then(async (response) => {
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok || !data || data.ok !== true) {
-                            let errMsg = @json(__('ui.save_failed'));
-                            if (data && data.errors && typeof data.errors === 'object') {
-                                const firstKey = Object.keys(data.errors)[0];
-                                const firstErr = firstKey ? data.errors[firstKey] : null;
-                                if (Array.isArray(firstErr) && firstErr.length > 0) {
-                                    errMsg = String(firstErr[0]);
-                                }
-                            } else if (data && data.message) {
-                                errMsg = String(data.message);
-                            }
-                            throw new Error(errMsg);
-                        }
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && importModal.classList.contains('is-open')) {
+                        closeImportModal();
+                    }
+                });
+            })();
 
-                        const savedStock = Number(data.stock ?? next);
-                        originalStock = savedStock;
-                        currentStockInput.value = String(savedStock);
-                        newStockInput.value = String(savedStock);
-                        window.PgposNumberFormat.formatInput(currentStockInput);
-                        window.PgposNumberFormat.formatInput(newStockInput);
-                        setRowStock(selectedProductId, savedStock);
-                        const serverMessage = String(data.message || @json(__('ui.saved')));
-                        const serverType = String(data.message_type || 'edit');
-                        statusText.textContent = serverMessage;
-                        if (window.PgposFlash && typeof window.PgposFlash.show === 'function') {
-                            window.PgposFlash.show(serverMessage, serverType);
+            (function () {
+                const openBtn = document.getElementById('product-bulk-delete-open');
+                const countEl = document.getElementById('product-bulk-delete-count');
+                const modal = document.getElementById('product-bulk-delete-modal');
+                const overlay = document.getElementById('product-bulk-delete-modal-overlay');
+                const closeBtn = document.getElementById('product-bulk-delete-close');
+                const cancelBtn = document.getElementById('product-bulk-delete-cancel');
+                const list = document.getElementById('product-bulk-delete-list');
+                const inputsWrap = document.getElementById('product-bulk-delete-inputs');
+
+                if (!openBtn || !countEl || !modal || !overlay || !closeBtn || !cancelBtn || !list || !inputsWrap) {
+                    return;
+                }
+
+                initProductBulkSelect = function () {
+                    const selectAll = document.getElementById('product-bulk-select-all');
+                    const checkboxes = Array.from(document.querySelectorAll('.js-product-bulk-checkbox'));
+
+                    const refreshState = () => {
+                        const selected = checkboxes.filter((checkbox) => checkbox.checked);
+                        countEl.textContent = String(selected.length);
+                        openBtn.disabled = selected.length === 0;
+                        if (selectAll) {
+                            selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+                            selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
                         }
-                        setTimeout(() => closeModal(), 250);
-                    })
-                    .catch((error) => {
-                        setRowStock(selectedProductId, originalStock);
-                        currentStockInput.value = String(originalStock);
-                        newStockInput.value = String(originalStock);
-                        window.PgposNumberFormat.formatInput(currentStockInput);
-                        window.PgposNumberFormat.formatInput(newStockInput);
-                        statusText.textContent = error.message || @json(__('ui.save_failed'));
-                    })
-                    .finally(() => {
-                        isSubmitting = false;
+                    };
+
+                    selectAll?.addEventListener('change', () => {
+                        checkboxes.forEach((checkbox) => { checkbox.checked = selectAll.checked; });
+                        refreshState();
                     });
-            };
+                    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refreshState));
+                    refreshState();
+                };
 
-            const scheduleAutoSave = () => {
-                if (saveTimer) clearTimeout(saveTimer);
-                saveTimer = setTimeout(triggerAutoSave, AUTO_SAVE_DELAY_MS);
-            };
+                const escapeHtml = (value) => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-            document.querySelectorAll('.js-open-product-stock-modal').forEach((button) => {
-                button.addEventListener('click', () => openModal(button));
-            });
+                const closeModal = () => {
+                    modal.style.display = 'none';
+                    overlay.style.display = 'none';
+                };
 
-            closeBtn.addEventListener('click', requestCloseModal);
-            overlay.addEventListener('click', requestCloseModal);
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && modal.style.display === 'block') {
-                    requestCloseModal();
+                openBtn.addEventListener('click', () => {
+                    const selected = Array.from(document.querySelectorAll('.js-product-bulk-checkbox')).filter((checkbox) => checkbox.checked);
+                    if (selected.length === 0) {
+                        window.PgposDialog?.showMessage(@json(__('ui.bulk_delete_products_none_selected')));
+                        return;
+                    }
+
+                    list.innerHTML = selected.map((checkbox) => {
+                        const code = escapeHtml(checkbox.getAttribute('data-product-code') || '-');
+                        const name = escapeHtml(checkbox.getAttribute('data-product-name') || '-');
+                        return `<li>${code} — ${name}</li>`;
+                    }).join('');
+
+                    inputsWrap.innerHTML = selected.map((checkbox) =>
+                        `<input type="hidden" name="product_ids[]" value="${escapeHtml(checkbox.value)}">`
+                    ).join('');
+
+                    modal.style.display = 'block';
+                    overlay.style.display = 'block';
+                    setTimeout(() => cancelBtn.focus(), 50);
+                });
+
+                closeBtn.addEventListener('click', closeModal);
+                cancelBtn.addEventListener('click', closeModal);
+                overlay.addEventListener('click', closeModal);
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && modal.style.display === 'block') {
+                        closeModal();
+                    }
+                });
+            })();
+
+            (function () {
+                const modal = document.getElementById('product-stock-edit-modal');
+                const overlay = document.getElementById('product-stock-edit-modal-overlay');
+                const closeBtn = document.getElementById('product-stock-edit-close');
+                const form = document.getElementById('product-stock-edit-form');
+                const statusText = document.getElementById('product-stock-edit-status');
+                const codeInput = document.getElementById('product-stock-edit-code');
+                const nameInput = document.getElementById('product-stock-edit-name');
+                const currentStockInput = document.getElementById('product-stock-edit-current-stock');
+                const newStockInput = document.getElementById('product-stock-edit-new-stock');
+                if (!modal || !overlay || !closeBtn || !form || !newStockInput) {
+                    return;
                 }
-                if (event.key === 'Enter' && modal.style.display === 'block') {
-                    event.preventDefault();
-                    scheduleAutoSave();
-                }
+
+                let saveTimer = null;
+                let isSubmitting = false;
+                let originalStock = 0;
+                let selectedProductId = 0;
+                const AUTO_SAVE_DELAY_MS = 5000;
+
+                const setRowStock = (productId, value) => {
+                    const stockValue = Number(value);
+                    const stockEl = document.querySelector('.js-product-stock-value[data-product-id="' + String(productId) + '"]');
+                    if (stockEl) {
+                        stockEl.textContent = stockValue.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+                    }
+
+                    const editBtn = document.querySelector('.js-open-product-stock-modal[data-product-id="' + String(productId) + '"]');
+                    if (editBtn) {
+                        editBtn.setAttribute('data-current-stock', String(stockValue));
+                    }
+                };
+
+                const openModal = (button) => {
+                    selectedProductId = Number(button.getAttribute('data-product-id') || '0');
+                    originalStock = Number(button.getAttribute('data-current-stock') || '0');
+                    form.action = String(button.getAttribute('data-update-url') || '');
+                    codeInput.value = String(button.getAttribute('data-product-code') || '-');
+                    nameInput.value = String(button.getAttribute('data-product-name') || '-');
+                    currentStockInput.value = String(originalStock);
+                    newStockInput.value = String(originalStock);
+                    window.PgposNumberFormat.formatInput(currentStockInput);
+                    window.PgposNumberFormat.formatInput(newStockInput);
+                    statusText.textContent = @json(__('ui.auto_save_hint'));
+                    modal.style.display = 'block';
+                    overlay.style.display = 'block';
+                    setTimeout(() => newStockInput.focus(), 50);
+                };
+
+                const closeModal = () => {
+                    modal.style.display = 'none';
+                    overlay.style.display = 'none';
+                    if (saveTimer) {
+                        clearTimeout(saveTimer);
+                        saveTimer = null;
+                    }
+                };
+                const hasPendingStockChange = () => {
+                    const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
+                    const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
+                    return !Number.isNaN(next) && next >= 0 && current !== next;
+                };
+                const requestCloseModal = () => {
+                    if (saveTimer) {
+                        clearTimeout(saveTimer);
+                        saveTimer = null;
+                    }
+                    if (isSubmitting) {
+                        return;
+                    }
+                    if (hasPendingStockChange()) {
+                        triggerAutoSave();
+                        return;
+                    }
+                    closeModal();
+                };
+
+                const triggerAutoSave = () => {
+                    const current = window.PgposNumberFormat.parseInt(currentStockInput.value || '0');
+                    const next = window.PgposNumberFormat.parseInt(newStockInput.value || '0');
+                    if (Number.isNaN(next) || next < 0) return;
+                    if (current === next) return;
+                    if (isSubmitting) return;
+                    if (!form.action) return;
+
+                    isSubmitting = true;
+                    statusText.textContent = @json(__('ui.saving'));
+                    const payload = new FormData(form);
+                    payload.set('stock', String(next));
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: payload,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                        .then(async (response) => {
+                            const data = await response.json().catch(() => ({}));
+                            if (!response.ok || !data || data.ok !== true) {
+                                let errMsg = @json(__('ui.save_failed'));
+                                if (data && data.errors && typeof data.errors === 'object') {
+                                    const firstKey = Object.keys(data.errors)[0];
+                                    const firstErr = firstKey ? data.errors[firstKey] : null;
+                                    if (Array.isArray(firstErr) && firstErr.length > 0) {
+                                        errMsg = String(firstErr[0]);
+                                    }
+                                } else if (data && data.message) {
+                                    errMsg = String(data.message);
+                                }
+                                throw new Error(errMsg);
+                            }
+
+                            const savedStock = Number(data.stock ?? next);
+                            originalStock = savedStock;
+                            currentStockInput.value = String(savedStock);
+                            newStockInput.value = String(savedStock);
+                            window.PgposNumberFormat.formatInput(currentStockInput);
+                            window.PgposNumberFormat.formatInput(newStockInput);
+                            setRowStock(selectedProductId, savedStock);
+                            const serverMessage = String(data.message || @json(__('ui.saved')));
+                            const serverType = String(data.message_type || 'edit');
+                            statusText.textContent = serverMessage;
+                            if (window.PgposFlash && typeof window.PgposFlash.show === 'function') {
+                                window.PgposFlash.show(serverMessage, serverType);
+                            }
+                            setTimeout(() => closeModal(), 250);
+                        })
+                        .catch((error) => {
+                            setRowStock(selectedProductId, originalStock);
+                            currentStockInput.value = String(originalStock);
+                            newStockInput.value = String(originalStock);
+                            window.PgposNumberFormat.formatInput(currentStockInput);
+                            window.PgposNumberFormat.formatInput(newStockInput);
+                            statusText.textContent = error.message || @json(__('ui.save_failed'));
+                        })
+                        .finally(() => {
+                            isSubmitting = false;
+                        });
+                };
+
+                const scheduleAutoSave = () => {
+                    if (saveTimer) clearTimeout(saveTimer);
+                    saveTimer = setTimeout(triggerAutoSave, AUTO_SAVE_DELAY_MS);
+                };
+
+                initProductStockModalTriggers = function () {
+                    document.querySelectorAll('.js-open-product-stock-modal').forEach((button) => {
+                        button.addEventListener('click', () => openModal(button));
+                    });
+                };
+                initProductStockModalTriggers();
+
+                closeBtn.addEventListener('click', requestCloseModal);
+                overlay.addEventListener('click', requestCloseModal);
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && modal.style.display === 'block') {
+                        requestCloseModal();
+                    }
+                    if (event.key === 'Enter' && modal.style.display === 'block') {
+                        event.preventDefault();
+                        scheduleAutoSave();
+                    }
+                });
+                newStockInput.addEventListener('input', scheduleAutoSave);
+                newStockInput.addEventListener('change', scheduleAutoSave);
+            })();
+
+            initProductBulkSelect();
+
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'products-search-form',
+                container: 'products-results',
+                onSwap: () => {
+                    initProductBulkSelect();
+                    initProductStockModalTriggers();
+                },
             });
-            newStockInput.addEventListener('input', scheduleAutoSave);
-            newStockInput.addEventListener('change', scheduleAutoSave);
-        })();
+            if (!ajax) {
+                return;
+            }
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('products-search-input'), () => ajax.submit(), 420);
+            window.PgposAutoSearch.bindChangeFilters([document.getElementById('products-type-filter')], () => ajax.submit());
+        });
     </script>
 @endsection
 
