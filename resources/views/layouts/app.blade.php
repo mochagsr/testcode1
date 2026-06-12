@@ -1882,12 +1882,106 @@
             return m[2].padStart(2, '0') + m[3].padStart(2, '0') + m[1];
         }
 
+        function initAjaxFilter(options) {
+            const form = typeof options.form === 'string' ? document.getElementById(options.form) : options.form;
+            const container = typeof options.container === 'string' ? document.getElementById(options.container) : options.container;
+            if (!form || !container) return null;
+
+            const onSwap = typeof options.onSwap === 'function' ? options.onSwap : null;
+            const syncTargets = Array.from(document.querySelectorAll('[data-ajax-sync]'));
+            let activeController = null;
+            let requestSeq = 0;
+
+            function cleanParams(params) {
+                Array.from(params.keys()).forEach((key) => { if (params.get(key) === '') params.delete(key); });
+                return params;
+            }
+
+            function buildUrl() {
+                const params = cleanParams(new URLSearchParams(new FormData(form)));
+                const action = form.getAttribute('action') || window.location.pathname;
+                const qs = params.toString();
+                return qs ? `${action}?${qs}` : action;
+            }
+
+            function syncExternalLinks() {
+                const params = cleanParams(new URLSearchParams(new FormData(form)));
+                syncTargets.forEach((el) => {
+                    const base = el.getAttribute('data-href-base');
+                    if (!base) return;
+                    const onlyParams = (el.getAttribute('data-href-params') || '').split(',').map((s) => s.trim()).filter(Boolean);
+                    let targetQs = params.toString();
+                    if (onlyParams.length > 0) {
+                        const filtered = new URLSearchParams();
+                        onlyParams.forEach((key) => { if (params.has(key)) filtered.set(key, params.get(key)); });
+                        targetQs = filtered.toString();
+                    }
+                    const href = targetQs ? `${base}?${targetQs}` : base;
+                    if (el.tagName === 'OPTION') el.value = href; else el.setAttribute('href', href);
+                });
+            }
+
+            function fetchAndSwap(url) {
+                const seq = ++requestSeq;
+                if (activeController) activeController.abort();
+                const controller = new AbortController();
+                activeController = controller;
+
+                return fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                    signal: controller.signal,
+                })
+                    .then((response) => { if (!response.ok) throw new Error('Request failed: ' + response.status); return response.text(); })
+                    .then((html) => {
+                        if (seq !== requestSeq) return;
+                        container.innerHTML = html;
+                        syncExternalLinks();
+                        window.history.replaceState(window.history.state, '', url);
+                        if (onSwap) onSwap(container);
+                    })
+                    .catch((error) => { if (error.name !== 'AbortError') console.error('PgposAutoSearch fetchAndSwap failed', error); })
+                    .finally(() => { if (activeController === controller) activeController = null; });
+            }
+
+            function submit() { fetchAndSwap(buildUrl()); }
+
+            container.addEventListener('click', (event) => {
+                const link = event.target.closest('a');
+                if (!link || !container.contains(link)) return;
+                if (link.target === '_blank' || link.hasAttribute('download')) return;
+                const href = link.getAttribute('href');
+                if (!href || href.startsWith('#')) return;
+                let url;
+                try { url = new URL(href, window.location.href); } catch (e) { return; }
+                if (url.origin !== window.location.origin) return;
+                event.preventDefault();
+                fetchAndSwap(url.pathname + url.search);
+            });
+
+            form.addEventListener('submit', (event) => { event.preventDefault(); submit(); });
+
+            return { submit, fetchAndSwap, buildUrl, syncExternalLinks };
+        }
+
+        function bindDebouncedSearch(input, submitFn, wait = 100) {
+            if (!input) return;
+            const handler = debounce(() => { if (!canSearchInput(input)) return; submitFn(); }, wait);
+            input.addEventListener('input', handler);
+        }
+
+        function bindChangeFilters(elements, submitFn) {
+            (elements || []).filter(Boolean).forEach((el) => el.addEventListener('change', submitFn));
+        }
+
         window.PgposAutoSearch = Object.assign({}, window.PgposAutoSearch || {}, {
             debounce,
             escapeAttribute,
             canSearchInput,
             deriveSemesterFromDate,
             semesterSortKey,
+            initAjaxFilter,
+            bindDebouncedSearch,
+            bindChangeFilters,
         });
 
         const mobileBreakpoint = window.matchMedia('(max-width: 900px)');
