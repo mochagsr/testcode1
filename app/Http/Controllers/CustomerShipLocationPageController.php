@@ -54,19 +54,26 @@ class CustomerShipLocationPageController extends Controller
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
+        $viewData = [
+            'locations' => $locations,
+            'search' => $search,
+            'selectedCustomerId' => $customerId > 0 ? $customerId : null,
+            'sort' => $sort,
+            'direction' => $direction,
+        ];
+
+        if ($request->ajax()) {
+            return view('customer_ship_locations.partials.results', $viewData);
+        }
+
         $customers = Customer::query()
             ->onlyOptionColumns()
             ->orderBy('name')
             ->limit(200)
             ->get();
 
-        return view('customer_ship_locations.index', [
-            'locations' => $locations,
+        return view('customer_ship_locations.index', $viewData + [
             'customers' => $customers,
-            'search' => $search,
-            'selectedCustomerId' => $customerId > 0 ? $customerId : null,
-            'sort' => $sort,
-            'direction' => $direction,
         ]);
     }
 

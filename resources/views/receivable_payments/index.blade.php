@@ -22,87 +22,26 @@
     </div>
 
     <div class="card">
-        <div class="transaction-list-scroll">
-        <table>
-            <thead>
-            <tr>
-                <th>{{ __('txn.no') }}</th>
-                <th>{{ __('txn.date') }}</th>
-                <th>{{ __('ui.customer_name') }}</th>
-                <th>{{ __('receivable.amount_paid') }}</th>
-                <th>{{ __('txn.status') }}</th>
-                <th>{{ __('receivable.action') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse($payments as $payment)
-                <tr>
-                    <td>
-                        <div class="list-doc-cell">
-                            <a class="list-doc-link" href="{{ route('receivable-payments.show', $payment) }}">{{ $payment->payment_number }}</a>
-                        </div>
-                    </td>
-                    <td>{{ $payment->payment_date?->format('d-m-Y') }}</td>
-                    <td>{{ $payment->customer?->name }} <span class="muted">({{ $payment->customer?->city }})</span></td>
-                    <td>Rp {{ number_format((int) round($payment->amount), 0, ',', '.') }}</td>
-                    <td>{{ $payment->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
-                    <td>
-                        <div class="flex">
-                            <a class="btn info-btn" href="{{ route('receivable-payments.show', $payment) }}">{{ __('txn.detail') }}</a>
-                            <select class="action-menu" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                                <option value="{{ route('receivable-payments.print', $payment) }}">{{ __('txn.print') }}</option>
-                                <option value="{{ route('receivable-payments.export.pdf', $payment) }}">{{ __('txn.pdf') }}</option>
-                            </select>
-                        </div>
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="6" class="muted">{{ __('receivable.no_receivable_payments') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        </div>
-
-        <div style="margin-top: 12px;">
-            {{ $payments->links() }}
+        <div id="receivable-payments-results">
+            @include('receivable_payments.partials.results')
         </div>
     </div>
 
     <script>
-        (function () {
-            const form = document.getElementById('receivable-payments-filter-form');
-            const searchInput = document.getElementById('receivable-payments-search-input');
-            const dateInput = document.getElementById('receivable-payments-date-input');
-            const statusInput = document.getElementById('receivable-payments-status-input');
-            if (!form || !searchInput || !dateInput || !statusInput) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'receivable-payments-filter-form',
+                container: 'receivable-payments-results',
+            });
+            if (!ajax) {
                 return;
             }
-
-            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                ? window.PgposAutoSearch.debounce
-                : (fn, wait = 100) => {
-                    let timeoutId = null;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), wait);
-                    };
-                };
-            const onSearchInput = debounce(() => {
-                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                    return;
-                }
-                form.requestSubmit();
-            }, 100);
-            searchInput.addEventListener('input', onSearchInput);
-
-            statusInput.addEventListener('change', () => {
-                form.requestSubmit();
-            });
-            dateInput.addEventListener('change', () => {
-                form.requestSubmit();
-            });
-        })();
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('receivable-payments-search-input'), () => ajax.submit(), 100);
+            window.PgposAutoSearch.bindChangeFilters([
+                document.getElementById('receivable-payments-date-input'),
+                document.getElementById('receivable-payments-status-input'),
+            ], () => ajax.submit());
+        });
     </script>
 @endsection
 

@@ -16,17 +16,6 @@
         .sort-link:hover { color: var(--primary, #2563eb); }
         .sort-mark { font-size: 11px; opacity: 0.65; }
     </style>
-    @php
-        $sortUrl = function (string $field) use ($search, $selectedSemester, $selectedStatus, $selectedReturnDate, $sort, $direction): string {
-            $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
-            return route('sales-returns.index', array_filter(['search' => $search, 'semester' => $selectedSemester, 'status' => $selectedStatus, 'return_date' => $selectedReturnDate, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== ''));
-        };
-        $sortMark = function (string $field) use ($sort, $direction): string {
-            if ($sort !== $field) return '↕';
-            return $direction === 'asc' ? '↑' : '↓';
-        };
-    @endphp
-
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('txn.sales_returns_title') }}</h1>
         @if(auth()->user()?->canAccess('sales_returns.create'))
@@ -56,119 +45,44 @@
     </div>
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
-            <strong>{{ __('txn.summary') }} {{ __('txn.date') }} {{ now()->format('d-m-Y') }}</strong>
-            <div class="muted">
-                {{ __('txn.summary_total_returns') }}: {{ (int) round((int) ($todaySummary->total_return ?? 0)) }} |
-                {{ __('txn.summary_grand_total') }}: Rp {{ number_format((int) round((float) ($todaySummary->grand_total ?? 0), 0), 0, ',', '.') }}
-            </div>
-        </div>
-    </div>
-    <div class="card">
-        <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_sales_returns') }}</strong>
             <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>Export</option>
-                <option value="{{ route('reports.export.pdf', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">Export PDF</option>
-                <option value="{{ route('reports.export.csv', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}">Export Excel</option>
+                <option
+                    data-ajax-sync
+                    data-href-base="{{ route('reports.export.pdf', ['dataset' => 'sales_returns']) }}"
+                    data-href-params="semester"
+                    value="{{ route('reports.export.pdf', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}"
+                >Export PDF</option>
+                <option
+                    data-ajax-sync
+                    data-href-base="{{ route('reports.export.csv', ['dataset' => 'sales_returns']) }}"
+                    data-href-params="semester"
+                    value="{{ route('reports.export.csv', ['dataset' => 'sales_returns', 'semester' => $selectedSemester]) }}"
+                >Export Excel</option>
             </select>
         </div>
     </div>
 
-    <div class="card">
-        <div class="transaction-list-scroll">
-        <table>
-            <thead>
-            <tr>
-                <th>{{ __('txn.return') }}</th>
-                <th><a class="sort-link" href="{{ $sortUrl('date') }}">{{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span></a></th>
-                <th><a class="sort-link" href="{{ $sortUrl('customer') }}">{{ __('ui.customer_name') }} <span class="sort-mark">{{ $sortMark('customer') }}</span></a></th>
-                <th>{{ __('txn.total_return') }}</th>
-                <th>{{ __('txn.action') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse ($returns as $row)
-                @php
-                    $lockKey = ((int) $row->customer_id).':'.(string) $row->semester_period;
-                    $lockState = $customerSemesterLockMap[$lockKey] ?? ['locked' => false, 'manual' => false, 'auto' => false];
-                    $adminAction = $returnAdminActionMap[(int) $row->id] ?? ['edited' => false, 'canceled' => false];
-                @endphp
-                <tr>
-                    <td>
-                        <div class="list-doc-cell">
-                            <a class="list-doc-link" href="{{ route('sales-returns.show', $row) }}">{{ $row->return_number }}</a>
-                            <span class="list-doc-badges">
-                                @if((bool) ($lockState['manual'] ?? false))
-                                    <span class="badge warning">{{ __('receivable.customer_semester_locked_manual') }}</span>
-                                @endif
-                                @if((bool) ($adminAction['edited'] ?? false))
-                                    <span class="badge warning">{{ __('txn.admin_badge_edit') }}</span>
-                                @endif
-                                @if((bool) ($adminAction['canceled'] ?? false))
-                                    <span class="badge danger">{{ __('txn.admin_badge_cancel') }}</span>
-                                @endif
-                            </span>
-                        </div>
-                    </td>
-                    <td>{{ $row->return_date->format('d-m-Y') }}</td>
-                    <td>
-                        {{ $row->customer->name }} <span class="muted">({{ $row->customer->city }})</span>
-                    </td>
-                    <td>Rp {{ number_format((int) round($row->total), 0, ',', '.') }}</td>
-                    <td>
-                        <div class="flex">
-                            <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                                <option value="{{ route('sales-returns.print', $row) }}">{{ __('txn.print') }}</option>
-                                <option value="{{ route('sales-returns.export.pdf', $row) }}">{{ __('txn.pdf') }}</option>
-                                <option value="{{ route('sales-returns.export.excel', $row) }}">{{ __('txn.excel') }}</option>
-                            </select>
-                        </div>
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="5" class="muted">{{ __('txn.no_returns_found') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        </div>
-
-        <div style="margin-top: 12px;">
-            {{ $returns->links() }}
-        </div>
+    <div id="sales-returns-results">
+        @include('sales_returns.partials.results')
     </div>
 
     <script>
-        (function () {
-            const form = document.getElementById('sales-returns-filter-form');
-            const searchInput = document.getElementById('sales-returns-search-input');
-            const dateInput = document.getElementById('sales-returns-date-input');
-            const semesterInput = document.getElementById('sales-returns-semester-input');
-
-            if (!form || !searchInput || !dateInput || !semesterInput) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'sales-returns-filter-form',
+                container: 'sales-returns-results',
+            });
+            if (!ajax) {
                 return;
             }
-
-            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                ? window.PgposAutoSearch.debounce
-                : (fn, wait = 100) => {
-                    let timeoutId = null;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), wait);
-                    };
-                };
-            const onSearchInput = debounce(() => {
-                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                    return;
-                }
-                form.requestSubmit();
-            }, 100);
-            searchInput.addEventListener('input', onSearchInput);
-
-            dateInput.addEventListener('change', () => form.requestSubmit());
-            semesterInput.addEventListener('change', () => form.requestSubmit());
-        })();
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('sales-returns-search-input'), () => ajax.submit(), 100);
+            window.PgposAutoSearch.bindChangeFilters([
+                document.getElementById('sales-returns-date-input'),
+                document.getElementById('sales-returns-semester-input'),
+            ], () => ajax.submit());
+        });
     </script>
 @endsection
 

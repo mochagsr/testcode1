@@ -49,7 +49,7 @@ class AuditLogPageController extends Controller
             ];
         }
 
-        return view('audit_logs.index', [
+        $viewData = [
             'logs' => $logs,
             'search' => $filters['search'],
             'selectedDocumentCode' => $filters['documentCode'],
@@ -62,7 +62,13 @@ class AuditLogPageController extends Controller
             'beforeAfterMap' => $viewMaps['beforeAfterMap'],
             'codeLinkMap' => $viewMaps['codeLinkMap'],
             'actionLabelMap' => $this->actionLabelMap($logs->getCollection()),
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('audit_logs.partials.results', $viewData);
+        }
+
+        return view('audit_logs.index', $viewData);
     }
 
     public function exportCsv(Request $request): StreamedResponse
@@ -218,8 +224,8 @@ class AuditLogPageController extends Controller
             ->when($dateToEnd !== null, function ($query) use ($dateToEnd): void {
                 $query->where('created_at', '<=', $dateToEnd);
             })
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($subQuery) use ($search): void {
+            ->when($search !== '', function ($query) use ($search, $hasRequestId): void {
+                $query->where(function ($subQuery) use ($search, $hasRequestId): void {
                     $subQuery->where('action', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%")
                         ->when($hasRequestId, function ($requestIdQuery) use ($search): void {

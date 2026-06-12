@@ -71,12 +71,18 @@ class ReceivablePaymentPageController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('receivable_payments.index', [
+        $viewData = [
             'payments' => $payments,
             'search' => $search,
             'selectedStatus' => $selectedStatus,
             'selectedPaymentDate' => $selectedPaymentDate,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('receivable_payments.partials.results', $viewData);
+        }
+
+        return view('receivable_payments.index', $viewData);
     }
 
     public function create(Request $request): View

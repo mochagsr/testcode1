@@ -82,10 +82,10 @@ class CustomerShipLocation extends Model
         }
 
         return $query->where(function (Builder $subQuery) use ($search): void {
-            $subQuery->where('school_name', 'like', "%{$search}%")
-                ->orWhere('recipient_name', 'like', "%{$search}%")
-                ->orWhere('city', 'like', "%{$search}%")
-                ->orWhere('address', 'like', "%{$search}%");
+            $subQuery->where('customer_ship_locations.school_name', 'like', "%{$search}%")
+                ->orWhere('customer_ship_locations.recipient_name', 'like', "%{$search}%")
+                ->orWhere('customer_ship_locations.city', 'like', "%{$search}%")
+                ->orWhere('customer_ship_locations.address', 'like', "%{$search}%");
         });
     }
 }

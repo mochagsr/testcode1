@@ -125,18 +125,25 @@ class DeliveryNotePageController extends Controller
             }
         );
 
-        return view('delivery_notes.index', [
+        $viewData = [
             'notes' => $notes,
             'search' => $search,
-            'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedNoteDate' => $selectedNoteDate,
-            'currentSemester' => $currentSemester,
-            'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
             'sort' => $sort,
             'direction' => $direction,
+        ];
+
+        if ($request->ajax()) {
+            return view('delivery_notes.partials.results', $viewData);
+        }
+
+        return view('delivery_notes.index', $viewData + [
+            'semesterOptions' => $semesterOptions,
+            'currentSemester' => $currentSemester,
+            'previousSemester' => $previousSemester,
         ]);
     }
 

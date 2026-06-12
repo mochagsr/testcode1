@@ -143,19 +143,26 @@ class OrderNotePageController extends Controller
             ->all();
         $noteProgressMap = $this->buildOrderNoteProgressMap($noteIds);
 
-        return view('order_notes.index', [
+        $viewData = [
             'notes' => $notes,
             'noteProgressMap' => $noteProgressMap,
             'search' => $search,
-            'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedNoteDate' => $selectedNoteDate,
-            'currentSemester' => $currentSemester,
-            'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
             'sort' => $sort,
             'direction' => $direction,
+        ];
+
+        if ($request->ajax()) {
+            return view('order_notes.partials.results', $viewData);
+        }
+
+        return view('order_notes.index', $viewData + [
+            'semesterOptions' => $semesterOptions,
+            'currentSemester' => $currentSemester,
+            'previousSemester' => $previousSemester,
         ]);
     }
 

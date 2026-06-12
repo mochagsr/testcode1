@@ -184,20 +184,27 @@ class SalesReturnPageController extends Controller
             }
         }
 
-        return view('sales_returns.index', [
+        $viewData = [
             'returns' => $returns,
             'search' => $search,
-            'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedReturnDate' => $selectedReturnDate,
-            'currentSemester' => $currentSemester,
-            'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
             'customerSemesterLockMap' => $customerSemesterLockMap,
             'returnAdminActionMap' => $returnAdminActionMap,
             'sort' => $sort,
             'direction' => $direction,
+        ];
+
+        if ($request->ajax()) {
+            return view('sales_returns.partials.results', $viewData);
+        }
+
+        return view('sales_returns.index', $viewData + [
+            'semesterOptions' => $semesterOptions,
+            'currentSemester' => $currentSemester,
+            'previousSemester' => $previousSemester,
         ]);
     }
 

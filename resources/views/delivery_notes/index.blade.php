@@ -27,16 +27,6 @@
     </div>
 
     <div class="card delivery-list-card">
-        @php
-            $sortUrl = function (string $field) use ($search, $selectedSemester, $selectedStatus, $selectedNoteDate, $sort, $direction): string {
-                $nextDir = ($sort === $field && $direction === 'asc') ? 'desc' : 'asc';
-                return route('delivery-notes.index', array_filter(['search' => $search, 'semester' => $selectedSemester, 'status' => $selectedStatus, 'note_date' => $selectedNoteDate, 'sort' => $field, 'direction' => $nextDir], fn ($v) => $v !== null && $v !== ''));
-            };
-            $sortMark = function (string $field) use ($sort, $direction): string {
-                if ($sort !== $field) return '↕';
-                return $direction === 'asc' ? '↑' : '↓';
-            };
-        @endphp
         <form id="delivery-notes-filter-form" method="get" class="filter-toolbar">
             <input type="hidden" name="sort" value="{{ $sort }}">
             <input type="hidden" name="direction" value="{{ $direction }}">
@@ -76,107 +66,45 @@
 
     <div class="card">
         <div class="flex" style="justify-content: space-between;">
-            <strong>{{ __('txn.summary') }} {{ __('txn.date') }} {{ now()->format('d-m-Y') }}</strong>
-            <div class="muted">
-                {{ __('txn.summary_total_delivery_notes') }}: {{ (int) round((int) ($todaySummary->total_notes ?? 0)) }} |
-                {{ __('txn.summary_total_qty') }}: {{ (int) round((int) ($todaySummary->total_qty ?? 0)) }}
-            </div>
-        </div>
-    </div>
-    <div class="card">
-        <div class="flex" style="justify-content: space-between;">
             <strong>{{ __('txn.report_delivery_notes') }}</strong>
             <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                 <option value="" selected disabled>Export</option>
-                <option value="{{ route('reports.export.pdf', ['dataset' => 'delivery_notes', 'semester' => $selectedSemester]) }}">Export PDF</option>
-                <option value="{{ route('reports.export.csv', ['dataset' => 'delivery_notes', 'semester' => $selectedSemester]) }}">Export Excel</option>
+                <option
+                    data-ajax-sync
+                    data-href-base="{{ route('reports.export.pdf', ['dataset' => 'delivery_notes']) }}"
+                    data-href-params="semester"
+                    value="{{ route('reports.export.pdf', ['dataset' => 'delivery_notes', 'semester' => $selectedSemester]) }}"
+                >Export PDF</option>
+                <option
+                    data-ajax-sync
+                    data-href-base="{{ route('reports.export.csv', ['dataset' => 'delivery_notes']) }}"
+                    data-href-params="semester"
+                    value="{{ route('reports.export.csv', ['dataset' => 'delivery_notes', 'semester' => $selectedSemester]) }}"
+                >Export Excel</option>
             </select>
         </div>
     </div>
 
-    <div class="card">
-        <div class="table-mobile-scroll transaction-list-scroll">
-        <table class="mobile-stack-table">
-            <thead>
-            <tr>
-                <th>{{ __('txn.no') }}</th>
-                <th><a class="sort-link" href="{{ $sortUrl('date') }}">{{ __('txn.date') }} <span class="sort-mark">{{ $sortMark('date') }}</span></a></th>
-                <th><a class="sort-link" href="{{ $sortUrl('recipient_name') }}">{{ __('txn.recipient') }} <span class="sort-mark">{{ $sortMark('recipient_name') }}</span></a></th>
-                <th><a class="sort-link" href="{{ $sortUrl('city') }}">{{ __('txn.city') }} <span class="sort-mark">{{ $sortMark('city') }}</span></a></th>
-                <th>{{ __('txn.created_by') }}</th>
-                <th>{{ __('txn.status') }}</th>
-                <th>{{ __('txn.action') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse($notes as $note)
-                <tr>
-                    <td data-label="{{ __('txn.no') }}">
-                        <div class="list-doc-cell">
-                            <a class="list-doc-link" href="{{ route('delivery-notes.show', $note) }}">{{ $note->note_number }}</a>
-                        </div>
-                    </td>
-                    <td data-label="{{ __('txn.date') }}">{{ $note->note_date->format('d-m-Y') }}</td>
-                    <td data-label="{{ __('txn.recipient') }}">{{ $note->recipient_name }}</td>
-                    <td data-label="{{ __('txn.city') }}">{{ $note->city ?: '-' }}</td>
-                    <td data-label="{{ __('txn.created_by') }}">{{ $note->created_by_name ?: '-' }}</td>
-                    <td data-label="{{ __('txn.status') }}">{{ $note->is_canceled ? __('txn.status_canceled') : __('txn.status_active') }}</td>
-                    <td data-label="{{ __('txn.action') }}" class="action">
-                        <div class="flex">
-                            <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                                <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
-                                <option value="{{ route('delivery-notes.print', $note) }}">{{ __('txn.print') }}</option>
-                                <option value="{{ route('delivery-notes.export.pdf', $note) }}">{{ __('txn.pdf') }}</option>
-                                <option value="{{ route('delivery-notes.export.excel', $note) }}">{{ __('txn.excel') }}</option>
-                            </select>
-                        </div>
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="7" class="muted">{{ __('txn.no_delivery_notes_found') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        </div>
-
-        <div style="margin-top: 12px;">
-            {{ $notes->links() }}
-        </div>
+    <div id="delivery-notes-results">
+        @include('delivery_notes.partials.results')
     </div>
 
     <script>
-        (function () {
-            const form = document.getElementById('delivery-notes-filter-form');
-            const searchInput = document.getElementById('delivery-notes-search-input');
-            const dateInput = document.getElementById('delivery-notes-date-input');
-            const semesterInput = document.getElementById('delivery-notes-semester-input');
-            const statusInput = document.getElementById('delivery-notes-status-input');
-
-            if (!form || !searchInput || !dateInput || !semesterInput || !statusInput) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'delivery-notes-filter-form',
+                container: 'delivery-notes-results',
+            });
+            if (!ajax) {
                 return;
             }
-
-            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                ? window.PgposAutoSearch.debounce
-                : (fn, wait = 100) => {
-                    let timeoutId = null;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), wait);
-                    };
-                };
-            const onSearchInput = debounce(() => {
-                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                    return;
-                }
-                form.requestSubmit();
-            }, 100);
-            searchInput.addEventListener('input', onSearchInput);
-
-            dateInput.addEventListener('change', () => form.requestSubmit());
-            semesterInput.addEventListener('change', () => form.requestSubmit());
-            statusInput.addEventListener('change', () => form.requestSubmit());
-        })();
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('delivery-notes-search-input'), () => ajax.submit(), 100);
+            window.PgposAutoSearch.bindChangeFilters([
+                document.getElementById('delivery-notes-date-input'),
+                document.getElementById('delivery-notes-semester-input'),
+                document.getElementById('delivery-notes-status-input'),
+            ], () => ajax.submit());
+        });
     </script>
 @endsection
 

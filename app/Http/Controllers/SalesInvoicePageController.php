@@ -172,18 +172,25 @@ class SalesInvoicePageController extends Controller
             }
         }
 
-        return view('sales_invoices.index', [
+        $viewData = [
             'invoices' => $invoices,
             'search' => $search,
-            'semesterOptions' => $semesterOptions,
             'selectedSemester' => $selectedSemester,
             'selectedStatus' => $selectedStatus,
             'selectedInvoiceDate' => $selectedInvoiceDate,
-            'currentSemester' => $currentSemester,
-            'previousSemester' => $previousSemester,
             'todaySummary' => $todaySummary,
             'customerSemesterLockMap' => $customerSemesterLockMap,
             'invoiceAdminActionMap' => $invoiceAdminActionMap,
+        ];
+
+        if ($request->ajax()) {
+            return view('sales_invoices.partials.results', $viewData);
+        }
+
+        return view('sales_invoices.index', $viewData + [
+            'semesterOptions' => $semesterOptions,
+            'currentSemester' => $currentSemester,
+            'previousSemester' => $previousSemester,
         ]);
     }
 

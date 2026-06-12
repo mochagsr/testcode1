@@ -42,6 +42,9 @@
             <button type="submit">{{ __('ui.search') }}</button>
             <a
                 class="btn info-btn"
+                data-ajax-sync
+                data-href-base="{{ route('audit-logs.export.csv') }}"
+                data-href-params="search,module,date_from,date_to,doc_code"
                 href="{{ route('audit-logs.export.csv', ['module' => $selectedModule, 'date_from' => $selectedDateFrom, 'date_to' => $selectedDateTo, 'search' => $search, 'doc_code' => ($selectedDocumentCode ?? '')]) }}"
             >
                 {{ __('ui.export_audit_csv') }}
@@ -51,189 +54,29 @@
             <strong>{{ __('ui.audit_help_title') }}:</strong>
             {{ __('ui.audit_help_note') }}
         </div>
-        @if($search !== '' || ($selectedDocumentCode ?? '') !== '' || $selectedModule !== '' || $selectedDateFrom !== '' || $selectedDateTo !== '')
-            @php
-                $moduleLabels = [
-                    'sales_invoice' => __('ui.audit_module_sales_invoice'),
-                    'sales_return' => __('ui.audit_module_sales_return'),
-                    'delivery_note' => __('ui.audit_module_delivery_note'),
-                    'order_note' => __('ui.audit_module_order_note'),
-                    'receivable_payment' => __('ui.audit_module_receivable_payment'),
-                    'supplier_payment' => __('ui.audit_module_supplier_payment'),
-                    'outgoing_transaction' => __('ui.audit_module_outgoing_transaction'),
-                    'delivery_trip' => __('ui.audit_module_delivery_trip'),
-                    'school_bulk' => __('ui.audit_module_school_bulk'),
-                    'master' => __('ui.audit_module_master'),
-                ];
-            @endphp
-            <div style="margin-top: 10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                <span class="muted">{{ __('ui.audit_filter_summary') }}:</span>
-                @if($selectedModule !== '')
-                    <span class="badge info">{{ $moduleLabels[$selectedModule] ?? $selectedModule }}</span>
-                @endif
-                @if($search !== '')
-                    <span class="badge neutral">{{ __('ui.audit_filter_search') }}: {{ $search }}</span>
-                @endif
-                @if(($selectedDocumentCode ?? '') !== '')
-                    <span class="badge neutral">{{ __('ui.audit_filter_doc_code') }}: {{ $selectedDocumentCode }}</span>
-                @endif
-                @if($selectedDateFrom !== '' || $selectedDateTo !== '')
-                    <span class="badge neutral">
-                        {{ __('ui.audit_filter_period') }}:
-                        {{ $selectedDateFrom !== '' ? \Illuminate\Support\Carbon::parse($selectedDateFrom)->format('d-m-Y') : '...' }}
-                        -
-                        {{ $selectedDateTo !== '' ? \Illuminate\Support\Carbon::parse($selectedDateTo)->format('d-m-Y') : '...' }}
-                    </span>
-                @endif
-            </div>
-        @endif
     </div>
 
-    <div class="card">
-        <div class="table-mobile-scroll">
-        <table>
-            <thead>
-            <tr>
-                <th>{{ __('txn.date') }}</th>
-                <th>{{ __('ui.user') }}</th>
-                <th>{{ __('ui.actions') }}</th>
-                <th>{{ __('ui.subject') }}</th>
-                <th>{{ __('ui.description') }}</th>
-                <th>{{ __('ui.audit_changes') }}</th>
-                <th>{{ __('ui.ip') }}</th>
-                <th>Req ID</th>
-            </tr>
-            </thead>
-            <tbody>
-            @php
-                if (!function_exists('audit_linkify_codes')) {
-                    function audit_linkify_codes(string $text, array $codeLinkMap): string
-                    {
-                        $chunks = preg_split('/(\b(?:INV|RET|RTN|RTR|SJ|PO|PYT|KWT)-\d{8}-\d{4}\b)/i', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
-                        if (!is_array($chunks)) {
-                            return e($text);
-                        }
-
-                        $html = '';
-                        foreach ($chunks as $chunk) {
-                            $upper = strtoupper($chunk);
-                            if (isset($codeLinkMap[$upper])) {
-                                $html .= '<a href="'.e((string) $codeLinkMap[$upper]).'" target="_blank" rel="noopener noreferrer">'.e($chunk).'</a>';
-                                continue;
-                            }
-                            $html .= e($chunk);
-                        }
-
-                        return $html;
-                    }
-                }
-            @endphp
-            @forelse($logs as $log)
-                <tr>
-                    <td>{{ $log->created_at?->format('d-m-Y H:i:s') }}</td>
-                    <td>{{ $log->user?->name ?? '-' }}</td>
-                    <td>
-                        @php
-                            $actionRaw = (string) $log->action;
-                            $actionLabel = (string) (($actionLabelMap[$actionRaw] ?? $actionRaw));
-                        @endphp
-                        {{ $actionLabel }}
-                    </td>
-                    <td>
-                        @php
-                            $subjectName = (string) ($subjectMap[$log->id] ?? '-');
-                            $subjectCode = (string) ($subjectCodeMap[$log->id] ?? '');
-                            $subjectLink = $subjectCode !== '' ? ($codeLinkMap[strtoupper($subjectCode)] ?? null) : null;
-                        @endphp
-                        {{ $subjectName }}
-                        @if($subjectCode !== '')
-                            :
-                            @if($subjectLink)
-                                <a href="{{ $subjectLink }}" target="_blank" rel="noopener noreferrer">{{ $subjectCode }}</a>
-                            @else
-                                {{ $subjectCode }}
-                            @endif
-                        @endif
-                    </td>
-                    <td>{!! audit_linkify_codes((string) ($descriptionMap[$log->id] ?? ($log->description ?: '-')), $codeLinkMap ?? []) !!}</td>
-                    <td style="min-width: 280px;">
-                        @php
-                            $beforeText = (string) (($beforeAfterMap[$log->id]['before'] ?? '-'));
-                            $afterText = (string) (($beforeAfterMap[$log->id]['after'] ?? '-'));
-                            $hasDiff = $beforeText !== '-' || $afterText !== '-';
-                        @endphp
-                        @if($hasDiff)
-                            <details>
-                                <summary>{{ __('ui.audit_view_changes') }}</summary>
-                                <div style="margin-top:6px;">
-                                    <strong style="color:#b91c1c;">{{ __('ui.audit_before') }}:</strong>
-                                    <pre style="white-space: pre-wrap; margin:4px 0; color:#b91c1c; background:rgba(185,28,28,0.08); border:1px solid rgba(185,28,28,0.2); padding:8px; border-radius:6px;">{{ $beforeText }}</pre>
-                                    <strong style="color:#166534;">{{ __('ui.audit_after') }}:</strong>
-                                    <pre style="white-space: pre-wrap; margin:4px 0; color:#166534; background:rgba(22,101,52,0.08); border:1px solid rgba(22,101,52,0.2); padding:8px; border-radius:6px;">{{ $afterText }}</pre>
-                                </div>
-                            </details>
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td>{{ $log->ip_address ?: '-' }}</td>
-                    <td>{{ $log->request_id ?: '-' }}</td>
-                </tr>
-            @empty
-                <tr><td colspan="8" class="muted">{{ __('ui.no_audit_logs') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        </div>
-
-        <div style="margin-top:12px;">
-            {{ $logs->links() }}
-        </div>
+    <div id="audit-logs-results">
+        @include('audit_logs.partials.results')
     </div>
 
     <script>
-        (function () {
-            const form = document.getElementById('audit-logs-search-form');
-            const searchInput = document.getElementById('audit-logs-search-input');
-            const moduleInput = document.getElementById('audit-logs-module-input');
-            const dateFromInput = document.getElementById('audit-logs-date-from-input');
-            const dateToInput = document.getElementById('audit-logs-date-to-input');
-            const docCodeInput = document.getElementById('audit-logs-doc-code-input');
-            if (!form || !searchInput || !moduleInput || !dateFromInput || !dateToInput || !docCodeInput) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'audit-logs-search-form',
+                container: 'audit-logs-results',
+            });
+            if (!ajax) {
                 return;
             }
-
-            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                ? window.PgposAutoSearch.debounce
-                : (fn, wait = 100) => {
-                    let timeoutId = null;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), wait);
-                    };
-                };
-            const onSearchInput = debounce(() => {
-                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                    return;
-                }
-                form.requestSubmit();
-            }, 100);
-            searchInput.addEventListener('input', onSearchInput);
-            const onDocInput = debounce(() => {
-                form.requestSubmit();
-            }, 250);
-            docCodeInput.addEventListener('input', onDocInput);
-
-            moduleInput.addEventListener('change', () => {
-                form.requestSubmit();
-            });
-            dateFromInput.addEventListener('change', () => {
-                form.requestSubmit();
-            });
-            dateToInput.addEventListener('change', () => {
-                form.requestSubmit();
-            });
-        })();
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('audit-logs-search-input'), () => ajax.submit(), 100);
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('audit-logs-doc-code-input'), () => ajax.submit(), 250);
+            window.PgposAutoSearch.bindChangeFilters([
+                document.getElementById('audit-logs-module-input'),
+                document.getElementById('audit-logs-date-from-input'),
+                document.getElementById('audit-logs-date-to-input'),
+            ], () => ajax.submit());
+        });
     </script>
 @endsection
 
