@@ -136,7 +136,7 @@ class OutgoingTransaction extends Model
      */
     public function scopeForSupplier(Builder $query, int $supplierId): Builder
     {
-        return $query->where('supplier_id', $supplierId);
+        return $query->where('outgoing_transactions.supplier_id', $supplierId);
     }
 
     /**

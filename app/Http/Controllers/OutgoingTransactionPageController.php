@@ -187,7 +187,7 @@ class OutgoingTransactionPageController extends Controller
             }
         }
 
-        return view('outgoing_transactions.index', [
+        $viewData = [
             'transactions' => $transactions,
             'sort' => $sort,
             'direction' => $direction,
@@ -211,7 +211,13 @@ class OutgoingTransactionPageController extends Controller
             'selectedSupplierYearClosed' => $selectedSupplierYearClosed,
             'supplierYearClosedMap' => $supplierYearClosedMap,
             'transactionAdminActionMap' => $transactionAdminActionMap,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('outgoing_transactions.partials.results', $viewData);
+        }
+
+        return view('outgoing_transactions.index', $viewData);
     }
 
     public function create(): View

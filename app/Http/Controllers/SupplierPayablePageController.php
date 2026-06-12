@@ -49,7 +49,7 @@ class SupplierPayablePageController extends Controller
     {
         $pageData = $this->buildIndexData($request);
 
-        return view('supplier_payables.index', [
+        $viewData = [
             'suppliers' => $pageData['suppliers'],
             'selectedSupplier' => $pageData['selectedSupplier'],
             'selectedSupplierId' => $pageData['selectedSupplierId'],
@@ -67,7 +67,13 @@ class SupplierPayablePageController extends Controller
             'finalOutstanding' => $pageData['finalOutstanding'],
             'selectedSupplierMonthClosed' => $pageData['selectedSupplierMonthClosed'],
             'direction' => $pageData['direction'],
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('supplier_payables.partials.results', $viewData);
+        }
+
+        return view('supplier_payables.index', $viewData);
     }
 
     public function create(Request $request): View
