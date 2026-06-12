@@ -23,10 +23,16 @@ class CustomerLevelPageController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('customer_levels.index', [
+        $viewData = [
             'levels' => $levels,
             'search' => $search,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('customer_levels.partials.results', $viewData);
+        }
+
+        return view('customer_levels.index', $viewData);
     }
 
     public function create(): View

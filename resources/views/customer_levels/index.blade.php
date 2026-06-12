@@ -54,68 +54,21 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="customer-levels-table-wrap">
-        <table class="customer-levels-table">
-            <thead>
-            <tr>
-                <th>{{ __('ui.code') }}</th>
-                <th>{{ __('ui.description') }}</th>
-                <th>{{ __('ui.actions') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse($levels as $level)
-                <tr>
-                    <td>{{ $level->code }}</td>
-                    <td>{{ $level->description ?: '-' }}</td>
-                    <td>
-                        <div class="flex">
-                            <a class="btn edit-btn" href="{{ route('customer-levels-web.edit', $level) }}">{{ __('ui.edit') }}</a>
-                            <form method="post" action="{{ route('customer-levels-web.destroy', $level) }}" data-confirm-modal data-confirm-message="{{ __('ui.confirm_delete_level') }}">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn danger-btn">{{ __('ui.delete') }}</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="3" class="muted">{{ __('ui.no_customer_levels') }}</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        </div>
-        <div style="margin-top: 12px;">
-            {{ $levels->links() }}
-        </div>
+    <div id="customer-levels-results">
+        @include('customer_levels.partials.results')
     </div>
 
     <script>
-        (function () {
-            const form = document.getElementById('customer-levels-search-form');
-            const searchInput = document.getElementById('customer-levels-search-input');
-            if (!form || !searchInput) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const ajax = window.PgposAutoSearch.initAjaxFilter({
+                form: 'customer-levels-search-form',
+                container: 'customer-levels-results',
+            });
+            if (!ajax) {
                 return;
             }
-
-            const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-                ? window.PgposAutoSearch.debounce
-                : (fn, wait = 100) => {
-                    let timeoutId = null;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), wait);
-                    };
-                };
-            const onSearchInput = debounce(() => {
-                if (window.PgposAutoSearch && !window.PgposAutoSearch.canSearchInput(searchInput)) {
-                    return;
-                }
-                form.requestSubmit();
-            }, 100);
-            searchInput.addEventListener('input', onSearchInput);
-        })();
+            window.PgposAutoSearch.bindDebouncedSearch(document.getElementById('customer-levels-search-input'), () => ajax.submit(), 100);
+        });
     </script>
 @endsection
 

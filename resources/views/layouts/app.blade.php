@@ -1897,6 +1897,14 @@
                 return params;
             }
 
+            function listPathname() {
+                const action = form.getAttribute('action');
+                if (action) {
+                    try { return new URL(action, window.location.href).pathname; } catch (e) { /* fall through */ }
+                }
+                return window.location.pathname;
+            }
+
             function buildUrl() {
                 const params = cleanParams(new URLSearchParams(new FormData(form)));
                 const action = form.getAttribute('action') || window.location.pathname;
@@ -1954,6 +1962,7 @@
                 let url;
                 try { url = new URL(href, window.location.href); } catch (e) { return; }
                 if (url.origin !== window.location.origin) return;
+                if (url.pathname !== listPathname()) return;
                 event.preventDefault();
                 fetchAndSwap(url.pathname + url.search);
             });
