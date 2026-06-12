@@ -1,3 +1,20 @@
+<style>
+    .category-ac-dropdown {
+        position: fixed; z-index: 9999; background: var(--card,#fff);
+        border: 1px solid var(--border,#d0d7de); border-radius: 6px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.16); min-width: 220px;
+        max-height: 240px; overflow-y: scroll; font-size: 13px;
+    }
+    .category-ac-dropdown::-webkit-scrollbar { width: 6px; }
+    .category-ac-dropdown::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 0 6px 6px 0; }
+    .category-ac-dropdown::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 3px; }
+    .category-ac-dropdown::-webkit-scrollbar-thumb:hover { background: #999; }
+    .category-ac-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border,#d0d7de); line-height: 1.35; }
+    .category-ac-item:last-child { border-bottom: none; }
+    .category-ac-item.is-active, .category-ac-item:hover { background: var(--hover-bg,rgba(59,130,246,0.08)); }
+    .category-ac-empty { padding: 10px 12px; color: var(--muted,#6b7280); font-style: italic; }
+</style>
+
 <div class="card">
     <div class="row inline">
         <div class="col-6">
@@ -41,13 +58,12 @@
                         <input
                             id="product-category-search"
                             type="text"
-                            list="product-categories-list"
                             value="{{ $oldCategoryLabel }}"
                             placeholder="{{ __('ui.search_item_categories_placeholder') }}"
+                            autocomplete="off"
                             required
                         >
                         <input id="product-category" type="hidden" name="item_category_id" value="{{ $oldCategoryId }}" required>
-                        <datalist id="product-categories-list"></datalist>
                     </div>
                     <div class="col-4">
                         <label>{{ __('ui.code') }}</label>
@@ -176,10 +192,7 @@
         });
         const previewNode = document.getElementById('product-code-preview');
         const resetButton = document.getElementById('product-code-reset');
-        const categoryList = document.getElementById('product-categories-list');
         const categories = @json($categoriesJson);
-        const MIN_CATEGORY_SEARCH_LENGTH = 3;
-        const SEARCH_DEBOUNCE_MS = 100;
         const autoPreviewTemplate = @json(__('ui.product_code_auto_preview', ['code' => '__CODE__']));
         const manualPreviewTemplate = @json(__('ui.product_code_auto_preview_manual', ['code' => '__CODE__']));
         if (!nameInput || !codeInput || !categoryInput || !categorySearchInput || !previewNode || !resetButton) {
@@ -240,9 +253,7 @@
                 }
             }
 
-            const byLabel = canSearchCategory(categorySearchInput.value)
-                ? findCategoryByLabel(categorySearchInput.value)
-                : null;
+            const byLabel = findCategoryByLabel(categorySearchInput.value);
             if (byLabel && byLabel.name) {
                 return String(byLabel.name);
             }
@@ -460,35 +471,66 @@
                 || null;
         }
 
-        function canSearchCategory(value) {
-            return normalize(value).length >= MIN_CATEGORY_SEARCH_LENGTH;
-        }
-
-        function renderCategoryOptions(value) {
-            if (!categoryList) {
-                return;
+        function createCategoryAutocomplete(inputEl, hiddenEl, onSelect) {
+            let dropdown = null, activeIdx = -1, currentMatches = [], blurTimer = null;
+            const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            function getMatches(query) {
+                const q = normalize(query || '');
+                if (q === '') {
+                    return categories.slice(0, 20);
+                }
+                return categories.filter((category) => {
+                    return normalize(categoryLabel(category)).includes(q)
+                        || normalize(category.code).includes(q)
+                        || normalize(category.name).includes(q);
+                }).slice(0, 20);
             }
-
-            categoryList.replaceChildren();
-
-            if (!canSearchCategory(value)) {
-                return;
+            function position() {
+                if (!dropdown) return;
+                const r = inputEl.getBoundingClientRect(), dropH = Math.min(240, currentMatches.length * 36 + 12), below = window.innerHeight - r.bottom;
+                dropdown.style.left = r.left + 'px'; dropdown.style.width = Math.max(r.width, 220) + 'px';
+                dropdown.style.top = (below >= dropH || below >= r.top) ? (r.bottom + 2) + 'px' : (r.top - dropH - 2) + 'px';
             }
-
-            const normalized = normalize(value);
-            const matches = categories
-                .filter((category) => {
-                    return normalize(categoryLabel(category)).includes(normalized)
-                        || normalize(category.code).includes(normalized)
-                        || normalize(category.name).includes(normalized);
-                })
-                .slice(0, 20);
-
-            for (const category of matches) {
-                const option = document.createElement('option');
-                option.value = categoryLabel(category);
-                categoryList.appendChild(option);
+            function close() { dropdown?.remove(); dropdown = null; currentMatches = []; activeIdx = -1; }
+            function setActive(idx) { activeIdx = idx; dropdown?.querySelectorAll('.category-ac-item').forEach((el, i) => el.classList.toggle('is-active', i === idx)); }
+            function pick(idx) {
+                const category = currentMatches[idx]; if (!category) return;
+                inputEl.value = categoryLabel(category); hiddenEl.value = category.id; close(); onSelect(category);
             }
+            function open(matches) {
+                close(); currentMatches = matches;
+                dropdown = document.createElement('div');
+                dropdown.className = 'category-ac-dropdown';
+                dropdown.innerHTML = matches.length === 0
+                    ? '<div class="category-ac-empty">Kategori tidak ditemukan</div>'
+                    : matches.map((category, i) => `<div class="category-ac-item" data-idx="${i}">${esc(categoryLabel(category))}</div>`).join('');
+                document.body.appendChild(dropdown); position();
+                dropdown.addEventListener('mousedown', e => { const item = e.target.closest('.category-ac-item'); if (!item) return; e.preventDefault(); pick(parseInt(item.dataset.idx, 10)); });
+                dropdown.addEventListener('mousemove', e => { const item = e.target.closest('.category-ac-item'); if (item) setActive(parseInt(item.dataset.idx, 10)); });
+            }
+            function suggest(query) { open(getMatches(query)); }
+            inputEl.addEventListener('input', () => { hiddenEl.value = ''; onSelect(null); suggest(inputEl.value); });
+            inputEl.addEventListener('focus', () => { clearTimeout(blurTimer); suggest(inputEl.value); });
+            inputEl.addEventListener('blur', () => {
+                blurTimer = setTimeout(() => {
+                    close();
+                    const val = inputEl.value.trim();
+                    if (val === '') { hiddenEl.value = ''; onSelect(null); return; }
+                    const category = findCategoryByLabel(val);
+                    hiddenEl.value = category ? category.id : '';
+                    if (category) { inputEl.value = categoryLabel(category); onSelect(category); }
+                    else { onSelect(null); }
+                }, 200);
+            });
+            inputEl.addEventListener('keydown', e => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); if (!dropdown) { suggest(inputEl.value); setActive(0); return; } setActive(Math.min(activeIdx + 1, currentMatches.length - 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(activeIdx - 1, 0)); }
+                else if (e.key === 'Enter' && dropdown && activeIdx >= 0) { e.preventDefault(); pick(activeIdx); }
+                else if (e.key === 'Escape') { close(); }
+            });
+            const repos = () => position();
+            window.addEventListener('scroll', repos, { passive: true });
+            window.addEventListener('resize', repos, { passive: true });
         }
 
         function syncCode() {
@@ -545,46 +587,8 @@
             sync();
         }
 
-        const debounce = (window.PgposAutoSearch && window.PgposAutoSearch.debounce)
-            ? (fn, wait = SEARCH_DEBOUNCE_MS) => window.PgposAutoSearch.debounce(fn, wait)
-            : (fn, wait = SEARCH_DEBOUNCE_MS) => {
-                let timeoutId = null;
-                return (...args) => {
-                    clearTimeout(timeoutId);
-                    timeoutId = setTimeout(() => fn(...args), wait);
-                };
-            };
-
         nameInput.addEventListener('input', syncCode);
-        const onCategoryInput = debounce(function () {
-            renderCategoryOptions(categorySearchInput.value);
-            if (!canSearchCategory(categorySearchInput.value)) {
-                categoryInput.value = '';
-                syncCode();
-                return;
-            }
-
-            const category = findCategoryByLabel(categorySearchInput.value);
-            categoryInput.value = category ? category.id : '';
-            if (category) {
-                categorySearchInput.value = categoryLabel(category);
-            }
-            syncCode();
-        });
-        categorySearchInput.addEventListener('input', onCategoryInput);
-        categorySearchInput.addEventListener('change', function () {
-            renderCategoryOptions(categorySearchInput.value);
-            if (!canSearchCategory(categorySearchInput.value)) {
-                categoryInput.value = '';
-                syncCode();
-                return;
-            }
-
-            const category = findCategoryByLabel(categorySearchInput.value);
-            categoryInput.value = category ? category.id : '';
-            if (category) {
-                categorySearchInput.value = categoryLabel(category);
-            }
+        createCategoryAutocomplete(categorySearchInput, categoryInput, function () {
             syncCode();
         });
         codeInput.addEventListener('input', function () {
@@ -606,7 +610,6 @@
             syncCode();
         });
 
-        renderCategoryOptions(categorySearchInput.value);
         currencyMappings.forEach(bindCurrencyInput);
 
         const productTypeSelect = document.getElementById('product-type');
