@@ -32,12 +32,18 @@ class ItemCategoryPageController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('item_categories.index', [
+        $viewData = [
             'categories' => $categories,
             'search' => $search,
             'sort' => $sort,
             'direction' => $direction,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('item_categories.partials.results', $viewData);
+        }
+
+        return view('item_categories.index', $viewData);
     }
 
     public function create(): View

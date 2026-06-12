@@ -24,10 +24,16 @@ class UserManagementController extends Controller
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
-        return view('users.index', [
+        $viewData = [
             'users' => $users,
             'search' => $search,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('users.partials.results', $viewData);
+        }
+
+        return view('users.index', $viewData);
     }
 
     public function create(): View

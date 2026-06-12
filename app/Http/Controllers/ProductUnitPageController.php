@@ -35,12 +35,18 @@ class ProductUnitPageController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('product_units.index', [
+        $viewData = [
             'units' => $units,
             'search' => $search,
             'sort' => $sort,
             'direction' => $direction,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('product_units.partials.results', $viewData);
+        }
+
+        return view('product_units.index', $viewData);
     }
 
     public function create(): View

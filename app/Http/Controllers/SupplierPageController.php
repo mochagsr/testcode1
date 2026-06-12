@@ -42,12 +42,18 @@ class SupplierPageController extends Controller
             ->paginate((int) config('pagination.master_per_page', 20))
             ->withQueryString();
 
-        return view('suppliers.index', [
+        $viewData = [
             'suppliers' => $suppliers,
             'search' => $search,
             'sort' => $sort,
             'direction' => $direction,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('suppliers.partials.results', $viewData);
+        }
+
+        return view('suppliers.index', $viewData);
     }
 
     public function create(): View
