@@ -22,9 +22,11 @@ use App\Support\AppCache;
 use App\Support\ProductCodeGenerator;
 use App\Support\TransactionType;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -215,6 +217,426 @@ class MassImportController extends Controller
 
         return back()->with('success', "Import selesai. Baru: {$created}, Update: {$updated}, Error: ".count($errors))
             ->with('import_errors', $errors);
+    }
+
+    /**
+     * Phase 1: parse the uploaded product file, match existing products by name,
+     * stash the file under a per-user token, and return a reconciliation preview.
+     * No database writes happen here.
+     */
+    public function analyzeProducts(Request $request): JsonResponse
+    {
+        $request->validate([
+            'import_file' => FluentRule::file()->required()->rule('mimes:xlsx,xls,csv,txt'),
+        ]);
+
+        $rows = $this->readSpreadsheetRows($request->file('import_file')->getRealPath());
+        if ($rows === []) {
+            return response()->json(['message' => 'File import kosong.'], 422);
+        }
+
+        $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $missingHeaders = $this->missingHeaders($headers, ['name', 'category', 'unit', 'stock', 'price_agent', 'price_sales', 'price_general']);
+        if ($missingHeaders !== []) {
+            return response()->json([
+                'message' => 'Kolom wajib pada file import belum lengkap: '.implode(', ', $missingHeaders).'. Gunakan template import terbaru.',
+            ], 422);
+        }
+
+        $userId = (int) ($request->user()?->id ?? 0);
+        $this->pruneImportTempFiles($userId);
+        $token = (string) Str::uuid();
+        $relativePath = $this->importTempRelativePath($userId, $token);
+        Storage::disk('local')->putFileAs(
+            dirname($relativePath),
+            $request->file('import_file'),
+            basename($relativePath)
+        );
+
+        $analysis = $this->buildProductImportAnalysis($rows, $headers);
+
+        return response()->json([
+            'token' => $token,
+            'summary' => $analysis['summary'],
+            'new' => $analysis['new'],
+            'matched' => $analysis['matched'],
+            'problems' => $analysis['problems'],
+        ]);
+    }
+
+    /**
+     * Phase 2: re-read the stashed file (source of truth for values) and apply the
+     * per-row actions chosen by the user inside one database transaction.
+     */
+    public function applyProducts(Request $request): JsonResponse
+    {
+        $token = (string) $request->string('token', '');
+        $userId = (int) ($request->user()?->id ?? 0);
+        $relativePath = $this->importTempRelativePath($userId, $token);
+        if ($token === '' || ! Storage::disk('local')->exists($relativePath)) {
+            return response()->json(['message' => 'Sesi import sudah kedaluwarsa. Silakan upload ulang file.'], 422);
+        }
+
+        $updatePrices = $request->boolean('update_prices', true);
+        /** @var array<int, array<string, mixed>> $decisionInput */
+        $decisionInput = (array) $request->input('decisions', []);
+        $decisions = [];
+        foreach ($decisionInput as $decision) {
+            $rowNumber = (int) ($decision['row'] ?? 0);
+            if ($rowNumber <= 0) {
+                continue;
+            }
+            $decisions[$rowNumber] = [
+                'action' => (string) ($decision['action'] ?? 'skip'),
+                'target_product_id' => isset($decision['target_product_id']) ? (int) $decision['target_product_id'] : null,
+            ];
+        }
+
+        $rows = $this->readSpreadsheetRows(Storage::disk('local')->path($relativePath));
+        $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $errors = [];
+
+        DB::transaction(function () use ($rows, $headers, $decisions, $updatePrices, $request, &$created, &$updated, &$skipped, &$errors): void {
+            foreach ($rows as $rowIndex => $row) {
+                $rowNumber = $rowIndex + 2;
+                $decision = $decisions[$rowNumber] ?? null;
+                if ($decision === null || $decision['action'] === 'skip') {
+                    continue;
+                }
+
+                $data = $this->normalizeProductImportNumbers($this->mapRow($headers, $row));
+                if ($this->isEmptyRow($data)) {
+                    continue;
+                }
+
+                $validator = Validator::make($data, $this->productImportRules());
+                if ($validator->fails()) {
+                    $errors[] = $this->formatImportRowError($rowNumber, implode('; ', $validator->errors()->all()));
+
+                    continue;
+                }
+
+                $categoryId = $this->resolveCategoryId((string) $data['category']);
+                if ($categoryId === null) {
+                    $errors[] = $this->formatImportRowError($rowNumber, 'Kategori tidak terdaftar. Samakan nama kategori dengan data master.');
+
+                    continue;
+                }
+
+                $fileStock = (int) $data['stock'];
+                $pricePayload = [
+                    'price_agent' => (int) round((float) $data['price_agent']),
+                    'price_sales' => (int) round((float) $data['price_sales']),
+                    'price_general' => (int) round((float) $data['price_general']),
+                ];
+
+                if ($decision['action'] === 'new') {
+                    $code = $this->productCodeGenerator->resolve(
+                        $this->productCodeGenerator->normalizeInput((string) ($data['code'] ?? '')),
+                        (string) $data['name'],
+                        null,
+                        (string) $data['category']
+                    );
+                    $product = Product::create(array_merge([
+                        'item_category_id' => $categoryId,
+                        'name' => (string) $data['name'],
+                        'code' => $code,
+                        'unit' => ProductUnit::ensureExists((string) $data['unit'])->code,
+                        'stock' => $fileStock,
+                        'is_active' => true,
+                    ], $pricePayload));
+                    if ($fileStock > 0) {
+                        $this->recordImportStockMutation($product->id, $fileStock, 'in', __('ui.stock_mutation_import_initial_note'), $request);
+                    }
+                    $created++;
+
+                    continue;
+                }
+
+                if (! in_array($decision['action'], ['update', 'add'], true)) {
+                    continue;
+                }
+
+                $target = Product::query()
+                    ->whereKey((int) $decision['target_product_id'])
+                    ->lockForUpdate()
+                    ->first();
+                if ($target === null) {
+                    $errors[] = $this->formatImportRowError($rowNumber, 'Barang tujuan tidak ditemukan.');
+
+                    continue;
+                }
+
+                $oldStock = (int) $target->stock;
+                $newStock = $decision['action'] === 'add' ? $oldStock + $fileStock : $fileStock;
+
+                $payload = ['stock' => $newStock];
+                if ($updatePrices) {
+                    $payload = array_merge($payload, $pricePayload);
+                }
+                $target->update($payload);
+
+                $delta = $newStock - $oldStock;
+                if ($delta !== 0) {
+                    $this->recordImportStockMutation(
+                        (int) $target->id,
+                        abs($delta),
+                        $delta > 0 ? 'in' : 'out',
+                        $delta > 0 ? __('ui.stock_mutation_import_add_note') : __('ui.stock_mutation_import_reduce_note'),
+                        $request
+                    );
+                }
+                $updated++;
+            }
+        });
+
+        Storage::disk('local')->delete($relativePath);
+        $this->auditLogService->log(
+            'master.product.import',
+            null,
+            "Import barang (rekonsiliasi): baru={$created}, update={$updated}, lewati={$skipped}, error=".count($errors),
+            $request
+        );
+        AppCache::forgetAfterFinancialMutation();
+
+        return response()->json([
+            'message' => "Import selesai. Baru: {$created}, Update: {$updated}, Error: ".count($errors),
+            'created' => $created,
+            'updated' => $updated,
+            'errors' => $errors,
+        ]);
+    }
+
+    /**
+     * Download an .xlsx containing only the problematic rows (with a reason column)
+     * so the user can fix and re-import them. Clean rows are excluded.
+     */
+    public function downloadProductImportProblems(Request $request, string $token): StreamedResponse|JsonResponse
+    {
+        $userId = (int) ($request->user()?->id ?? 0);
+        $relativePath = $this->importTempRelativePath($userId, $token);
+        if (! Storage::disk('local')->exists($relativePath)) {
+            return response()->json(['message' => 'Sesi import sudah kedaluwarsa.'], 422);
+        }
+
+        $rows = $this->readSpreadsheetRows(Storage::disk('local')->path($relativePath));
+        $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
+        $analysis = $this->buildProductImportAnalysis($rows, $headers);
+
+        $exportRows = [['kode', 'nama', 'kategori', 'satuan', 'stok', 'harga_agen', 'harga_sales', 'harga_umum', 'masalah']];
+        foreach ($analysis['problems'] as $problem) {
+            $data = (array) $problem['data'];
+            $exportRows[] = [
+                (string) ($data['code'] ?? ''),
+                (string) ($data['name'] ?? ''),
+                (string) ($data['category'] ?? ''),
+                (string) ($data['unit'] ?? ''),
+                (string) ($data['stock'] ?? ''),
+                (string) ($data['price_agent'] ?? ''),
+                (string) ($data['price_sales'] ?? ''),
+                (string) ($data['price_general'] ?? ''),
+                (string) $problem['reason'],
+            ];
+        }
+
+        return $this->downloadTemplate('import-barang-bermasalah.xlsx', $exportRows, 'Bermasalah');
+    }
+
+    /**
+     * @param  array<int, array<int, mixed>>  $rows
+     * @param  array<int, string>  $headers
+     * @return array{summary: array<string, int>, new: array<int, array<string, mixed>>, matched: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>}
+     */
+    private function buildProductImportAnalysis(array $rows, array $headers): array
+    {
+        $existingByName = [];
+        $existing = Product::query()
+            ->with('category:id,name')
+            ->get(['id', 'item_category_id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general']);
+        foreach ($existing as $product) {
+            $existingByName[$this->normalizeProductName((string) $product->name)][] = $product;
+        }
+
+        $fileNameCounts = [];
+        foreach ($rows as $row) {
+            $data = $this->mapRow($headers, $row);
+            if ($this->isEmptyRow($data)) {
+                continue;
+            }
+            $key = $this->normalizeProductName((string) ($data['name'] ?? ''));
+            if ($key !== '') {
+                $fileNameCounts[$key] = ($fileNameCounts[$key] ?? 0) + 1;
+            }
+        }
+
+        $new = [];
+        $matched = [];
+        $problems = [];
+
+        foreach ($rows as $rowIndex => $row) {
+            $rowNumber = $rowIndex + 2;
+            $data = $this->normalizeProductImportNumbers($this->mapRow($headers, $row));
+            if ($this->isEmptyRow($data)) {
+                continue;
+            }
+
+            $validator = Validator::make($data, $this->productImportRules());
+            if ($validator->fails()) {
+                $problems[] = $this->makeProblem($rowNumber, $data, implode('; ', $validator->errors()->all()));
+
+                continue;
+            }
+
+            $nameKey = $this->normalizeProductName((string) $data['name']);
+            if (($fileNameCounts[$nameKey] ?? 0) > 1) {
+                $problems[] = $this->makeProblem($rowNumber, $data, 'Nama barang muncul lebih dari sekali di file ini.');
+
+                continue;
+            }
+
+            $categoryId = $this->resolveCategoryId((string) $data['category']);
+            if ($categoryId === null) {
+                $problems[] = $this->makeProblem($rowNumber, $data, 'Kategori tidak terdaftar. Samakan nama kategori dengan data master.');
+
+                continue;
+            }
+
+            $candidates = $existingByName[$nameKey] ?? [];
+            if (count($candidates) === 0) {
+                $new[] = [
+                    'row' => $rowNumber,
+                    'name' => (string) $data['name'],
+                    'category' => (string) $data['category'],
+                    'stock_file' => (int) $data['stock'],
+                    'price_general_file' => (int) round((float) $data['price_general']),
+                ];
+
+                continue;
+            }
+
+            if (count($candidates) > 1) {
+                $problems[] = $this->makeProblem(
+                    $rowNumber,
+                    $data,
+                    'Ada '.count($candidates).' barang dengan nama sama di database — pilih manual.',
+                    array_map(fn ($product): array => [
+                        'id' => (int) $product->id,
+                        'code' => (string) $product->code,
+                        'category' => (string) ($product->category->name ?? '-'),
+                        'stock' => (int) $product->stock,
+                    ], $candidates)
+                );
+
+                continue;
+            }
+
+            $product = $candidates[0];
+            $matched[] = [
+                'row' => $rowNumber,
+                'product_id' => (int) $product->id,
+                'code' => (string) $product->code,
+                'name_db' => (string) $product->name,
+                'name_file' => (string) $data['name'],
+                'category' => (string) $data['category'],
+                'stock_db' => (int) $product->stock,
+                'stock_file' => (int) $data['stock'],
+                'price_db' => [
+                    'agent' => (int) $product->price_agent,
+                    'sales' => (int) $product->price_sales,
+                    'general' => (int) $product->price_general,
+                ],
+                'price_file' => [
+                    'agent' => (int) round((float) $data['price_agent']),
+                    'sales' => (int) round((float) $data['price_sales']),
+                    'general' => (int) round((float) $data['price_general']),
+                ],
+            ];
+        }
+
+        return [
+            'summary' => [
+                'new' => count($new),
+                'matched' => count($matched),
+                'problems' => count($problems),
+            ],
+            'new' => $new,
+            'matched' => $matched,
+            'problems' => $problems,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<int, array<string, mixed>>  $candidates
+     * @return array<string, mixed>
+     */
+    private function makeProblem(int $rowNumber, array $data, string $reason, array $candidates = []): array
+    {
+        return [
+            'row' => $rowNumber,
+            'name_file' => (string) ($data['name'] ?? ''),
+            'reason' => $reason,
+            'candidates' => $candidates,
+            'data' => $data,
+        ];
+    }
+
+    private function normalizeProductName(string $name): string
+    {
+        $normalized = strtolower(trim($name));
+
+        return preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+    }
+
+    private function importTempRelativePath(int $userId, string $token): string
+    {
+        $safeToken = preg_replace('/[^a-zA-Z0-9\-]/', '', $token) ?? '';
+
+        return 'import_tmp/products/'.$userId.'/'.$safeToken.'.xlsx';
+    }
+
+    private function pruneImportTempFiles(int $userId): void
+    {
+        $dir = 'import_tmp/products/'.$userId;
+        $threshold = now()->subHours(6)->getTimestamp();
+        foreach (Storage::disk('local')->files($dir) as $file) {
+            if (Storage::disk('local')->lastModified($file) < $threshold) {
+                Storage::disk('local')->delete($file);
+            }
+        }
+    }
+
+    private function recordImportStockMutation(int $productId, int $quantity, string $type, string $notes, Request $request): void
+    {
+        StockMutation::query()->create([
+            'product_id' => $productId,
+            'reference_type' => Product::class,
+            'reference_id' => $productId,
+            'mutation_type' => $type,
+            'quantity' => $quantity,
+            'notes' => $notes,
+            'created_by_user_id' => $request->user()?->id,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function productImportRules(): array
+    {
+        return [
+            'name' => FluentRule::string()->required()->max(200),
+            'category' => FluentRule::string()->required()->max(200),
+            'unit' => FluentRule::string()->required()->max(30),
+            'stock' => FluentRule::integer()->required()->min(0),
+            'price_agent' => FluentRule::numeric()->required()->min(0),
+            'price_sales' => FluentRule::numeric()->required()->min(0),
+            'price_general' => FluentRule::numeric()->required()->min(0),
+        ];
     }
 
     public function importCustomers(Request $request): RedirectResponse

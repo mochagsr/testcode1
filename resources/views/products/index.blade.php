@@ -330,17 +330,59 @@
                     </div>
                     <button type="button" class="btn info-btn product-action-btn" id="product-import-close" style="min-height:32px; padding:5px 11px;">{{ __('ui.cancel') }}</button>
                 </div>
-                <form method="post" action="{{ route('products.import') }}" enctype="multipart/form-data">
+                <form id="product-import-form" method="post"
+                    data-analyze-url="{{ route('products.import.analyze') }}"
+                    data-apply-url="{{ route('products.import.apply') }}"
+                    data-problems-base="{{ url('products/import/problems') }}"
+                    enctype="multipart/form-data">
                     @csrf
                     <div class="product-import-file-wrap">
                         <label for="product-import-file">File Import</label>
                         <input id="product-import-file" type="file" name="import_file" accept=".xlsx,.xls,.csv,.txt" required>
                     </div>
+                    <div class="muted" id="product-import-analyze-status" style="margin-top:8px; min-height:18px;"></div>
                     <div class="product-import-modal-actions">
                         <a class="btn info-btn product-action-btn" href="{{ route('products.import.template') }}">Download Template</a>
-                        <button type="submit" class="btn process-btn product-action-btn">Import</button>
+                        <button type="button" id="product-import-analyze-btn" class="btn process-btn product-action-btn">Cek &amp; Update Data</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <div class="product-import-overlay" id="product-reconcile-modal" aria-hidden="true">
+            <div class="product-import-modal" role="dialog" aria-modal="true" style="width:min(960px,97vw);">
+                <div class="product-import-modal-head">
+                    <div>
+                        <div class="product-import-modal-title">Cek Kesamaan Data Barang</div>
+                        <div class="muted" id="product-reconcile-summary">—</div>
+                    </div>
+                    <button type="button" class="btn info-btn product-action-btn" id="product-reconcile-close" style="min-height:32px; padding:5px 11px;">{{ __('ui.cancel') }}</button>
+                </div>
+
+                <div class="flex" style="gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+                    <label class="flex" style="gap:6px; align-items:center;">
+                        <input type="checkbox" id="product-reconcile-update-prices" checked>
+                        <span>Perbarui harga sesuai file</span>
+                    </label>
+                    <label class="flex" style="gap:6px; align-items:center;">
+                        <span class="muted">Set semua yang cocok:</span>
+                        <select id="product-reconcile-bulk" class="action-menu action-menu-md">
+                            <option value="">— pilih —</option>
+                            <option value="update">Update terbaru</option>
+                            <option value="add">Tambah stok</option>
+                            <option value="skip">Lewati</option>
+                        </select>
+                    </label>
+                    <a id="product-reconcile-problems-link" class="btn info-btn product-action-btn" href="#" style="display:none;" target="_blank" rel="noopener">Download .xlsx bermasalah</a>
+                </div>
+
+                <div id="product-reconcile-body" style="max-height:60vh; overflow:auto;"></div>
+
+                <div class="product-import-modal-actions">
+                    <span class="muted" id="product-reconcile-apply-status" style="margin-right:auto;"></span>
+                    <button type="button" class="btn info-btn product-action-btn" id="product-reconcile-cancel">{{ __('ui.cancel') }}</button>
+                    <button type="button" class="btn process-btn product-action-btn" id="product-reconcile-apply">Proses</button>
+                </div>
             </div>
         </div>
     @endif
@@ -695,4 +737,190 @@
             window.PgposAutoSearch.bindChangeFilters([document.getElementById('products-type-filter')], () => ajax.submit());
         });
     </script>
+
+    @if($canImportProducts)
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('product-import-form');
+            const analyzeBtn = document.getElementById('product-import-analyze-btn');
+            const analyzeStatus = document.getElementById('product-import-analyze-status');
+            const uploadModal = document.getElementById('product-import-modal');
+            const reconcileModal = document.getElementById('product-reconcile-modal');
+            const body = document.getElementById('product-reconcile-body');
+            const summaryEl = document.getElementById('product-reconcile-summary');
+            const problemsLink = document.getElementById('product-reconcile-problems-link');
+            const bulkSelect = document.getElementById('product-reconcile-bulk');
+            const updatePricesEl = document.getElementById('product-reconcile-update-prices');
+            const applyBtn = document.getElementById('product-reconcile-apply');
+            const applyStatus = document.getElementById('product-reconcile-apply-status');
+            const cancelBtn = document.getElementById('product-reconcile-cancel');
+            const closeBtn = document.getElementById('product-reconcile-close');
+            if (!form || !analyzeBtn || !reconcileModal || !body) {
+                return;
+            }
+
+            let currentToken = '';
+            const csrf = () => (form.querySelector('input[name=_token]') || {}).value || '';
+            const esc = (value) => String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const rupiah = (value) => 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+
+            const openReconcile = () => { reconcileModal.classList.add('is-open'); reconcileModal.setAttribute('aria-hidden', 'false'); };
+            const closeReconcile = () => { reconcileModal.classList.remove('is-open'); reconcileModal.setAttribute('aria-hidden', 'true'); };
+
+            function actionSelect(extraNew) {
+                return '<select class="action-menu action-menu-sm js-recon-action">'
+                    + '<option value="update">Update terbaru</option>'
+                    + '<option value="add">Tambah stok</option>'
+                    + (extraNew ? '<option value="new">Buat baru</option>' : '')
+                    + '<option value="skip">Lewati</option>'
+                    + '</select>';
+            }
+
+            function render(data) {
+                let html = '';
+
+                if (data.matched.length) {
+                    html += '<h4 style="margin:6px 0;">Nama Cocok (' + data.matched.length + ')</h4>';
+                    html += '<div class="products-table-wrap"><table class="products-table" style="min-width:0;"><thead><tr>'
+                        + '<th>Kode</th><th>Nama</th><th>Stok DB → File</th><th>Harga umum DB → File</th><th>Aksi</th></tr></thead><tbody>';
+                    data.matched.forEach((m) => {
+                        html += '<tr class="js-recon-matched" data-row="' + m.row + '" data-product-id="' + m.product_id + '">'
+                            + '<td>' + esc(m.code) + '</td>'
+                            + '<td>' + esc(m.name_db) + '</td>'
+                            + '<td>' + m.stock_db + ' → <strong>' + m.stock_file + '</strong></td>'
+                            + '<td>' + rupiah(m.price_db.general) + ' → <strong>' + rupiah(m.price_file.general) + '</strong></td>'
+                            + '<td>' + actionSelect(false) + '</td></tr>';
+                    });
+                    html += '</tbody></table></div>';
+                }
+
+                if (data.new.length) {
+                    html += '<h4 style="margin:14px 0 6px;">Barang Baru (' + data.new.length + ')</h4>';
+                    html += '<div class="products-table-wrap"><table class="products-table" style="min-width:0;"><thead><tr>'
+                        + '<th>Buat?</th><th>Nama</th><th>Kategori</th><th>Stok</th></tr></thead><tbody>';
+                    data.new.forEach((n) => {
+                        html += '<tr class="js-recon-new" data-row="' + n.row + '">'
+                            + '<td><input type="checkbox" class="js-recon-new-check" checked></td>'
+                            + '<td>' + esc(n.name) + '</td><td>' + esc(n.category) + '</td><td>' + n.stock_file + '</td></tr>';
+                    });
+                    html += '</tbody></table></div>';
+                }
+
+                if (data.problems.length) {
+                    html += '<h4 style="margin:14px 0 6px; color:#b45309;">Perlu Perhatian (' + data.problems.length + ')</h4>';
+                    html += '<div class="products-table-wrap"><table class="products-table" style="min-width:0;"><thead><tr>'
+                        + '<th>Baris</th><th>Nama di File</th><th>Masalah</th><th>Pilih Barang</th><th>Aksi</th></tr></thead><tbody>';
+                    data.problems.forEach((p) => {
+                        let pick = '<span class="muted">—</span>';
+                        let action = '<span class="muted">perbaiki file</span>';
+                        if (p.candidates && p.candidates.length) {
+                            pick = '<select class="action-menu action-menu-sm js-recon-candidate">'
+                                + p.candidates.map((c) => '<option value="' + c.id + '">' + esc(c.code) + ' · ' + esc(c.category) + ' · stok ' + c.stock + '</option>').join('')
+                                + '</select>';
+                            action = actionSelect(true);
+                        }
+                        html += '<tr class="js-recon-problem" data-row="' + p.row + '">'
+                            + '<td>' + p.row + '</td><td>' + esc(p.name_file) + '</td>'
+                            + '<td style="white-space:normal;">' + esc(p.reason) + '</td>'
+                            + '<td>' + pick + '</td><td>' + action + '</td></tr>';
+                    });
+                    html += '</tbody></table></div>';
+                }
+
+                if (!html) {
+                    html = '<p class="muted">Tidak ada data untuk diproses.</p>';
+                }
+                body.innerHTML = html;
+
+                // problem rows: default action skip
+                body.querySelectorAll('.js-recon-problem .js-recon-action').forEach((sel) => { sel.value = 'skip'; });
+            }
+
+            analyzeBtn.addEventListener('click', function () {
+                const fileInput = document.getElementById('product-import-file');
+                if (!fileInput || !fileInput.files || !fileInput.files.length) {
+                    analyzeStatus.textContent = 'Pilih file dulu.';
+                    return;
+                }
+                const fd = new FormData();
+                fd.append('import_file', fileInput.files[0]);
+                fd.append('_token', csrf());
+                analyzeBtn.disabled = true;
+                analyzeStatus.textContent = 'Memeriksa file…';
+                fetch(form.getAttribute('data-analyze-url'), {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    body: fd,
+                })
+                    .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+                    .then(({ ok, j }) => {
+                        if (!ok) { analyzeStatus.textContent = j.message || 'Gagal memeriksa file.'; return; }
+                        currentToken = j.token;
+                        summaryEl.textContent = 'Baru: ' + j.summary.new + ' · Cocok: ' + j.summary.matched + ' · Perlu Perhatian: ' + j.summary.problems;
+                        render(j);
+                        if (j.summary.problems > 0) {
+                            problemsLink.href = form.getAttribute('data-problems-base') + '/' + encodeURIComponent(currentToken);
+                            problemsLink.style.display = '';
+                        } else {
+                            problemsLink.style.display = 'none';
+                        }
+                        analyzeStatus.textContent = '';
+                        uploadModal.classList.remove('is-open');
+                        uploadModal.setAttribute('aria-hidden', 'true');
+                        openReconcile();
+                    })
+                    .catch(() => { analyzeStatus.textContent = 'Terjadi kesalahan jaringan.'; })
+                    .finally(() => { analyzeBtn.disabled = false; });
+            });
+
+            bulkSelect.addEventListener('change', function () {
+                if (!this.value) { return; }
+                body.querySelectorAll('.js-recon-matched .js-recon-action').forEach((sel) => { sel.value = this.value; });
+            });
+
+            applyBtn.addEventListener('click', function () {
+                const decisions = [];
+                body.querySelectorAll('.js-recon-matched').forEach((tr) => {
+                    const action = tr.querySelector('.js-recon-action').value;
+                    if (action === 'skip') { return; }
+                    decisions.push({ row: Number(tr.dataset.row), action: action, target_product_id: Number(tr.dataset.productId) });
+                });
+                body.querySelectorAll('.js-recon-new').forEach((tr) => {
+                    if (tr.querySelector('.js-recon-new-check').checked) {
+                        decisions.push({ row: Number(tr.dataset.row), action: 'new' });
+                    }
+                });
+                body.querySelectorAll('.js-recon-problem').forEach((tr) => {
+                    const sel = tr.querySelector('.js-recon-action');
+                    if (!sel) { return; }
+                    const action = sel.value;
+                    if (action === 'skip') { return; }
+                    if (action === 'new') { decisions.push({ row: Number(tr.dataset.row), action: 'new' }); return; }
+                    const cand = tr.querySelector('.js-recon-candidate');
+                    if (!cand) { return; }
+                    decisions.push({ row: Number(tr.dataset.row), action: action, target_product_id: Number(cand.value) });
+                });
+
+                if (!decisions.length) { applyStatus.textContent = 'Tidak ada aksi dipilih.'; return; }
+                applyBtn.disabled = true;
+                applyStatus.textContent = 'Memproses…';
+                fetch(form.getAttribute('data-apply-url'), {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
+                    body: JSON.stringify({ token: currentToken, update_prices: updatePricesEl.checked, decisions: decisions }),
+                })
+                    .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+                    .then(({ ok, j }) => {
+                        if (!ok) { applyStatus.textContent = j.message || 'Gagal memproses.'; applyBtn.disabled = false; return; }
+                        applyStatus.textContent = j.message || 'Selesai.';
+                        setTimeout(() => { window.location.reload(); }, 700);
+                    })
+                    .catch(() => { applyStatus.textContent = 'Terjadi kesalahan jaringan.'; applyBtn.disabled = false; });
+            });
+
+            [cancelBtn, closeBtn].forEach((btn) => btn && btn.addEventListener('click', closeReconcile));
+            reconcileModal.addEventListener('click', (e) => { if (e.target === reconcileModal) { closeReconcile(); } });
+        });
+    </script>
+    @endif
 @endsection

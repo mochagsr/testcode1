@@ -309,6 +309,9 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::delete('/product-units/{productUnit}', [ProductUnitPageController::class, 'destroy'])->middleware('perm:products.delete')->name('product-units.destroy');
     Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:products.import')->name('products.import.template');
     Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:products.import')->name('products.import');
+    Route::post('/products/import/analyze', [MassImportController::class, 'analyzeProducts'])->middleware('perm:products.import')->name('products.import.analyze');
+    Route::post('/products/import/apply', [MassImportController::class, 'applyProducts'])->middleware('perm:products.import')->name('products.import.apply');
+    Route::get('/products/import/problems/{token}', [MassImportController::class, 'downloadProductImportProblems'])->middleware('perm:products.import')->name('products.import.problems');
     Route::get('/item-categories/import/template', [MassImportController::class, 'templateCategories'])->middleware('perm:products.import')->name('item-categories.import.template');
     Route::post('/item-categories/import', [MassImportController::class, 'importCategories'])->middleware('perm:products.import')->name('item-categories.import');
     Route::get('/products/create', [ProductPageController::class, 'create'])->middleware('perm:products.create')->name('products.create');
