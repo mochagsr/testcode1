@@ -958,13 +958,12 @@ class SupplierStockCardPageController extends Controller
             ->select([
                 DB::raw('DATE(sm.created_at) as event_date'),
                 DB::raw('sm.id as reference_id'),
-                DB::raw("('MNL-' || sm.id) as reference_number"),
-                DB::raw('CAST(sm.reference_id AS INTEGER) as supplier_id'),
+                DB::raw('sm.reference_id as supplier_id'),
                 DB::raw('sm.product_id as product_id'),
                 DB::raw('p.code as product_code'),
                 DB::raw('p.name as product_name'),
                 DB::raw("COALESCE(p.unit, 'exp') as unit"),
-                DB::raw('CAST(sm.quantity AS INTEGER) as quantity'),
+                DB::raw('sm.quantity as quantity'),
                 DB::raw('sm.mutation_type as mutation_type'),
             ])
             ->orderBy('sm.created_at')
@@ -985,7 +984,7 @@ class SupplierStockCardPageController extends Controller
                 'oti.product_code',
                 'oti.product_name',
                 'oti.unit',
-                DB::raw('CAST(oti.quantity AS INTEGER) as quantity'),
+                DB::raw('oti.quantity as quantity'),
             ])
             ->orderBy('ot.transaction_date')
             ->orderBy('ot.id')
@@ -1005,7 +1004,7 @@ class SupplierStockCardPageController extends Controller
                 'sii.product_id',
                 'sii.product_code',
                 'sii.product_name',
-                DB::raw('CAST(sii.quantity AS INTEGER) as quantity'),
+                DB::raw('sii.quantity as quantity'),
             ])
             ->orderBy('si.invoice_date')
             ->orderBy('si.id')
@@ -1025,7 +1024,7 @@ class SupplierStockCardPageController extends Controller
                 'sri.product_id',
                 'sri.product_code',
                 'sri.product_name',
-                DB::raw('CAST(sri.quantity AS INTEGER) as quantity'),
+                DB::raw('sri.quantity as quantity'),
             ])
             ->orderBy('sr.return_date')
             ->orderBy('sr.id')
@@ -1119,7 +1118,7 @@ class SupplierStockCardPageController extends Controller
                 'event_date' => (string) $manualItem->event_date,
                 'priority' => 4,
                 'reference_id' => (int) $manualItem->reference_id,
-                'reference_number' => (string) $manualItem->reference_number,
+                'reference_number' => 'MNL-'.(int) $manualItem->reference_id,
                 'supplier_id' => (int) ($manualItem->supplier_id ?? 0),
                 'product_id' => $mappedProduct['product_id'],
                 'product_key' => $mappedProduct['product_key'],
