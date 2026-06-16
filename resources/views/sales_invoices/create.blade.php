@@ -1186,16 +1186,8 @@
                 if (!expected || !selected) return;
                 if (semesterSortKey(selected) >= semesterSortKey(expected)) return;
 
-                // Selected semester is earlier than what the date suggests
-                const lanjutkan = window.confirm(
-                    'Kamu menambahkan ke semester ' + selected + ' yang telah lewat.\n' +
-                    'Seharusnya masuk semester ' + expected + '.\n\n' +
-                    'Bersedia melanjutkan? (pilih Batal untuk kembali ke ' + expected + ')'
-                );
-
-                if (!lanjutkan) {
+                const resetSemester = () => {
                     autoChangingSemester = true;
-                    // Ensure expected option exists
                     const hasOption = Array.from(semesterPeriodSelect.options).some((o) => o.value === expected);
                     if (!hasOption) {
                         const opt = document.createElement('option');
@@ -1205,11 +1197,30 @@
                     }
                     semesterPeriodSelect.value = expected;
                     autoChangingSemester = false;
+                };
+
+                const message = 'Kamu menambahkan ke semester ' + selected + ' yang telah lewat.\n'
+                    + 'Seharusnya masuk semester ' + expected + '.\n\n'
+                    + 'Bersedia melanjutkan? (pilih Batal untuk kembali ke ' + expected + ')';
+
+                if (!window.PgposDialog?.showConfirm) {
+                    resetSemester();
+                    return;
                 }
+
+                window.PgposDialog.showConfirm(message, () => {}, 'Konfirmasi Semester');
+                const cancelButton = document.getElementById('pgpos-dialog-cancel');
+                const closeButton = document.getElementById('pgpos-dialog-close');
+                const overlay = document.getElementById('pgpos-dialog-overlay');
+                const bindResetOnce = (button) => {
+                    button?.addEventListener('click', resetSemester, { once: true });
+                };
+                bindResetOnce(cancelButton);
+                bindResetOnce(closeButton);
+                bindResetOnce(overlay);
             });
         }
     </script>
 
     @include('partials.printing_subtype_script')
 @endsection
-

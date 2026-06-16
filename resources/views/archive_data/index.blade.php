@@ -380,7 +380,9 @@
                             </button>
                             <button type="submit" class="btn danger"
                                 formaction="{{ route('archive-data.quick-purge') }}"
-                                onclick="if(!confirm('Yakin hapus semua data semester ini? Pastikan file arsip sudah diunduh dan disimpan.')){return false;} document.getElementById('quick-confirm-purge').value='1';"
+                                onclick="document.getElementById('quick-confirm-purge').value='1';"
+                                data-confirm-modal
+                                data-confirm-message="Yakin hapus semua data semester ini? Pastikan file arsip sudah diunduh dan disimpan."
                                 {{ empty($semesterOptions) ? 'disabled' : '' }}>
                                 Hapus Permanen
                             </button>
@@ -526,7 +528,8 @@
                         </div>
                     @endif
                     <form method="post" action="{{ route('archive-data.eligible-soft-delete') }}"
-                          onsubmit="return confirm('Tandai data eligible sebagai terhapus (soft delete)? Data belum benar-benar hilang.');">
+                          data-confirm-modal
+                          data-confirm-message="Tandai data eligible sebagai terhapus (soft delete)? Data belum benar-benar hilang.">
                         @csrf
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
                             <label style="font-size:12px;white-space:nowrap;">Minimal usia:</label>
@@ -557,7 +560,8 @@
                         </div>
                     @endif
                     <form method="post" action="{{ route('archive-data.eligible-hard-delete') }}"
-                          onsubmit="return confirm('HAPUS PERMANEN semua data yang sudah di-soft-delete? Tindakan ini TIDAK BISA dibatalkan.');">
+                          data-confirm-modal
+                          data-confirm-message="HAPUS PERMANEN semua data yang sudah di-soft-delete? Tindakan ini TIDAK BISA dibatalkan.">
                         @csrf
                         <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;margin-bottom:10px;cursor:pointer;">
                             <input type="checkbox" name="confirm_hard_delete" value="1" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;accent-color:var(--primary,#3b82f6);">
@@ -743,7 +747,9 @@
                                 <td>
                                     <div style="display:flex;gap:6px;">
                                         <a href="{{ route('archive-data.download', ['file' => $sqlEnc]) }}" class="btn secondary" style="font-size:11px;padding:4px 8px;">Unduh</a>
-                                        <form method="post" action="{{ route('archive-data.import') }}" style="display:inline;" onsubmit="return confirm('Import file ini ke database sekarang?');">
+                                        <form method="post" action="{{ route('archive-data.import') }}" style="display:inline;"
+                                              data-confirm-modal
+                                              data-confirm-message="Import file ini ke database sekarang?">
                                             @csrf
                                             <input type="hidden" name="archive_file" value="{{ $sqlFile['path'] }}">
                                             <button type="submit" class="btn secondary" style="font-size:11px;padding:4px 8px;">Import</button>
@@ -765,7 +771,9 @@
                     @csrf
                     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                         <input type="file" name="archive_upload" accept=".sql" style="font-size:13px;">
-                        <button type="submit" class="btn secondary" onclick="return confirm('Import file SQL yang dipilih ke database sekarang?');">Upload & Import</button>
+                        <button type="submit" class="btn secondary"
+                                data-confirm-modal
+                                data-confirm-message="Import file SQL yang dipilih ke database sekarang?">Upload & Import</button>
                     </div>
                 </form>
             </div>
@@ -813,4 +821,3 @@
     </div>
 
 @endsection
-

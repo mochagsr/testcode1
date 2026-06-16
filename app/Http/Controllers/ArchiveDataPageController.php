@@ -11,9 +11,11 @@ use App\Support\SemesterBookService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use SanderMuller\FluentValidation\FluentRule;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -30,8 +32,7 @@ class ArchiveDataPageController extends Controller
 
         $definitions = DataArchiveRegistry::businessDefinitions();
         $selectedScopeType = 'year';
-        $semesterOptions = $semesterBookService
-            ->buildSemesterOptionCollection([], false, true)
+        $semesterOptions = collect($semesterBookService->closedSemesters())
             ->values()
             ->all();
         $selectedSemester = (string) ($request->old('archive_semester', $semesterOptions[0] ?? $semesterBookService->currentSemester()) ?: ($semesterOptions[0] ?? $semesterBookService->currentSemester()));
@@ -155,7 +156,7 @@ class ArchiveDataPageController extends Controller
                 'name' => basename($path),
                 'path' => $path,
                 'size' => $size,
-                'modified' => \Illuminate\Support\Carbon::createFromTimestamp(
+                'modified' => Carbon::createFromTimestamp(
                     (int) File::lastModified($path)
                 )->timezone(config('app.timezone', 'Asia/Jakarta'))->format('d-m-Y H:i'),
             ];
@@ -201,7 +202,7 @@ class ArchiveDataPageController extends Controller
      */
     private function productYearOptions(): array
     {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('products')) {
+        if (! Schema::hasTable('products')) {
             return [];
         }
 
@@ -210,7 +211,7 @@ class ArchiveDataPageController extends Controller
             ->orderByDesc('created_at')
             ->pluck('created_at')
             ->map(static function ($createdAt): string {
-                return trim((string) optional(\Illuminate\Support\Carbon::parse((string) $createdAt))->format('Y'));
+                return trim((string) optional(Carbon::parse((string) $createdAt))->format('Y'));
             })
             ->filter(static fn (string $year): bool => preg_match('/^\d{4}$/', $year) === 1)
             ->unique()
@@ -414,9 +415,9 @@ class ArchiveDataPageController extends Controller
         $integrityOk = null;
         try {
             Artisan::call('app:integrity-check');
-            $latest = \App\Models\IntegrityCheckLog::query()
+            $latest = IntegrityCheckLog::query()
                 ->latest('checked_at')->latest('id')->first();
-            $integrityOk = $latest instanceof \App\Models\IntegrityCheckLog
+            $integrityOk = $latest instanceof IntegrityCheckLog
                 ? (bool) $latest->is_ok
                 : null;
         } catch (\Throwable) {

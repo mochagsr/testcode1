@@ -282,21 +282,29 @@
                         href="{{ route('products.print', ['search' => $search, 'product_type' => $productType]) }}"
                         target="_blank"
                     >{{ __('txn.print') }}</a>
-                    <select class="action-menu action-menu-md product-action-btn" aria-label="Export" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                        <option value="" selected disabled>Export</option>
-                        <option
-                            data-ajax-sync
-                            data-href-base="{{ route('products.export.pdf') }}"
-                            data-href-params="search,product_type"
-                            value="{{ route('products.export.pdf', ['search' => $search, 'product_type' => $productType]) }}"
-                        >Export PDF</option>
-                        <option
-                            data-ajax-sync
-                            data-href-base="{{ route('products.export.csv') }}"
-                            data-href-params="search,product_type"
-                            value="{{ route('products.export.csv', ['search' => $search, 'product_type' => $productType]) }}"
-                        >Export Excel</option>
-                    </select>
+                    <x-export-menu
+                        class="product-action-btn"
+                        :options="[
+                            [
+                                'label' => 'Export PDF',
+                                'url' => route('products.export.pdf', ['search' => $search, 'product_type' => $productType]),
+                                'attributes' => [
+                                    'data-ajax-sync' => '1',
+                                    'data-href-base' => route('products.export.pdf'),
+                                    'data-href-params' => 'search,product_type',
+                                ],
+                            ],
+                            [
+                                'label' => 'Export Excel',
+                                'url' => route('products.export.csv', ['search' => $search, 'product_type' => $productType]),
+                                'attributes' => [
+                                    'data-ajax-sync' => '1',
+                                    'data-href-base' => route('products.export.csv'),
+                                    'data-href-params' => 'search,product_type',
+                                ],
+                            ],
+                        ]"
+                    />
                 </div>
             </div>
         </div>
@@ -688,4 +696,3 @@
         });
     </script>
 @endsection
-

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://127.0.0.1:8765/login)",
+      "Bash(node __phase6_receivables_verify.cjs)",
+      "Bash(node __phase6_receivables_debug.cjs)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8765/login)",
+      "Bash(cmd //c \"taskkill /F /PID 128300\")",
+      "Bash(cmd //c \"taskkill /F /PID 117452\")",
+      "Bash(php -l app/Http/Controllers/ProductPageController.php)",
+      "Bash(php -l resources/views/receivables/partials/results.blade.php)",
+      "Bash(php -l resources/views/products/partials/results.blade.php)",
+      "Bash(rm -f bootstrap/cache/*.tmp; php artisan package:discover --ansi 2>&1 | tail -5; echo \"=== retry config:clear ===\"; php artisan config:clear 2>&1 | tail -2)",
+      "PowerShell($p = \"G:\\\\laragon\\\\www\\\\tespgpos\\\\bootstrap\\\\cache\"; \"Exists: $\\(Test-Path $p\\)\"; try { $t = Join-Path $p \"writetest.txt\"; Set-Content -Path $t -Value \"x\" -ErrorAction Stop; \"WRITE OK\"; Remove-Item $t -Force } catch { \"WRITE FAIL: $\\($_.Exception.Message\\)\" }; Get-ChildItem $p -Force | Select-Object Name,Length)",
+      "PowerShell($d = Get-Item \"G:\\\\laragon\\\\www\\\\tespgpos\\\\bootstrap\\\\cache\" -Force; \"Attributes: $\\($d.Attributes\\)\"; attrib -R \"G:\\\\laragon\\\\www\\\\tespgpos\\\\bootstrap\\\\cache\" ; attrib -R \"G:\\\\laragon\\\\www\\\\tespgpos\\\\bootstrap\" ; $d2 = Get-Item \"G:\\\\laragon\\\\www\\\\tespgpos\\\\bootstrap\\\\cache\" -Force; \"After: $\\($d2.Attributes\\)\")",
+      "PowerShell(php artisan test 2>&1)",
+      "Bash(sed 's/\\\\x1b\\\\[[0-9;]*m//g' \"C:\\\\Users\\\\mochagsr\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\g--laragon-www-tespgpos\\\\67e454bd-693a-4108-81e6-afaee01b117a\\\\tasks\\\\bwg1kckwi.output\" > /tmp/testout.txt; grep -E \"FAILED|⨯|✗\" /tmp/testout.txt | head -40)",
+      "Bash(awk '/customer list defaults to alphabetical/{f=1} f{print} /^$/{if\\(f\\)c++} c>2{exit}' tf.txt)"
+    ],
+    "additionalDirectories": [
+      "G:\\laragon\\www\\tespgpos\\bootstrap\\cache",
+      "C:\\Users\\mochagsr\\AppData\\Local\\Temp\\claude\\g--laragon-www-tespgpos\\67e454bd-693a-4108-81e6-afaee01b117a\\tasks"
+    ]
+  }
+}

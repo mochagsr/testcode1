@@ -24,7 +24,6 @@ class ProductDeletionTest extends TestCase
         $this->actingAs($admin)
             ->get(route('products.index'))
             ->assertOk()
-            ->assertSee(__('ui.view'))
             ->assertSee(__('ui.edit'))
             ->assertSee(__('ui.edit_stock'))
             ->assertSee(__('ui.stock_mutations_title'))
@@ -146,6 +145,7 @@ class ProductDeletionTest extends TestCase
             'code' => 'del-product',
             'name' => 'Produk Hapus',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 10,
             'price_agent' => 1000,
             'price_sales' => 2000,

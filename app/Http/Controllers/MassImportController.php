@@ -118,6 +118,7 @@ class MassImportController extends Controller
                 if ($this->isEmptyRow($data)) {
                     continue;
                 }
+                $data = $this->normalizeProductImportNumbers($data);
 
                 $validator = Validator::make($data, [
                     'name' => FluentRule::string()->required()->max(200),
@@ -903,11 +904,58 @@ class MassImportController extends Controller
         if ($value === '') {
             return null;
         }
+        $normalized = Str::lower($value);
 
         return ItemCategory::query()
-            ->where('name', $value)
-            ->orWhere('code', $value)
+            ->whereRaw('LOWER(name) = ?', [$normalized])
+            ->orWhereRaw('LOWER(code) = ?', [$normalized])
             ->value('id');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizeProductImportNumbers(array $data): array
+    {
+        foreach (['stock', 'price_agent', 'price_sales', 'price_general'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = $this->normalizeImportNumber($data[$field]);
+                if ($field === 'stock' && is_numeric($data[$field]) && floor((float) $data[$field]) === (float) $data[$field]) {
+                    $data[$field] = (string) (int) $data[$field];
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    private function normalizeImportNumber(mixed $value): string
+    {
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        $normalized = trim((string) $value);
+        if ($normalized === '') {
+            return '';
+        }
+
+        $normalized = str_replace(["\xc2\xa0", ' ', 'Rp', 'rp', 'IDR', 'idr'], '', $normalized);
+
+        if (preg_match('/^-?\d{1,3}(\.\d{3})+(,\d+)?$/', $normalized) === 1) {
+            return str_replace('.', '', preg_replace('/,\d+$/', '', $normalized) ?? $normalized);
+        }
+
+        if (preg_match('/^-?\d{1,3}(,\d{3})+(\.\d+)?$/', $normalized) === 1) {
+            return str_replace(',', '', preg_replace('/\.\d+$/', '', $normalized) ?? $normalized);
+        }
+
+        if (preg_match('/^-?\d+([.,]\d+)?$/', $normalized) === 1) {
+            return str_replace(',', '.', $normalized);
+        }
+
+        return $normalized;
     }
 
     private function resolveCustomerLevelId(string $level): ?int

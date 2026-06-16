@@ -158,21 +158,28 @@
                 href="{{ route('supplier-payables.print', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}"
                 target="_blank"
             >{{ __('txn.print') }}</a>
-            <select class="action-menu action-menu-md" aria-label="Export" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                <option value="" selected disabled>Export</option>
-                <option
-                    data-ajax-sync
-                    data-href-base="{{ route('supplier-payables.export.pdf') }}"
-                    data-href-params="search,supplier_id,year,month"
-                    value="{{ route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}"
-                >Export PDF</option>
-                <option
-                    data-ajax-sync
-                    data-href-base="{{ route('supplier-payables.export.excel') }}"
-                    data-href-params="search,supplier_id,year,month"
-                    value="{{ route('supplier-payables.export.excel', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]) }}"
-                >Export Excel</option>
-            </select>
+            <x-export-menu
+                :options="[
+                    [
+                        'label' => 'Export PDF',
+                        'url' => route('supplier-payables.export.pdf', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]),
+                        'attributes' => [
+                            'data-ajax-sync' => '1',
+                            'data-href-base' => route('supplier-payables.export.pdf'),
+                            'data-href-params' => 'search,supplier_id,year,month',
+                        ],
+                    ],
+                    [
+                        'label' => 'Export Excel',
+                        'url' => route('supplier-payables.export.excel', ['search' => $search, 'supplier_id' => $selectedSupplierId, 'year' => $selectedYear, 'month' => $selectedMonth]),
+                        'attributes' => [
+                            'data-ajax-sync' => '1',
+                            'data-href-base' => route('supplier-payables.export.excel'),
+                            'data-href-params' => 'search,supplier_id,year,month',
+                        ],
+                    ],
+                ]"
+            />
             <a class="btn payment-btn" href="{{ route('supplier-payables.create') }}">{{ __('supplier_payable.add_payment') }}</a>
         </form>
     </div>
@@ -252,5 +259,4 @@
         });
     </script>
 @endsection
-
 

@@ -95,7 +95,7 @@ class CustomerLevelListFilterTest extends TestCase
         $response->assertJsonPath('customers.0.id', $customerA->id);
     }
 
-    public function test_customer_list_defaults_to_alphabetical_order_without_filters(): void
+    public function test_customer_list_defaults_to_latest_created_without_filters(): void
     {
         $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['*']]);
 
@@ -113,8 +113,8 @@ class CustomerLevelListFilterTest extends TestCase
 
         $response->assertOk();
         $response->assertSeeInOrder([
-            'Alpha Customer',
             'Zulu Customer',
+            'Alpha Customer',
         ]);
     }
 

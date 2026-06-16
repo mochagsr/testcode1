@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\OutgoingTransaction;
 use App\Models\Supplier;
@@ -13,7 +14,6 @@ use App\Services\AccountingService;
 use App\Services\AuditLogService;
 use App\Services\SupplierLedgerService;
 use App\Support\AppCache;
-use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
 use App\Support\PrintPaperSize;
 use App\Support\PrintTextFormatter;
@@ -158,7 +158,7 @@ class SupplierPayablePageController extends Controller
             $afterOutstanding = (int) $ledger->balance_after;
 
             if ($afterOutstanding === 0) {
-                \App\Models\OutgoingTransaction::query()
+                OutgoingTransaction::query()
                     ->where('supplier_id', (int) $supplier->id)
                     ->whereNull('settled_at')
                     ->update(['settled_at' => $paymentDate->toDateString()]);

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\ItemCategory;
 use App\Models\Product;
 use App\Models\Supplier;
@@ -15,7 +16,7 @@ class SearchLookupApiTest extends TestCase
 
     public function test_customer_lookup_returns_empty_when_search_token_below_three_chars(): void
     {
-        $response = $this->getJson('/api/customers?search=ma');
+        $response = $this->actingAs($this->apiUser())->getJson('/api/customers?search=ma');
 
         $response->assertOk();
         $response->assertJsonPath('data', []);
@@ -23,13 +24,13 @@ class SearchLookupApiTest extends TestCase
 
     public function test_customer_lookup_returns_matches_for_valid_search_token(): void
     {
-        \App\Models\Customer::query()->create([
+        Customer::query()->create([
             'code' => 'CUST-LOOK-001',
             'name' => 'Mawar Jaya',
             'city' => 'Malang',
         ]);
 
-        $response = $this->getJson('/api/customers?search=maw');
+        $response = $this->actingAs($this->apiUser())->getJson('/api/customers?search=maw');
 
         $response->assertOk();
         $response->assertJsonCount(1, 'data');
@@ -38,13 +39,13 @@ class SearchLookupApiTest extends TestCase
 
     public function test_customer_lookup_supports_label_like_name_city_format(): void
     {
-        \App\Models\Customer::query()->create([
+        Customer::query()->create([
             'code' => 'CUST-LOOK-002',
             'name' => 'Angga',
             'city' => 'Sidoarjo',
         ]);
 
-        $response = $this->getJson('/api/customers?search=angga%20(sidoarjo)');
+        $response = $this->actingAs($this->apiUser())->getJson('/api/customers?search=angga%20(sidoarjo)');
 
         $response->assertOk();
         $response->assertJsonCount(1, 'data');
@@ -77,11 +78,11 @@ class SearchLookupApiTest extends TestCase
             'is_active' => false,
         ]);
 
-        $shortTokenResponse = $this->getJson('/api/products?search=ma&active_only=1');
+        $shortTokenResponse = $this->actingAs($this->apiUser())->getJson('/api/products?search=ma&active_only=1');
         $shortTokenResponse->assertOk();
         $shortTokenResponse->assertJsonPath('data', []);
 
-        $validTokenResponse = $this->getJson('/api/products?search=mat&active_only=1');
+        $validTokenResponse = $this->actingAs($this->apiUser())->getJson('/api/products?search=mat&active_only=1');
         $validTokenResponse->assertOk();
         $validTokenResponse->assertJsonCount(1, 'data');
         $validTokenResponse->assertJsonPath('data.0.code', 'PRD-LOOK-A');
@@ -107,5 +108,13 @@ class SearchLookupApiTest extends TestCase
         $validTokenResponse->assertOk();
         $validTokenResponse->assertJsonCount(1, 'data');
         $validTokenResponse->assertJsonPath('data.0.name', 'Sumber Makmur');
+    }
+
+    private function apiUser(): User
+    {
+        return User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['*'],
+        ]);
     }
 }

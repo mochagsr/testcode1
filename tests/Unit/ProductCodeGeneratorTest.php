@@ -18,7 +18,7 @@ class ProductCodeGeneratorTest extends TestCase
 
         $code = $generator->generateBase('matematika 1 edisi 5 semester 1 tahun ajar 2025-2026');
 
-        $this->assertSame('mt1e5s156', $code);
+        $this->assertSame('mt1e51ts156', $code);
     }
 
     public function test_generate_base_supports_abbreviated_edition_semester_and_short_year(): void
@@ -144,7 +144,7 @@ class ProductCodeGeneratorTest extends TestCase
 
         Product::query()->create([
             'item_category_id' => $category->id,
-            'code' => 'mt1e5s156',
+            'code' => 'mt1e51ts156',
             'name' => 'Existing',
             'unit' => 'pcs',
             'stock' => 1,
@@ -158,6 +158,6 @@ class ProductCodeGeneratorTest extends TestCase
 
         $resolved = $generator->resolve('', 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026');
 
-        $this->assertSame('mt1e5s15601', $resolved);
+        $this->assertSame('mt1e51ts15601', $resolved);
     }
 }

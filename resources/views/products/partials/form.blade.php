@@ -471,14 +471,17 @@
                 || null;
         }
 
+        const MIN_CATEGORY_SEARCH_LENGTH = 3;
+
+        function canSearchCategory(value) {
+            return normalize(value || '').length >= MIN_CATEGORY_SEARCH_LENGTH;
+        }
+
         function createCategoryAutocomplete(inputEl, hiddenEl, onSelect) {
             let dropdown = null, activeIdx = -1, currentMatches = [], blurTimer = null;
             const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             function getMatches(query) {
                 const q = normalize(query || '');
-                if (q === '') {
-                    return categories.slice(0, 20);
-                }
                 return categories.filter((category) => {
                     return normalize(categoryLabel(category)).includes(q)
                         || normalize(category.code).includes(q)
@@ -508,9 +511,31 @@
                 dropdown.addEventListener('mousedown', e => { const item = e.target.closest('.category-ac-item'); if (!item) return; e.preventDefault(); pick(parseInt(item.dataset.idx, 10)); });
                 dropdown.addEventListener('mousemove', e => { const item = e.target.closest('.category-ac-item'); if (item) setActive(parseInt(item.dataset.idx, 10)); });
             }
-            function suggest(query) { open(getMatches(query)); }
-            inputEl.addEventListener('input', () => { hiddenEl.value = ''; onSelect(null); suggest(inputEl.value); });
-            inputEl.addEventListener('focus', () => { clearTimeout(blurTimer); suggest(inputEl.value); });
+            function suggest(query) {
+                if (!canSearchCategory(query)) {
+                    close();
+                    return;
+                }
+                open(getMatches(query));
+            }
+            inputEl.addEventListener('input', () => {
+                const value = inputEl.value;
+                hiddenEl.value = '';
+                onSelect(null);
+                if (!canSearchCategory(value)) {
+                    close();
+                    return;
+                }
+                suggest(value);
+            });
+            inputEl.addEventListener('focus', () => {
+                clearTimeout(blurTimer);
+                if (!canSearchCategory(categorySearchInput.value)) {
+                    close();
+                    return;
+                }
+                suggest(inputEl.value);
+            });
             inputEl.addEventListener('blur', () => {
                 blurTimer = setTimeout(() => {
                     close();

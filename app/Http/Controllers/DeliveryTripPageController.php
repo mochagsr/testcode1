@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\DeliveryTrip;
 use App\Services\AccountingService;
 use App\Services\AuditLogService;
-use App\Support\AppSetting;
 use App\Support\ExcelExportStyler;
 use App\Support\PrintPaperSize;
 use App\Support\PrintTextFormatter;

@@ -1646,22 +1646,36 @@
 
                 document.addEventListener('submit', (event) => {
                     const form = event.target;
-                    if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm-modal')) {
+                    const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+                    const confirmationTarget = submitter?.hasAttribute('data-confirm-modal') ? submitter : form;
+
+                    if (!(form instanceof HTMLFormElement) || !confirmationTarget.hasAttribute('data-confirm-modal')) {
                         return;
                     }
-                    if (form.dataset.confirmApproved === '1') {
+                    if (confirmationTarget.dataset.confirmApproved === '1') {
+                        confirmationTarget.dataset.confirmApproved = '0';
                         return;
                     }
 
                     event.preventDefault();
                     window.PgposDialog.showConfirm(
-                        form.getAttribute('data-confirm-message') || defaultConfirmTitle,
+                        confirmationTarget.getAttribute('data-confirm-message') || defaultConfirmTitle,
                         () => {
-                            form.dataset.confirmApproved = '1';
+                            confirmationTarget.dataset.confirmApproved = '1';
                             window.PgposNumberFormat?.cleanForm(form);
+                            if (submitter instanceof HTMLElement && typeof form.requestSubmit === 'function') {
+                                form.requestSubmit(submitter);
+                                return;
+                            }
+
+                            if (typeof form.requestSubmit === 'function') {
+                                form.requestSubmit();
+                                return;
+                            }
+
                             form.submit();
                         },
-                        form.getAttribute('data-confirm-title') || defaultConfirmTitle
+                        confirmationTarget.getAttribute('data-confirm-title') || defaultConfirmTitle
                     );
                 }, true);
             })();

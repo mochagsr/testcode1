@@ -41,16 +41,65 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:5,1')
+        ->name('login.post');
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
-Route::prefix('api')->name('api.')->group(function (): void {
-    Route::apiResource('item-categories', ItemCategoryController::class);
-    Route::apiResource('customer-levels', CustomerLevelController::class);
-    Route::apiResource('products', ProductController::class);
-    Route::apiResource('customers', CustomerController::class);
+Route::prefix('api')->name('api.')->middleware(['auth', 'prefs'])->group(function (): void {
+    Route::apiResource('item-categories', ItemCategoryController::class)
+        ->only(['index', 'show'])
+        ->middleware('perm:masters.products.view');
+    Route::apiResource('item-categories', ItemCategoryController::class)
+        ->only(['store'])
+        ->middleware('perm:products.create');
+    Route::apiResource('item-categories', ItemCategoryController::class)
+        ->only(['update'])
+        ->middleware('perm:products.edit');
+    Route::apiResource('item-categories', ItemCategoryController::class)
+        ->only(['destroy'])
+        ->middleware('perm:products.delete');
+
+    Route::apiResource('customer-levels', CustomerLevelController::class)
+        ->only(['index', 'show'])
+        ->middleware('perm:masters.customers.view');
+    Route::apiResource('customer-levels', CustomerLevelController::class)
+        ->only(['store'])
+        ->middleware('perm:customers.create');
+    Route::apiResource('customer-levels', CustomerLevelController::class)
+        ->only(['update'])
+        ->middleware('perm:customers.edit');
+    Route::apiResource('customer-levels', CustomerLevelController::class)
+        ->only(['destroy'])
+        ->middleware('perm:customers.delete');
+
+    Route::apiResource('products', ProductController::class)
+        ->only(['index', 'show'])
+        ->middleware('perm:masters.products.view');
+    Route::apiResource('products', ProductController::class)
+        ->only(['store'])
+        ->middleware('perm:products.create');
+    Route::apiResource('products', ProductController::class)
+        ->only(['update'])
+        ->middleware('perm:products.edit');
+    Route::apiResource('products', ProductController::class)
+        ->only(['destroy'])
+        ->middleware('perm:products.delete');
+
+    Route::apiResource('customers', CustomerController::class)
+        ->only(['index', 'show'])
+        ->middleware('perm:masters.customers.view');
+    Route::apiResource('customers', CustomerController::class)
+        ->only(['store'])
+        ->middleware('perm:customers.create');
+    Route::apiResource('customers', CustomerController::class)
+        ->only(['update'])
+        ->middleware('perm:customers.edit');
+    Route::apiResource('customers', CustomerController::class)
+        ->only(['destroy'])
+        ->middleware('perm:customers.delete');
 });
 
 Route::middleware(['auth', 'prefs'])->group(function (): void {

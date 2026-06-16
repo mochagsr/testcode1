@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\AppSetting;
+use App\Models\ReceivablePayment;
+use App\Models\SalesReturn;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -481,7 +483,7 @@ class ArchiveCommandsTest extends TestCase
             ->assertSessionHas('archive_success');
     }
 
-    public function test_archive_page_year_dropdown_uses_closed_semester_years(): void
+    public function test_archive_page_semester_dropdown_uses_closed_semester_periods(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',
@@ -490,19 +492,15 @@ class ArchiveCommandsTest extends TestCase
 
         AppSetting::setValue('closed_semester_periods', 'S2-2425,S1-2526,S2-2526');
 
-        $response = $this->withSession([
-            '_old_input' => [
-                'dataset_key' => 'sales_invoices',
-                'archive_scope_type' => 'year',
-            ],
-        ])->actingAs($admin)->get(route('archive-data.index'));
+        $response = $this->actingAs($admin)->get(route('archive-data.index'));
 
         $response->assertOk();
-        $response->assertSee('value="2526"', false);
-        $response->assertSee('value="2425"', false);
+        $response->assertSee('value="S2-2526"', false);
+        $response->assertSee('value="S1-2526"', false);
+        $response->assertSee('value="S2-2425"', false);
     }
 
-    public function test_archive_page_products_use_product_years_without_waiting_for_closed_semester(): void
+    public function test_archive_page_explains_product_archiving_through_easy_mode(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',
@@ -528,16 +526,11 @@ class ArchiveCommandsTest extends TestCase
             'updated_at' => '2024-06-15 08:00:00',
         ]);
 
-        $response = $this->withSession([
-            '_old_input' => [
-                'dataset_key' => 'products',
-                'archive_scope_type' => 'year',
-            ],
-        ])->actingAs($admin)->get(route('archive-data.index'));
+        $response = $this->actingAs($admin)->get(route('archive-data.index'));
 
         $response->assertOk();
-        $response->assertSee('value="2024"', false);
-        $response->assertSee('Daftar Barang memakai tahun dari data barang yang sudah ada');
+        $response->assertSee('Mode Mudah');
+        $response->assertSee('Semua dataset bisnis diproses sekaligus');
     }
 
     public function test_archive_scan_and_export_cover_semester_filtered_sales_invoices(): void
@@ -642,8 +635,8 @@ class ArchiveCommandsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Arsip Data Bisnis');
         $response->assertSee('Pembersihan Otomatis Log Sistem');
-        $response->assertSee('Daftar Barang');
-        $response->assertDontSee('value="audit_logs"', false);
+        $response->assertSee('Log sistem');
+        $response->assertDontSee('name="datasets[]" value="audit_logs"', false);
     }
 
     public function test_system_logs_cleanup_command_prunes_old_system_logs_and_export_files(): void
@@ -800,7 +793,7 @@ class ArchiveCommandsTest extends TestCase
 
         DB::table('stock_mutations')->insert([
             'product_id' => $productId,
-            'reference_type' => \App\Models\SalesReturn::class,
+            'reference_type' => SalesReturn::class,
             'reference_id' => $returnId,
             'mutation_type' => 'in',
             'quantity' => 1,
@@ -828,7 +821,7 @@ class ArchiveCommandsTest extends TestCase
             'entry_number' => 'JR-02012024-0001',
             'entry_date' => '2024-01-02',
             'entry_type' => 'sales_return_create',
-            'reference_type' => \App\Models\SalesReturn::class,
+            'reference_type' => SalesReturn::class,
             'reference_id' => $returnId,
             'description' => 'Posting retur #'.$returnId,
             'created_by_user_id' => null,
@@ -878,9 +871,9 @@ class ArchiveCommandsTest extends TestCase
         $this->assertSame(0, $purgeExit, Artisan::output());
         $this->assertDatabaseMissing('sales_returns', ['id' => $returnId]);
         $this->assertDatabaseMissing('sales_return_items', ['sales_return_id' => $returnId]);
-        $this->assertDatabaseMissing('stock_mutations', ['reference_type' => \App\Models\SalesReturn::class, 'reference_id' => $returnId]);
+        $this->assertDatabaseMissing('stock_mutations', ['reference_type' => SalesReturn::class, 'reference_id' => $returnId]);
         $this->assertDatabaseMissing('receivable_ledgers', ['description' => 'Retur RTR-02012024-0001']);
-        $this->assertDatabaseMissing('journal_entries', ['reference_type' => \App\Models\SalesReturn::class, 'reference_id' => $returnId]);
+        $this->assertDatabaseMissing('journal_entries', ['reference_type' => SalesReturn::class, 'reference_id' => $returnId]);
         $this->assertDatabaseHas('customers', [
             'id' => $customerId,
             'outstanding_receivable' => 10000,
@@ -950,7 +943,7 @@ class ArchiveCommandsTest extends TestCase
             'entry_number' => 'JR-06012024-0001',
             'entry_date' => '2024-01-06',
             'entry_type' => 'receivable_payment_create',
-            'reference_type' => \App\Models\ReceivablePayment::class,
+            'reference_type' => ReceivablePayment::class,
             'reference_id' => $paymentId,
             'description' => 'Posting pembayaran piutang #'.$paymentId,
             'created_by_user_id' => null,
@@ -1001,7 +994,7 @@ class ArchiveCommandsTest extends TestCase
         $this->assertDatabaseMissing('receivable_payments', ['id' => $paymentId]);
         $this->assertDatabaseMissing('invoice_payments', ['notes' => 'Pembayaran KWT-06012024-0001']);
         $this->assertDatabaseMissing('receivable_ledgers', ['description' => 'Pembayaran KWT-06012024-0001 untuk INV-05012024-0001']);
-        $this->assertDatabaseMissing('journal_entries', ['reference_type' => \App\Models\ReceivablePayment::class, 'reference_id' => $paymentId]);
+        $this->assertDatabaseMissing('journal_entries', ['reference_type' => ReceivablePayment::class, 'reference_id' => $paymentId]);
         $this->assertDatabaseHas('sales_invoices', [
             'id' => $invoiceId,
             'total_paid' => 0,
@@ -1255,8 +1248,7 @@ class ArchiveCommandsTest extends TestCase
         string $status,
         string $invoiceDate = '2024-01-01',
         string $semesterPeriod = 'S2-2425'
-    ): int
-    {
+    ): int {
         return (int) DB::table('sales_invoices')->insertGetId([
             'invoice_number' => $number,
             'customer_id' => $customerId,

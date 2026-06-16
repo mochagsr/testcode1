@@ -100,7 +100,7 @@ class AppSetting extends Model
                 return;
             }
 
-            DB::table((new static)->getTable())
+            DB::table((new self)->getTable())
                 ->upsert($rows, ['key'], ['value', 'updated_at']);
 
             Cache::forget(static::CACHE_KEY);
@@ -116,7 +116,7 @@ class AppSetting extends Model
             return static::$tableExists;
         }
 
-        static::$tableExists = Schema::hasTable((new static)->getTable());
+        static::$tableExists = Schema::hasTable((new self)->getTable());
 
         return static::$tableExists;
     }

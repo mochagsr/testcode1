@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\LoginRequest;
 use App\Models\User;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
@@ -9,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use SanderMuller\FluentValidation\FluentRule;
 
 class AuthController extends Controller
 {
@@ -26,12 +26,9 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request): RedirectResponse
+    public function login(LoginRequest $request): RedirectResponse
     {
-        $credentials = $request->validate([
-            'login' => FluentRule::string()->required()->max(255),
-            'password' => FluentRule::string()->required(),
-        ]);
+        $credentials = $request->validated();
 
         $loginInput = trim((string) ($credentials['login'] ?? ''));
         $password = (string) ($credentials['password'] ?? '');

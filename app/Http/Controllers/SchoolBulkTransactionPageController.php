@@ -573,7 +573,9 @@ class SchoolBulkTransactionPageController extends Controller
         }
 
         DB::transaction(function () use ($schoolBulkTransaction): void {
-            $schoolBulkTransaction->delete();
+            $schoolBulkTransaction->items()->delete();
+            $schoolBulkTransaction->locations()->delete();
+            $schoolBulkTransaction->forceDelete();
         });
 
         $this->auditLogService->log(

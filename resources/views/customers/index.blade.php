@@ -178,21 +178,28 @@
                 @if($canImportCustomers)
                     <button type="button" class="btn process-btn" id="customer-import-open">Import Data</button>
                 @endif
-                <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                    <option value="" selected disabled>Export</option>
-                    <option
-                        data-ajax-sync
-                        data-href-base="{{ route('customers-web.export.pdf') }}"
-                        data-href-params="search,level_id"
-                        value="{{ route('customers-web.export.pdf', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}"
-                    >Export PDF</option>
-                    <option
-                        data-ajax-sync
-                        data-href-base="{{ route('customers-web.export.csv') }}"
-                        data-href-params="search,level_id"
-                        value="{{ route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]) }}"
-                    >Export Excel</option>
-                </select>
+                <x-export-menu
+                    :options="[
+                        [
+                            'label' => 'Export PDF',
+                            'url' => route('customers-web.export.pdf', ['search' => $search, 'level_id' => $selectedLevelId ?: null]),
+                            'attributes' => [
+                                'data-ajax-sync' => '1',
+                                'data-href-base' => route('customers-web.export.pdf'),
+                                'data-href-params' => 'search,level_id',
+                            ],
+                        ],
+                        [
+                            'label' => 'Export Excel',
+                            'url' => route('customers-web.export.csv', ['search' => $search, 'level_id' => $selectedLevelId ?: null]),
+                            'attributes' => [
+                                'data-ajax-sync' => '1',
+                                'data-href-base' => route('customers-web.export.csv'),
+                                'data-href-params' => 'search,level_id',
+                            ],
+                        ],
+                    ]"
+                />
             </div>
         </div>
         @if(session('import_errors'))
@@ -421,4 +428,3 @@
         });
     </script>
 @endsection
-

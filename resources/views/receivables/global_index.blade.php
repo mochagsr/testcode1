@@ -99,11 +99,12 @@
                 <a class="btn info-btn" target="_blank" href="{{ route('receivables.global.print', request()->query()) }}">
                     {{ $selectedCustomerId > 0 ? 'Print Invoice' : __('txn.print') }}
                 </a>
-                <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
-                    <option value="" selected disabled>Export</option>
-                    <option value="{{ route('receivables.global.export.excel', request()->query()) }}">Export Excel</option>
-                    <option value="{{ route('receivables.global.export.pdf', request()->query()) }}">Export PDF</option>
-                </select>
+                <x-export-menu
+                    :options="[
+                        ['label' => 'Export Excel', 'url' => route('receivables.global.export.excel', request()->query())],
+                        ['label' => 'Export PDF', 'url' => route('receivables.global.export.pdf', request()->query())],
+                    ]"
+                />
             </div>
         </form>
     </div>
@@ -173,5 +174,4 @@
         @endif
     </div>
 @endsection
-
 

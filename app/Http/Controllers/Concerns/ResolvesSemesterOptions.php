@@ -23,13 +23,15 @@ trait ResolvesSemesterOptions
             AppCache::lookupCacheKey($cachePrefix),
             now()->addSeconds(60),
             function () use ($modelClass, $column): Collection {
-                return $this->resolveSemesterBookService()->buildSemesterOptionCollection(
+                $semesterBookService = $this->resolveSemesterBookService();
+
+                return $semesterBookService->buildSemesterOptionCollection(
                     $modelClass::query()
                         ->whereNotNull($column)
                         ->where($column, '!=', '')
                         ->distinct()
                         ->pluck($column)
-                        ->merge($this->resolveSemesterBookService()->configuredSemesterOptions()),
+                        ->merge($semesterBookService->configuredSemesterOptions()),
                     false,
                     true
                 );
@@ -49,13 +51,17 @@ trait ResolvesSemesterOptions
             AppCache::lookupCacheKey($cachePrefix),
             now()->addSeconds(60),
             function () use ($modelClass, $dateColumn): Collection {
-                return $this->resolveSemesterBookService()->buildSemesterOptionCollection(
+                $semesterBookService = $this->resolveSemesterBookService();
+
+                return $semesterBookService->buildSemesterOptionCollection(
                     $modelClass::query()
                         ->whereNotNull($dateColumn)
                         ->orderByDesc($dateColumn)
                         ->pluck($dateColumn)
-                        ->map(fn ($date): string => $this->semesterPeriodFromDate($date))
-                        ->merge($this->resolveSemesterBookService()->configuredSemesterOptions()),
+                        ->map(fn ($date): string => $semesterBookService->semesterFromDate(
+                            $date instanceof \DateTimeInterface ? $date->format('Y-m-d') : (string) $date
+                        ) ?? $semesterBookService->currentSemester())
+                        ->merge($semesterBookService->configuredSemesterOptions()),
                     false,
                     true
                 );

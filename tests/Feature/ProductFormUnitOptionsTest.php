@@ -85,6 +85,7 @@ class ProductFormUnitOptionsTest extends TestCase
             'code' => '',
             'name' => 'Barang Supplier Umum',
             'unit' => 'pcs',
+            'product_type' => 'general',
             'stock' => 3,
             'price_agent' => 0,
             'price_sales' => 0,
@@ -96,6 +97,7 @@ class ProductFormUnitOptionsTest extends TestCase
         $this->assertDatabaseHas('products', [
             'name' => 'Barang Supplier Umum',
             'unit' => 'pcs',
+            'product_type' => 'general',
             'price_agent' => 0,
             'price_sales' => 0,
             'price_general' => 0,

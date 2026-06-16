@@ -25,6 +25,7 @@ class ProductCodeGenerationTest extends TestCase
             'code' => '',
             'name' => 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 10,
             'price_agent' => 10000,
             'price_sales' => 12000,
@@ -34,7 +35,7 @@ class ProductCodeGenerationTest extends TestCase
         $response->assertRedirect(route('products.index'));
         $this->assertDatabaseHas('products', [
             'name' => 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026',
-            'code' => 'mt1e5s156',
+            'code' => 'mt1e51ts156',
         ]);
     }
 
@@ -55,6 +56,7 @@ class ProductCodeGenerationTest extends TestCase
             'code' => '',
             'name' => 'matematika 1 ed 5 smt 1 2526',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 10,
             'price_agent' => 10000,
             'price_sales' => 12000,
@@ -66,6 +68,7 @@ class ProductCodeGenerationTest extends TestCase
             'code' => '',
             'name' => 'matematika 1 ed 5 smt 1 2526',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 10,
             'price_agent' => 10000,
             'price_sales' => 12000,
@@ -94,6 +97,7 @@ class ProductCodeGenerationTest extends TestCase
             'item_category_id' => $pintar->id,
             'code' => '',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 10,
             'price_agent' => 3200,
             'price_sales' => 3500,
@@ -163,6 +167,7 @@ class ProductCodeGenerationTest extends TestCase
             'code' => '',
             'name' => 'matematika 1 ed 5 smt 1 2526',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 10,
             'price_agent' => 10000,
             'price_sales' => 12000,
@@ -192,9 +197,10 @@ class ProductCodeGenerationTest extends TestCase
 
         Product::query()->create([
             'item_category_id' => $category->id,
-            'code' => 'mt1e5s156',
+            'code' => 'mt1e51ts156',
             'name' => 'Produk Existing',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 3,
             'price_agent' => 10000,
             'price_sales' => 12000,
@@ -207,6 +213,7 @@ class ProductCodeGenerationTest extends TestCase
             'code' => '',
             'name' => 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 7,
             'price_agent' => 9000,
             'price_sales' => 10000,
@@ -215,22 +222,24 @@ class ProductCodeGenerationTest extends TestCase
 
         $this->assertDatabaseHas('products', [
             'name' => 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026',
-            'code' => 'mt1e5s15601',
+            'code' => 'mt1e51ts15601',
         ]);
     }
 
     public function test_api_store_keeps_manual_code_when_provided(): void
     {
+        $admin = User::factory()->create(['role' => 'admin']);
         $category = ItemCategory::query()->create([
             'code' => 'CAT-01',
             'name' => 'Buku',
         ]);
 
-        $response = $this->postJson('/api/products', [
+        $response = $this->actingAs($admin)->postJson('/api/products', [
             'item_category_id' => $category->id,
             'code' => 'MANUAL-001',
             'name' => 'produk manual',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 1,
             'price_agent' => 1000,
             'price_sales' => 2000,
@@ -247,16 +256,18 @@ class ProductCodeGenerationTest extends TestCase
 
     public function test_api_store_normalizes_dirty_manual_code_input(): void
     {
+        $admin = User::factory()->create(['role' => 'admin']);
         $category = ItemCategory::query()->create([
             'code' => 'CAT-01',
             'name' => 'Buku',
         ]);
 
-        $response = $this->postJson('/api/products', [
+        $response = $this->actingAs($admin)->postJson('/api/products', [
             'item_category_id' => $category->id,
             'code' => '  MANUAL -- 001 !! ',
             'name' => 'produk manual kotor',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 1,
             'price_agent' => 1000,
             'price_sales' => 2000,
@@ -281,9 +292,10 @@ class ProductCodeGenerationTest extends TestCase
 
         $product = Product::query()->create([
             'item_category_id' => $category->id,
-            'code' => 'mt1e5s156',
+            'code' => 'mt1e51ts156',
             'name' => 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 4,
             'price_agent' => 10000,
             'price_sales' => 11000,
@@ -296,6 +308,7 @@ class ProductCodeGenerationTest extends TestCase
             'code' => '',
             'name' => 'matematika 1 edisi 5 semester 1 tahun ajar 2025-2026',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 5,
             'price_agent' => 10500,
             'price_sales' => 11500,
@@ -303,11 +316,12 @@ class ProductCodeGenerationTest extends TestCase
         ])->assertRedirect(route('products.index'));
 
         $product->refresh();
-        $this->assertSame('mt1e5s156', $product->code);
+        $this->assertSame('mt1e51ts156', $product->code);
     }
 
     public function test_api_store_rejects_manual_code_that_conflicts_after_normalization(): void
     {
+        $admin = User::factory()->create(['role' => 'admin']);
         $category = ItemCategory::query()->create([
             'code' => 'CAT-01',
             'name' => 'Buku',
@@ -318,6 +332,7 @@ class ProductCodeGenerationTest extends TestCase
             'code' => 'manual-001',
             'name' => 'existing manual',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 1,
             'price_agent' => 1000,
             'price_sales' => 1000,
@@ -325,11 +340,12 @@ class ProductCodeGenerationTest extends TestCase
             'is_active' => true,
         ]);
 
-        $response = $this->postJson('/api/products', [
+        $response = $this->actingAs($admin)->postJson('/api/products', [
             'item_category_id' => $category->id,
             'code' => '  MANUAL -- 001 !! ',
             'name' => 'produk bentrok',
             'unit' => 'exp',
+            'product_type' => 'general',
             'stock' => 1,
             'price_agent' => 1000,
             'price_sales' => 2000,

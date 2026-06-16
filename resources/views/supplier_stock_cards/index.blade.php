@@ -84,21 +84,30 @@
                 href="{{ route('supplier-stock-cards.print', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}"
                 target="_blank"
             >{{ __('txn.print') }}</a>
-            <select class="supplier-stock-toolbar-export" aria-label="Export" onchange="if (this.value) { window.location.href = this.value; this.selectedIndex = 0; }">
-                <option value="">Export</option>
-                <option
-                    data-ajax-sync
-                    data-href-base="{{ route('supplier-stock-cards.export.pdf') }}"
-                    data-href-params="supplier_id,product_id,search,date_from,date_to"
-                    value="{{ route('supplier-stock-cards.export.pdf', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}"
-                >Export PDF</option>
-                <option
-                    data-ajax-sync
-                    data-href-base="{{ route('supplier-stock-cards.export.excel') }}"
-                    data-href-params="supplier_id,product_id,search,date_from,date_to"
-                    value="{{ route('supplier-stock-cards.export.excel', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}"
-                >Export Excel</option>
-            </select>
+            <x-export-menu
+                class="supplier-stock-toolbar-export"
+                mode="location"
+                :options="[
+                    [
+                        'label' => 'Export PDF',
+                        'url' => route('supplier-stock-cards.export.pdf', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]),
+                        'attributes' => [
+                            'data-ajax-sync' => '1',
+                            'data-href-base' => route('supplier-stock-cards.export.pdf'),
+                            'data-href-params' => 'supplier_id,product_id,search,date_from,date_to',
+                        ],
+                    ],
+                    [
+                        'label' => 'Export Excel',
+                        'url' => route('supplier-stock-cards.export.excel', ['supplier_id' => $selectedSupplierId, 'product_id' => $selectedProductId, 'search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo]),
+                        'attributes' => [
+                            'data-ajax-sync' => '1',
+                            'data-href-base' => route('supplier-stock-cards.export.excel'),
+                            'data-href-params' => 'supplier_id,product_id,search,date_from,date_to',
+                        ],
+                    ],
+                ]"
+            />
             <a class="btn process-btn" href="{{ route('products.index') }}?search=&product_type=raw_material">Lihat Stok</a>
             <a class="btn secondary" href="{{ route('supplier-stock-cards.index') }}">{{ __('txn.all') }}</a>
         </form>
@@ -343,4 +352,3 @@
         });
     </script>
 @endsection
-
