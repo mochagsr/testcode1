@@ -488,7 +488,7 @@ Artisan::command('app:normalize-semester-codes {--dry-run}', function () {
     $this->info('Semester normalization completed.');
 })->purpose('Normalize semester codes to academic format S1-2526/S2-2526 based on transaction dates');
 
-Artisan::command('app:db-backup {--path=} {--gzip}', function () {
+Artisan::command('app:db-backup {--path=} {--gzip} {--mysqldump=}', function () {
     $connection = config('database.default');
     $config = config("database.connections.{$connection}");
     $driver = (string) ($config['driver'] ?? '');
@@ -523,26 +523,52 @@ Artisan::command('app:db-backup {--path=} {--gzip}', function () {
     $username = (string) ($config['username'] ?? '');
     $password = (string) ($config['password'] ?? '');
 
+    $mysqldump = (string) ($this->option('mysqldump') ?: env('MYSQLDUMP_PATH') ?: 'mysqldump');
+    $errFile = $target.'.err';
     $command = sprintf(
-        'mysqldump --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false %s > "%s"',
+        '%s --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false %s > "%s" 2> "%s"',
+        escapeshellarg($mysqldump),
         escapeshellarg($host),
         escapeshellarg($port),
         escapeshellarg($username),
         escapeshellarg($password),
         escapeshellarg($database),
-        $target
+        $target,
+        $errFile
     );
     exec($command, $output, $exitCode);
-    if ($exitCode !== 0 || ! File::exists($target)) {
-        $this->error('Backup failed. Ensure mysqldump is available in PATH.');
+    if ($exitCode !== 0 || ! File::exists($target) || File::size($target) === 0) {
+        $stderr = File::exists($errFile) ? trim((string) File::get($errFile)) : '';
+        if (File::exists($errFile)) {
+            File::delete($errFile);
+        }
+        if (File::exists($target)) {
+            File::delete($target);
+        }
+        $hint = 'pastikan mysqldump tersedia (set MYSQLDUMP_PATH atau --mysqldump ke path absolut bila dijalankan via cron)';
+        $this->error('Backup failed (exit '.$exitCode.'): '.($stderr !== '' ? $stderr : $hint).'.');
 
         return 1;
     }
+    if (File::exists($errFile)) {
+        File::delete($errFile);
+    }
 
     if ((bool) $this->option('gzip')) {
+        // Stream-gzip to avoid loading the whole dump into memory on large DBs.
         $gzTarget = $target.'.gz';
-        $content = File::get($target);
-        File::put($gzTarget, gzencode($content, 9));
+        $in = fopen($target, 'rb');
+        $gz = gzopen($gzTarget, 'wb9');
+        if ($in === false || $gz === false) {
+            $this->error('Backup gzip failed: tidak bisa membuka file backup.');
+
+            return 1;
+        }
+        while (! feof($in)) {
+            gzwrite($gz, (string) fread($in, 1048576));
+        }
+        fclose($in);
+        gzclose($gz);
         File::delete($target);
         $target = $gzTarget;
     }
