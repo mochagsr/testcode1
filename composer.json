@@ -25,6 +25,7 @@
         "laravel/sail": "^1.58",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.9",
+        "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^12.0",
         "rector/rector": "^2.4",
         "sandermuller/laravel-fluent-validation-rector": "^1.2"
@@ -60,6 +61,18 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "test:mysql": [
+            "@putenv DB_CONNECTION=mysql",
+            "@putenv DB_DATABASE=tespgpos_test",
+            "@putenv DB_HOST=127.0.0.1",
+            "@putenv DB_PORT=3306",
+            "@putenv DB_USERNAME=root",
+            "@putenv DB_PASSWORD=",
+            "@php artisan test"
+        ],
+        "analyse": [
+            "@php vendor/bin/phpstan analyse --no-progress"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
