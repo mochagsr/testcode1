@@ -8,7 +8,7 @@
         return $direction === 'asc' ? '↑' : '↓';
     };
 @endphp
-<div style="margin-top: 12px;" class="item-categories-table-wrap">
+<x-table-scroll style="margin-top: 12px;">
 <table class="item-categories-table">
     <thead>
     <tr>
@@ -40,7 +40,7 @@
     @endforelse
     </tbody>
 </table>
-</div>
+</x-table-scroll>
 
 <div style="margin-top: 12px;">
     {{ $categories->links() }}
