@@ -386,6 +386,7 @@
                             <option value="">— pilih —</option>
                             <option value="update">Update terbaru</option>
                             <option value="add">Tambah stok</option>
+                            <option value="subtract">Kurangi stok</option>
                             <option value="skip">Lewati</option>
                         </select>
                     </label>
@@ -787,6 +788,7 @@
                 return '<select class="action-menu action-menu-sm js-recon-action">'
                     + '<option value="update">Update terbaru</option>'
                     + '<option value="add">Tambah stok</option>'
+                    + '<option value="subtract">Kurangi stok</option>'
                     + (extraNew ? '<option value="new">Buat baru</option>' : '')
                     + '<option value="skip">Lewati</option>'
                     + '</select>';

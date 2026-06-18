@@ -357,7 +357,7 @@ class MassImportController extends Controller
                     continue;
                 }
 
-                if (! in_array($decision['action'], ['update', 'add'], true)) {
+                if (! in_array($decision['action'], ['update', 'add', 'subtract'], true)) {
                     continue;
                 }
 
@@ -372,7 +372,17 @@ class MassImportController extends Controller
                 }
 
                 $oldStock = (int) $target->stock;
-                $newStock = $decision['action'] === 'add' ? $oldStock + $fileStock : $fileStock;
+                $newStock = match ($decision['action']) {
+                    'add' => $oldStock + $fileStock,
+                    'subtract' => $oldStock - $fileStock,
+                    default => $fileStock,
+                };
+
+                if ($newStock < 0) {
+                    $errors[] = $this->formatImportRowError($rowNumber, 'Stok tidak cukup untuk dikurangi (stok saat ini '.$oldStock.', diminta kurang '.$fileStock.').');
+
+                    continue;
+                }
 
                 $payload = ['stock' => $newStock];
                 if ($updatePrices) {

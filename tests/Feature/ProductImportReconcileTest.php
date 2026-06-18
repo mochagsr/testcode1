@@ -245,6 +245,47 @@ class ProductImportReconcileTest extends TestCase
         $response->assertJsonPath('summary.problems', 2);
     }
 
+    public function test_apply_subtract_reduces_stock(): void
+    {
+        Storage::fake('local');
+        ItemCategory::query()->create(['code' => 'CRD', 'name' => 'CERDAS']);
+        $product = Product::query()->create(['item_category_id' => 1, 'code' => 'CRD-MTK', 'name' => 'MATEMATIKA 1', 'unit' => 'exp', 'stock' => 100, 'price_agent' => 3000, 'price_sales' => 3300, 'price_general' => 12000, 'is_active' => true]);
+
+        $file = $this->makeXlsx([['', 'MATEMATIKA 1', 'CERDAS', 'exp', 30, 3500, 3800, 13000]]);
+        $token = $this->actingAs($this->admin())->post(route('products.import.analyze'), ['import_file' => $file])->json('token');
+
+        $this->actingAs($this->admin())->postJson(route('products.import.apply'), [
+            'token' => $token,
+            'update_prices' => false,
+            'decisions' => [['row' => 2, 'action' => 'subtract', 'target_product_id' => $product->id]],
+        ])->assertOk();
+
+        $product->refresh();
+        $this->assertSame(70, (int) $product->stock);
+        $this->assertDatabaseHas('stock_mutations', ['product_id' => $product->id, 'mutation_type' => 'out', 'quantity' => 30]);
+    }
+
+    public function test_apply_subtract_below_zero_is_blocked(): void
+    {
+        Storage::fake('local');
+        ItemCategory::query()->create(['code' => 'CRD', 'name' => 'CERDAS']);
+        $product = Product::query()->create(['item_category_id' => 1, 'code' => 'CRD-MTK', 'name' => 'MATEMATIKA 1', 'unit' => 'exp', 'stock' => 20, 'price_agent' => 3000, 'price_sales' => 3300, 'price_general' => 12000, 'is_active' => true]);
+
+        $file = $this->makeXlsx([['', 'MATEMATIKA 1', 'CERDAS', 'exp', 50, 3500, 3800, 13000]]);
+        $token = $this->actingAs($this->admin())->post(route('products.import.analyze'), ['import_file' => $file])->json('token');
+
+        $response = $this->actingAs($this->admin())->postJson(route('products.import.apply'), [
+            'token' => $token,
+            'update_prices' => false,
+            'decisions' => [['row' => 2, 'action' => 'subtract', 'target_product_id' => $product->id]],
+        ]);
+
+        $response->assertOk();
+        $this->assertSame(1, count($response->json('errors')));
+        $product->refresh();
+        $this->assertSame(20, (int) $product->stock);
+    }
+
     public function test_analyze_requires_authentication(): void
     {
         $this->post(route('products.import.analyze'))->assertRedirect(route('login'));
