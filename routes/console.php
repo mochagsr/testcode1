@@ -1798,7 +1798,10 @@ Artisan::command('app:http-smoke-test', function () {
             }
 
             return [
-                'ok' => $status >= 200 && $status < 300,
+                // Accept 2xx and 3xx: redirect-back (302) is the correct success
+                // response for PRG POST actions (e.g. archive scan/export). Only
+                // 4xx/5xx indicate a broken route.
+                'ok' => $status >= 200 && $status < 400,
                 'detail' => $detail,
             ];
         } catch (Throwable $throwable) {
