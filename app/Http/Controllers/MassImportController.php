@@ -453,36 +453,58 @@ class MassImportController extends Controller
      */
     private function buildProductImportAnalysis(array $rows, array $headers): array
     {
-        $existingByName = [];
+        $existingByKey = [];
         $existing = Product::query()
             ->with('category:id,name')
             ->get(['id', 'item_category_id', 'code', 'name', 'stock', 'price_agent', 'price_sales', 'price_general']);
         foreach ($existing as $product) {
-            $existingByName[$this->normalizeProductName((string) $product->name)][] = $product;
+            $key = $this->normalizeProductName((string) $product->name).'|'.(int) $product->item_category_id;
+            $existingByKey[$key][] = $product;
         }
 
-        $fileNameCounts = [];
-        foreach ($rows as $row) {
-            $data = $this->mapRow($headers, $row);
+        // Resolve each distinct category once, then prepare every non-empty row.
+        // Product identity here is name + category (the code is derived from both),
+        // so matching and duplicate detection must key on both, not name alone.
+        $categoryCache = [];
+        $resolveCategory = function (string $category) use (&$categoryCache): ?int {
+            $cacheKey = strtolower(trim($category));
+            if (! array_key_exists($cacheKey, $categoryCache)) {
+                $categoryCache[$cacheKey] = $this->resolveCategoryId($category);
+            }
+
+            return $categoryCache[$cacheKey];
+        };
+
+        $prepared = [];
+        $keyCounts = [];
+        foreach ($rows as $rowIndex => $row) {
+            $data = $this->normalizeProductImportNumbers($this->mapRow($headers, $row));
             if ($this->isEmptyRow($data)) {
                 continue;
             }
-            $key = $this->normalizeProductName((string) ($data['name'] ?? ''));
-            if ($key !== '') {
-                $fileNameCounts[$key] = ($fileNameCounts[$key] ?? 0) + 1;
+            $categoryId = $resolveCategory((string) ($data['category'] ?? ''));
+            $name = (string) ($data['name'] ?? '');
+            $matchKey = ($name !== '' && $categoryId !== null)
+                ? $this->normalizeProductName($name).'|'.$categoryId
+                : null;
+            if ($matchKey !== null) {
+                $keyCounts[$matchKey] = ($keyCounts[$matchKey] ?? 0) + 1;
             }
+            $prepared[] = [
+                'row' => $rowIndex + 2,
+                'data' => $data,
+                'category_id' => $categoryId,
+                'match_key' => $matchKey,
+            ];
         }
 
         $new = [];
         $matched = [];
         $problems = [];
 
-        foreach ($rows as $rowIndex => $row) {
-            $rowNumber = $rowIndex + 2;
-            $data = $this->normalizeProductImportNumbers($this->mapRow($headers, $row));
-            if ($this->isEmptyRow($data)) {
-                continue;
-            }
+        foreach ($prepared as $entry) {
+            $rowNumber = $entry['row'];
+            $data = $entry['data'];
 
             $validator = Validator::make($data, $this->productImportRules());
             if ($validator->fails()) {
@@ -491,21 +513,20 @@ class MassImportController extends Controller
                 continue;
             }
 
-            $nameKey = $this->normalizeProductName((string) $data['name']);
-            if (($fileNameCounts[$nameKey] ?? 0) > 1) {
-                $problems[] = $this->makeProblem($rowNumber, $data, 'Nama barang muncul lebih dari sekali di file ini.');
-
-                continue;
-            }
-
-            $categoryId = $this->resolveCategoryId((string) $data['category']);
-            if ($categoryId === null) {
+            if ($entry['category_id'] === null) {
                 $problems[] = $this->makeProblem($rowNumber, $data, 'Kategori tidak terdaftar. Samakan nama kategori dengan data master.');
 
                 continue;
             }
 
-            $candidates = $existingByName[$nameKey] ?? [];
+            $matchKey = (string) $entry['match_key'];
+            if (($keyCounts[$matchKey] ?? 0) > 1) {
+                $problems[] = $this->makeProblem($rowNumber, $data, 'Nama + kategori yang sama muncul lebih dari sekali di file ini.');
+
+                continue;
+            }
+
+            $candidates = $existingByKey[$matchKey] ?? [];
             if (count($candidates) === 0) {
                 $new[] = [
                     'row' => $rowNumber,
@@ -522,7 +543,7 @@ class MassImportController extends Controller
                 $problems[] = $this->makeProblem(
                     $rowNumber,
                     $data,
-                    'Ada '.count($candidates).' barang dengan nama sama di database — pilih manual.',
+                    'Ada '.count($candidates).' barang dengan nama + kategori sama di database — pilih manual.',
                     array_map(fn ($product): array => [
                         'id' => (int) $product->id,
                         'code' => (string) $product->code,

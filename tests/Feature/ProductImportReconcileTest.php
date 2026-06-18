@@ -213,6 +213,38 @@ class ProductImportReconcileTest extends TestCase
         $this->assertStringContainsString('spreadsheet', strtolower((string) $response->headers->get('content-type')));
     }
 
+    public function test_same_name_different_category_is_not_flagged_as_duplicate(): void
+    {
+        Storage::fake('local');
+        ItemCategory::query()->create(['code' => 'CRD', 'name' => 'CERDAS']);
+        ItemCategory::query()->create(['code' => 'CRD64', 'name' => 'CERDAS64']);
+
+        $file = $this->makeXlsx([
+            ['', 'PAI 7 EDISI 1 HAL64 SMT 1 25/26', 'CERDAS', 'exp', 100, 3500, 3800, 13000],
+            ['', 'PAI 7 EDISI 1 HAL64 SMT 1 25/26', 'CERDAS64', 'exp', 200, 3500, 3800, 13000],
+        ]);
+
+        $response = $this->actingAs($this->admin())->post(route('products.import.analyze'), ['import_file' => $file]);
+        $response->assertOk();
+        $response->assertJsonPath('summary.problems', 0);
+        $response->assertJsonPath('summary.new', 2);
+    }
+
+    public function test_same_name_and_same_category_twice_is_flagged(): void
+    {
+        Storage::fake('local');
+        ItemCategory::query()->create(['code' => 'CRD', 'name' => 'CERDAS']);
+
+        $file = $this->makeXlsx([
+            ['', 'PAI 7 EDISI 1 HAL64 SMT 1 25/26', 'CERDAS', 'exp', 100, 3500, 3800, 13000],
+            ['', 'PAI 7 EDISI 1 HAL64 SMT 1 25/26', 'CERDAS', 'exp', 200, 3500, 3800, 13000],
+        ]);
+
+        $response = $this->actingAs($this->admin())->post(route('products.import.analyze'), ['import_file' => $file]);
+        $response->assertOk();
+        $response->assertJsonPath('summary.problems', 2);
+    }
+
     public function test_analyze_requires_authentication(): void
     {
         $this->post(route('products.import.analyze'))->assertRedirect(route('login'));
