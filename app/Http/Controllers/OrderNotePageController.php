@@ -21,6 +21,7 @@ use App\Support\SemesterBookService;
 use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use App\Http\Requests\StoreOrderNoteRequest;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -432,25 +433,9 @@ class OrderNotePageController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreOrderNoteRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'note_date' => FluentRule::date()->required(),
-            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
-            'customer_name' => FluentRule::string()->required()->max(150),
-            'customer_phone' => FluentRule::string()->nullable()->max(30),
-            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
-            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
-            'address' => FluentRule::string()->nullable(),
-            'city' => FluentRule::string()->nullable()->max(100),
-            'notes' => FluentRule::string()->nullable(),
-            'items' => FluentRule::array()->required()->min(1),
-            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
-            'items.*.product_code' => FluentRule::string()->nullable()->max(60),
-            'items.*.product_name' => FluentRule::string()->required()->max(200),
-            'items.*.quantity' => FluentRule::integer()->required()->min(1),
-            'items.*.notes' => FluentRule::string()->nullable(),
-        ]);
+        $data = $request->validated();
 
         $customer = Customer::query()
             ->onlyOrderFormColumns()

@@ -22,6 +22,7 @@ use App\Support\SemesterBookService;
 use App\Support\TransactionType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use App\Http\Requests\StoreSalesReturnRequest;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -275,19 +276,9 @@ class SalesReturnPageController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreSalesReturnRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
-            'return_date' => FluentRule::date()->required(),
-            'semester_period' => FluentRule::string()->nullable()->max(30),
-            'transaction_type' => FluentRule::field()->nullable()->rule('in:product,printing'),
-            'customer_printing_subtype_id' => FluentRule::integer()->nullable()->exists('customer_printing_subtypes', 'id'),
-            'reason' => FluentRule::string()->nullable(),
-            'items' => FluentRule::array()->required()->min(1),
-            'items.*.product_id' => FluentRule::integer()->required()->exists('products', 'id'),
-            'items.*.quantity' => FluentRule::integer()->required()->min(1),
-        ]);
+        $data = $request->validated();
         $normalizedSemester = $this->semesterBookService()->normalizeSemester((string) ($data['semester_period'] ?? ''));
         $semesterFromDate = $this->semesterBookService()->semesterFromDate((string) $data['return_date']);
         $selectedSemester = $normalizedSemester ?? $semesterFromDate ?? $this->defaultSemesterPeriod();

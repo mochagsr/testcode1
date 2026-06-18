@@ -20,6 +20,7 @@ use App\Support\UploadedImageCompressor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use App\Http\Requests\StoreReceivablePaymentRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -135,21 +136,9 @@ class ReceivablePaymentPageController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreReceivablePaymentRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
-            'payment_date' => FluentRule::date()->required(),
-            'customer_address' => FluentRule::string()->nullable()->max(255),
-            'amount' => FluentRule::integer()->required()->min(1),
-            'payment_description' => FluentRule::string()->required()->max(120),
-            'payment_proof_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
-            'preferred_invoice_id' => FluentRule::integer()->nullable()->exists('sales_invoices', 'id'),
-            'return_to' => FluentRule::string()->nullable()->max(500),
-            'customer_signature' => FluentRule::string()->required()->max(120),
-            'user_signature' => FluentRule::string()->required()->max(120),
-            'notes' => FluentRule::string()->nullable(),
-        ]);
+        $data = $request->validated();
 
         $paymentProofPhotoPath = null;
         if ($request->hasFile('payment_proof_photo')) {

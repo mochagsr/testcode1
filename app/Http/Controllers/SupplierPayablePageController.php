@@ -22,6 +22,7 @@ use App\Support\UploadedImageCompressor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use App\Http\Requests\StoreSupplierPaymentRequest;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -94,18 +95,9 @@ class SupplierPayablePageController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreSupplierPaymentRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'supplier_id' => FluentRule::integer()->required()->exists('suppliers', 'id'),
-            'payment_date' => FluentRule::date()->required(),
-            'proof_number' => FluentRule::string()->nullable()->max(80),
-            'payment_proof_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
-            'amount' => FluentRule::integer()->required()->min(1),
-            'supplier_signature' => FluentRule::string()->nullable()->max(120),
-            'user_signature' => FluentRule::string()->nullable()->max(120),
-            'notes' => FluentRule::string()->nullable(),
-        ]);
+        $data = $request->validated();
 
         $supplierYear = $this->semesterBookService->yearFromDate((string) $data['payment_date']);
         $supplierMonth = (int) Carbon::parse((string) $data['payment_date'])->format('n');
