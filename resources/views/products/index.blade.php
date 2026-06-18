@@ -110,6 +110,22 @@
             justify-content: flex-end;
             margin-top: 14px;
         }
+        /* Reconciliation modal: compact rows + smaller checkboxes */
+        #product-reconcile-body table { font-size: 12px; }
+        #product-reconcile-body th,
+        #product-reconcile-body td { padding: 5px 8px; }
+        #product-reconcile-body input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            margin: 0;
+            vertical-align: middle;
+        }
+        #product-reconcile-body select.action-menu-sm {
+            min-height: 28px;
+            padding: 3px 6px;
+            font-size: 12px;
+        }
         .products-table-wrap {
             overflow-x: auto;
         }
