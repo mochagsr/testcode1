@@ -175,6 +175,9 @@
                 <button type="submit">{{ __('ui.search') }}</button>
             </form>
             <div class="customers-toolbar-actions">
+                @if(($currentUser?->role ?? '') === 'admin')
+                    <a class="btn info-btn" href="{{ route('customers-web.export.full') }}">Export Data (.xlsx)</a>
+                @endif
                 @if($canImportCustomers)
                     <button type="button" class="btn process-btn" id="customer-import-open">Import Data</button>
                 @endif

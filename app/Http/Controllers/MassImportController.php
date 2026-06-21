@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -59,6 +60,60 @@ class MassImportController extends Controller
             ['nama', 'level_customer', 'no_hp_1', 'no_hp_2', 'kota', 'alamat', 'catatan'],
             ['Toko Sumber Ilmu', 'Agen', '08123456789', '08234567890', 'Malang', 'Jl. Soekarno Hatta 10', 'Customer lama'],
         ], 'Customers');
+    }
+
+    /**
+     * Export every customer to an .xlsx that matches the import template,
+     * so the data can be re-imported as-is (e.g. when moving servers).
+     * Phone columns are written as text to preserve leading zeros.
+     */
+    public function exportCustomers(): StreamedResponse
+    {
+        $header = ['nama', 'level_customer', 'no_hp_1', 'no_hp_2', 'kota', 'alamat', 'catatan'];
+        $filename = 'export-customers-'.now('Asia/Jakarta')->format('Ymd-His').'.xlsx';
+
+        return response()->streamDownload(function () use ($header): void {
+            $spreadsheet = new Spreadsheet;
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Customers');
+            $sheet->fromArray([$header], null, 'A1');
+
+            $rowIndex = 2;
+            Customer::query()
+                ->with('level:id,name')
+                ->orderBy('name')
+                ->orderBy('id')
+                ->chunk(500, function ($customers) use ($sheet, &$rowIndex): void {
+                    foreach ($customers as $customer) {
+                        $values = [
+                            (string) $customer->name,
+                            (string) ($customer->level->name ?? ''),
+                            (string) $customer->phone,
+                            (string) $customer->phone_secondary,
+                            (string) $customer->city,
+                            (string) $customer->address,
+                            (string) $customer->notes,
+                        ];
+                        $col = 1;
+                        foreach ($values as $value) {
+                            $sheet->setCellValueExplicit([$col, $rowIndex], $value, DataType::TYPE_STRING);
+                            $col++;
+                        }
+                        $rowIndex++;
+                    }
+                });
+
+            foreach (range(1, count($header)) as $columnIndex) {
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($columnIndex))->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     public function templateCategories(): StreamedResponse

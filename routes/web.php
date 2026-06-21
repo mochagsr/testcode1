@@ -351,6 +351,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/customers-web/level/{customerLevel}', [CustomerPageController::class, 'levelCustomers'])->middleware('perm:masters.customers.view')->name('customers-web.level-customers');
     Route::get('/customers-web/pdf', [CustomerPageController::class, 'exportPdf'])->middleware('perm:masters.customers.view')->name('customers-web.export.pdf');
     Route::get('/customers-web/export.csv', [CustomerPageController::class, 'exportCsv'])->middleware('perm:masters.customers.view')->name('customers-web.export.csv');
+    Route::get('/customers-web/export/full', [MassImportController::class, 'exportCustomers'])->middleware('admin')->name('customers-web.export.full');
     Route::get('/customers-web/import/template', [MassImportController::class, 'templateCustomers'])->middleware('perm:customers.import')->name('customers-web.import.template');
     Route::post('/customers-web/import', [MassImportController::class, 'importCustomers'])->middleware('perm:customers.import')->name('customers-web.import');
     Route::get('/customers-web/create', [CustomerPageController::class, 'create'])->middleware('perm:customers.create')->name('customers-web.create');
