@@ -79,6 +79,50 @@ ERP berbasis Laravel untuk distribusi/penerbitan dengan modul:
 5. `php artisan db:seed --force`
 6. `php artisan serve`
 
+## Redis (opsional)
+Secara default aplikasi jalan tanpa Redis (cache/session/queue memakai driver `database`), jadi **tidak wajib**. Redis berguna saat trafik naik atau ingin cache/session/queue lebih cepat. Aplikasi sudah **siap Redis** — saat pindah server cukup ubah `.env`, tidak perlu ubah kode. Client `predis` (pure-PHP) sudah terpasang sehingga **tidak perlu meng-compile extension** apa pun.
+
+### 1. Pasang & jalankan server Redis
+- Ubuntu / aaPanel:
+  ```bash
+  sudo apt update && sudo apt install -y redis-server
+  sudo systemctl enable --now redis-server
+  redis-cli ping     # harus balas: PONG
+  ```
+  (Di aaPanel bisa juga lewat App Store → install Redis.)
+- Windows / Laragon: Menu → Tools → Redis, atau jalankan `redis-server.exe` dari `laragon/bin/redis/...`.
+
+### 2. Ubah `.env`
+```env
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+
+REDIS_CLIENT=predis        # predis = paling mudah (tanpa extension). phpredis = lebih cepat tapi butuh extension PHP "redis"
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null        # isi kalau server Redis pakai password
+REDIS_PORT=6379
+```
+Lalu segarkan cache config:
+```bash
+php artisan optimize:clear && php artisan config:cache
+```
+
+### 3. Jalankan ulang queue worker
+Kalau `QUEUE_CONNECTION=redis`, worker harus dijalankan ulang agar membaca queue Redis (lihat bagian Deploy untuk worker permanen):
+```bash
+php artisan queue:work
+```
+
+### 4. Pastikan jalan
+```bash
+php artisan tinker --execute "Cache::put('t','ok',60); echo Cache::get('t'); echo PHP_EOL.get_class(Cache::store()->getStore());"
+```
+Harus mencetak `ok` dan `Illuminate\Cache\RedisStore`. Kalau muncul error koneksi, cek server Redis hidup (`redis-cli ping`) dan `REDIS_HOST/PORT/PASSWORD`.
+
+### Kembali tanpa Redis
+Cukup set ketiga baris kembali ke `database` (atau `file`), lalu `php artisan optimize:clear && php artisan config:cache`.
+
 ## Akun default setelah seed
 - Admin
   - username: `admin`

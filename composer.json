@@ -12,6 +12,7 @@
         "laravel/tinker": "^3.0",
         "maatwebsite/excel": "^3.1",
         "phpoffice/phpspreadsheet": "^1.30.4",
+        "predis/predis": "^2.3",
         "sandermuller/laravel-fluent-validation": "^1.25",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-backup": "^10.2",
