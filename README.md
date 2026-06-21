@@ -120,6 +120,23 @@ php artisan tinker --execute "Cache::put('t','ok',60); echo Cache::get('t'); ech
 ```
 Harus mencetak `ok` dan `Illuminate\Cache\RedisStore`. Kalau muncul error koneksi, cek server Redis hidup (`redis-cli ping`) dan `REDIS_HOST/PORT/PASSWORD`.
 
+### Redis di server/LXC terpisah (mis. Proxmox)
+Kalau Redis berjalan di container/host lain (bukan localhost), aplikasi tidak perlu diubah — cukup arahkan `.env` ke IP-nya:
+```env
+REDIS_HOST=10.0.0.50        # IP container/LXC Redis
+REDIS_PORT=6379
+REDIS_PASSWORD=ganti_password_kuat   # WAJIB karena Redis terbuka di jaringan
+REDIS_CLIENT=predis
+```
+Di sisi **container Redis** (`/etc/redis/redis.conf`), untuk aman + tahan lama dengan maintenance minimal:
+- `bind 0.0.0.0` (atau IP bridge container) — agar bisa diakses app.
+- `protected-mode yes` **dan** `requirepass ganti_password_kuat` — jangan buka Redis tanpa password di jaringan.
+- Batasi firewall: hanya izinkan port `6379` dari IP container aplikasi.
+- `appendonly yes` (AOF) — data cache/queue/session bertahan saat container restart.
+- **Hati-hati `maxmemory-policy`**: kalau Redis ini juga dipakai untuk **queue & session** (bukan cache saja), jangan pakai eviction agresif seperti `allkeys-lru` — job/sesi bisa terbuang saat memori penuh. Untuk satu instance gabungan, biarkan default `noeviction` dan sediakan RAM cukup; kalau mau aman penuh, pisahkan: satu Redis untuk cache (boleh `allkeys-lru`), satu untuk queue/session (`noeviction` + AOF).
+
+Verifikasi dari server aplikasi: `redis-cli -h 10.0.0.50 -a ganti_password_kuat ping` harus balas `PONG`.
+
 ### Kembali tanpa Redis
 Cukup set ketiga baris kembali ke `database` (atau `file`), lalu `php artisan optimize:clear && php artisan config:cache`.
 
