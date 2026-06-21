@@ -36,6 +36,42 @@
     </style>
 
     <div class="ops-grid">
+    @if($systemAlerts->isNotEmpty() || $schedulerStale)
+    <div class="card ops-col-12" style="border-color:#f59e0b;">
+        <h3 style="margin-top:0; color:#b45309;">⚠ Peringatan Sistem ({{ $systemAlerts->count() + ($schedulerStale ? 1 : 0) }})</h3>
+        @if($schedulerStale)
+            <div class="alert alert-error" style="margin:0 0 10px;">
+                Scheduler (cron) tampak <strong>tidak berjalan</strong>. Terakhir aktif:
+                {{ $schedulerLastRun ? $schedulerLastRun->diffForHumans() : 'belum pernah' }}.
+                Otomasi (backup, integrity check, cleanup) berhenti sampai cron <code>schedule:run</code> aktif kembali.
+            </div>
+        @endif
+        @if($systemAlerts->isNotEmpty())
+        <div class="table-mobile-scroll">
+        <table class="ops-kv" style="width:100%;">
+            <thead><tr><th style="width:auto;">Peringatan</th><th>Waktu</th><th>Aksi</th></tr></thead>
+            <tbody>
+            @foreach($systemAlerts as $alert)
+                <tr>
+                    <td>
+                        <strong>{{ $alert->title }}</strong>
+                        @if($alert->message)<div class="muted" style="font-size:12px;">{{ $alert->message }}</div>@endif
+                    </td>
+                    <td style="white-space:nowrap;">{{ optional($alert->updated_at)->format('d-m-Y H:i') }}</td>
+                    <td>
+                        <form method="post" action="{{ route('ops-health.alerts.resolve', $alert) }}">
+                            @csrf
+                            <button type="submit" class="btn secondary" style="min-height:28px; padding:3px 10px;">Tandai selesai</button>
+                        </form>
+                    </td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+        </div>
+        @endif
+    </div>
+    @endif
     <div class="card ops-col-12">
         <h1 class="page-title" style="margin:0 0 8px 0;">Ops Health</h1>
         @if (session('ops_success'))
@@ -51,6 +87,7 @@
             <tr><th>Debug Mode</th><td>{{ $appDebug ? 'ON' : 'OFF' }}</td></tr>
             <tr><th>DB Connection</th><td>{{ $dbConnection }}</td></tr>
             <tr><th>Failed Jobs</th><td>{{ $failedJobs }}</td></tr>
+            <tr><th>Scheduler (cron)</th><td>{!! $schedulerStale ? '<span class="ops-metric-bad">TIDAK AKTIF</span>' : '<span class="ops-metric-ok">AKTIF</span>' !!} — terakhir: {{ $schedulerLastRun ? $schedulerLastRun->format('d-m-Y H:i:s') : 'belum pernah' }}</td></tr>
             <tr><th>Queued Report Tasks</th><td>{{ $pendingReportTasks }}</td></tr>
             <tr><th>Pending Approval</th><td>{{ $pendingApprovals }}</td></tr>
             <tr><th>Latest Backup File</th><td>{{ $latestBackup ?: '-' }}</td></tr>

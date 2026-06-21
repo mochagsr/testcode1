@@ -11,6 +11,7 @@ use App\Models\OrderNote;
 use App\Models\OutgoingTransaction;
 use App\Models\PerformanceProbeLog;
 use App\Models\Product;
+use App\Models\SystemAlert;
 use App\Models\ReportExportTask;
 use App\Models\SalesInvoice;
 use App\Models\Supplier;
@@ -209,6 +210,11 @@ class DashboardController extends Controller
             ? $this->pendingOrderNotesPaginator($pendingOrderNotesPerPage, $pendingOrderNotesPageName)
             : $this->emptyPaginator($pendingOrderNotesPerPage, $currentPath, $currentQuery, $pendingOrderNotesPageName);
 
+        $isAdmin = ($user?->canAccess('settings.admin') ?? false) || ((string) ($user?->role ?? '') === 'admin');
+        $systemAlertCount = ($isAdmin && Schema::hasTable('system_alerts'))
+            ? (int) SystemAlert::query()->unresolved()->count()
+            : 0;
+
         return view('dashboard', [
             'summary' => $summary,
             'uncollectedCustomers' => $uncollectedCustomers,
@@ -221,6 +227,7 @@ class DashboardController extends Controller
             'archiveUatChecklist' => $archiveUatChecklist,
             'quickLinks' => $quickLinks,
             'readyToCloseSemesters' => $readyToCloseSemesters,
+            'systemAlertCount' => $systemAlertCount,
         ]);
     }
 

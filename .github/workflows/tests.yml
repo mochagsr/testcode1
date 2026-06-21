@@ -59,6 +59,11 @@ jobs:
         if: matrix.db == 'sqlite'
         run: composer analyse
 
+      - name: Dependency vulnerability audit (report only)
+        if: matrix.db == 'sqlite'
+        continue-on-error: true
+        run: composer audit
+
       - name: Prepare sqlite
         if: matrix.db == 'sqlite'
         run: |

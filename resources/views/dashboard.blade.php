@@ -104,6 +104,13 @@
     </style>
     <h1 class="page-title">{{ __('ui.dashboard_title') }}</h1>
 
+    @if(($systemAlertCount ?? 0) > 0)
+        <div class="alert alert-error" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span>⚠ Ada <strong>{{ $systemAlertCount }}</strong> peringatan sistem yang belum ditangani (mis. tugas terjadwal gagal).</span>
+            <a class="btn secondary" href="{{ route('ops-health.index') }}" style="min-height:30px; padding:5px 12px;">Lihat Ops Health</a>
+        </div>
+    @endif
+
     @if($showAdminDashboard)
         <div class="grid">
             <div class="stat">

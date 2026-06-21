@@ -293,6 +293,40 @@ Catatan aaPanel:
 - untuk first deploy, tetap disarankan mulai dari `Terminal + git clone`
 - `Create for Git` aman dipakai juga, tapi tetap harus dilanjutkan dengan setup Laravel lengkap
 
+## Queue worker & scheduler (untuk minimal maintenance)
+Agar otomasi jalan terus tanpa di-babysit:
+
+**Scheduler (cron, tiap menit):**
+```cron
+* * * * * cd /www/wwwroot/NAMA-SITE && php artisan schedule:run >> /dev/null 2>&1
+```
+Aplikasi mencatat "detak" scheduler tiap menit. Kalau cron mati, halaman **Sistem > Ops Health** dan banner dashboard admin akan menandai **"Scheduler TIDAK AKTIF"** otomatis.
+
+**Queue worker (disarankan systemd, auto-restart):** lebih andal daripada cron `queue:work --stop-when-empty`. Buat `/etc/systemd/system/erpos-worker.service`:
+```ini
+[Unit]
+Description=ERPOS queue worker
+After=network.target
+
+[Service]
+User=www-data
+Restart=always
+RestartSec=5
+WorkingDirectory=/www/wwwroot/NAMA-SITE
+ExecStart=/usr/bin/php artisan queue:work --queue=exports,default --sleep=3 --tries=3 --max-time=3600
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now erpos-worker
+sudo systemctl status erpos-worker
+```
+Worker yang sama otomatis melayani queue Redis kalau `QUEUE_CONNECTION=redis`. Setelah deploy yang mengubah kode job, restart: `sudo systemctl restart erpos-worker`.
+
+**Notifikasi kegagalan (in-app, admin):** kalau ada tugas terjadwal yang gagal (mis. backup), aplikasi membuat **peringatan sistem** yang muncul sebagai banner di dashboard admin dan daftar di **Ops Health** (bisa "Tandai selesai"). Jadi kegagalan tidak lagi senyap.
+
 ## Panduan user/admin siap cetak
 - Ringkas siap print:
   - `docs/USER_PRINT_README.md`

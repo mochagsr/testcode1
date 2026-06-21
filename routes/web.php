@@ -410,6 +410,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/ops-health', [OpsHealthController::class, 'index'])->middleware('perm:settings.admin')->name('ops-health.index');
     Route::post('/ops-health/integrity-check', [OpsHealthController::class, 'runIntegrityCheck'])->middleware('perm:settings.admin')->name('ops-health.integrity-check');
     Route::post('/ops-health/check-financial', [OpsHealthController::class, 'runFinancialCheck'])->middleware('perm:settings.admin')->name('ops-health.check-financial');
+    Route::post('/ops-health/alerts/{alert}/resolve', [OpsHealthController::class, 'resolveAlert'])->middleware('perm:settings.admin')->name('ops-health.alerts.resolve');
     Route::get('/archive-data', [ArchiveDataPageController::class, 'index'])->middleware('perm:settings.admin')->name('archive-data.index');
     Route::get('/archive-data/download', [ArchiveDataPageController::class, 'download'])->middleware('perm:settings.admin')->name('archive-data.download');
     Route::post('/archive-data/scan', [ArchiveDataPageController::class, 'scan'])->middleware('perm:settings.admin')->name('archive-data.scan');

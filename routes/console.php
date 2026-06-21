@@ -19,6 +19,7 @@ use App\Models\SchoolBulkTransaction;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use App\Models\SupplierPayment;
+use App\Models\SystemAlert;
 use App\Models\User;
 use App\Services\AccountingService;
 use App\Support\AppCache;
@@ -31,6 +32,7 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schedule;
@@ -981,8 +983,10 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
         return 1;
     }
 
+    $mysqldump = (string) (env('MYSQLDUMP_PATH') ?: 'mysqldump');
     $dumpCommand = sprintf(
-        'mysqldump --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false --default-character-set=utf8mb4 %s > "%s"',
+        '%s --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false --default-character-set=utf8mb4 %s > "%s"',
+        escapeshellarg($mysqldump),
         escapeshellarg($host),
         escapeshellarg($port),
         escapeshellarg($username),
@@ -992,7 +996,7 @@ Artisan::command('app:sqlite-to-mysql-snapshot {--source=} {--target=} {--temp-d
     );
     exec($dumpCommand, $dumpOutput, $dumpExitCode);
     if ($dumpExitCode !== 0 || ! File::exists($target)) {
-        $this->error('mysqldump failed. Ensure mysqldump is available in PATH.');
+        $this->error('mysqldump failed. Pastikan mysqldump tersedia atau set MYSQLDUMP_PATH ke path absolut.');
 
         return 1;
     }
@@ -1067,8 +1071,10 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
         return 1;
     }
 
+    $mysqldump = (string) (env('MYSQLDUMP_PATH') ?: 'mysqldump');
     $dumpCommand = sprintf(
-        'mysqldump --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false --default-character-set=utf8mb4 %s > "%s"',
+        '%s --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --lock-tables=false --default-character-set=utf8mb4 %s > "%s"',
+        escapeshellarg($mysqldump),
         escapeshellarg($host),
         escapeshellarg($port),
         escapeshellarg($username),
@@ -1078,7 +1084,7 @@ Artisan::command('app:mysql-prod-bootstrap {--target=} {--temp-db=} {--mysql-hos
     );
     exec($dumpCommand, $dumpOutput, $dumpExitCode);
     if ($dumpExitCode !== 0 || ! File::exists($target)) {
-        $this->error('mysqldump failed. Ensure mysqldump is available in PATH.');
+        $this->error('mysqldump failed. Pastikan mysqldump tersedia atau set MYSQLDUMP_PATH ke path absolut.');
 
         return 1;
     }
@@ -2324,13 +2330,37 @@ Artisan::command('app:report-exports-fix-stuck {--minutes=30}', function () {
     return 0;
 })->purpose('Mark processing export tasks as failed when stuck for too long');
 
-Schedule::command('app:db-backup --gzip')->dailyAt('01:00');
-Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00');
-Schedule::command('app:archive:review')->monthlyOn(1, '02:30');
-Schedule::command('app:integrity-check')->dailyAt('03:00');
-Schedule::command('app:financial-rebuild')->dailyAt('03:30');
-Schedule::command('app:system-logs-cleanup')->dailyAt('04:00');
+// Raise an admin-visible system alert whenever a scheduled task fails, so a
+// silent failure (e.g. backup) surfaces in-app instead of only in the log.
+$alertOnFailure = static function (string $command): Closure {
+    return static function () use ($command): void {
+        SystemAlert::raise(
+            type: 'scheduled_failure',
+            title: 'Tugas terjadwal gagal: '.$command,
+            message: 'Perintah "'.$command.'" gagal saat dijalankan terjadwal. Periksa log aplikasi untuk detail.',
+            level: 'critical',
+            context: ['command' => $command, 'failed_at' => now()->toDateTimeString()],
+            dedupeKey: 'scheduled_failure:'.$command,
+        );
+    };
+};
+
+Schedule::command('app:db-backup --gzip')->dailyAt('01:00')->onFailure($alertOnFailure('app:db-backup'));
+Schedule::command('app:db-restore-test')->weeklyOn(0, '02:00')->onFailure($alertOnFailure('app:db-restore-test'));
+Schedule::command('app:archive:review')->monthlyOn(1, '02:30')->onFailure($alertOnFailure('app:archive:review'));
+Schedule::command('app:integrity-check')->dailyAt('03:00')->onFailure($alertOnFailure('app:integrity-check'));
+Schedule::command('app:financial-rebuild')->dailyAt('03:30')->onFailure($alertOnFailure('app:financial-rebuild'));
+Schedule::command('app:system-logs-cleanup')->dailyAt('04:00')->onFailure($alertOnFailure('app:system-logs-cleanup'));
 if (! app()->environment('production')) {
     Schedule::command('app:load-test-light --loops=80 --search=ang')->dailyAt('04:30');
 }
-Schedule::command('app:report-exports-fix-stuck --minutes=30')->hourly();
+Schedule::command('app:report-exports-fix-stuck --minutes=30')->hourly()->onFailure($alertOnFailure('app:report-exports-fix-stuck'));
+
+// Keep queue bookkeeping tables from growing forever (14-day retention).
+Schedule::command('queue:prune-failed --hours=336')->dailyAt('04:10');
+Schedule::command('queue:prune-batches --hours=336')->dailyAt('04:15');
+
+// Heartbeat: record the last scheduler tick so Ops Health can detect a dead cron.
+Schedule::call(static function (): void {
+    Cache::forever('ops.scheduler_last_run', now()->toIso8601String());
+})->everyMinute()->name('ops-scheduler-heartbeat')->withoutOverlapping();

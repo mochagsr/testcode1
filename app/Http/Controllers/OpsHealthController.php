@@ -8,9 +8,13 @@ use App\Models\ApprovalRequest;
 use App\Models\IntegrityCheckLog;
 use App\Models\PerformanceProbeLog;
 use App\Models\ReportExportTask;
+use App\Models\SystemAlert;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
@@ -56,7 +60,18 @@ class OpsHealthController extends Controller
 
         $latestSystemCleanup = $this->latestSystemCleanupSummary();
 
+        $schedulerLastRunRaw = Cache::get('ops.scheduler_last_run');
+        $schedulerLastRun = $schedulerLastRunRaw ? Carbon::parse((string) $schedulerLastRunRaw) : null;
+        $schedulerStale = $schedulerLastRun === null || $schedulerLastRun->lt(now()->subMinutes(10));
+
+        $systemAlerts = Schema::hasTable('system_alerts')
+            ? SystemAlert::query()->unresolved()->latest('id')->limit(50)->get()
+            : collect();
+
         return view('ops_health.index', [
+            'systemAlerts' => $systemAlerts,
+            'schedulerLastRun' => $schedulerLastRun,
+            'schedulerStale' => $schedulerStale,
             'failedJobs' => $failedJobs,
             'pendingReportTasks' => $pendingReportTasks,
             'pendingApprovals' => $pendingApprovals,
@@ -71,6 +86,16 @@ class OpsHealthController extends Controller
             'latestPerformanceProbe' => $latestPerformanceProbe,
             'latestSystemCleanup' => $latestSystemCleanup,
         ]);
+    }
+
+    public function resolveAlert(SystemAlert $alert): RedirectResponse
+    {
+        $alert->forceFill([
+            'resolved_at' => now(),
+            'resolved_by_user_id' => Auth::id(),
+        ])->save();
+
+        return back()->with('ops_success', 'Peringatan ditandai selesai.');
     }
 
     public function runIntegrityCheck(): RedirectResponse
