@@ -195,6 +195,33 @@
         <div class="card">
             <h3 style="margin: 0;">{{ __('txn.items') }}</h3>
             <p class="muted" style="margin-top: 8px;">{{ __('school_bulk.bulk_items_note') }}</p>
+
+            <div style="margin-top: 10px; padding: 10px; border: 1px dashed var(--border); border-radius: 10px;">
+                <label class="flex" style="gap: 8px; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="use-shared-items" style="width:auto; margin:0;">
+                    <strong>Barang sama untuk semua sekolah</strong>
+                </label>
+                <p class="muted" style="margin: 6px 0 0;">Isi daftar barang sekali di sini; tiap sekolah otomatis terisi barang ini, Anda tinggal mengisi jumlahnya per sekolah. Tetap bisa tambah/hapus barang di tiap sekolah.</p>
+                <div id="shared-items-wrap" style="display:none; margin-top: 10px;">
+                    <div class="school-table-scroll">
+                        <table id="shared-items-table" class="school-items-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('txn.product') }}</th>
+                                    <th>{{ __('txn.price') }}</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="flex" style="gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn process-soft-btn" id="shared-add-item">{{ __('txn.add_row') }}</button>
+                        <button type="button" class="btn process-btn" id="shared-apply">Terapkan ke semua sekolah</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="school-item-cards" style="margin-top: 10px;"></div>
             <p class="muted" id="school-item-empty-hint" style="margin-top: 10px;">{{ __('school_bulk.fill_school_locations') }}</p>
         </div>
@@ -995,6 +1022,97 @@
                 reindexSchoolItemRows(cardEl, uid);
             }
 
+            // ---- Shared item template: "barang sama untuk semua sekolah" ----
+            const useSharedItemsToggle = document.getElementById('use-shared-items');
+            const sharedItemsWrap = document.getElementById('shared-items-wrap');
+            const sharedItemsTable = document.getElementById('shared-items-table');
+            const sharedAddItemBtn = document.getElementById('shared-add-item');
+            const sharedApplyBtn = document.getElementById('shared-apply');
+
+            function sharedItemsActive() {
+                return !!(useSharedItemsToggle && useSharedItemsToggle.checked);
+            }
+
+            function addSharedItemRow(initial = {}) {
+                const tbody = sharedItemsTable?.querySelector('tbody');
+                if (!tbody) {
+                    return;
+                }
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <input type="text" class="product-name" value="${initial.product_name || ''}" autocomplete="off">
+                        <input type="hidden" class="product-id" value="${initial.product_id || ''}">
+                        <input type="hidden" class="product-unit" value="${initial.unit || ''}">
+                    </td>
+                    <td><input type="text" inputmode="numeric" class="product-price js-thousand-input" value="${initial.unit_price || ''}" style="max-width: 110px;"></td>
+                    <td><button type="button" class="btn danger-btn remove-shared-item">{{ __('txn.remove') }}</button></td>
+                `;
+                tr.querySelectorAll('.js-thousand-input').forEach((input) => window.PgposNumberFormat.formatInput(input));
+                const nameInput = tr.querySelector('.product-name');
+                const idInput = tr.querySelector('.product-id');
+                const unitInput = tr.querySelector('.product-unit');
+                const priceInput = tr.querySelector('.product-price');
+                createProductAutocomplete(nameInput, idInput, (product) => {
+                    if (!product) {
+                        return;
+                    }
+                    unitInput.value = product.unit || '';
+                    if (!priceInput.value) {
+                        priceInput.value = Math.round(productPriceForCurrentCustomer(product));
+                        window.PgposNumberFormat.formatInput(priceInput);
+                    }
+                });
+                tr.querySelector('.remove-shared-item').addEventListener('click', () => tr.remove());
+                tbody.appendChild(tr);
+            }
+
+            function collectSharedItems() {
+                const tbody = sharedItemsTable?.querySelector('tbody');
+                if (!tbody) {
+                    return [];
+                }
+                return Array.from(tbody.querySelectorAll('tr'))
+                    .map((tr) => ({
+                        product_id: String(tr.querySelector('.product-id')?.value || '').trim(),
+                        product_name: String(tr.querySelector('.product-name')?.value || '').trim(),
+                        unit: String(tr.querySelector('.product-unit')?.value || '').trim(),
+                        unit_price: String(tr.querySelector('.product-price')?.value || '').replace(/\D/g, ''),
+                    }))
+                    .filter((item) => item.product_id !== '' && item.product_name !== '');
+            }
+
+            useSharedItemsToggle?.addEventListener('change', () => {
+                if (sharedItemsWrap) {
+                    sharedItemsWrap.style.display = sharedItemsActive() ? 'block' : 'none';
+                }
+                if (sharedItemsActive() && (sharedItemsTable?.querySelector('tbody')?.children.length || 0) === 0) {
+                    addSharedItemRow();
+                }
+            });
+            sharedAddItemBtn?.addEventListener('click', () => addSharedItemRow());
+            sharedApplyBtn?.addEventListener('click', () => {
+                const template = collectSharedItems();
+                if (template.length === 0) {
+                    return;
+                }
+                document.querySelectorAll('.school-item-card').forEach((card) => {
+                    const uid = String(card.getAttribute('data-location-uid') || '');
+                    const tbody = card.querySelector('tbody');
+                    if (!tbody || uid === '') {
+                        return;
+                    }
+                    tbody.innerHTML = '';
+                    template.forEach((shared) => addSchoolItemRow(card, uid, {
+                        product_id: shared.product_id,
+                        product_name: shared.product_name,
+                        unit: shared.unit,
+                        unit_price: shared.unit_price,
+                        quantity: '',
+                    }));
+                });
+            });
+
             function renderSchoolItemCards() {
                 if (!schoolItemCards) {
                     return;
@@ -1053,7 +1171,18 @@
                     if (schoolName !== '') {
                         activeCardCount += 1;
                         if (!Array.isArray(items) || items.length === 0) {
-                            addSchoolItemRow(card, uid);
+                            const sharedTemplate = sharedItemsActive() ? collectSharedItems() : [];
+                            if (sharedTemplate.length > 0) {
+                                sharedTemplate.forEach((shared) => addSchoolItemRow(card, uid, {
+                                    product_id: shared.product_id,
+                                    product_name: shared.product_name,
+                                    unit: shared.unit,
+                                    unit_price: shared.unit_price,
+                                    quantity: '',
+                                }));
+                            } else {
+                                addSchoolItemRow(card, uid);
+                            }
                         } else {
                             items.forEach((item) => addSchoolItemRow(card, uid, item || {}));
                         }
