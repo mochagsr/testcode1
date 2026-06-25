@@ -350,7 +350,7 @@ class SchoolBulkTransactionPageController extends Controller
         ]);
     }
 
-    public function generateInvoices(Request $request, SchoolBulkTransaction $schoolBulkTransaction): RedirectResponse
+    public function generateDeliveryNotes(Request $request, SchoolBulkTransaction $schoolBulkTransaction): RedirectResponse
     {
         $data = $request->validate([
             'note_date' => FluentRule::date()->nullable(),
@@ -478,9 +478,28 @@ class SchoolBulkTransactionPageController extends Controller
             }
 
             $createdNumbers = [];
+            $itemRows = [];
+            $mutationRows = [];
+            $decrementByProduct = [];
+            $now = now();
+            $actorId = auth()->id();
+            $actorName = auth()->user()?->name;
+
+            // Pre-compute the delivery-note number sequence once (instead of a
+            // locking query per location); we are already inside the locked txn.
+            $notePrefix = 'SJ-'.$noteDate->format('dmY');
+            $lastNoteNumber = DeliveryNote::query()
+                ->whereDate('note_date', $noteDate->toDateString())
+                ->where('note_number', 'like', $notePrefix.'-%')
+                ->lockForUpdate()
+                ->max('note_number');
+            $noteSequence = 1;
+            if (is_string($lastNoteNumber) && preg_match('/-(\d{4})$/', $lastNoteNumber, $seqMatch) === 1) {
+                $noteSequence = ((int) $seqMatch[1]) + 1;
+            }
+
             foreach ($targetLocations as $location) {
-                $noteNumber = $this->generateDeliveryNoteNumber($noteDate->toDateString());
-                $locationItems = $resolveItemsForLocation($location);
+                $noteNumber = sprintf('%s-%04d', $notePrefix, $noteSequence++);
 
                 $deliveryNote = DeliveryNote::create([
                     'note_number' => $noteNumber,
@@ -495,17 +514,17 @@ class SchoolBulkTransactionPageController extends Controller
                     'city' => $location->city ?: null,
                     'address' => $location->address ?: null,
                     'notes' => __('school_bulk.generated_from_bulk', ['number' => $transaction->transaction_number]),
-                    'created_by_name' => auth()->user()?->name,
+                    'created_by_name' => $actorName,
                 ]);
 
-                foreach ($locationItems as $item) {
+                foreach ($resolveItemsForLocation($location) as $item) {
                     $product = $products->get((int) $item->product_id);
                     if (! $product) {
                         continue;
                     }
                     $quantity = max(1, (int) $item->quantity);
 
-                    DeliveryNoteItem::create([
+                    $itemRows[] = [
                         'delivery_note_id' => $deliveryNote->id,
                         'product_id' => $product->id,
                         'product_code' => $product->code,
@@ -514,11 +533,11 @@ class SchoolBulkTransactionPageController extends Controller
                         'quantity' => $quantity,
                         'unit_price' => $item->unit_price !== null ? (int) round((float) $item->unit_price) : null,
                         'notes' => $item->notes,
-                    ]);
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
 
-                    $product->decrement('stock', $quantity);
-
-                    StockMutation::create([
+                    $mutationRows[] = [
                         'product_id' => $product->id,
                         'reference_type' => DeliveryNote::class,
                         'reference_id' => $deliveryNote->id,
@@ -528,11 +547,29 @@ class SchoolBulkTransactionPageController extends Controller
                             'bulk' => $transaction->transaction_number,
                             'delivery' => $deliveryNote->note_number,
                         ]),
-                        'created_by_user_id' => auth()->id(),
-                    ]);
+                        'created_by_user_id' => $actorId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+
+                    $decrementByProduct[(int) $product->id] = ((int) ($decrementByProduct[(int) $product->id] ?? 0)) + $quantity;
                 }
 
                 $createdNumbers[] = $deliveryNote->note_number;
+            }
+
+            // Bulk insert line items & stock mutations, then decrement stock once
+            // per product. DeliveryNoteItem/StockMutation have no model observers,
+            // so bulk insert is side-effect free; the per-product decrement uses
+            // the model instance so the Product audit observer still fires.
+            foreach (array_chunk($itemRows, 500) as $chunk) {
+                DeliveryNoteItem::insert($chunk);
+            }
+            foreach (array_chunk($mutationRows, 500) as $chunk) {
+                StockMutation::insert($chunk);
+            }
+            foreach ($decrementByProduct as $productId => $totalQty) {
+                $products->get($productId)?->decrement('stock', (int) $totalQty);
             }
 
             return [
@@ -731,23 +768,5 @@ class SchoolBulkTransactionPageController extends Controller
         }
 
         return (float) round((float) ($product->price_general ?? 0));
-    }
-
-    private function generateDeliveryNoteNumber(string $noteDate): string
-    {
-        $date = Carbon::parse($noteDate);
-        $prefix = 'SJ-'.$date->format('dmY');
-        $lastNumber = DeliveryNote::query()
-            ->whereDate('note_date', $date->toDateString())
-            ->where('note_number', 'like', $prefix.'-%')
-            ->lockForUpdate()
-            ->max('note_number');
-
-        $sequence = 1;
-        if (is_string($lastNumber) && preg_match('/-(\d{4})$/', $lastNumber, $matches) === 1) {
-            $sequence = ((int) $matches[1]) + 1;
-        }
-
-        return sprintf('%s-%04d', $prefix, $sequence);
     }
 }

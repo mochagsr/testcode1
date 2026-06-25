@@ -63,7 +63,7 @@
             </div>
         </div>
         <p class="muted" style="margin: 8px 0 0;">{{ __('school_bulk.generate_delivery_notes_help') }}</p>
-        <form method="post" action="{{ route('school-bulk-transactions.generate-invoices', $transaction) }}" class="row" style="margin-top: 10px;">
+        <form method="post" action="{{ route('school-bulk-transactions.generate-delivery-notes', $transaction) }}" class="row" style="margin-top: 10px;">
             @csrf
             <input type="hidden" name="_idempotency_key" value="{{ 'bulk-generate-'.$transaction->id.'-'.now()->timestamp }}">
             <div class="col-3">

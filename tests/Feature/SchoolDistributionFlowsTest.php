@@ -534,7 +534,7 @@ class SchoolDistributionFlowsTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('school-bulk-transactions.generate-invoices', $transaction), [
+            ->post(route('school-bulk-transactions.generate-delivery-notes', $transaction), [
                 'note_date' => '2026-05-10',
             ])
             ->assertRedirect(route('school-bulk-transactions.show', $transaction));
@@ -713,7 +713,7 @@ class SchoolDistributionFlowsTest extends TestCase
         ]);
 
         $firstResponse = $this->actingAs($user)->post(
-            route('school-bulk-transactions.generate-invoices', $transaction),
+            route('school-bulk-transactions.generate-delivery-notes', $transaction),
             [
                 '_idempotency_key' => 'bulk-generate-first',
                 'note_date' => '2026-02-20',
@@ -756,7 +756,7 @@ class SchoolDistributionFlowsTest extends TestCase
             ->assertSee(__('school_bulk.pending_schools').': 0');
 
         $secondResponse = $this->actingAs($user)->post(
-            route('school-bulk-transactions.generate-invoices', $transaction),
+            route('school-bulk-transactions.generate-delivery-notes', $transaction),
             [
                 '_idempotency_key' => 'bulk-generate-second',
                 'note_date' => '2026-02-20',
