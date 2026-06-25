@@ -273,6 +273,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'index'])->middleware('perm:transactions.view')->name('school-bulk-transactions.index');
     Route::get('/school-bulk-transactions/create', [SchoolBulkTransactionPageController::class, 'create'])->middleware('perm:school_bulk_transactions.create')->name('school-bulk-transactions.create');
     Route::post('/school-bulk-transactions', [SchoolBulkTransactionPageController::class, 'store'])->middleware(['semester.open', 'idempotent', 'perm:school_bulk_transactions.create'])->name('school-bulk-transactions.store');
+    Route::get('/school-bulk-transactions/{schoolBulkTransaction}/edit', [SchoolBulkTransactionPageController::class, 'edit'])->middleware('perm:school_bulk_transactions.create')->name('school-bulk-transactions.edit');
+    Route::put('/school-bulk-transactions/{schoolBulkTransaction}', [SchoolBulkTransactionPageController::class, 'update'])->middleware(['semester.open', 'idempotent', 'perm:school_bulk_transactions.create'])->name('school-bulk-transactions.update');
     Route::post('/school-bulk-transactions/{schoolBulkTransaction}/generate-delivery-notes', [SchoolBulkTransactionPageController::class, 'generateDeliveryNotes'])
         ->middleware(['perm:school_bulk_transactions.create', 'finance.unlocked', 'semester.open', 'idempotent'])
         ->name('school-bulk-transactions.generate-delivery-notes');

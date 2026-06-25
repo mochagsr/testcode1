@@ -122,8 +122,14 @@
         .product-ac-empty { padding: 8px 12px; color: #888; }
     </style>
 
-    <form method="post" action="{{ route('school-bulk-transactions.store') }}">
+    @php
+        $editTransaction = $editTransaction ?? null;
+    @endphp
+    <form method="post" action="{{ $editTransaction ? route('school-bulk-transactions.update', $editTransaction) : route('school-bulk-transactions.store') }}">
         @csrf
+        @if($editTransaction)
+            @method('PUT')
+        @endif
 
         <div class="card">
             <div class="row">
@@ -134,7 +140,7 @@
                     </label>
                     @php
                         $customerMap = $customers->keyBy('id');
-                        $oldCustomerId = (int) old('customer_id', 0);
+                        $oldCustomerId = (int) old('customer_id', $prefillCustomerId ?? 0);
                         $oldCustomerLabel = $oldCustomerId > 0 && $customerMap->has($oldCustomerId)
                             ? $customerMap[$oldCustomerId]->name.' ('.($customerMap[$oldCustomerId]->city ?: '-').')'
                             : '';
@@ -154,15 +160,15 @@
                 </div>
                 <div class="col-3">
                     <label>{{ __('txn.date') }} <span class="label-required">*</span></label>
-                    <input type="date" id="transaction-date" name="transaction_date" value="{{ old('transaction_date', now()->format('Y-m-d')) }}" required>
+                    <input type="date" id="transaction-date" name="transaction_date" value="{{ old('transaction_date', $prefillDate ?? now()->format('Y-m-d')) }}" required>
                 </div>
                 <div class="col-3">
                     <label>{{ __('txn.semester_period') }}</label>
-                    <input type="text" id="semester-period" name="semester_period" value="{{ old('semester_period', $defaultSemesterPeriod) }}">
+                    <input type="text" id="semester-period" name="semester_period" value="{{ old('semester_period', $prefillSemester ?? $defaultSemesterPeriod) }}">
                 </div>
                 <div class="col-12">
                     <label>{{ __('txn.notes') }}</label>
-                    <textarea name="notes" rows="2">{{ old('notes') }}</textarea>
+                    <textarea name="notes" rows="2">{{ old('notes', $prefillNotes ?? '') }}</textarea>
                 </div>
             </div>
         </div>
@@ -226,7 +232,7 @@
             <p class="muted" id="school-item-empty-hint" style="margin-top: 10px;">{{ __('school_bulk.fill_school_locations') }}</p>
         </div>
 
-        <button class="btn" type="submit">{{ __('school_bulk.save_bulk_transaction') }}</button>
+        <button class="btn" type="submit">{{ $editTransaction ? __('school_bulk.update_bulk_transaction') : __('school_bulk.save_bulk_transaction') }}</button>
         <a class="btn secondary" href="{{ route('school-bulk-transactions.index') }}">{{ __('txn.cancel') }}</a>
     </form>
 
@@ -267,8 +273,8 @@
             const transactionDateInput = document.getElementById('transaction-date');
             const semesterPeriodInput = document.getElementById('semester-period');
             const form = document.querySelector('form');
-            const oldLocations = @json(old('locations', []));
-            const oldLocationItems = @json(old('location_items', []));
+            const oldLocations = @json(old('locations', $prefillLocations ?? []));
+            const oldLocationItems = @json(old('location_items', $prefillLocationItems ?? []));
             let locationItemsByUid = (oldLocationItems && typeof oldLocationItems === 'object')
                 ? JSON.parse(JSON.stringify(oldLocationItems))
                 : {};

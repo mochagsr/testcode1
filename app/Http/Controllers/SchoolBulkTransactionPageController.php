@@ -104,213 +104,32 @@ class SchoolBulkTransactionPageController extends Controller
 
     public function create(): View
     {
-        $defaultSemester = $this->semesterBookService->currentSemester();
-        $oldCustomerId = (int) old('customer_id', 0);
-
-        $customers = Cache::remember(
-            AppCache::lookupCacheKey('forms.school_bulk.customers', ['limit' => 200]),
-            now()->addSeconds(60),
-            fn () => Customer::query()
-                ->onlyDeliveryFormColumns()
-                ->with('level:id,code,name')
-                ->orderBy('name')
-                ->limit(200)
-                ->get()
-        );
-        if ($oldCustomerId > 0 && ! $customers->contains('id', $oldCustomerId)) {
-            $oldCustomer = Customer::query()
-                ->onlyDeliveryFormColumns()
-                ->with('level:id,code,name')
-                ->whereKey($oldCustomerId)
-                ->first();
-            if ($oldCustomer !== null) {
-                $customers->prepend($oldCustomer);
-            }
-        }
-        $customers = $customers->unique('id')->values();
-
-        $products = Cache::remember(
-            AppCache::lookupCacheKey('forms.school_bulk.products', ['limit' => 100, 'active_only' => 1]),
-            now()->addSeconds(60),
-            fn () => Product::query()
-                ->onlyDeliveryFormColumns()
-                ->active()
-                ->orderBy('name')
-                ->limit(100)
-                ->get()
-        );
-
-        $shipLocations = collect();
-        if ($oldCustomerId > 0) {
-            $shipLocations = CustomerShipLocation::query()
-                ->select(['id', 'customer_id', 'school_name', 'recipient_phone', 'city', 'address'])
-                ->where('customer_id', $oldCustomerId)
-                ->where('is_active', true)
-                ->orderBy('school_name')
-                ->limit(20)
-                ->get();
-        }
-
-        return view('school_bulk_transactions.create', [
-            'customers' => $customers,
-            'products' => $products,
-            'shipLocations' => $shipLocations,
-            'defaultSemesterPeriod' => $defaultSemester,
-        ]);
+        return view('school_bulk_transactions.create', $this->bulkFormData((int) old('customer_id', 0)));
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
-            'transaction_date' => FluentRule::date()->required(),
-            'semester_period' => FluentRule::string()->nullable()->max(30),
-            'notes' => FluentRule::string()->nullable(),
-            'locations' => FluentRule::array()->required()->min(1),
-            'locations.*.uid' => FluentRule::string()->required()->max(50),
-            'locations.*.customer_ship_location_id' => FluentRule::integer()->nullable()->exists('customer_ship_locations', 'id'),
-            'locations.*.school_name' => FluentRule::string()->required()->max(150),
-            'locations.*.recipient_phone' => FluentRule::string()->nullable()->max(30),
-            'locations.*.city' => FluentRule::string()->nullable()->max(100),
-            'locations.*.address' => FluentRule::string()->nullable(),
-            'location_items' => FluentRule::array()->required()->min(1),
-            'location_items.*' => FluentRule::array()->required()->min(1),
-            'location_items.*.*.product_id' => FluentRule::integer()->nullable()->exists('products', 'id'),
-            'location_items.*.*.product_name' => FluentRule::string()->required()->max(200),
-            'location_items.*.*.unit' => FluentRule::string()->nullable()->max(30),
-            'location_items.*.*.quantity' => FluentRule::integer()->required()->min(1),
-            'location_items.*.*.unit_price' => FluentRule::numeric()->nullable()->min(0),
-            'location_items.*.*.notes' => FluentRule::string()->nullable(),
-        ]);
+        $data = $request->validate($this->bulkRules());
 
         $transaction = DB::transaction(function () use ($data): SchoolBulkTransaction {
             $transactionDate = Carbon::parse((string) $data['transaction_date']);
             $semesterPeriod = $this->semesterBookService->normalizeSemester((string) ($data['semester_period'] ?? ''))
                 ?? $this->semesterBookService->semesterFromDate($transactionDate->toDateString())
                 ?? $this->semesterBookService->currentSemester();
-            $transactionNumber = $this->generateTransactionNumber($transactionDate);
-            $locationRows = collect($data['locations'])->values();
-            $locationItemsMap = collect((array) ($data['location_items'] ?? []));
-            $allItemRows = $locationItemsMap
-                ->flatMap(function ($rows): Collection {
-                    return collect((array) $rows)->values();
-                })
-                ->values();
-            $customerId = (int) $data['customer_id'];
-            $customer = Customer::query()
-                ->with('level:id,code,name')
-                ->findOrFail($customerId);
-
-            $shipLocationIds = $locationRows
-                ->pluck('customer_ship_location_id')
-                ->map(fn ($id): int => (int) $id)
-                ->filter(fn (int $id): bool => $id > 0)
-                ->unique()
-                ->values();
-            $shipLocations = CustomerShipLocation::query()
-                ->where('customer_id', $customerId)
-                ->whereIn('id', $shipLocationIds->all())
-                ->get()
-                ->keyBy('id');
-            if ($shipLocationIds->count() !== $shipLocations->count()) {
-                throw ValidationException::withMessages([
-                    'locations' => __('school_bulk.invalid_ship_location_customer'),
-                ]);
-            }
-
-            $productIds = $allItemRows
-                ->pluck('product_id')
-                ->map(fn ($id): int => (int) $id)
-                ->filter(fn (int $id): bool => $id > 0)
-                ->unique()
-                ->values();
-            $products = Product::query()
-                ->onlyDeliveryFormColumns()
-                ->whereIn('id', $productIds->all())
-                ->get()
-                ->keyBy('id');
 
             $transaction = SchoolBulkTransaction::create([
-                'transaction_number' => $transactionNumber,
+                'transaction_number' => $this->generateTransactionNumber($transactionDate),
                 'transaction_date' => $transactionDate->toDateString(),
-                'customer_id' => $customerId,
+                'customer_id' => (int) $data['customer_id'],
                 'semester_period' => $semesterPeriod,
-                'total_locations' => (int) $locationRows->count(),
+                'total_locations' => count((array) ($data['locations'] ?? [])),
                 'total_items' => 0,
                 'notes' => $data['notes'] ?? null,
                 'created_by_user_id' => auth()->id(),
             ]);
 
-            $totalItems = 0;
-            $defaultLocationItemRows = $locationItemsMap
-                ->values()
-                ->map(fn ($rows): Collection => collect((array) $rows)->values())
-                ->first(fn (Collection $rows): bool => $rows->isNotEmpty(), collect());
-            $locationRows->each(function (array $row, int $index) use ($customer, $transaction, $shipLocations, $locationItemsMap, $defaultLocationItemRows, $products, &$totalItems): void {
-                $shipLocation = null;
-                $shipLocationId = (int) ($row['customer_ship_location_id'] ?? 0);
-                if ($shipLocationId > 0) {
-                    $shipLocation = $shipLocations->get($shipLocationId);
-                }
-                $uid = trim((string) ($row['uid'] ?? ''));
-                $locationItemRows = collect((array) $locationItemsMap->get($uid, []))->values();
-                if ($locationItemRows->isEmpty()) {
-                    $locationItemRows = $defaultLocationItemRows;
-                }
-                if ($locationItemRows->isEmpty()) {
-                    throw ValidationException::withMessages([
-                        'location_items' => __('school_bulk.fill_items'),
-                    ]);
-                }
-
-                $schoolName = trim((string) ($row['school_name'] ?? ''));
-                $recipientPhone = trim((string) ($row['recipient_phone'] ?? ''));
-                $city = trim((string) ($row['city'] ?? ''));
-                $address = trim((string) ($row['address'] ?? ''));
-
-                $createdLocation = SchoolBulkTransactionLocation::create([
-                    'school_bulk_transaction_id' => $transaction->id,
-                    'customer_ship_location_id' => $shipLocation?->id,
-                    'school_name' => $schoolName !== '' ? $schoolName : (string) ($shipLocation?->school_name ?: '-'),
-                    'recipient_name' => null,
-                    'recipient_phone' => $recipientPhone !== '' ? $recipientPhone : ($shipLocation?->recipient_phone ?: null),
-                    'city' => $city !== '' ? $city : ($shipLocation?->city ?: null),
-                    'address' => $address !== '' ? $address : ($shipLocation?->address ?: null),
-                    'sort_order' => $index,
-                ]);
-
-                $locationItemRows->each(function (array $itemRow, int $itemIndex) use ($customer, $transaction, $products, $createdLocation, &$totalItems): void {
-                    $productId = (int) ($itemRow['product_id'] ?? 0);
-                    $product = $productId > 0 ? $products->get($productId) : null;
-                    $productName = trim((string) ($itemRow['product_name'] ?? ''));
-                    $unit = trim((string) ($itemRow['unit'] ?? ''));
-                    $unitPriceInput = $itemRow['unit_price'] ?? null;
-                    $unitPrice = $unitPriceInput === null || $unitPriceInput === ''
-                        ? null
-                        : (int) round((float) $unitPriceInput);
-                    if ($unitPrice === null && $product !== null) {
-                        $unitPrice = (int) $this->resolvePriceByCustomerLevel($product, $customer);
-                    }
-
-                    SchoolBulkTransactionItem::create([
-                        'school_bulk_transaction_id' => $transaction->id,
-                        'school_bulk_transaction_location_id' => $createdLocation->id,
-                        'product_id' => $product?->id,
-                        'product_code' => $product?->code,
-                        'product_name' => $productName !== '' ? $productName : (string) ($product?->name ?: '-'),
-                        'unit' => $unit !== '' ? $unit : ($product?->unit ?: null),
-                        'quantity' => max(1, (int) ($itemRow['quantity'] ?? 1)),
-                        'unit_price' => $unitPrice,
-                        'notes' => $itemRow['notes'] ?? null,
-                        'sort_order' => $itemIndex,
-                    ]);
-                    $totalItems++;
-                });
-            });
-
-            $transaction->update([
-                'total_items' => $totalItems,
-            ]);
+            $totalItems = $this->syncBulkLocationsAndItems($transaction, $data);
+            $transaction->update(['total_items' => $totalItems]);
 
             return $transaction;
         });
@@ -326,6 +145,113 @@ class SchoolBulkTransactionPageController extends Controller
         return redirect()
             ->route('school-bulk-transactions.show', $transaction)
             ->with('success', __('school_bulk.bulk_transaction_created', ['number' => $transaction->transaction_number]));
+    }
+
+    public function edit(SchoolBulkTransaction $schoolBulkTransaction): View|RedirectResponse
+    {
+        if ($this->hasGeneratedDocuments($schoolBulkTransaction)) {
+            return redirect()
+                ->route('school-bulk-transactions.show', $schoolBulkTransaction)
+                ->with('error', __('school_bulk.bulk_transaction_edit_blocked'));
+        }
+
+        $schoolBulkTransaction->load(['locations', 'items']);
+        $itemsByLocation = $schoolBulkTransaction->items
+            ->groupBy(fn (SchoolBulkTransactionItem $item): int => (int) ($item->school_bulk_transaction_location_id ?? 0));
+
+        $prefillLocations = [];
+        $prefillLocationItems = [];
+        foreach ($schoolBulkTransaction->locations as $location) {
+            $uid = 'loc-'.$location->id;
+            $prefillLocations[] = [
+                'uid' => $uid,
+                'customer_ship_location_id' => $location->customer_ship_location_id ? (string) $location->customer_ship_location_id : '',
+                'school_name' => (string) $location->school_name,
+                'recipient_phone' => (string) ($location->recipient_phone ?? ''),
+                'city' => (string) ($location->city ?? ''),
+                'address' => (string) ($location->address ?? ''),
+            ];
+            $prefillLocationItems[$uid] = collect($itemsByLocation->get((int) $location->id, []))
+                ->map(fn (SchoolBulkTransactionItem $item): array => [
+                    'product_id' => $item->product_id ? (string) $item->product_id : '',
+                    'product_name' => (string) $item->product_name,
+                    'quantity' => (string) $item->quantity,
+                    'unit' => (string) ($item->unit ?? ''),
+                    'unit_price' => $item->unit_price !== null ? (string) $item->unit_price : '',
+                    'notes' => (string) ($item->notes ?? ''),
+                ])
+                ->values()
+                ->all();
+        }
+
+        return view('school_bulk_transactions.create', array_merge(
+            $this->bulkFormData((int) $schoolBulkTransaction->customer_id),
+            [
+                'editTransaction' => $schoolBulkTransaction,
+                'prefillCustomerId' => (int) $schoolBulkTransaction->customer_id,
+                'prefillDate' => optional($schoolBulkTransaction->transaction_date)->format('Y-m-d'),
+                'prefillSemester' => (string) $schoolBulkTransaction->semester_period,
+                'prefillNotes' => (string) ($schoolBulkTransaction->notes ?? ''),
+                'prefillLocations' => $prefillLocations,
+                'prefillLocationItems' => $prefillLocationItems,
+            ]
+        ));
+    }
+
+    public function update(Request $request, SchoolBulkTransaction $schoolBulkTransaction): RedirectResponse
+    {
+        if ($this->hasGeneratedDocuments($schoolBulkTransaction)) {
+            return back()->with('error', __('school_bulk.bulk_transaction_edit_blocked'));
+        }
+
+        $data = $request->validate($this->bulkRules());
+
+        $transaction = DB::transaction(function () use ($schoolBulkTransaction, $data): SchoolBulkTransaction {
+            $transaction = SchoolBulkTransaction::query()
+                ->whereKey($schoolBulkTransaction->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($this->hasGeneratedDocuments($transaction)) {
+                throw ValidationException::withMessages([
+                    'locations' => __('school_bulk.bulk_transaction_edit_blocked'),
+                ]);
+            }
+
+            $transactionDate = Carbon::parse((string) $data['transaction_date']);
+            $semesterPeriod = $this->semesterBookService->normalizeSemester((string) ($data['semester_period'] ?? ''))
+                ?? $this->semesterBookService->semesterFromDate($transactionDate->toDateString())
+                ?? $this->semesterBookService->currentSemester();
+
+            $transaction->items()->delete();
+            $transaction->locations()->delete();
+
+            $transaction->update([
+                'transaction_date' => $transactionDate->toDateString(),
+                'customer_id' => (int) $data['customer_id'],
+                'semester_period' => $semesterPeriod,
+                'total_locations' => count((array) ($data['locations'] ?? [])),
+                'total_items' => 0,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            $totalItems = $this->syncBulkLocationsAndItems($transaction, $data);
+            $transaction->update(['total_items' => $totalItems]);
+
+            return $transaction;
+        });
+
+        $this->auditLogService->log(
+            'school.bulk.update',
+            $transaction,
+            __('school_bulk.audit_bulk_updated', ['number' => $transaction->transaction_number]),
+            $request
+        );
+        AppCache::bumpLookupVersion();
+
+        return redirect()
+            ->route('school-bulk-transactions.show', $transaction)
+            ->with('success', __('school_bulk.bulk_transaction_updated', ['number' => $transaction->transaction_number]));
     }
 
     public function show(SchoolBulkTransaction $schoolBulkTransaction): View
@@ -602,10 +528,8 @@ class SchoolBulkTransactionPageController extends Controller
     public function destroy(Request $request, SchoolBulkTransaction $schoolBulkTransaction): RedirectResponse
     {
         $deletedNumber = (string) $schoolBulkTransaction->transaction_number;
-        $hasGeneratedDocuments = $schoolBulkTransaction->generatedDeliveryNotes()->exists()
-            || $schoolBulkTransaction->generatedInvoices()->withTrashed()->exists();
 
-        if ($hasGeneratedDocuments) {
+        if ($this->hasGeneratedDocuments($schoolBulkTransaction)) {
             return back()->with('error', __('school_bulk.bulk_transaction_delete_blocked'));
         }
 
@@ -734,6 +658,216 @@ class SchoolBulkTransactionPageController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function bulkRules(): array
+    {
+        return [
+            'customer_id' => FluentRule::integer()->required()->exists('customers', 'id'),
+            'transaction_date' => FluentRule::date()->required(),
+            'semester_period' => FluentRule::string()->nullable()->max(30),
+            'notes' => FluentRule::string()->nullable(),
+            'locations' => FluentRule::array()->required()->min(1),
+            'locations.*.uid' => FluentRule::string()->required()->max(50),
+            'locations.*.customer_ship_location_id' => FluentRule::integer()->nullable()->exists('customer_ship_locations', 'id'),
+            'locations.*.school_name' => FluentRule::string()->required()->max(150),
+            'locations.*.recipient_phone' => FluentRule::string()->nullable()->max(30),
+            'locations.*.city' => FluentRule::string()->nullable()->max(100),
+            'locations.*.address' => FluentRule::string()->nullable(),
+            'location_items' => FluentRule::array()->required()->min(1),
+            'location_items.*' => FluentRule::array()->required()->min(1),
+            'location_items.*.*.product_id' => FluentRule::integer()->nullable()->exists('products', 'id'),
+            'location_items.*.*.product_name' => FluentRule::string()->required()->max(200),
+            'location_items.*.*.unit' => FluentRule::string()->nullable()->max(30),
+            'location_items.*.*.quantity' => FluentRule::integer()->required()->min(1),
+            'location_items.*.*.unit_price' => FluentRule::numeric()->nullable()->min(0),
+            'location_items.*.*.notes' => FluentRule::string()->nullable(),
+        ];
+    }
+
+    private function hasGeneratedDocuments(SchoolBulkTransaction $transaction): bool
+    {
+        return $transaction->generatedDeliveryNotes()->exists()
+            || $transaction->generatedInvoices()->withTrashed()->exists();
+    }
+
+    /**
+     * Shared form data (customers, products, ship locations) for create & edit.
+     *
+     * @return array<string, mixed>
+     */
+    private function bulkFormData(int $selectedCustomerId): array
+    {
+        $customers = Cache::remember(
+            AppCache::lookupCacheKey('forms.school_bulk.customers', ['limit' => 200]),
+            now()->addSeconds(60),
+            fn () => Customer::query()
+                ->onlyDeliveryFormColumns()
+                ->with('level:id,code,name')
+                ->orderBy('name')
+                ->limit(200)
+                ->get()
+        );
+        if ($selectedCustomerId > 0 && ! $customers->contains('id', $selectedCustomerId)) {
+            $selectedCustomer = Customer::query()
+                ->onlyDeliveryFormColumns()
+                ->with('level:id,code,name')
+                ->whereKey($selectedCustomerId)
+                ->first();
+            if ($selectedCustomer !== null) {
+                $customers->prepend($selectedCustomer);
+            }
+        }
+        $customers = $customers->unique('id')->values();
+
+        $products = Cache::remember(
+            AppCache::lookupCacheKey('forms.school_bulk.products', ['limit' => 100, 'active_only' => 1]),
+            now()->addSeconds(60),
+            fn () => Product::query()
+                ->onlyDeliveryFormColumns()
+                ->active()
+                ->orderBy('name')
+                ->limit(100)
+                ->get()
+        );
+
+        $shipLocations = collect();
+        if ($selectedCustomerId > 0) {
+            $shipLocations = CustomerShipLocation::query()
+                ->select(['id', 'customer_id', 'school_name', 'recipient_phone', 'city', 'address'])
+                ->where('customer_id', $selectedCustomerId)
+                ->where('is_active', true)
+                ->orderBy('school_name')
+                ->limit(20)
+                ->get();
+        }
+
+        return [
+            'customers' => $customers,
+            'products' => $products,
+            'shipLocations' => $shipLocations,
+            'defaultSemesterPeriod' => $this->semesterBookService->currentSemester(),
+        ];
+    }
+
+    /**
+     * Build the location + item rows for a bulk transaction from validated input.
+     * Shared by store() and update(). Returns the total item count.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function syncBulkLocationsAndItems(SchoolBulkTransaction $transaction, array $data): int
+    {
+        $locationRows = collect($data['locations'])->values();
+        $locationItemsMap = collect((array) ($data['location_items'] ?? []));
+        $allItemRows = $locationItemsMap
+            ->flatMap(fn ($rows): Collection => collect((array) $rows)->values())
+            ->values();
+        $customerId = (int) $data['customer_id'];
+        $customer = Customer::query()
+            ->with('level:id,code,name')
+            ->findOrFail($customerId);
+
+        $shipLocationIds = $locationRows
+            ->pluck('customer_ship_location_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+        $shipLocations = CustomerShipLocation::query()
+            ->where('customer_id', $customerId)
+            ->whereIn('id', $shipLocationIds->all())
+            ->get()
+            ->keyBy('id');
+        if ($shipLocationIds->count() !== $shipLocations->count()) {
+            throw ValidationException::withMessages([
+                'locations' => __('school_bulk.invalid_ship_location_customer'),
+            ]);
+        }
+
+        $productIds = $allItemRows
+            ->pluck('product_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+        $products = Product::query()
+            ->onlyDeliveryFormColumns()
+            ->whereIn('id', $productIds->all())
+            ->get()
+            ->keyBy('id');
+
+        $totalItems = 0;
+        $defaultLocationItemRows = $locationItemsMap
+            ->values()
+            ->map(fn ($rows): Collection => collect((array) $rows)->values())
+            ->first(fn (Collection $rows): bool => $rows->isNotEmpty(), collect());
+        $locationRows->each(function (array $row, int $index) use ($customer, $transaction, $shipLocations, $locationItemsMap, $defaultLocationItemRows, $products, &$totalItems): void {
+            $shipLocation = null;
+            $shipLocationId = (int) ($row['customer_ship_location_id'] ?? 0);
+            if ($shipLocationId > 0) {
+                $shipLocation = $shipLocations->get($shipLocationId);
+            }
+            $uid = trim((string) ($row['uid'] ?? ''));
+            $locationItemRows = collect((array) $locationItemsMap->get($uid, []))->values();
+            if ($locationItemRows->isEmpty()) {
+                $locationItemRows = $defaultLocationItemRows;
+            }
+            if ($locationItemRows->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'location_items' => __('school_bulk.fill_items'),
+                ]);
+            }
+
+            $schoolName = trim((string) ($row['school_name'] ?? ''));
+            $recipientPhone = trim((string) ($row['recipient_phone'] ?? ''));
+            $city = trim((string) ($row['city'] ?? ''));
+            $address = trim((string) ($row['address'] ?? ''));
+
+            $createdLocation = SchoolBulkTransactionLocation::create([
+                'school_bulk_transaction_id' => $transaction->id,
+                'customer_ship_location_id' => $shipLocation?->id,
+                'school_name' => $schoolName !== '' ? $schoolName : (string) ($shipLocation?->school_name ?: '-'),
+                'recipient_name' => null,
+                'recipient_phone' => $recipientPhone !== '' ? $recipientPhone : ($shipLocation?->recipient_phone ?: null),
+                'city' => $city !== '' ? $city : ($shipLocation?->city ?: null),
+                'address' => $address !== '' ? $address : ($shipLocation?->address ?: null),
+                'sort_order' => $index,
+            ]);
+
+            $locationItemRows->each(function (array $itemRow, int $itemIndex) use ($customer, $transaction, $products, $createdLocation, &$totalItems): void {
+                $productId = (int) ($itemRow['product_id'] ?? 0);
+                $product = $productId > 0 ? $products->get($productId) : null;
+                $productName = trim((string) ($itemRow['product_name'] ?? ''));
+                $unit = trim((string) ($itemRow['unit'] ?? ''));
+                $unitPriceInput = $itemRow['unit_price'] ?? null;
+                $unitPrice = $unitPriceInput === null || $unitPriceInput === ''
+                    ? null
+                    : (int) round((float) $unitPriceInput);
+                if ($unitPrice === null && $product !== null) {
+                    $unitPrice = (int) $this->resolvePriceByCustomerLevel($product, $customer);
+                }
+
+                SchoolBulkTransactionItem::create([
+                    'school_bulk_transaction_id' => $transaction->id,
+                    'school_bulk_transaction_location_id' => $createdLocation->id,
+                    'product_id' => $product?->id,
+                    'product_code' => $product?->code,
+                    'product_name' => $productName !== '' ? $productName : (string) ($product?->name ?: '-'),
+                    'unit' => $unit !== '' ? $unit : ($product?->unit ?: null),
+                    'quantity' => max(1, (int) ($itemRow['quantity'] ?? 1)),
+                    'unit_price' => $unitPrice,
+                    'notes' => $itemRow['notes'] ?? null,
+                    'sort_order' => $itemIndex,
+                ]);
+                $totalItems++;
+            });
+        });
+
+        return $totalItems;
     }
 
     private function generateTransactionNumber(Carbon $transactionDate): string

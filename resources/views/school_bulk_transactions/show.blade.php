@@ -8,11 +8,17 @@
             && (int) ($transaction->generated_delivery_documents_count ?? 0) === 0
             && (int) ($transaction->generated_invoice_documents_count ?? 0) === 0;
         $showDeleteBlockedAction = auth()->user()?->canAccess('school_bulk_transactions.delete') && ! $canDeleteDraft;
+        $canEditDraft = auth()->user()?->canAccess('school_bulk_transactions.create')
+            && (int) ($transaction->generated_delivery_documents_count ?? 0) === 0
+            && (int) ($transaction->generated_invoice_documents_count ?? 0) === 0;
     @endphp
     <div class="flex" style="justify-content: space-between; margin-bottom: 12px;">
         <h1 class="page-title" style="margin: 0;">{{ __('school_bulk.bulk_transaction_title') }} {{ $transaction->transaction_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('school-bulk-transactions.index') }}">{{ __('txn.back') }}</a>
+            @if($canEditDraft)
+                <a class="btn process-soft-btn" href="{{ route('school-bulk-transactions.edit', $transaction) }}">{{ __('ui.edit') }}</a>
+            @endif
             <select class="action-menu action-menu-md" onchange="if(this.value){window.open(this.value,'_blank');this.selectedIndex=0;}">
                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
                 <option value="{{ route('school-bulk-transactions.print', $transaction) }}">{{ __('txn.print') }}</option>
