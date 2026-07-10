@@ -286,6 +286,9 @@
                         {{ __('ui.bulk_delete_products') }} (<span id="product-bulk-delete-count">0</span>)
                     </button>
                 @endif
+                @if($isAdmin)
+                    <a class="btn info-btn product-action-btn" href="{{ route('products.export.full') }}">Export Data (.xlsx)</a>
+                @endif
                 @if($canImportProducts)
                     <button type="button" class="btn process-btn product-action-btn" id="product-import-open">Import Data</button>
                 @endif

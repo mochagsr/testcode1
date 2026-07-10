@@ -54,6 +54,61 @@ class MassImportController extends Controller
         ], 'Products');
     }
 
+    /**
+     * Export every product to an .xlsx that matches the import template,
+     * so the data can be re-imported as-is (e.g. when moving servers).
+     * Values are written as text to preserve codes exactly.
+     */
+    public function exportProducts(): StreamedResponse
+    {
+        $header = ['kode', 'nama', 'kategori', 'satuan', 'stok', 'harga_agen', 'harga_sales', 'harga_umum'];
+        $filename = 'export-barang-'.now('Asia/Jakarta')->format('Ymd-His').'.xlsx';
+
+        return response()->streamDownload(function () use ($header): void {
+            $spreadsheet = new Spreadsheet;
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Barang');
+            $sheet->fromArray([$header], null, 'A1');
+
+            $rowIndex = 2;
+            Product::query()
+                ->with('category:id,name')
+                ->orderBy('name')
+                ->orderBy('id')
+                ->chunk(500, function ($products) use ($sheet, &$rowIndex): void {
+                    foreach ($products as $product) {
+                        $values = [
+                            (string) $product->code,
+                            (string) $product->name,
+                            (string) ($product->category->name ?? ''),
+                            (string) $product->unit,
+                            (string) (int) $product->stock,
+                            (string) (int) $product->price_agent,
+                            (string) (int) $product->price_sales,
+                            (string) (int) $product->price_general,
+                        ];
+                        $col = 1;
+                        foreach ($values as $value) {
+                            $sheet->setCellValueExplicit([$col, $rowIndex], $value, DataType::TYPE_STRING);
+                            $col++;
+                        }
+                        $rowIndex++;
+                    }
+                });
+
+            foreach (range(1, count($header)) as $columnIndex) {
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($columnIndex))->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
     public function templateCustomers(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-customers.xlsx', [

@@ -309,6 +309,7 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/product-units/{productUnit}/edit', [ProductUnitPageController::class, 'edit'])->middleware('perm:products.edit')->name('product-units.edit');
     Route::put('/product-units/{productUnit}', [ProductUnitPageController::class, 'update'])->middleware('perm:products.edit')->name('product-units.update');
     Route::delete('/product-units/{productUnit}', [ProductUnitPageController::class, 'destroy'])->middleware('perm:products.delete')->name('product-units.destroy');
+    Route::get('/products/export/full', [MassImportController::class, 'exportProducts'])->middleware('admin')->name('products.export.full');
     Route::get('/products/import/template', [MassImportController::class, 'templateProducts'])->middleware('perm:products.import')->name('products.import.template');
     Route::post('/products/import', [MassImportController::class, 'importProducts'])->middleware('perm:products.import')->name('products.import');
     Route::post('/products/import/analyze', [MassImportController::class, 'analyzeProducts'])->middleware('perm:products.import')->name('products.import.analyze');
