@@ -1311,6 +1311,31 @@
                 min-height: 38px;
             }
         }
+        .txn-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+        .txn-modal.open {
+            display: flex;
+        }
+        .txn-modal-card {
+            width: min(1100px, 100%);
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+            border-radius: 12px;
+        }
+        .txn-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body @if($isDark) style="--bg:#111827;--surface:#111827;--card:#1F2937;--text:#F9FAFB;--muted:#9CA3AF;--border:#374151;--accent:#F9FAFB;--sidebar-bg:#1F2937;--sidebar-text:#D1D5DB;--sidebar-muted:#9CA3AF;--sidebar-hover:#2563EB;--sidebar-group-hover:rgba(37,99,235,0.12);--sidebar-group-active:rgba(37,99,235,0.18);--sidebar-group-border:rgba(37,99,235,0.35);--sidebar-group-title-active-bg:rgba(37,99,235,0.20);--sidebar-sub-text:#D1D5DB;--sidebar-sub-active:#2563EB;--sidebar-sub-active-border:#2563EB;--sidebar-active-text:#FFFFFF;--table-bg:#1F2937;--table-header-bg:#111827;--table-border:#374151;--table-border-soft:#374151;--input-bg:#111827;--link:#93c5fd;--link-hover:#bfdbfe;--btn-secondary-bg:#374151;--btn-secondary-text:#F9FAFB;--alert-success-bg:#0f2a18;--alert-success-border:#2f7f47;--alert-success-text:#d8f6e1;--alert-increase-bg:#11301f;--alert-increase-border:#4fb06e;--alert-increase-text:#d9ffe7;--alert-decrease-bg:#3a1717;--alert-decrease-border:#d86868;--alert-decrease-text:#ffd9d9;--alert-edit-bg:#3f3415;--alert-edit-border:#d3b25a;--alert-edit-text:#ffedb8;--alert-error-bg:#2d1212;--alert-error-border:#8e3333;--alert-error-text:#ffdede;--badge-neutral-bg:#2b2f36;--badge-neutral-text:#d8dee9;--badge-success-bg:#143621;--badge-success-text:#bde8cb;--badge-warning-bg:#3d2f14;--badge-warning-text:#f6d98f;--badge-danger-bg:#4b1f1f;--badge-danger-text:#ffd2d2;" @endif>

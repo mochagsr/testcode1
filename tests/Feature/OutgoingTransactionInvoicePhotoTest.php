@@ -226,5 +226,9 @@ class OutgoingTransactionInvoicePhotoTest extends TestCase
             strpos($content, 'id="admin-outgoing-edit-form"'),
             strpos($content, 'id="admin-edit-modal"'),
         );
+
+        // Without the overlay styles the modal markup just renders inline.
+        $this->assertStringContainsString('.txn-modal {', $content);
+        $this->assertStringContainsString('.txn-modal.open {', $content);
     }
 }

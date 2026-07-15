@@ -17,30 +17,9 @@
             -moz-appearance: textfield;
             appearance: textfield;
         }
-        .txn-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.45);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            padding: 16px;
-        }
-        .txn-modal.open {
-            display: flex;
-        }
+        /* Wider than the shared default: this table has more columns. */
         .txn-modal-card {
             width: min(1180px, 100%);
-            max-height: calc(100vh - 32px);
-            overflow: auto;
-            border-radius: 12px;
-        }
-        .txn-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
         }
         #admin-order-items-table {
             table-layout: fixed;

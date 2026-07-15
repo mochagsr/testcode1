@@ -8,31 +8,6 @@
         $canCancelTransactions = auth()->user()?->canAccess('delivery_notes.cancel') ?? false;
     @endphp
     <style>
-        .txn-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.45);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            padding: 16px;
-        }
-        .txn-modal.open {
-            display: flex;
-        }
-        .txn-modal-card {
-            width: min(1100px, 100%);
-            max-height: calc(100vh - 32px);
-            overflow: auto;
-            border-radius: 12px;
-        }
-        .txn-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
         #admin-delivery-items-table input[type=number].qty-input::-webkit-outer-spin-button,
         #admin-delivery-items-table input[type=number].qty-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
