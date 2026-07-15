@@ -12,6 +12,15 @@
             <label>{{ __('ui.name') }} <span class="label-required">*</span></label>
             <input id="item-category-name" type="text" name="name" value="{{ old('name', $category?->name) }}" required>
         </div>
+        <div class="col-4">
+            <label>{{ __('ui.product_type_label') }} <span class="label-required">*</span></label>
+            @php $resolvedCategoryType = old('type', $category?->type ?? \App\Models\ItemCategory::TYPE_GENERAL); @endphp
+            <select id="item-category-type" name="type" required>
+                @foreach(($typeOptions ?? \App\Models\ItemCategory::typeOptions()) as $typeKey => $typeLabel)
+                    <option value="{{ $typeKey }}" @selected($resolvedCategoryType === $typeKey)>{{ $typeLabel }}</option>
+                @endforeach
+            </select>
+        </div>
         <div class="col-12">
             <label>{{ __('ui.description') }}</label>
             <textarea name="description" rows="3">{{ old('description', $category?->description) }}</textarea>

@@ -9,7 +9,6 @@ return [
     'search_placeholder' => 'Cari nama barang / kategori / kode...',
     'stock_from_supplier' => 'Stok dari Supplier',
     'master_stock' => 'Total Stok Barang',
-    'unattributed_stock_note' => ':qty tanpa asal supplier',
     'pick_supplier_hint' => 'Pilih supplier terlebih dahulu untuk melihat kartu stok.',
     'selected_supplier' => 'Supplier Dipilih',
     'total_in' => 'Total Masuk',

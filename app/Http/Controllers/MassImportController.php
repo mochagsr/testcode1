@@ -174,8 +174,9 @@ class MassImportController extends Controller
     public function templateCategories(): StreamedResponse
     {
         return $this->downloadTemplate('template-import-item-categories.xlsx', [
-            ['kode', 'nama', 'deskripsi'],
-            ['', 'Paket SD', 'Kategori paket sekolah dasar'],
+            ['kode', 'nama', 'jenis', 'deskripsi'],
+            ['', 'Paket SD', 'umum', 'Kategori paket sekolah dasar'],
+            ['', 'Roll Web', 'bahan baku', 'Kategori bahan baku kertas'],
         ], 'ItemCategories');
     }
 
@@ -892,6 +893,7 @@ class MassImportController extends Controller
 
                 $validator = Validator::make($data, [
                     'name' => FluentRule::string()->required()->max(150),
+                    'type' => FluentRule::string()->nullable()->max(30),
                     'description' => FluentRule::string()->nullable(),
                     'code' => FluentRule::string()->nullable()->max(50),
                 ]);
@@ -904,6 +906,7 @@ class MassImportController extends Controller
 
                 $name = trim((string) $data['name']);
                 $code = $this->resolveImportCategoryCode((string) ($data['code'] ?? ''), $name);
+                $type = $this->normalizeImportCategoryType((string) ($data['type'] ?? ''));
 
                 $existing = ItemCategory::query()
                     ->where('code', $code)
@@ -913,6 +916,7 @@ class MassImportController extends Controller
                 $payload = [
                     'code' => $code,
                     'name' => $name,
+                    'type' => $type,
                     'description' => (string) ($data['description'] ?? ''),
                 ];
 
@@ -1360,6 +1364,7 @@ class MassImportController extends Controller
             'kode' => 'code',
             'nama' => 'name',
             'kategori' => 'category',
+            'jenis' => 'type',
             'satuan' => 'unit',
             'stok' => 'stock',
             'hargaagen' => 'price_agent',
@@ -1554,6 +1559,24 @@ class MassImportController extends Controller
             ->count() + 1;
 
         return sprintf('%s-%04d', $prefix, $count);
+    }
+
+    /**
+     * Map the Indonesian "jenis" column to the stored category type.
+     * Anything unrecognised (or empty) falls back to general goods.
+     */
+    private function normalizeImportCategoryType(string $rawType): string
+    {
+        $value = mb_strtolower(trim($rawType));
+        if ($value === '') {
+            return ItemCategory::TYPE_GENERAL;
+        }
+
+        $isRawMaterial = str_contains($value, 'bahan')
+            || str_contains($value, 'baku')
+            || str_contains($value, 'raw');
+
+        return $isRawMaterial ? ItemCategory::TYPE_RAW_MATERIAL : ItemCategory::TYPE_GENERAL;
     }
 
     private function resolveImportCategoryCode(string $rawCode, string $name): string

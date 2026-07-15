@@ -50,16 +50,37 @@ class SupplierStockCardSummaryTest extends TestCase
         }
     }
 
-    public function test_summary_shows_total_product_stock_and_unattributed_portion(): void
+    public function test_summary_shows_total_product_stock_column(): void
     {
         $this->seedCard();
 
         $response = $this->actingAs($this->admin)->get(route('supplier-stock-cards.index'));
 
         $response->assertOk();
-        // 10 from each supplier = 20 traced; product stock is 120 -> 100 has no supplier origin
         $response->assertSee(__('supplier_stock.master_stock'));
-        $response->assertSee(__('supplier_stock.unattributed_stock_note', ['qty' => '100']));
+        $response->assertSee('120');
+    }
+
+    public function test_summary_hides_repeated_category_and_product_by_default(): void
+    {
+        $this->seedCard();
+
+        $response = $this->actingAs($this->admin)->get(route('supplier-stock-cards.index'));
+
+        $response->assertOk();
+        // Both suppliers carry the same product: the label is printed on the first row only.
+        $this->assertSame(1, substr_count($response->getContent(), '#stock-mutations">kertas web 68gr cd</a>'));
+    }
+
+    public function test_summary_repeats_labels_when_sorted_by_supplier(): void
+    {
+        $this->seedCard();
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('supplier-stock-cards.index', ['sort' => 'supplier', 'direction' => 'asc']));
+
+        $response->assertOk();
+        $this->assertSame(2, substr_count($response->getContent(), '#stock-mutations">kertas web 68gr cd</a>'));
     }
 
     public function test_summary_can_be_searched_by_category(): void

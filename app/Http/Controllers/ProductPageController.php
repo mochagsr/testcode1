@@ -339,7 +339,7 @@ class ProductPageController extends Controller
     public function create(): View
     {
         return view('products.create', [
-            'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
+            'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name', 'type']),
             'unitOptions' => $this->configuredProductUnitOptions(),
             'defaultUnit' => $this->defaultProductUnitCode(),
             'productTypeOptions' => $this->productTypeOptions(),
@@ -396,7 +396,7 @@ class ProductPageController extends Controller
 
         return view('products.edit', [
             'product' => $product,
-            'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name']),
+            'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'code', 'name', 'type']),
             'unitOptions' => $this->configuredProductUnitOptions(),
             'defaultUnit' => $this->defaultProductUnitCode(),
             'productTypeOptions' => $this->productTypeOptions(),

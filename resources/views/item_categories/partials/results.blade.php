@@ -14,6 +14,7 @@
     <tr>
         <th><a class="sort-link" href="{{ $sortUrl('code') }}">{{ __('ui.code') }} <span class="sort-mark">{{ $sortMark('code') }}</span></a></th>
         <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('ui.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
+        <th>{{ __('ui.product_type_label') }}</th>
         <th>{{ __('ui.description') }}</th>
         <th class="action-col">{{ __('ui.actions') }}</th>
     </tr>
@@ -23,6 +24,7 @@
         <tr>
             <td>{{ $category->code }}</td>
             <td>{{ $category->name }}</td>
+            <td>{{ \App\Models\ItemCategory::typeOptions()[$category->type] ?? __('ui.product_type_general') }}</td>
             <td>{{ $category->description ?: '-' }}</td>
             <td class="action-col">
                 <div class="category-actions">
@@ -36,7 +38,7 @@
             </td>
         </tr>
     @empty
-        <tr><td colspan="4" class="muted">{{ __('ui.no_item_categories') }}</td></tr>
+        <tr><td colspan="5" class="muted">{{ __('ui.no_item_categories') }}</td></tr>
     @endforelse
     </tbody>
 </table>

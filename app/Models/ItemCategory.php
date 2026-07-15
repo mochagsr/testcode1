@@ -13,14 +13,43 @@ class ItemCategory extends Model
 {
     use HasFactory;
 
+    public const TYPE_GENERAL = 'general';
+
+    public const TYPE_RAW_MATERIAL = 'raw_material';
+
     /**
      * @var list<string>
      */
     protected $fillable = [
         'code',
         'name',
+        'type',
         'description',
     ];
+
+    /**
+     * Category types keyed by value.
+     *
+     * @return array<string, string>
+     */
+    public static function typeOptions(): array
+    {
+        return [
+            self::TYPE_GENERAL => __('ui.product_type_general'),
+            self::TYPE_RAW_MATERIAL => __('ui.product_type_raw_material'),
+        ];
+    }
+
+    /**
+     * Scope: only categories of the given product type.
+     *
+     * @param  Builder<ItemCategory>  $query
+     * @return Builder<ItemCategory>
+     */
+    public function scopeOfType(Builder $query, string $type): Builder
+    {
+        return $query->where('type', $type === self::TYPE_RAW_MATERIAL ? self::TYPE_RAW_MATERIAL : self::TYPE_GENERAL);
+    }
 
     /**
      * @return HasMany<Product, $this>
@@ -38,7 +67,7 @@ class ItemCategory extends Model
      */
     public function scopeOnlyListColumns(Builder $query): Builder
     {
-        return $query->select(['id', 'code', 'name', 'description']);
+        return $query->select(['id', 'code', 'name', 'type', 'description']);
     }
 
     /**

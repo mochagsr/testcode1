@@ -41,17 +41,32 @@
             </tr>
             </thead>
             <tbody>
+            @php
+                // Rows are grouped per product only while sorted by category/name (the default),
+                // so repeated labels can be blanked out. Other sorts interleave products.
+                $groupRepeats = ! in_array($sort, ['supplier', 'balance'], true);
+                $previousCategory = null;
+                $previousProduct = null;
+            @endphp
             @forelse($summaryPaginator as $row)
                 @php
                     $supplierId = (int) ($row['supplier_id'] ?? 0);
                     $stockBalance = (int) ($row['balance'] ?? 0);
                     $editableProductId = (int) ($row['editable_product_id'] ?? 0);
                     $rowKey = md5(($row['product_code'] ?? '').'|'.($row['product_name'] ?? '').'|'.$supplierId.'|'.$editableProductId);
+
+                    $currentCategory = (string) ($row['category_name'] ?? '-');
+                    $currentProduct = $editableProductId.'|'.((string) ($row['product_code'] ?? '')).'|'.((string) ($row['product_name'] ?? ''));
+                    $repeatCategory = $groupRepeats && $previousCategory === $currentCategory;
+                    $repeatProduct = $groupRepeats && $previousProduct === $currentProduct;
+                    $previousCategory = $currentCategory;
+                    $previousProduct = $currentProduct;
                 @endphp
                 <tr>
-                    <td>{{ $row['category_name'] ?? '-' }}</td>
+                    <td>{{ $repeatCategory ? '' : $currentCategory }}</td>
                     <td>
-                        @if($editableProductId > 0)
+                        @if($repeatProduct)
+                        @elseif($editableProductId > 0)
                             <a href="{{ route('products.mutations', ['product' => $editableProductId]) }}#stock-mutations">{{ $row['product_name'] }}</a>
                         @else
                             {{ $row['product_name'] }}
@@ -77,11 +92,6 @@
                     </td>
                     <td class="num">
                         {{ number_format((int) ($row['master_stock'] ?? 0), 0, ',', '.') }}
-                        @if((int) ($row['unattributed_stock'] ?? 0) > 0)
-                            <div class="muted" style="font-size:11px; white-space:nowrap;">
-                                {{ __('supplier_stock.unattributed_stock_note', ['qty' => number_format((int) $row['unattributed_stock'], 0, ',', '.')]) }}
-                            </div>
-                        @endif
                     </td>
                     <td class="action">
                         <button

@@ -23,6 +23,15 @@
                 <p class="form-section-note">{{ __('ui.product_info_note') }}</p>
                 <div class="row">
                     <div class="col-4">
+                        <label>{{ __('ui.product_type_label') }} <span class="label-required">*</span></label>
+                        @php $resolvedProductType = old('product_type', $product?->product_type ?? 'general'); @endphp
+                        <select id="product-type" name="product_type" required>
+                            @foreach(($productTypeOptions ?? []) as $typeKey => $typeLabel)
+                                <option value="{{ $typeKey }}" @selected($resolvedProductType === $typeKey)>{{ $typeLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-4">
                         <label>{{ __('ui.category') }} <span class="label-required">*</span></label>
                         @php
                             $categoryMap = $categories->keyBy('id');
@@ -95,15 +104,6 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-4">
-                        <label>{{ __('ui.product_type_label') }} <span class="label-required">*</span></label>
-                        @php $resolvedProductType = old('product_type', $product?->product_type ?? 'general'); @endphp
-                        <select id="product-type" name="product_type" required>
-                            @foreach(($productTypeOptions ?? []) as $typeKey => $typeLabel)
-                                <option value="{{ $typeKey }}" @selected($resolvedProductType === $typeKey)>{{ $typeLabel }}</option>
-                            @endforeach
-                        </select>
-                    </div>
                     <div class="col-8">
                         <label>{{ __('ui.name') }} <span class="label-required">*</span></label>
                         <input id="product-name" type="text" name="name" value="{{ old('name', $product?->name) }}" required>
@@ -171,6 +171,7 @@
                     'id' => (int) $category->id,
                     'code' => (string) $category->code,
                     'name' => (string) $category->name,
+                    'type' => (string) ($category->type ?: \App\Models\ItemCategory::TYPE_GENERAL),
                 ];
             })->all();
         @endphp
@@ -482,7 +483,12 @@
             const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             function getMatches(query) {
                 const q = normalize(query || '');
+                // Only offer categories that belong to the selected product type.
+                const selectedType = document.getElementById('product-type')?.value || 'general';
                 return categories.filter((category) => {
+                    if (String(category.type || 'general') !== selectedType) {
+                        return false;
+                    }
                     return normalize(categoryLabel(category)).includes(q)
                         || normalize(category.code).includes(q)
                         || normalize(category.name).includes(q);
@@ -660,8 +666,28 @@
             });
         }
 
+        function clearCategoryIfTypeMismatch() {
+            const selectedId = parseInt(categoryInput?.value || '', 10);
+            if (!selectedId) {
+                return;
+            }
+            const selected = categories.find((category) => category.id === selectedId);
+            const selectedType = productTypeSelect?.value || 'general';
+            if (selected && String(selected.type || 'general') === selectedType) {
+                return;
+            }
+            categoryInput.value = '';
+            if (categorySearchInput) {
+                categorySearchInput.value = '';
+            }
+            syncCode();
+        }
+
         if (productTypeSelect) {
-            productTypeSelect.addEventListener('change', syncPriceRequired);
+            productTypeSelect.addEventListener('change', function () {
+                syncPriceRequired();
+                clearCategoryIfTypeMismatch();
+            });
         }
         syncPriceRequired();
 

@@ -1498,8 +1498,8 @@ class SupplierStockCardPageController extends Controller
     }
 
     /**
-     * Attach the product's total stock (and the portion with no supplier origin)
-     * so the card can show why a supplier balance differs from the product stock.
+     * Attach the product's total stock so the card can be read next to the
+     * per-supplier balance without opening the product master.
      *
      * @param  Collection<int, array<string, mixed>>  $rows
      * @return Collection<int, array<string, mixed>>
@@ -1519,18 +1519,9 @@ class SupplierStockCardPageController extends Controller
                 ->whereIn('id', $productIds->all())
                 ->pluck('stock', 'id');
 
-        // Total balance traced to suppliers, per product.
-        $supplierBalanceByProductId = $rows
-            ->groupBy(fn (array $row): int => (int) ($row['editable_product_id'] ?? 0))
-            ->map(fn (Collection $group): int => (int) $group->sum(fn (array $row): int => (int) ($row['balance'] ?? 0)));
-
-        return $rows->map(function (array $row) use ($stockByProductId, $supplierBalanceByProductId): array {
+        return $rows->map(function (array $row) use ($stockByProductId): array {
             $productId = (int) ($row['editable_product_id'] ?? 0);
-            $masterStock = $productId > 0 ? (int) ($stockByProductId[$productId] ?? 0) : 0;
-            $tracedTotal = (int) ($supplierBalanceByProductId[$productId] ?? 0);
-
-            $row['master_stock'] = $masterStock;
-            $row['unattributed_stock'] = $productId > 0 ? max(0, $masterStock - $tracedTotal) : 0;
+            $row['master_stock'] = $productId > 0 ? (int) ($stockByProductId[$productId] ?? 0) : 0;
 
             return $row;
         });

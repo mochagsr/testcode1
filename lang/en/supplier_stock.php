@@ -9,7 +9,6 @@ return [
     'search_placeholder' => 'Search product / category / code...',
     'stock_from_supplier' => 'Stock From Supplier',
     'master_stock' => 'Total Product Stock',
-    'unattributed_stock_note' => ':qty without supplier origin',
     'pick_supplier_hint' => 'Select a supplier first to view stock card movements.',
     'selected_supplier' => 'Selected Supplier',
     'total_in' => 'Total In',

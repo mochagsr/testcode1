@@ -48,7 +48,7 @@ class ItemCategoryPageController extends Controller
 
     public function create(): View
     {
-        return view('item_categories.create');
+        return view('item_categories.create', ['typeOptions' => ItemCategory::typeOptions()]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -62,7 +62,10 @@ class ItemCategoryPageController extends Controller
 
     public function edit(ItemCategory $itemCategory): View
     {
-        return view('item_categories.edit', ['category' => $itemCategory]);
+        return view('item_categories.edit', [
+            'category' => $itemCategory,
+            'typeOptions' => ItemCategory::typeOptions(),
+        ]);
     }
 
     public function update(Request $request, ItemCategory $itemCategory): RedirectResponse
@@ -90,6 +93,7 @@ class ItemCategoryPageController extends Controller
         $data = $request->validate([
             'name' => FluentRule::string()->required()->max(100),
             'code' => FluentRule::string()->nullable()->max(50),
+            'type' => FluentRule::string()->required()->in([ItemCategory::TYPE_GENERAL, ItemCategory::TYPE_RAW_MATERIAL]),
             'description' => FluentRule::string()->nullable(),
         ]);
 
