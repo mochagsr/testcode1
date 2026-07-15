@@ -154,7 +154,7 @@
     </div>
 
     <div id="id-card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; align-items:center; justify-content:center;">
-        <img id="id-card-modal-image" src="" alt="{{ __('supplier_payable.supplier_invoice_photo') }}" style="max-width:25vw; max-height:25vh; width:auto; height:auto; border:2px solid #fff; border-radius:8px; background:#fff;">
+        <img id="id-card-modal-image" src="" alt="{{ __('supplier_payable.supplier_invoice_photo') }}" style="max-width:92vw; max-height:92vh; width:auto; height:auto; border:2px solid #fff; border-radius:8px; background:#fff;">
     </div>
 
     <script>
