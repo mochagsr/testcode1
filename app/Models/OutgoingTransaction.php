@@ -88,6 +88,7 @@ class OutgoingTransaction extends Model
             'supplier_id',
             'semester_period',
             'note_number',
+            'supplier_invoice_photo_path',
             'subtotal_before_tax',
             'total_tax',
             'total',

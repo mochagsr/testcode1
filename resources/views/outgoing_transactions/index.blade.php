@@ -153,7 +153,47 @@
         @include('outgoing_transactions.partials.results')
     </div>
 
+    <div id="id-card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; align-items:center; justify-content:center;">
+        <img id="id-card-modal-image" src="" alt="{{ __('supplier_payable.supplier_invoice_photo') }}" style="max-width:25vw; max-height:25vh; width:auto; height:auto; border:2px solid #fff; border-radius:8px; background:#fff;">
+    </div>
+
     <script>
+        (function () {
+            const modal = document.getElementById('id-card-modal');
+            const modalImage = document.getElementById('id-card-modal-image');
+            if (!modal || !modalImage) {
+                return;
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+                modalImage.setAttribute('src', '');
+            }
+
+            // Delegated so the buttons keep working after the AJAX filter swaps the list.
+            document.addEventListener('click', function (event) {
+                const trigger = event.target.closest('.id-card-preview-trigger');
+                if (!trigger) {
+                    return;
+                }
+                event.preventDefault();
+                const image = trigger.getAttribute('data-image');
+                if (!image) {
+                    return;
+                }
+                modalImage.setAttribute('src', image);
+                modal.style.display = 'flex';
+            });
+
+            modal.addEventListener('click', closeModal);
+            modalImage.addEventListener('click', closeModal);
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeModal();
+                }
+            });
+        })();
+
         document.addEventListener('DOMContentLoaded', function () {
             const ajax = window.PgposAutoSearch.initAjaxFilter({
                 form: 'outgoing-filter-form',

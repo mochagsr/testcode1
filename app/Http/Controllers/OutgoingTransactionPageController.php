@@ -28,6 +28,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -99,6 +100,7 @@ class OutgoingTransactionPageController extends Controller
                         'outgoing_transactions.id', 'outgoing_transactions.transaction_number',
                         'outgoing_transactions.transaction_date', 'outgoing_transactions.supplier_id',
                         'outgoing_transactions.semester_period', 'outgoing_transactions.note_number',
+                        'outgoing_transactions.supplier_invoice_photo_path',
                         'outgoing_transactions.subtotal_before_tax', 'outgoing_transactions.total_tax',
                         'outgoing_transactions.total', 'outgoing_transactions.created_by_user_id',
                     ])
@@ -510,6 +512,7 @@ class OutgoingTransactionPageController extends Controller
             'semester_period' => FluentRule::string()->nullable()->max(30),
             'supplier_id' => FluentRule::integer()->nullable()->exists('suppliers', 'id'),
             'note_number' => FluentRule::string()->nullable()->max(80),
+            'supplier_invoice_photo' => FluentRule::image()->nullable()->rule('mimes:jpg,jpeg,png,webp')->max(4096),
             'notes' => FluentRule::string()->nullable(),
             'items' => FluentRule::array()->required()->min(1),
             'items.*.product_id' => FluentRule::integer()->nullable()->exists('products', 'id'),
@@ -528,7 +531,14 @@ class OutgoingTransactionPageController extends Controller
         $auditBefore = '';
         $auditAfter = '';
 
-        DB::transaction(function () use ($outgoingTransaction, $data, &$auditBefore, &$auditAfter): void {
+        // Only replace the photo when a new one is uploaded; the previous file is
+        // removed after the transaction commits so a rollback keeps it intact.
+        $newInvoicePhotoPath = $request->hasFile('supplier_invoice_photo')
+            ? UploadedImageCompressor::storeJpeg($request->file('supplier_invoice_photo'), 'supplier_invoices')
+            : null;
+        $previousInvoicePhotoPath = (string) $outgoingTransaction->supplier_invoice_photo_path;
+
+        DB::transaction(function () use ($outgoingTransaction, $data, $newInvoicePhotoPath, &$auditBefore, &$auditAfter): void {
             $transaction = OutgoingTransaction::query()
                 ->with('items')
                 ->whereKey($outgoingTransaction->id)
@@ -751,7 +761,7 @@ class OutgoingTransactionPageController extends Controller
                 ]);
             }
 
-            $transaction->update([
+            $attributes = [
                 'transaction_date' => $transactionDate->toDateString(),
                 'semester_period' => $selectedSemester,
                 'note_number' => $data['note_number'] ?? null,
@@ -759,7 +769,13 @@ class OutgoingTransactionPageController extends Controller
                 'subtotal_before_tax' => (int) round($newSubtotalBeforeTax),
                 'total_tax' => (int) round($newTotalTax),
                 'total' => (int) round($newTotal),
-            ]);
+            ];
+
+            if ($newInvoicePhotoPath !== null) {
+                $attributes['supplier_invoice_photo_path'] = $newInvoicePhotoPath;
+            }
+
+            $transaction->update($attributes);
 
             $difference = (float) round($newTotal - $oldTotal);
             if ($difference > 0) {
@@ -797,6 +813,10 @@ class OutgoingTransactionPageController extends Controller
                 })
                 ->implode(' | ');
         });
+
+        if ($newInvoicePhotoPath !== null && $previousInvoicePhotoPath !== '' && $previousInvoicePhotoPath !== $newInvoicePhotoPath) {
+            Storage::disk('public')->delete($previousInvoicePhotoPath);
+        }
 
         $outgoingTransaction->refresh();
         $this->auditLogService->log(

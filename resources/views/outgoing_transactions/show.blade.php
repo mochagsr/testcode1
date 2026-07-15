@@ -14,6 +14,9 @@
         <h1 class="page-title" style="margin: 0;">{{ $transaction->transaction_number }}</h1>
         <div class="flex">
             <a class="btn secondary" href="{{ route('outgoing-transactions.index') }}">{{ __('txn.back') }}</a>
+            @if($canEditTransactions)
+                <button type="button" class="btn edit-btn" id="open-admin-edit-modal">{{ __('txn.edit_transaction') }}</button>
+            @endif
             @if($canRequestCorrection)
                 <a class="btn warning-btn" href="{{ route('transaction-corrections.create', ['type' => 'outgoing_transaction', 'id' => $transaction->id]) }}">Wizard Koreksi</a>
             @endif
@@ -235,11 +238,15 @@
     </div>
 
     @if($canEditTransactions)
-        <div class="card">
+        <div id="admin-edit-modal" class="txn-modal" aria-hidden="true">
+            <div class="card txn-modal-card">
             <div class="form-section">
-                <h3 class="form-section-title">{{ __('txn.edit_transaction') }}</h3>
+                <div class="txn-modal-header">
+                    <h3 class="form-section-title" style="margin: 0;">{{ __('txn.edit_transaction') }}</h3>
+                    <button type="button" class="btn secondary" id="close-admin-edit-modal">{{ __('txn.cancel') }}</button>
+                </div>
                 <p class="form-section-note">Gunakan hak akses edit transaksi ini untuk koreksi cepat. Jika perubahan perlu jejak approval, tetap gunakan Wizard Koreksi.</p>
-                <form id="admin-outgoing-edit-form" method="post" action="{{ route('outgoing-transactions.admin-update', $transaction) }}">
+                <form id="admin-outgoing-edit-form" method="post" action="{{ route('outgoing-transactions.admin-update', $transaction) }}" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')
                     <div class="row">
@@ -260,7 +267,16 @@
                             <input type="text" value="{{ $transaction->supplier?->name ?: '-' }}" disabled>
                             <input type="hidden" name="supplier_id" value="{{ (int) $transaction->supplier_id }}">
                         </div>
-                        <div class="col-12">
+                        <div class="col-6">
+                            <label>{{ __('supplier_payable.supplier_invoice_photo') }}</label>
+                            <input type="file" name="supplier_invoice_photo" accept="image/*">
+                            <small class="muted" style="display:block; margin-top:4px;">
+                                {{ $transaction->supplier_invoice_photo_path
+                                    ? __('supplier_payable.supplier_invoice_photo_replace_hint')
+                                    : __('supplier_payable.supplier_invoice_photo_add_hint') }}
+                            </small>
+                        </div>
+                        <div class="col-6">
                             <label>{{ __('txn.notes') }}</label>
                             <textarea name="notes" rows="2">{{ old('notes', $transaction->notes) }}</textarea>
                         </div>
@@ -337,7 +353,46 @@
                     </div>
                 </form>
             </div>
+            </div>
         </div>
+
+        <script>
+            (function () {
+                const modal = document.getElementById('admin-edit-modal');
+                const openBtn = document.getElementById('open-admin-edit-modal');
+                const closeBtn = document.getElementById('close-admin-edit-modal');
+                const modalCard = modal?.querySelector('.txn-modal-card');
+                if (!modal || !openBtn || !closeBtn) {
+                    return;
+                }
+
+                const closeModal = () => {
+                    modal.classList.remove('open');
+                    modal.setAttribute('aria-hidden', 'true');
+                };
+                const openModal = () => {
+                    modal.classList.add('open');
+                    modal.setAttribute('aria-hidden', 'false');
+                };
+
+                openBtn.addEventListener('click', openModal);
+                closeBtn.addEventListener('click', closeModal);
+                modal.addEventListener('click', (event) => {
+                    if (!modalCard || modalCard.contains(event.target)) {
+                        return;
+                    }
+                    closeModal();
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        closeModal();
+                    }
+                });
+                @if($errors->any())
+                openModal();
+                @endif
+            })();
+        </script>
     @endif
 
     <div id="id-card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; align-items:center; justify-content:center;">

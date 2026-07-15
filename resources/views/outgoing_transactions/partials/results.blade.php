@@ -27,13 +27,14 @@
             <div class="outgoing-scroll-wrap" style="margin-top: 10px;">
             <table class="outgoing-transactions-table mobile-stack-table">
                 <colgroup>
-                    <col style="width: 22%;">
-                    <col style="width: 11%;">
-                    <col style="width: 14%;">
-                    <col style="width: 14%;">
+                    <col style="width: 20%;">
                     <col style="width: 10%;">
-                    <col style="width: 11%;">
+                    <col style="width: 13%;">
+                    <col style="width: 12%;">
+                    <col style="width: 9%;">
                     <col style="width: 10%;">
+                    <col style="width: 9%;">
+                    <col style="width: 9%;">
                     <col style="width: 8%;">
                 </colgroup>
                 <thead>
@@ -45,6 +46,7 @@
                     <th>{{ __('txn.semester_period') }}</th>
                     <th class="num">{{ __('txn.total') }}</th>
                     <th class="num">{{ __('txn.total_weight') }}</th>
+                    <th>{{ __('supplier_payable.supplier_invoice_photo') }}</th>
                     <th class="action">{{ __('txn.action') }}</th>
                 </tr>
                 </thead>
@@ -70,6 +72,13 @@
                         <td data-label="{{ __('txn.semester_period') }}">{{ $transaction->semester_period ?: '-' }}</td>
                         <td data-label="{{ __('txn.total') }}" class="num">Rp {{ number_format((int) round((float) $transaction->total, 0), 0, ',', '.') }}</td>
                         <td data-label="{{ __('txn.total_weight') }}" class="num">{{ number_format((float) ($transaction->total_weight ?? 0), 3, ',', '.') }}</td>
+                        <td data-label="{{ __('supplier_payable.supplier_invoice_photo') }}">
+                            @if($transaction->supplier_invoice_photo_path)
+                                <a class="btn info-btn id-card-preview-trigger" href="#" data-image="{{ asset('storage/'.$transaction->supplier_invoice_photo_path) }}">{{ __('supplier_payable.view_photo') }}</a>
+                            @else
+                                <span class="muted">{{ __('supplier_payable.no_photo') }}</span>
+                            @endif
+                        </td>
                         <td data-label="{{ __('txn.action') }}" class="action">
                             <select class="action-menu action-menu-sm" onchange="if(this.value){window.open(this.value,'_blank'); this.selectedIndex=0;}">
                                 <option value="" selected disabled>{{ __('txn.action_menu') }}</option>
@@ -80,7 +89,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="muted">{{ __('txn.no_outgoing_found') }}</td></tr>
+                    <tr><td colspan="9" class="muted">{{ __('txn.no_outgoing_found') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
