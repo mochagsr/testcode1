@@ -12,7 +12,7 @@ return [
     'total_in' => 'Total In',
     'total_out' => 'Total Out',
     'total_balance' => 'Ending Balance',
-    'product_summary' => 'Per Product Summary',
+    'product_summary' => 'Per Product & Supplier Summary',
     'mutation_title' => 'Stock Card Movements',
     'description' => 'Description',
     'in' => 'In',

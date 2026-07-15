@@ -74,9 +74,22 @@
     <div id="stock-mutations" class="card">
         <h3 style="margin-top: 0;">{{ __('ui.stock_mutations_title') }}</h3>
         <p class="muted" style="margin-top: 0;">{{ __('ui.stock_mutations_note') }}</p>
+        @if(($isRawMaterial ?? false) && ($supplierOptions ?? collect())->isNotEmpty())
+            <form method="get" action="{{ route('products.mutations', $product) }}" class="flex" style="gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+                <label style="margin: 0;">{{ __('txn.supplier') }}</label>
+                <select name="supplier_id" class="action-menu action-menu-md" onchange="this.form.submit()">
+                    <option value="">{{ __('txn.all_suppliers') }}</option>
+                    @foreach($supplierOptions as $supplierOption)
+                        <option value="{{ $supplierOption->id }}" @selected((int) ($selectedSupplierId ?? 0) === (int) $supplierOption->id)>{{ $supplierOption->name }}</option>
+                    @endforeach
+                </select>
+            </form>
+        @endif
         @include('products.partials.stock_mutations_table', [
             'stockMutations' => $stockMutations,
             'mutationReferenceMap' => $mutationReferenceMap,
+            'isRawMaterial' => $isRawMaterial ?? false,
+            'mutationSupplierMap' => $mutationSupplierMap ?? [],
         ])
 
         <div style="margin-top: 12px;">

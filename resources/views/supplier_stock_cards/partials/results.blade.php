@@ -23,25 +23,22 @@
         <div class="supplier-stock-scroll-wrap">
         <table class="supplier-stock-summary-table">
             <colgroup>
-                <col style="width: 22%;">
                 <col style="width: 16%;">
                 <col style="width: 30%;">
+                <col style="width: 22%;">
                 <col style="width: 16%;">
                 <col style="width: 16%;">
             </colgroup>
             <thead>
             <tr>
-                <th><a class="sort-link" href="{{ $sortUrl('supplier') }}">{{ __('txn.supplier') }} <span class="sort-mark">{{ $sortMark('supplier') }}</span></a></th>
                 <th><a class="sort-link" href="{{ $sortUrl('category') }}">{{ __('ui.category') }} <span class="sort-mark">{{ $sortMark('category') }}</span></a></th>
                 <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('txn.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
+                <th><a class="sort-link" href="{{ $sortUrl('supplier') }}">{{ __('txn.supplier') }} <span class="sort-mark">{{ $sortMark('supplier') }}</span></a></th>
                 <th class="num"><a class="sort-link" style="justify-content:flex-end;" href="{{ $sortUrl('balance') }}">{{ __('ui.stock') }} <span class="sort-mark">{{ $sortMark('balance') }}</span></a></th>
                 <th class="action">{{ __('txn.action') }}</th>
             </tr>
             </thead>
             <tbody>
-            @php
-                $lastSupplierId = null;
-            @endphp
             @forelse($summaryPaginator as $row)
                 @php
                     $supplierId = (int) ($row['supplier_id'] ?? 0);
@@ -50,18 +47,23 @@
                     $rowKey = md5(($row['product_code'] ?? '').'|'.($row['product_name'] ?? '').'|'.$supplierId.'|'.$editableProductId);
                 @endphp
                 <tr>
+                    <td>{{ $row['category_name'] ?? '-' }}</td>
                     <td>
-                        @if($supplierId > 0 && $lastSupplierId !== $supplierId)
+                        @if($editableProductId > 0)
+                            <a href="{{ route('products.mutations', ['product' => $editableProductId]) }}#stock-mutations">{{ $row['product_name'] }}</a>
+                        @else
+                            {{ $row['product_name'] }}
+                        @endif
+                    </td>
+                    <td>
+                        @if($supplierId > 0)
                             <a href="{{ route('supplier-stock-cards.index', array_merge(request()->query(), ['supplier_id' => $supplierId])) }}">
                                 {{ $row['supplier_name'] ?? '-' }}
                             </a>
-                            @php
-                                $lastSupplierId = $supplierId;
-                            @endphp
+                        @else
+                            {{ $row['supplier_name'] ?? '-' }}
                         @endif
                     </td>
-                    <td>{{ $row['category_name'] ?? '-' }}</td>
-                    <td>{{ $row['product_name'] }}</td>
                     <td class="num">
                         <strong
                             class="js-stock-value"

@@ -12,7 +12,7 @@ return [
     'total_in' => 'Total Masuk',
     'total_out' => 'Total Keluar',
     'total_balance' => 'Saldo Akhir',
-    'product_summary' => 'Ringkasan per Barang',
+    'product_summary' => 'Ringkasan per Barang & Supplier',
     'mutation_title' => 'Mutasi Kartu Stok',
     'description' => 'Keterangan',
     'in' => 'Masuk',

@@ -14,6 +14,7 @@ use App\Models\ProductUnit;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\StockMutation;
+use App\Models\Supplier;
 use App\Services\AuditLogService;
 use App\Support\AppCache;
 use App\Support\ExcelExportStyler;
@@ -406,13 +407,25 @@ class ProductPageController extends Controller
 
     public function mutations(Request $request, Product $product): View
     {
-        [$stockMutations, $mutationReferenceMap] = $this->loadStockMutations($product);
+        // Supplier tracing only applies to raw materials; general goods never
+        // come from a supplier, so their view stays exactly as before.
+        $isRawMaterial = (string) $product->product_type === 'raw_material';
+        $selectedSupplierId = $isRawMaterial ? max(0, (int) $request->integer('supplier_id', 0)) : 0;
+
+        [$stockMutations, $mutationReferenceMap] = $this->loadStockMutations(
+            $product,
+            $selectedSupplierId > 0 ? $selectedSupplierId : null
+        );
 
         return view('products.mutations', [
             'product' => $product,
             'stockMutations' => $stockMutations,
             'mutationReferenceMap' => $mutationReferenceMap,
             'initialStock' => $this->initialStockForProduct($product),
+            'isRawMaterial' => $isRawMaterial,
+            'mutationSupplierMap' => $isRawMaterial ? $this->buildStockMutationSupplierMap($stockMutations) : [],
+            'supplierOptions' => $isRawMaterial ? $this->supplierOptionsForProduct($product) : collect(),
+            'selectedSupplierId' => $selectedSupplierId,
         ]);
     }
 
@@ -769,16 +782,139 @@ class ProductPageController extends Controller
     /**
      * @return array{0:LengthAwarePaginator,1:array<string, array{number:string, url:string}>}
      */
-    private function loadStockMutations(Product $product): array
+    private function loadStockMutations(Product $product, ?int $supplierId = null): array
     {
         $stockMutations = $product->stockMutations()
             ->with('creator:id,name')
+            ->when($supplierId !== null && $supplierId > 0, function (Builder $query) use ($supplierId): void {
+                $query->where(function (Builder $inner) use ($supplierId): void {
+                    $inner
+                        ->where(function (Builder $direct) use ($supplierId): void {
+                            $direct
+                                ->where('reference_type', Supplier::class)
+                                ->where('reference_id', $supplierId);
+                        })
+                        ->orWhere(function (Builder $viaReceipt) use ($supplierId): void {
+                            $viaReceipt
+                                ->where('reference_type', OutgoingTransaction::class)
+                                ->whereIn('reference_id', OutgoingTransaction::query()
+                                    ->where('supplier_id', $supplierId)
+                                    ->select('id'));
+                        });
+                });
+            })
             ->latest('id')
             ->paginate((int) config('pagination.default_per_page', 20), ['*'], 'mutation_page')
             ->withQueryString();
         $mutationReferenceMap = $this->buildStockMutationReferenceMap($stockMutations);
 
         return [$stockMutations, $mutationReferenceMap];
+    }
+
+    /**
+     * Map each mutation id to the supplier it originated from, when traceable:
+     * a goods receipt (OutgoingTransaction) or a supplier stock-card adjustment.
+     * Manual/import edits and customer-side movements have no supplier.
+     *
+     * @return array<int, string>
+     */
+    private function buildStockMutationSupplierMap(LengthAwarePaginator $paginator): array
+    {
+        /** @var Collection<int, StockMutation> $mutations */
+        $mutations = collect($paginator->items());
+
+        $supplierIdsByMutation = [];
+        $receiptIdsByMutation = [];
+        foreach ($mutations as $mutation) {
+            $type = (string) ($mutation->reference_type ?? '');
+            $referenceId = (int) ($mutation->reference_id ?? 0);
+            if ($referenceId <= 0) {
+                continue;
+            }
+            if ($type === Supplier::class) {
+                $supplierIdsByMutation[(int) $mutation->id] = $referenceId;
+            } elseif ($type === OutgoingTransaction::class) {
+                $receiptIdsByMutation[(int) $mutation->id] = $referenceId;
+            }
+        }
+
+        $receiptSupplierIds = [];
+        if ($receiptIdsByMutation !== []) {
+            $receiptSupplierIds = OutgoingTransaction::query()
+                ->select(['id', 'supplier_id'])
+                ->whereIn('id', array_values(array_unique($receiptIdsByMutation)))
+                ->pluck('supplier_id', 'id')
+                ->all();
+        }
+
+        $allSupplierIds = array_values(array_unique(array_filter(array_merge(
+            array_values($supplierIdsByMutation),
+            array_map(static fn ($id): int => (int) $id, array_values($receiptSupplierIds))
+        ))));
+        if ($allSupplierIds === []) {
+            return [];
+        }
+
+        $supplierNames = Supplier::query()
+            ->select(['id', 'name'])
+            ->whereIn('id', $allSupplierIds)
+            ->pluck('name', 'id')
+            ->all();
+
+        $map = [];
+        foreach ($supplierIdsByMutation as $mutationId => $supplierId) {
+            if (isset($supplierNames[$supplierId])) {
+                $map[$mutationId] = (string) $supplierNames[$supplierId];
+            }
+        }
+        foreach ($receiptIdsByMutation as $mutationId => $receiptId) {
+            $supplierId = (int) ($receiptSupplierIds[$receiptId] ?? 0);
+            if ($supplierId > 0 && isset($supplierNames[$supplierId])) {
+                $map[$mutationId] = (string) $supplierNames[$supplierId];
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Suppliers that ever moved stock for this product (receipt or adjustment).
+     *
+     * @return Collection<int, Supplier>
+     */
+    private function supplierOptionsForProduct(Product $product): Collection
+    {
+        $directSupplierIds = StockMutation::query()
+            ->where('product_id', $product->id)
+            ->where('reference_type', Supplier::class)
+            ->distinct()
+            ->pluck('reference_id')
+            ->map(static fn ($id): int => (int) $id);
+
+        $receiptSupplierIds = OutgoingTransaction::query()
+            ->whereIn('id', StockMutation::query()
+                ->where('product_id', $product->id)
+                ->where('reference_type', OutgoingTransaction::class)
+                ->select('reference_id'))
+            ->distinct()
+            ->pluck('supplier_id')
+            ->map(static fn ($id): int => (int) $id);
+
+        $supplierIds = $directSupplierIds
+            ->merge($receiptSupplierIds)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($supplierIds->isEmpty()) {
+            return collect();
+        }
+
+        return Supplier::query()
+            ->select(['id', 'name'])
+            ->whereIn('id', $supplierIds->all())
+            ->orderBy('name')
+            ->get();
     }
 
     /**

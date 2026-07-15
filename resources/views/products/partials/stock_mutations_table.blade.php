@@ -4,6 +4,9 @@
         <th>{{ __('txn.date') }}</th>
         <th>{{ __('ui.status') }}</th>
         <th>{{ __('ui.stock') }}</th>
+        @if($isRawMaterial ?? false)
+            <th>{{ __('txn.supplier') }}</th>
+        @endif
         <th>{{ __('ui.description') }}</th>
         <th>{{ __('ui.user') }}</th>
     </tr>
@@ -55,6 +58,9 @@
             <td style="font-weight: 700; color: {{ $isOut ? '#b91c1c' : '#166534' }};">
                 {{ $signedQty }}
             </td>
+            @if($isRawMaterial ?? false)
+                <td>{{ ($mutationSupplierMap ?? [])[$mutation->id] ?? '-' }}</td>
+            @endif
             <td>
                 @if($referenceLink)
                     <a href="{{ $referenceLink }}" target="_blank">{{ $referenceNumber }}</a> - {{ $description }}
@@ -66,7 +72,7 @@
         </tr>
     @empty
         <tr>
-            <td colspan="5" class="muted">{{ __('ui.stock_mutations_empty') }}</td>
+            <td colspan="{{ ($isRawMaterial ?? false) ? 6 : 5 }}" class="muted">{{ __('ui.stock_mutations_empty') }}</td>
         </tr>
     @endforelse
     </tbody>
