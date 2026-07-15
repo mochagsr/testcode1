@@ -23,18 +23,20 @@
         <div class="supplier-stock-scroll-wrap">
         <table class="supplier-stock-summary-table">
             <colgroup>
-                <col style="width: 16%;">
-                <col style="width: 30%;">
-                <col style="width: 22%;">
-                <col style="width: 16%;">
-                <col style="width: 16%;">
+                <col style="width: 14%;">
+                <col style="width: 26%;">
+                <col style="width: 20%;">
+                <col style="width: 14%;">
+                <col style="width: 14%;">
+                <col style="width: 12%;">
             </colgroup>
             <thead>
             <tr>
                 <th><a class="sort-link" href="{{ $sortUrl('category') }}">{{ __('ui.category') }} <span class="sort-mark">{{ $sortMark('category') }}</span></a></th>
                 <th><a class="sort-link" href="{{ $sortUrl('name') }}">{{ __('txn.name') }} <span class="sort-mark">{{ $sortMark('name') }}</span></a></th>
                 <th><a class="sort-link" href="{{ $sortUrl('supplier') }}">{{ __('txn.supplier') }} <span class="sort-mark">{{ $sortMark('supplier') }}</span></a></th>
-                <th class="num"><a class="sort-link" style="justify-content:flex-end;" href="{{ $sortUrl('balance') }}">{{ __('ui.stock') }} <span class="sort-mark">{{ $sortMark('balance') }}</span></a></th>
+                <th class="num"><a class="sort-link" style="justify-content:flex-end;" href="{{ $sortUrl('balance') }}">{{ __('supplier_stock.stock_from_supplier') }} <span class="sort-mark">{{ $sortMark('balance') }}</span></a></th>
+                <th class="num">{{ __('supplier_stock.master_stock') }}</th>
                 <th class="action">{{ __('txn.action') }}</th>
             </tr>
             </thead>
@@ -73,6 +75,14 @@
                             {{ number_format($stockBalance, 0, ',', '.') }}
                         </strong>
                     </td>
+                    <td class="num">
+                        {{ number_format((int) ($row['master_stock'] ?? 0), 0, ',', '.') }}
+                        @if((int) ($row['unattributed_stock'] ?? 0) > 0)
+                            <div class="muted" style="font-size:11px; white-space:nowrap;">
+                                {{ __('supplier_stock.unattributed_stock_note', ['qty' => number_format((int) $row['unattributed_stock'], 0, ',', '.')]) }}
+                            </div>
+                        @endif
+                    </td>
                     <td class="action">
                         <button
                             type="button"
@@ -91,7 +101,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="muted">{{ __('supplier_stock.no_data') }}</td></tr>
+                <tr><td colspan="6" class="muted">{{ __('supplier_stock.no_data') }}</td></tr>
             @endforelse
             </tbody>
         </table>

@@ -707,6 +707,8 @@ class SupplierStockCardPageController extends Controller
             ->values();
         $summaryRows = $this->attachEditableProductIds($summaryRows);
         [$summaryRows, $movements] = $this->attachCategoryLabels($summaryRows, $movements);
+        $summaryRows = $this->attachMasterStock($summaryRows);
+        $summaryRows = $this->filterSummaryBySearch($summaryRows, $search);
 
         $totals = [
             'qty_in' => $summaryRows->sum('qty_in'),
@@ -1466,17 +1468,72 @@ class SupplierStockCardPageController extends Controller
                 ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) === $selectedProductId)
                 ->values();
         }
-        if ($search !== '') {
-            $searchLower = mb_strtolower($search);
-            $summaryRows = $summaryRows
-                ->filter(function (array $row) use ($searchLower): bool {
-                    return str_contains(mb_strtolower((string) ($row['product_code'] ?? '')), $searchLower)
-                        || str_contains(mb_strtolower((string) ($row['product_name'] ?? '')), $searchLower);
-                })
-                ->values();
-        }
+        // Summary search is applied later (buildPageData), after category labels
+        // are attached, so the category can be searched too.
 
         return [$movements, $summaryRows];
+    }
+
+    /**
+     * Filter summary rows by category, product name or product code.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function filterSummaryBySearch(Collection $rows, string $search): Collection
+    {
+        if (trim($search) === '') {
+            return $rows;
+        }
+
+        $searchLower = mb_strtolower(trim($search));
+
+        return $rows
+            ->filter(function (array $row) use ($searchLower): bool {
+                return str_contains(mb_strtolower((string) ($row['category_name'] ?? '')), $searchLower)
+                    || str_contains(mb_strtolower((string) ($row['product_name'] ?? '')), $searchLower)
+                    || str_contains(mb_strtolower((string) ($row['product_code'] ?? '')), $searchLower);
+            })
+            ->values();
+    }
+
+    /**
+     * Attach the product's total stock (and the portion with no supplier origin)
+     * so the card can show why a supplier balance differs from the product stock.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function attachMasterStock(Collection $rows): Collection
+    {
+        $productIds = $rows
+            ->map(fn (array $row): int => (int) ($row['editable_product_id'] ?? 0))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $stockByProductId = $productIds->isEmpty()
+            ? collect()
+            : Product::query()
+                ->select(['id', 'stock'])
+                ->whereIn('id', $productIds->all())
+                ->pluck('stock', 'id');
+
+        // Total balance traced to suppliers, per product.
+        $supplierBalanceByProductId = $rows
+            ->groupBy(fn (array $row): int => (int) ($row['editable_product_id'] ?? 0))
+            ->map(fn (Collection $group): int => (int) $group->sum(fn (array $row): int => (int) ($row['balance'] ?? 0)));
+
+        return $rows->map(function (array $row) use ($stockByProductId, $supplierBalanceByProductId): array {
+            $productId = (int) ($row['editable_product_id'] ?? 0);
+            $masterStock = $productId > 0 ? (int) ($stockByProductId[$productId] ?? 0) : 0;
+            $tracedTotal = (int) ($supplierBalanceByProductId[$productId] ?? 0);
+
+            $row['master_stock'] = $masterStock;
+            $row['unattributed_stock'] = $productId > 0 ? max(0, $masterStock - $tracedTotal) : 0;
+
+            return $row;
+        });
     }
 
     /**
