@@ -136,6 +136,7 @@ Kenapa `192.168.1.7:80` dan bukan `localhost:80`: cloudflared berjalan di LXC `1
 Catatan:
 - di aaPanel, buat `Website` untuk `erpos.kiananreho.com` seperti biasa (Nginx dengar di port `80`)
 - karena TLS di-terminate Cloudflare, `APP_URL` tetap `https://...`; di tunnel cukup `Type` `HTTP` ke `192.168.1.7:80`
+- **HTTPS/mixed content sudah ditangani di app**: ERPOS memakai `trustProxies(at: '*')` di `bootstrap/app.php`, jadi header `X-Forwarded-Proto` dari tunnel dibaca dan semua `asset()`/`route()`/redirect otomatis jadi `https://` — tidak ada langkah tambahan. Kalau situs pernah menampilkan aset campur `http://` atau upload/AJAX "Failed to fetch", biasanya karena bagian ini hilang; di ERPOS sudah ada.
 - kalau app perlu jalur HTTPS internal, ganti `Type` jadi `HTTPS` dan aktifkan `No TLS Verify` di `Additional application settings` tunnel
 - semua perubahan hostname/ingress dilakukan dari dashboard; tidak ada file config di server aaPanel yang perlu diedit
 
@@ -214,19 +215,45 @@ php artisan app:about-updates-refresh
 php artisan view:cache
 ```
 
-## 7. Scheduler dan queue
+## 7. Scheduler dan queue (lewat menu aaPanel)
 
-Cron scheduler:
+Pakai menu bawaan aaPanel, bukan `crontab` manual di terminal: scheduler lewat `Cron`, queue worker lewat `Supervisor Manager`.
+
+Catatan PHP binary: di aaPanel, `php` di PATH belum tentu versi yang benar. Pakai path lengkap ke PHP 8.3, biasanya `/www/server/php/83/bin/php` (sesuaikan `83` dengan versi PHP yang kamu pasang).
+
+### 7.1. Scheduler — menu `Cron`
+
+`aaPanel` → `Cron` → `Add Task`:
+- `Task Type`: `Shell Script`
+- `Name`: `erpos schedule`
+- `Period`: `N Minutes` = `1` (tiap 1 menit)
+- `Script`:
 
 ```bash
-cd /www/wwwroot/erpos.kiananreho.com && php artisan schedule:run >> /dev/null 2>&1
+cd /www/wwwroot/erpos.kiananreho.com && /www/server/php/83/bin/php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Queue worker:
+Laravel scheduler dirancang dipanggil tiap menit; dari sini semua jadwal internal (backup, `app:about-updates-refresh`, cleanup, cek ops) berjalan sendiri.
+
+### 7.2. Queue worker — menu `Supervisor Manager`
+
+Queue worker HARUS jalan terus-menerus dan auto-restart kalau mati, jadi jangan pakai cron. Install `Supervisor Manager` dari `App Store` kalau belum ada, lalu `Add Daemon`:
+- `Name`: `erpos-queue`
+- `Run User`: `www`
+- `Run Dir`: `/www/wwwroot/erpos.kiananreho.com`
+- `Start Command`:
 
 ```bash
-cd /www/wwwroot/erpos.kiananreho.com && php artisan queue:work --stop-when-empty --tries=1 >> /dev/null 2>&1
+/www/server/php/83/bin/php artisan queue:work --tries=3 --sleep=3 --max-time=3600
 ```
+
+- `Processes`: `1` (naikkan hanya kalau antrean padat)
+
+Kenapa Supervisor, bukan cron: worker persisten memproses job seketika dan Supervisor otomatis menghidupkannya lagi kalau crash/OOM. `--max-time=3600` membuat worker restart tiap jam supaya memori bersih.
+
+Penting: **setiap selesai `git pull`/deploy**, restart worker supaya memakai kode terbaru — lewat tombol `Restart` di Supervisor Manager, atau tambahkan `php artisan queue:restart` di langkah update.
+
+Kalau kamu belum memakai queue sama sekali (semua sinkron), bagian 7.2 boleh dilewati dulu. Tapi 7.1 (scheduler) tetap wajib.
 
 ## 8. Smoke test
 
@@ -259,10 +286,12 @@ php artisan migrate --force
 php artisan optimize:clear
 php artisan app:about-updates-refresh
 php artisan view:cache
+php artisan queue:restart
 ```
 
 Catatan:
 - `app:about-updates-refresh` memperbarui daftar commit di `Sistem > About`
+- `queue:restart` membuat worker Supervisor memuat kode terbaru (lewati kalau belum pakai queue)
 - jalankan command ini setiap selesai `git pull`
 
 ## 10. Catatan penting
