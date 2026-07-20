@@ -34,6 +34,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind Cloudflare Tunnel the origin is reached over plain HTTP, so
+        // trust the forwarded headers. Without this Laravel thinks the request
+        // is HTTP and asset()/route()/redirects emit http:// URLs, causing
+        // mixed-content blocks and "Failed to fetch" on uploads/AJAX. The
+        // origin is only reachable through the tunnel, so trusting all proxies
+        // is safe here.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'admin' => EnsureAdmin::class,
             'prefs' => ApplyUserPreferences::class,
