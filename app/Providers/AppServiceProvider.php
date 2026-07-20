@@ -21,9 +21,11 @@ use App\Observers\SalesInvoiceAuditObserver;
 use App\Services\AccountingService;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogService;
+use App\Models\User;
 use App\Services\ConfigurationService;
 use App\Support\PerformanceMonitor;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -58,6 +60,16 @@ class AppServiceProvider extends ServiceProvider
 
         // Register model observers for audit logging
         $this->registerModelObservers();
+
+        // Laravel Pulse dashboard is admin-only.
+        Gate::define('viewPulse', function (?User $user): bool {
+            if ($user === null) {
+                return false;
+            }
+
+            return strtolower(trim((string) $user->role)) === 'admin'
+                || in_array('*', $user->resolvedPermissions(), true);
+        });
     }
 
     /**

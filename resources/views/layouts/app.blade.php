@@ -1388,6 +1388,9 @@
             $canUsersManage = $authUser?->canAccess('users.manage') ?? false;
             $canAuditLogsView = $authUser?->canAccess('audit_logs.view') ?? false;
             $canAboutView = $authUser !== null;
+            $canPulseView = $authUser !== null
+                && (strtolower(trim((string) $authUser->role)) === 'admin'
+                    || in_array('*', $authUser->resolvedPermissions(), true));
             $showItemsGroup = $authUser !== null;
             $showCustomersGroup = $authUser !== null;
             $showSuppliersGroup = $authUser !== null;
@@ -1395,7 +1398,7 @@
             $showTransactionsGroup = $authUser !== null;
             $showReceivablesGroup = $canReceivablesView || $canReceivablesPay;
             $showReportsGroup = $canReportsView;
-            $showSystemGroup = $canUsersManage || $canAuditLogsView || $canCorrectionApprove || $canSettingsAdmin || $canSettingsProfile || $canSemesterBulk || $canAboutView;
+            $showSystemGroup = $canUsersManage || $canAuditLogsView || $canCorrectionApprove || $canSettingsAdmin || $canSettingsProfile || $canSemesterBulk || $canAboutView || $canPulseView;
         @endphp
         <nav class="nav">
             @if($canDashboard)
@@ -1511,8 +1514,8 @@
             @endif
             @auth
                 @if($showSystemGroup)
-                    <div class="nav-group {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('archive-data.*') || request()->routeIs('about.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-group>
-                        <button type="button" class="nav-group-title {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('archive-data.*') || request()->routeIs('about.*') || request()->routeIs('settings.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_system') }}</button>
+                    <div class="nav-group {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('archive-data.*') || request()->routeIs('about.*') || request()->routeIs('settings.*') || request()->routeIs('pulse') ? 'active' : '' }}" data-nav-group>
+                        <button type="button" class="nav-group-title {{ request()->routeIs('users.*') || request()->routeIs('audit-logs.*') || request()->routeIs('approvals.*') || request()->routeIs('semester-transactions.*') || request()->routeIs('ops-health.*') || request()->routeIs('archive-data.*') || request()->routeIs('about.*') || request()->routeIs('settings.*') || request()->routeIs('pulse') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_system') }}</button>
                         <div class="nav-sub">
                         @if($canUsersManage)
                             <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'active' : '' }}">{{ __('menu.users') }}</a>
@@ -1529,6 +1532,9 @@
                         @if($canSettingsAdmin)
                             <a href="{{ route('ops-health.index') }}" class="{{ request()->routeIs('ops-health.*') ? 'active' : '' }}">Ops Health</a>
                             <a href="{{ route('archive-data.index') }}" class="{{ request()->routeIs('archive-data.*') ? 'active' : '' }}">{{ __('menu.archive_data') }}</a>
+                        @endif
+                        @if($canPulseView)
+                            <a href="{{ route('pulse') }}" class="{{ request()->routeIs('pulse') ? 'active' : '' }}">Pulse</a>
                         @endif
                         @if($canAboutView)
                             <a href="{{ route('about.index') }}" class="{{ request()->routeIs('about.*') ? 'active' : '' }}">{{ __('menu.about') }}</a>
