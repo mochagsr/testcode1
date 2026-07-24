@@ -1387,6 +1387,7 @@
             $canSemesterBulk = $authUser?->canAccess('semester.bulk') ?? false;
             $canUsersManage = $authUser?->canAccess('users.manage') ?? false;
             $canAuditLogsView = $authUser?->canAccess('audit_logs.view') ?? false;
+            $canProduksiView = $authUser?->canAccess('produksi.view') ?? false;
             $canAboutView = $authUser !== null;
             $canPulseView = $authUser !== null
                 && (strtolower(trim((string) $authUser->role)) === 'admin'
@@ -1509,6 +1510,14 @@
                     <button type="button" class="nav-group-title {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-nav-toggle>{{ __('ui.nav_reports') }}</button>
                     <div class="nav-sub">
                         <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active' : '' }}">{{ __('menu.reports') }}</a>
+                    </div>
+                </div>
+            @endif
+            @if($canProduksiView)
+                <div class="nav-group {{ request()->routeIs('produksi.*') ? 'active' : '' }}" data-nav-group>
+                    <button type="button" class="nav-group-title {{ request()->routeIs('produksi.*') ? 'active' : '' }}" data-nav-toggle>Produksi</button>
+                    <div class="nav-sub">
+                        <a href="{{ route('produksi.kalender.index') }}" class="{{ request()->routeIs('produksi.*') ? 'active' : '' }}">Kalender Produksi</a>
                     </div>
                 </div>
             @endif

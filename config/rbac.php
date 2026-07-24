@@ -92,6 +92,16 @@ return [
             'suppliers.delete',
             'suppliers.import',
         ],
+        // PPIC yang boleh kelola SPK otomatis boleh melihat kalender produksi.
+        'produksi.spk.kelola' => [
+            'produksi.view',
+        ],
+        'produksi.realisasi' => [
+            'produksi.view',
+        ],
+        'produksi.export' => [
+            'produksi.view',
+        ],
     ],
 
     'permissions' => [
@@ -167,5 +177,9 @@ return [
         'semester.bulk',
         'users.manage',
         'audit_logs.view',
+        'produksi.view',
+        'produksi.spk.kelola',
+        'produksi.realisasi',
+        'produksi.export',
     ],
 ];

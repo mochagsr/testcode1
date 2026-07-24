@@ -40,6 +40,7 @@
         'system' => 'Sistem',
         'products' => 'Barang',
         'customers' => 'Customer',
+        'produksi' => 'Kalender Produksi',
     ];
 
     $permissionDetailMap = [
@@ -174,6 +175,22 @@
             'title' => 'Menu Audit Log',
             'note' => 'Bisa membuka menu Sistem > Audit Log.',
         ],
+        'produksi.view' => [
+            'title' => 'Lihat Kalender Produksi',
+            'note' => 'Bisa membuka menu Produksi > Kalender Produksi (semua tampilan & detail SPK).',
+        ],
+        'produksi.spk.kelola' => [
+            'title' => 'Kelola SPK (PPIC)',
+            'note' => 'Bisa membuat dan mengedit SPK (rencana produksi).',
+        ],
+        'produksi.realisasi' => [
+            'title' => 'Input Realisasi (Operator)',
+            'note' => 'Bisa mengisi realisasi tiap tahap; saat Finishing selesai, jumlah jadi masuk ke stok barang umum.',
+        ],
+        'produksi.export' => [
+            'title' => 'Export Excel Produksi',
+            'note' => 'Bisa mengunduh daftar SPK terfilter ke Excel.',
+        ],
     ];
 
     $permissionUiGroupMap = [
@@ -239,6 +256,10 @@
         'users.manage' => 'system',
         'audit_logs.view' => 'system',
         'transactions.correction.approve' => 'system',
+        'produksi.view' => 'produksi',
+        'produksi.spk.kelola' => 'produksi',
+        'produksi.realisasi' => 'produksi',
+        'produksi.export' => 'produksi',
     ];
 
     $permissionGroups = collect($availablePermissions ?? [])

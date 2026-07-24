@@ -16,6 +16,7 @@ use App\Http\Controllers\DeliveryNotePageController;
 use App\Http\Controllers\DeliveryTripPageController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ItemCategoryPageController;
+use App\Http\Controllers\KalenderProduksiController;
 use App\Http\Controllers\MassImportController;
 use App\Http\Controllers\OpsHealthController;
 use App\Http\Controllers\OrderNotePageController;
@@ -431,4 +432,14 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::post('/archive-data/eligible-soft-delete', [ArchiveDataPageController::class, 'eligibleSoftDelete'])->middleware('perm:settings.admin')->name('archive-data.eligible-soft-delete');
     Route::post('/archive-data/eligible-hard-delete', [ArchiveDataPageController::class, 'eligibleHardDelete'])->middleware('perm:settings.admin')->name('archive-data.eligible-hard-delete');
     Route::get('/about', [AboutPageController::class, 'index'])->name('about.index');
+
+    // Kalender Produksi (SPK)
+    Route::get('/produksi/kalender', [KalenderProduksiController::class, 'index'])->middleware('perm:produksi.view')->name('produksi.kalender.index');
+    Route::get('/produksi/kalender/lookup', [KalenderProduksiController::class, 'lookup'])->middleware('perm:produksi.spk.kelola')->name('produksi.kalender.lookup');
+    Route::get('/produksi/kalender/export', [KalenderProduksiController::class, 'export'])->middleware('perm:produksi.export')->name('produksi.kalender.export');
+    Route::post('/produksi/spk', [KalenderProduksiController::class, 'store'])->middleware('perm:produksi.spk.kelola')->name('produksi.spk.store');
+    Route::get('/produksi/spk/{spk}', [KalenderProduksiController::class, 'show'])->middleware('perm:produksi.view')->name('produksi.spk.show');
+    Route::put('/produksi/spk/{spk}', [KalenderProduksiController::class, 'update'])->middleware('perm:produksi.spk.kelola')->name('produksi.spk.update');
+    Route::post('/produksi/spk/{spk}/realisasi', [KalenderProduksiController::class, 'storeRealisasi'])->middleware('perm:produksi.realisasi')->name('produksi.spk.realisasi');
+    Route::get('/produksi/spk/{spk}/cetak', [KalenderProduksiController::class, 'cetak'])->middleware('perm:produksi.view')->name('produksi.spk.cetak');
 });
