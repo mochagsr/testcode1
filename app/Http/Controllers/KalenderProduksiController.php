@@ -14,6 +14,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -87,6 +88,57 @@ class KalenderProduksiController extends Controller
             'canManage' => $request->user()?->canAccess('produksi.spk.kelola') ?? false,
             'canRealisasi' => $request->user()?->canAccess('produksi.realisasi') ?? false,
             'canExport' => $request->user()?->canAccess('produksi.export') ?? false,
+        ]);
+    }
+
+    public function create(): View
+    {
+        return view('produksi.kalender.create');
+    }
+
+    /**
+     * Dedicated history/list page: SPKs by deadline window (default last ~2 months,
+     * can go further back), with konsumen + status filters. Completed ones included.
+     */
+    public function riwayat(Request $request): View
+    {
+        $today = Carbon::today();
+        $from = $this->parseDate((string) $request->string('from', '')) ?? (clone $today)->subMonthsNoOverflow(2)->startOfMonth();
+        $to = $this->parseDate((string) $request->string('to', '')) ?? $today;
+        if ($from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+        $konsumen = trim((string) $request->string('konsumen', ''));
+        $status = trim((string) $request->string('status', ''));
+
+        $rows = Spk::query()
+            ->with(['stages', 'items'])
+            ->whereBetween('deadline_kirim', [$from->toDateString(), $to->toDateString()])
+            ->when($konsumen !== '', fn ($q) => $q->where('konsumen', $konsumen))
+            ->orderByDesc('deadline_kirim')
+            ->orderByDesc('id')
+            ->get()
+            ->when(in_array($status, [Spk::STATUS_ANTRE, Spk::STATUS_PROSES, Spk::STATUS_SELESAI, Spk::STATUS_TELAT], true),
+                fn (Collection $c): Collection => $c->filter(fn (Spk $s): bool => $s->computedStatus() === $status)->values());
+
+        $perPage = 30;
+        $page = max(1, (int) $request->integer('page', 1));
+        $paginator = new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return view('produksi.riwayat', [
+            'spks' => $paginator,
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'konsumen' => $konsumen,
+            'status' => $status,
+            'konsumenOptions' => Spk::query()->select('konsumen')->distinct()->orderBy('konsumen')->pluck('konsumen')->all(),
+            'canRealisasi' => $request->user()?->canAccess('produksi.realisasi') ?? false,
         ]);
     }
 
@@ -522,6 +574,19 @@ class KalenderProduksiController extends Controller
         $noSpk = $urut.'/SPK/'.$this->romanMonth((int) $date->format('n')).'/'.$date->format('Y');
 
         return [$noSpk, $urut, $semester];
+    }
+
+    private function parseDate(string $value): ?Carbon
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function romanMonth(int $month): string

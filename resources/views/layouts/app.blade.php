@@ -1517,7 +1517,8 @@
                 <div class="nav-group {{ request()->routeIs('produksi.*') ? 'active' : '' }}" data-nav-group>
                     <button type="button" class="nav-group-title {{ request()->routeIs('produksi.*') ? 'active' : '' }}" data-nav-toggle>Produksi</button>
                     <div class="nav-sub">
-                        <a href="{{ route('produksi.kalender.index') }}" class="{{ request()->routeIs('produksi.*') ? 'active' : '' }}">Kalender Produksi</a>
+                        <a href="{{ route('produksi.kalender.index') }}" class="{{ request()->routeIs('produksi.kalender.*') || request()->routeIs('produksi.spk.*') ? 'active' : '' }}">Kalender Produksi</a>
+                        <a href="{{ route('produksi.riwayat') }}" class="{{ request()->routeIs('produksi.riwayat') ? 'active' : '' }}">Riwayat SPK</a>
                     </div>
                 </div>
             @endif

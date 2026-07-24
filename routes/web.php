@@ -437,6 +437,8 @@ Route::middleware(['auth', 'prefs'])->group(function (): void {
     Route::get('/produksi/kalender', [KalenderProduksiController::class, 'index'])->middleware('perm:produksi.view')->name('produksi.kalender.index');
     Route::get('/produksi/kalender/lookup', [KalenderProduksiController::class, 'lookup'])->middleware('perm:produksi.spk.kelola')->name('produksi.kalender.lookup');
     Route::get('/produksi/kalender/export', [KalenderProduksiController::class, 'export'])->middleware('perm:produksi.export')->name('produksi.kalender.export');
+    Route::get('/produksi/riwayat', [KalenderProduksiController::class, 'riwayat'])->middleware('perm:produksi.view')->name('produksi.riwayat');
+    Route::get('/produksi/spk/create', [KalenderProduksiController::class, 'create'])->middleware('perm:produksi.spk.kelola')->name('produksi.spk.create');
     Route::post('/produksi/spk', [KalenderProduksiController::class, 'store'])->middleware('perm:produksi.spk.kelola')->name('produksi.spk.store');
     Route::get('/produksi/spk/{spk}', [KalenderProduksiController::class, 'show'])->middleware('perm:produksi.view')->name('produksi.spk.show');
     Route::put('/produksi/spk/{spk}', [KalenderProduksiController::class, 'update'])->middleware('perm:produksi.spk.kelola')->name('produksi.spk.update');

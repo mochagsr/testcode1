@@ -56,12 +56,13 @@
     .pk-tl-chip { display: block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-bottom: 3px; color: #fff; cursor: pointer; }
     .pk-tl-chip.antre { background: #7c8a9c; } .pk-tl-chip.proses { background: #e08a1e; } .pk-tl-chip.selesai { background: #3a9d63; } .pk-tl-chip.telat { background: #d24b3e; }
 
-    /* Drawer + modal: hidden by default (display:none) so nothing stray renders. */
-    .pk-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9998; display: none; }
-    .pk-overlay.open { display: block; }
-    .pk-drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(560px, 100%); background: var(--card); color: var(--text); z-index: 9999; overflow-y: auto; box-shadow: -4px 0 24px rgba(0,0,0,.25); display: none; }
-    .pk-drawer.open { display: block; }
-    .pk-modal-box { position: fixed; inset: 24px; max-width: 960px; margin: auto; background: var(--card); color: var(--text); border-radius: 12px; overflow: auto; z-index: 9999; }
+    /* Popups: display:none by default. position:fixed !important so the layout's
+       ".main > :not(script)" position:relative rule cannot pull them into flow. */
+    .pk-overlay { position: fixed !important; inset: 0; background: rgba(0,0,0,.5); z-index: 9998; display: none; }
+    .pk-overlay.open { display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; overflow-y: auto; }
+    .pk-modal-box { position: relative; width: 100%; max-width: 960px; margin: auto; background: var(--card); color: var(--text); border-radius: 12px; overflow: hidden; z-index: 9999; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    .pk-modal-box.narrow { max-width: 660px; }
+    .pk-modal-scroll { max-height: calc(100vh - 64px); overflow-y: auto; }
 
     .pk-wrap input, .pk-wrap select, .pk-wrap textarea { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; }
     .pk-wrap label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 3px; }

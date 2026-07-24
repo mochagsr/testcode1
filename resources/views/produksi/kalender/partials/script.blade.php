@@ -77,22 +77,22 @@
             .catch(() => { region.style.opacity = ''; window.location = nav.href; });
     });
 
-    // ---- Drawer ----
-    const overlay = document.getElementById('pk-drawer-overlay');
-    const drawer = document.getElementById('pk-drawer');
-    const drawerBody = document.getElementById('pk-drawer-body');
-    function openDrawer(id) {
+    // ---- Detail popup ----
+    const detailOverlay = document.getElementById('pk-detail-overlay');
+    const detailBody = document.getElementById('pk-detail-body');
+    function openDetail(id) {
+        if (!PK.showUrlTpl) return;
         fetch(PK.showUrlTpl.replace('__ID__', id), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then((r) => r.text())
-            .then((html) => { drawerBody.innerHTML = html; overlay.classList.add('open'); drawer.classList.add('open'); });
+            .then((html) => { detailBody.innerHTML = html; detailOverlay.classList.add('open'); });
     }
-    function closeDrawer() { overlay.classList.remove('open'); drawer.classList.remove('open'); }
-    if (overlay) overlay.addEventListener('click', closeDrawer);
+    function closeDetail() { detailOverlay?.classList.remove('open'); }
+    if (detailOverlay) detailOverlay.addEventListener('click', (e) => { if (e.target === detailOverlay) closeDetail(); });
 
     document.addEventListener('click', (e) => {
         const el = e.target.closest('.pk-spk-el');
-        if (el) { openDrawer(el.getAttribute('data-spk-id')); return; }
-        if (e.target.closest('.pk-drawer-close')) { closeDrawer(); return; }
+        if (el) { openDetail(el.getAttribute('data-spk-id')); return; }
+        if (e.target.closest('.pk-drawer-close')) { closeDetail(); return; }
         if (e.target.closest('#pk-toggle-realisasi')) { document.getElementById('pk-realisasi-form-wrap')?.classList.toggle('pk-hidden'); return; }
         const editBtn = e.target.closest('.pk-edit-spk');
         if (editBtn) { openModalForEdit(editBtn.getAttribute('data-spk-id')); return; }
@@ -202,21 +202,6 @@
 
     function resetForm() { form.reset(); itemsBody.innerHTML = ''; versiList.innerHTML = ''; pjList.innerHTML = ''; }
 
-    function openModalForNew() {
-        if (!form) return;
-        resetForm();
-        document.getElementById('pk-modal-title').textContent = 'Buat SPK Baru';
-        document.getElementById('pk-save-btn').textContent = 'Simpan SPK';
-        document.getElementById('pk-form-method').value = 'POST';
-        form.action = PK.storeUrl;
-        form.querySelector('[name="pakai_web"]').checked = true;
-        form.querySelector('[name="pakai_sheet"]').checked = true;
-        form.querySelector('.pk-jenis[value="penuh"]').checked = true;
-        addItemRow(); addPjRow();
-        syncBahanColumns(); syncJenis();
-        openModal();
-    }
-
     function openModalForEdit(id) {
         if (!form) return;
         const d = PK.data[id];
@@ -238,15 +223,19 @@
         (d.pj || []).forEach((p) => addPjRow(p));
         if (!(d.pj || []).length) addPjRow();
         syncBahanColumns(); syncJenis();
-        closeDrawer(); openModal();
+        closeDetail(); openModal();
     }
-    window.pkOpenEdit = openModalForEdit;
-    document.getElementById('pk-new-spk')?.addEventListener('click', openModalForNew);
 
     // ---- Init ----
     readData();
     applyTab();
     applyFilters();
-    if (PK.openId) openDrawer(PK.openId);
+    if (PK.openId) openDetail(PK.openId);
+
+    // Create page: seed one empty item + PJ row so the form is ready to fill.
+    if (form && form.getAttribute('data-mode') === 'create') {
+        addItemRow(); addPjRow();
+        syncBahanColumns(); syncJenis();
+    }
 })();
 </script>

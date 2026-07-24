@@ -171,6 +171,52 @@ class ProductionCalendarTest extends TestCase
             ->assertSee('pk-bar', false);
     }
 
+    public function test_create_page_renders_and_new_button_links_to_it(): void
+    {
+        $this->actingAs($this->admin())
+            ->get(route('produksi.kalender.index'))
+            ->assertOk()
+            ->assertSee(route('produksi.spk.create'), false);
+
+        $this->actingAs($this->admin())
+            ->get(route('produksi.spk.create'))
+            ->assertOk()
+            ->assertSee('Buat SPK Baru')
+            ->assertSee('data-mode="create"', false);
+    }
+
+    public function test_riwayat_page_lists_spk_within_range(): void
+    {
+        $this->actingAs($this->admin())->post(route('produksi.spk.store'), $this->spkPayload());
+        $this->actingAs($this->admin())->get(route('produksi.kalender.index')); // consume the create flash
+
+        $this->actingAs($this->admin())
+            ->get(route('produksi.riwayat', ['from' => '2026-07-01', 'to' => '2026-07-31']))
+            ->assertOk()
+            ->assertSee('Riwayat SPK')
+            ->assertSee('1/SPK/VII/2026');
+
+        // Outside the window it should not appear.
+        $this->actingAs($this->admin())
+            ->get(route('produksi.riwayat', ['from' => '2026-09-01', 'to' => '2026-09-30']))
+            ->assertOk()
+            ->assertSee('Tidak ada SPK')
+            ->assertDontSee('1/SPK/VII/2026');
+    }
+
+    public function test_riwayat_status_filter_keeps_only_matching(): void
+    {
+        $this->actingAs($this->admin())->post(route('produksi.spk.store'), $this->spkPayload());
+        $this->actingAs($this->admin())->get(route('produksi.kalender.index')); // consume the create flash
+
+        // The SPK is telat (deadline past, unfinished), so a "selesai" filter hides it.
+        $this->actingAs($this->admin())
+            ->get(route('produksi.riwayat', ['from' => '2026-07-01', 'to' => '2026-07-31', 'status' => 'selesai']))
+            ->assertOk()
+            ->assertSee('Tidak ada SPK')
+            ->assertDontSee('1/SPK/VII/2026');
+    }
+
     public function test_ajax_month_navigation_returns_region_fragment(): void
     {
         $this->actingAs($this->admin())

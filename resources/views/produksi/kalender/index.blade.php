@@ -8,11 +8,12 @@
     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
         <h1 class="page-title" style="margin:0;">Kalender Produksi</h1>
         <div style="display:flex; gap:8px;">
+            <a class="btn secondary" href="{{ route('produksi.riwayat') }}">Riwayat SPK</a>
             @if($canExport)
                 <a class="btn secondary" id="pk-export-btn" href="{{ route('produksi.kalender.export') }}">Excel</a>
             @endif
             @if($canManage)
-                <button type="button" class="btn" id="pk-new-spk">+ SPK Baru</button>
+                <a class="btn" href="{{ route('produksi.spk.create') }}">+ SPK Baru</a>
             @endif
         </div>
     </div>
@@ -47,9 +48,10 @@
     </div>
 </div>
 
-{{-- Drawer --}}
-<div class="pk-overlay" id="pk-drawer-overlay"></div>
-<div class="pk-drawer" id="pk-drawer"><div id="pk-drawer-body"></div></div>
+{{-- Detail popup --}}
+<div class="pk-overlay" id="pk-detail-overlay">
+    <div class="pk-wrap pk-modal-box narrow"><div class="pk-modal-scroll" id="pk-detail-body"></div></div>
+</div>
 
 @if($canManage)
     @include('produksi.kalender.partials.modal')
